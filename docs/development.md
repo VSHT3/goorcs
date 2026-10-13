@@ -31,6 +31,15 @@ godot --headless --path . --script tests/path_layout_test.gd
 
 # Run navigation and drawing-state regressions.
 godot --headless --path . --script tests/navigation_test.gd
+
+# Run collection grant and save-failure regressions.
+godot --headless --path . --script tests/collection_store_test.gd
+
+# Run chest presentation lifecycle and layout regressions.
+godot --headless --path . --script tests/chest_reveal_test.gd
+
+# Run collection-screen navigation and grant regressions.
+godot --headless --path . --script tests/chest_flow_test.gd
 ```
 
 A headless pass verifies that the project loads and runs, not that the visuals or interactions are correct. Inspect runtime errors as well as the exit status.
@@ -110,6 +119,18 @@ For manual verification, connect E to B, create a longer branch and a shortcut, 
 Also open the workshop by keyboard, draw while holding the mouse and press Esc, release outside the board, and resume. Hovering must not draw or emit mouse-button errors. Return through the Menu button and resume again; budget and route must remain unchanged.
 
 Desktop exports, combat, and internet multiplayer are not verified or implemented.
+
+## Collection and chest verification
+
+Collection unlocks are stored in `user://collection.json`, separate from unsaved workshop layouts. On Linux with the current application name, this is normally `~/.local/share/godot/app_userdata/Goorcs/collection.json`; Godot's resolved user-data path is authoritative. Use one game instance at a time for this save. There is no cloud sync or concurrent-writer coordination.
+
+Opening chooses rewards in `CollectionStore`, writes a sibling temporary file, and renames it over the previous save before committing the in-memory grant. The reveal receives that saved result and cannot change it. Unknown versions/IDs, malformed data, unreadable files, or write failures block openings with a visible error. Long error details are selectable and scrollable. Repair or move aside a damaged save and restart; the game never silently resets it. Moving the file aside starts a new collection, so preserve a copy if its unlocks matter.
+
+The commands above pass. Regressions cover count-roll boundaries, duplicate-free draws, remaining-count caps, persistence, catalog exhaustion, failed writes preserving both saved and in-memory state, malformed saves, idempotent reveal completion, one/three/five-card bounds and overlap, saved-before-reveal grants, repeated clicks/skips, and leaving/resuming mid-reveal.
+
+Graphical verification exercised real collection-screen input, natural opening/reveal completion, skipping, navigation, collection exhaustion, and a corrupt-save error. Separate game processes confirmed a saved unlock survives restarting. Inspected one- and three-reward results, a five-reward standalone reveal using an expanded test catalog, and compact collection/error surfaces. Five actual rewards remain impossible with the production three-type catalog.
+
+For manual checks, open a chest, return to the menu during its animation, resume, and restart the game. Verify the same unlocks remain, skipping does not add rewards, and completing the collection disables opening. Use an isolated save for repeatable trials; tests never modify the real collection save.
 
 ## Shareable game brief
 

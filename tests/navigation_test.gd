@@ -16,6 +16,7 @@ func _check(condition: bool, description: String) -> void:
 
 func _run() -> void:
 	main = load("res://scenes/main.tscn").instantiate()
+	main.collection_store = CollectionStore.new("user://navigation_test_%d.json" % OS.get_process_id())
 	root.add_child(main)
 	await process_frame
 	await process_frame

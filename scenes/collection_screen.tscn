@@ -1,0 +1,197 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/collection_screen.gd" id="1_collection"]
+[ext_resource type="PackedScene" path="res://scenes/chest_reveal.tscn" id="2_reveal"]
+
+[sub_resource type="StyleBoxFlat" id="StyleButton"]
+bg_color = Color(0.24, 0.34, 0.27, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.47, 0.56, 0.42, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleHover"]
+bg_color = Color(0.32, 0.43, 0.32, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878, 0.737, 0.467, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleDisabled"]
+bg_color = Color(0.16, 0.20, 0.17, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleFocus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.878, 0.737, 0.467, 1)
+
+[sub_resource type="Theme" id="ThemeCollection"]
+default_font_size = 16
+Label/colors/font_color = Color(0.90, 0.88, 0.81, 1)
+Button/colors/font_color = Color(0.95, 0.94, 0.85, 1)
+Button/colors/font_hover_color = Color(1, 0.95, 0.79, 1)
+Button/colors/font_pressed_color = Color(1, 0.95, 0.79, 1)
+Button/colors/font_disabled_color = Color(0.57, 0.63, 0.57, 1)
+Button/styles/normal = SubResource("StyleButton")
+Button/styles/hover = SubResource("StyleHover")
+Button/styles/pressed = SubResource("StyleButton")
+Button/styles/disabled = SubResource("StyleDisabled")
+Button/styles/focus = SubResource("StyleFocus")
+
+[node name="CollectionScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("ThemeCollection")
+script = ExtResource("1_collection")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.067, 0.10, 0.086, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="Content" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="Margin/Content"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Margin/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 30
+text = "GOORCS / Collection"
+
+[node name="Back" type="Button" parent="Margin/Content/Header"]
+custom_minimum_size = Vector2(120, 40)
+layout_mode = 2
+text = "Back / Esc"
+
+[node name="Subtitle" type="Label" parent="Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
+theme_override_font_sizes/font_size = 14
+text = "Your local tower archive. Open a chest to unlock something new."
+
+[node name="Workspace" type="HBoxContainer" parent="Margin/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 24
+
+[node name="Archive" type="VBoxContainer" parent="Margin/Content/Workspace"]
+custom_minimum_size = Vector2(302, 0)
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Margin/Content/Workspace/Archive"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Tower archive"
+
+[node name="Count" type="Label" parent="Margin/Content/Workspace/Archive"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="Catalog" type="VBoxContainer" parent="Margin/Content/Workspace/Archive"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Status" type="RichTextLabel" parent="Margin/Content/Workspace/Archive"]
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 14
+selection_enabled = true
+focus_mode = 2
+
+[node name="ChestPanel" type="PanelContainer" parent="Margin/Content/Workspace"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ChestContent" type="VBoxContainer" parent="Margin/Content/Workspace/ChestPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Reveal" parent="Margin/Content/Workspace/ChestPanel/ChestContent" instance=ExtResource("2_reveal")]
+custom_minimum_size = Vector2(500, 410)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Actions" type="HBoxContainer" parent="Margin/Content/Workspace/ChestPanel/ChestContent"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="Open" type="Button" parent="Margin/Content/Workspace/ChestPanel/ChestContent/Actions"]
+custom_minimum_size = Vector2(220, 42)
+layout_mode = 2
+text = "Open free chest"
+
+[node name="Skip" type="Button" parent="Margin/Content/Workspace/ChestPanel/ChestContent/Actions"]
+visible = false
+custom_minimum_size = Vector2(150, 42)
+layout_mode = 2
+text = "Skip reveal"
+
+[node name="Result" type="Label" parent="Margin/Content/Workspace/ChestPanel/ChestContent"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
+theme_override_font_sizes/font_size = 13
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Odds" type="Label" parent="Margin/Content"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+theme_override_font_sizes/font_size = 14
+text = "Provisional odds: 1 reward 80% · 3 rewards 15% · 5 rewards 5%. Only locked types, no duplicates.\nRewards are capped to the remaining locked types. With this 3-type catalog, a 5-roll grants at most 3."
+autowrap_mode = 2
+
+[node name="Scope" type="Label" parent="Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
+theme_override_font_sizes/font_size = 13
+text = "Free local collection openings. Prototype identities only; no combat or stats. Workshop layouts are separate."

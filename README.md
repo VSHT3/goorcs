@@ -4,13 +4,22 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path-building prototype with a main menu: place/remove square-grid path tiles, track a maximum budget, validate connectivity, and preview the shortest entrance-to-base route. Combat, multiplayer, progression, and final art are not implemented. No MCP plugin is installed.
+Playable local path workshop plus a persistent tower collection and animated reward chests, reached through the main menu. Combat, multiplayer, loadouts, permanent stat growth, and final art are not implemented. No MCP plugin is installed.
 
 ## Run
 
 Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.
 
 For command-line launch and verification, see the [development commands](docs/development.md#setup).
+
+## Collection and chests
+
+- Choose **Collection & chests**, then **Open free chest**. The chest shakes, opens with light and decorative coins, and reveals the actual rewards together. There is no roulette reel.
+- Unlock Arrow tower, Orc ballista, and Rune obelisk. These are collection identities with original icons, not implemented combat units.
+- Provisional reward-count odds are 80% for one, 15% for three, and 5% for five. Draws contain only locked types and are capped to those remaining; the three-type roster cannot grant five actual rewards.
+- **Skip reveal** changes only the animation. Rewards are saved before it starts; leaving and returning cannot reroll or grant them again.
+- Unlock all three types to complete the collection; further openings are disabled.
+- Collection unlocks survive restarting on this computer. Workshop layouts still last only for the running session. See [save ownership and verification](docs/development.md#collection-and-chest-verification).
 
 ## Path workshop
 
@@ -36,9 +45,10 @@ This workshop does not simulate waves, enemies, or combat-time route locking.
 ```text
 project.godot       Engine settings and main scene
 AGENTS.md          Repository editing instructions
-scenes/main.tscn    Playable path workshop
-scripts/           Path rules, board drawing/input, and UI controller
-tests/             Headless path-rule regressions
+scenes/            Main navigation, path workshop, collection, and reusable chest reveal
+scripts/           Rule owners, persistence, input, and presentation
+resources/collection/  Tower reward definitions
+tests/             Path, navigation, collection, and chest regressions
 docs/              Project documentation
 ```
 

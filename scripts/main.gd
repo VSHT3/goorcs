@@ -8,6 +8,9 @@ extends Control
 
 var layout: PathLayout
 var _workshop_opened: bool = false
+var collection_store: CollectionStore
+var collection_screen: CollectionScreen
+var _last_activity: Control
 
 @onready var board: PathBoard = $Margin/Content/Workspace/Board
 @onready var status: Label = $Margin/Content/Workspace/Sidebar/Status
@@ -28,6 +31,14 @@ func _ready() -> void:
 	open_button.pressed.connect(_open_workshop)
 	$Menu/Center/Panel/Quit.pressed.connect(_quit)
 	$Margin/Content/Header/Menu.pressed.connect(_show_menu)
+	$Menu/Center/Panel/Collection.pressed.connect(_open_collection)
+	if collection_store == null:
+		collection_store = CollectionStore.new()
+	collection_screen = preload("res://scenes/collection_screen.tscn").instantiate()
+	collection_screen.store = collection_store
+	collection_screen.hide()
+	add_child(collection_screen)
+	collection_screen.back_requested.connect(_show_menu)
 	$Margin/Content/Workspace/Sidebar/Settings.text = "%d × %d board · %d tile maximum\nTemporary prototype settings" % [board_dimensions.x, board_dimensions.y, tile_budget]
 	_refresh()
 	_show_menu()
@@ -35,14 +46,27 @@ func _ready() -> void:
 
 func _open_workshop() -> void:
 	_workshop_opened = true
+	_last_activity = workshop
+	collection_screen.prepare_to_leave()
+	collection_screen.hide()
 	menu.hide()
 	workshop.show()
 	$Margin/Content/Header/Menu.grab_focus()
 
 
+func _open_collection() -> void:
+	board.cancel_stroke()
+	_last_activity = collection_screen
+	menu.hide()
+	workshop.hide()
+	collection_screen.show()
+
+
 func _show_menu() -> void:
 	board.cancel_stroke()
 	workshop.hide()
+	collection_screen.prepare_to_leave()
+	collection_screen.hide()
 	menu.show()
 	open_button.text = "Resume workshop" if _workshop_opened else "Open workshop"
 	open_button.grab_focus()
@@ -56,10 +80,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key := event as InputEventKey
 		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
-			if workshop.visible:
+			if workshop.visible or collection_screen.visible:
 				_show_menu()
-			elif _workshop_opened:
+			elif _last_activity == workshop:
 				_open_workshop()
+			elif _last_activity == collection_screen:
+				_open_collection()
 			get_viewport().set_input_as_handled()
 
 

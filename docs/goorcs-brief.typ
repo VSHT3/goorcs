@@ -180,8 +180,8 @@ Planning could use a fixed timer, a ready button that starts a short countdown f
 )
 
 #v(4mm)
-#note([Where the project stands], [We are building this with AI assistance in Godot, using GDScript. One player hosting the match is the proposed networking model; connection details remain open. A local path workshop now supports tile editing, budget checks, and shortest-route previews. Combat and multiplayer are not implemented.])
+#note([Where the project stands], [We are building this with AI assistance in Godot, using GDScript. One player hosting is the proposed networking model; connection details remain open. The local path workshop supports editing and route previews. Free animated chests now unlock three tower identities in a saved collection, without duplicates. Combat and multiplayer are not implemented.])
 #v(3mm)
 #text(size: 9.5pt)[*First playable:* connect two boards with one tower type and one enemy type. Prove the path rules, live building and upgrades, selling, income from sends, and base defeat before adding the collection and larger content roster.]
 #v(2mm)
-#small[Source: docs/game-direction.md. The full match design remains planned; only the local path workshop is implemented.]
+#small[Source: docs/game-direction.md. The full match design remains planned; local paths and collection chests are implemented.]

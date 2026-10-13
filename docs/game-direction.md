@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path-building workshop. Combat, multiplayer, progression, and final art are not implemented. The workshop was approved as a narrow prototype; the full first playable milestone below is not complete.
+The project contains a playable local path workshop and a persistent collection chest flow. Combat, multiplayer, loadouts, permanent stat growth, and final art are not implemented. These were approved as narrow prototypes; the full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -132,6 +132,19 @@ Earn currency from runs for collection pulls and progression outside the match. 
 
 Choose a limited loadout before a run. That loadout determines the known unit types available to buy. Loadout size, duplicate slots, purchase limits, starter access, and permanent duplicate handling are open.
 
+### Implemented collection chest
+
+- **Approved prototype rules:** free chest openings on the collection screen; unlock only missing tower types, without duplicates. Openings stop when the catalog is exhausted.
+- **Provisional payout odds:** roll one reward 80% of the time, three 15%, and five 5%; cap to the number of types still locked. The initial three-entry catalog means a five-roll can grant at most three actual rewards.
+- **Initial identities:** Arrow tower, Orc ballista, Rune obelisk. They have resource definitions and original procedural icons, but no combat stats or behavior.
+- **Ownership:** `CollectionStore` selects the rewards and atomically saves the complete unlocked set before granting it in memory. Invalid saves or write failures disable openings and grant nothing; existing saved data is not silently replaced.
+- **Presentation:** `ChestReveal` only displays a supplied reward list. Shake, lid opening, light, decorative coins, and simultaneous reward cards borrow the chest-reveal idea, not assets or a roulette reel. Skipping or navigation cannot reroll or grant rewards.
+- **Persistence:** a local `user://collection.json` save belongs to one running game instance. There is no cloud sync, account, concurrent-writer coordination, or host-authoritative match reward integration.
+- **Check:** open, skip, return to the menu, restart, and inspect the same unlocks; complete the three-type catalog and confirm openings stop. Regression commands and save-error handling are in [development](development.md#collection-and-chest-verification).
+
+Free prototype openings do not decide how completed runs award collection currency or chests, loadout rules, or permanent stat changes.
+
+
 ### In-run purchases and randomness
 
 **Choose the unit identity, randomize its bonuses.** Buying a tower is not a roll for an unknown tower type. Bonuses should include both numerical stats and meaningful traits that can affect behavior or synergies.
@@ -208,4 +221,4 @@ This milestone is not the finished game and does not discard the requested abili
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.
 - **Randomness and progression:** trait reveal/reroll rules, run reward choices, loadout limits, starter collection, permanent stat growth, and post-run payouts.
 - **Balance and readability:** intended duration, economic scaling, late-run density, visual hierarchy, and performance targets.
-- **Delivery:** desktop operating systems, save ownership, collection persistence, and connection setup.
+- **Delivery:** desktop operating systems, future save ownership beyond the current local collection, and connection setup.
