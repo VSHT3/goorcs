@@ -30,7 +30,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - A **run** is the complete 1v1 contest. Enemies reaching a base damage it; a destroyed base ends the entire run.
 - Base health carries between rounds. Losing a base is not merely losing one round or spending a run life.
 - A crystal is the current suggested representation of the base and its health; its exact appearance is not finalized.
-- A **wave** is a group of regular enemies. Opponent-sent enemies provide additional pressure; exact delivery timing is open.
+- A **wave** is a group of regular enemies. Opponent-sent enemies join the current wave until a delivery cutoff. Later orders wait for the next wave. The cutoff allows both boards to clear before the planning break; its timing is still open.
 - The desired format combines a standalone competitive match with development across multiple encounters.
 
 ### Working preference
@@ -57,6 +57,10 @@ This is the conceptual sequence, not a fixed wave schedule or finalized reward c
 
 Players lay walkable path tiles on a square grid. Both players start with the same path-tile budget, and the tiles must connect the entrance to the base. **30 tiles was an example, not a chosen balance value.** Whether the full budget must be used is still open.
 
+The preferred presentation places one player on the left and the other on the right, with both enemy streams entering from the middle. Regular waves and opponent-sent enemies join each board's own stream. This visual arrangement does not require identical player-built paths, map mechanics, or commanders.
+
+The entrance and crystal stay in place as the board expands. New territory becomes available around the existing board, and extra path tiles let players route enemies through it. The crystal's visual design and the initial endpoint positions still need map sketches.
+
 Enemies take the shortest route across connected path tiles. They do not follow the order in which the player placed the tiles. Adjacent path sections can therefore create shortcuts. This replaces the earlier tower-blocked-maze assumption: towers and walls do not define the enemy route by blocking otherwise walkable ground.
 
 Both the available path tiles and the map's buildable area grow during the run. The whole board expands at milestones rather than the player selecting individual land sections to unlock. Milestone timing, amounts, and whether both players expand at the same time remain open.
@@ -72,7 +76,7 @@ Some major tower upgrades expand their occupied footprint. An expanding upgrade 
 - Initial path-budget size, whether every tile must be used, and the timing and amounts of milestone-based path-tile and whole-board growth.
 - Movement adjacency, equal-length route selection, and how the route preview explains shortcuts.
 - Whether paths can be redrawn freely between waves and whether unused tiles are retained.
-- Placement relative to path tiles, board dimensions, terrain, and entrance/base positions as the map expands.
+- Placement relative to path tiles, initial board dimensions, terrain, and the placement of the fixed entrance and crystal.
 - How much of the opposing board is visible at once.
 - Sale refunds, purchase/roll costs, and restrictions needed to prevent unlimited trait rerolls through sale/rebuy.
 
@@ -105,7 +109,7 @@ These are desired action categories, not defined content lists. Concrete ability
 
 ### Abilities across both boards
 
-**Confirmed:** abilities can affect both the player's own board and the opponent's board. Offense is not restricted to sending enemies or buffing sent units.
+**Confirmed:** abilities can affect both the player's own board and the opponent's board. Opponent-targeted spells cause temporary disruption, such as briefly slowing or disabling defenses. They cannot permanently destroy opposing towers or directly damage the opponent's base.
 
 Exact effects, eligible targets, resource costs, cooldowns, visibility, and ways to respond remain open. Clear warnings or counterplay for powerful disruption are design proposals to evaluate, not an implemented system. A spell's ability to target the opposing board does not implicitly permit editing its path, violating route locks, or bypassing the open-route requirement.
 
@@ -179,7 +183,7 @@ The first implementation milestone remains deliberately smaller than the full di
 2. At least one known tower type and one enemy type support a basic defense loop.
 3. Each player draws a legal path within an equal tile budget. Enemies follow the chosen route; route edits are unavailable during the current wave.
 4. Construction, individual upgrades, and selling work during combat without obstructing the route. Direct relocation is free only during breaks; expanding upgrades require a legal enlarged footprint.
-5. Regular waves threaten both bases. Sending enemies costs currency and increases the sender's future income.
+5. Regular waves threaten both bases. Sending enemies costs currency and increases the sender's future income. Sends enter the current wave until a delivery cutoff; later orders wait for the next wave.
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. A simultaneous defeat rule must be chosen before completion.
 
@@ -187,8 +191,8 @@ This milestone is not the finished game and does not discard the requested abili
 
 ## Decisions still needed before their implementation
 
-- **Board interaction:** path-budget and map-expansion rules, shortest-route details, placement relative to the path, entrance/base positions, and sale/refund rules.
-- **Run pacing:** confirm board continuity; define round boundaries, wave scheduling, the fixed/ready-up planning timer, send delivery timing, endgame pressure, and simultaneous defeat.
+- **Board interaction:** path-budget and map-expansion rules, shortest-route details, placement relative to the path, initial entrance/crystal positions, and sale/refund rules.
+- **Run pacing:** confirm board continuity; define round boundaries, wave scheduling, the fixed/ready-up planning timer, send cutoff timing, endgame pressure, and simultaneous defeat.
 - **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules and the initial structure/enemy archetypes, targeting, attacks, defenses, and counters.
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.
 - **Randomness and progression:** trait reveal/reroll rules, run reward choices, loadout limits, starter collection, permanent stat growth, and post-run payouts.

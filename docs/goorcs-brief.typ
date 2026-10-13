@@ -65,8 +65,8 @@
       rotate(45deg, square(size: 2.5mm, fill: tint, stroke: none)))
   ]
 }
-#let route-a = ((0,1),(1,1),(2,1),(3,1),(4,1),(5,1),(6,1),(6,2),(6,3),(6,4),(6,5),(5,5),(4,5),(3,5),(2,5),(2,4),(2,3),(3,3),(4,3))
-#let route-b = ((0,1),(1,1),(2,1),(2,2),(2,3),(3,3),(4,3),(5,3),(6,3),(6,4),(6,5),(5,5),(4,5),(3,5),(2,5),(1,5),(1,4))
+#let route-a = ((8,1),(7,1),(6,1),(5,1),(4,1),(3,1),(2,1),(2,2),(2,3),(3,3),(4,3),(5,3),(6,3),(6,4),(6,5),(5,5),(4,5),(3,5),(2,5),(1,5),(0,5))
+#let route-b = ((0,1),(0,2),(0,3),(0,4),(0,5),(1,5),(2,5),(3,5),(4,5),(4,4),(4,3),(4,2),(4,1),(5,1),(6,1),(7,1),(8,1),(8,2),(8,3),(8,4),(8,5))
 
 #label[The idea]
 #block(above: 4mm, below: 5mm)[#text(font: "Anton", size: 62pt, weight: "regular", top-edge: "cap-height", bottom-edge: "baseline")[Goorcs]]
@@ -80,20 +80,22 @@ A run starts with a small defense. The board expands as towers evolve into large
 #v(3mm)
 #block(width: 100%, inset: 4mm, stroke: 0.6pt + rule, radius: 1mm)[
   #grid(columns: (1fr, 39mm, 1fr), align: center,
-    [#label[Your board] #v(2mm) #board(route-a, ((1,3),(4,4),(7,2)), accent)],
-    [#v(10mm) #text(size: 9pt, weight: "bold")[Send enemies] #v(1mm) #text(size: 24pt, fill: rust)[⇄] #v(1mm) #text(size: 8.5pt)[Spend money now.\ Gain future income.]],
-    [#label[Opponent] #v(2mm) #board(route-b, ((4,1),(4,4),(7,5)), rust)],
+    [#label[Left player] #v(2mm) #board(route-a, ((6,2),(4,4),(1,3)), accent)],
+    [#label[Central entry] #v(2mm) #block(height: 38.5mm)[#block(above: 2mm, below: 3mm)[#text(size: 24pt, fill: rust)[← →]] #text(size: 8.5pt)[Regular waves\ and sent enemies]]],
+    [#label[Right player] #v(2mm) #board(route-b, ((2,3),(6,3),(5,4)), rust)],
   )
   #v(3mm)
   #small[E = entrance · Squares = towers · Diamond = proposed crystal base]
   #v(1mm)
-  #small[Layout sketches only. Board symmetry and the base’s appearance remain open.]
+  #small[Entrances and crystals stay fixed as maps grow. Layouts and art are illustrative.]
+  #v(1mm)
+  #small[Your sends join the opponent’s stream. Each player designs a separate path.]
 ]
 
 == A run at a glance
 #step("1", [Prepare a loadout], [Choose a limited set of tower types from your permanent collection. Your hero is an off-board commander.])
 #v(3mm)
-#step("2", [Build and fight], [Lay a connected path, buy towers and react during combat. Scout the opponent’s board to decide when to spend on an attack.])
+#step("2", [Build and fight], [Buy and improve towers during combat. Sending enemies costs currency and increases future income, competing with spending on your own defense.])
 #v(3mm)
 #step("3", [Develop the defense], [Buy upgrades and adapt to random rewards. Both your path allowance and the whole map grow at milestones.])
 #v(3mm)
@@ -118,6 +120,11 @@ Towers use the same grid. Their placement must preserve the route. Some major up
   [Build, upgrade and sell towers. Use abilities on either board. Send enemies, scout, gamble, construct other buildings and interact with map features. The current route stays fixed.],
   [Redesign the path and freely relocate existing towers while keeping their upgrades and traits. Break timing is still being decided.],
 )
+
+== Enemy sends and spells
+Purchased enemies enter the opponent’s current wave until a cutoff. Later orders wait for the next wave. Both boards clear before the planning break.
+
+Spells aimed at the opponent cause temporary disruption. They cannot permanently destroy towers or directly damage the base.
 
 == Known towers, different results
 You buy a chosen tower type from your loadout. Its bonuses are randomized, with both stat changes and traits that can change how it works with the rest of your defense. When those bonuses become visible is still open.
@@ -174,5 +181,7 @@ Planning could use a fixed timer, a ready button that starts a short countdown f
 
 #v(4mm)
 #note([Where the project stands], [We plan to build this with AI assistance in Godot, using GDScript. One player hosting the match is the proposed networking model; connection details remain open. The repository currently contains a title scene and design documentation. Gameplay has not been implemented.])
+#v(3mm)
+#text(size: 9.5pt)[*First playable:* connect two boards with one tower type and one enemy type. Prove the path rules, live building and upgrades, selling, income from sends, and base defeat before adding the collection and larger content roster.]
 #v(2mm)
 #small[Source: docs/game-direction.md. All gameplay described here is planned.]
