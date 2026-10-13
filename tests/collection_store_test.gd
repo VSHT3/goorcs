@@ -14,6 +14,8 @@ func _init() -> void:
 		_test_persistence_and_exhaustion()
 		_test_expanded_catalog_and_capping()
 		_test_write_failure()
+		_test_reset_progress()
+		_test_reset_failure()
 		_test_missing_folder_failure()
 		_test_invalid_saves()
 		_test_unreadable_save()
@@ -148,6 +150,33 @@ func _test_expanded_catalog_and_capping() -> void:
 		_check(reward.id != &"test_tower_0" and reward.id != &"test_tower_1", "Capped rewards exclude prior unlocks")
 
 
+func _test_reset_progress() -> void:
+	var path: String = _path("reset.json")
+	var catalog: Array[TowerReward] = _catalog(3)
+	var store := CollectionStore.new(path, catalog, _rng_for_roll(95))
+	_check_grant(store.open_chest(), 3, "Complete collection before reset")
+	_check(not store.can_open(), "Completed collection rejects more chests")
+	_check(store.reset_progress(), "Completed collection can be reset")
+	_check(store.unlocked_count() == 0 and store.can_open(), "Reset enables openings with no unlocks")
+	var restored := CollectionStore.new(path, catalog, _rng_for_roll(0))
+	for reward: TowerReward in catalog:
+		_check(not restored.is_unlocked(reward.id), "Reset removes every saved unlock")
+	_check_grant(restored.open_chest(), 1, "A reset collection can grant new rewards")
+
+
+func _test_reset_failure() -> void:
+	var path: String = _path("blocked_reset.json")
+	var catalog: Array[TowerReward] = _catalog(3)
+	var store := CollectionStore.new(path, catalog, _rng_for_roll(95))
+	_check_grant(store.open_chest(), 3, "Pre-failure reset collection")
+	var previous_save: String = FileAccess.get_file_as_string(path)
+	_check(DirAccess.make_dir_absolute(path + ".tmp") == OK, "Block reset temporary save")
+	_check(not store.reset_progress(), "Failed reset reports failure")
+	for reward: TowerReward in catalog:
+		_check(store.is_unlocked(reward.id), "Failed reset retains in-memory unlocks")
+	_check(FileAccess.get_file_as_string(path) == previous_save, "Failed reset preserves saved bytes")
+
+
 func _test_write_failure() -> void:
 	var path: String = _path("blocked_write.json")
 	var random: RandomNumberGenerator = _rng_for_roll(0)
@@ -204,6 +233,7 @@ func _test_invalid_saves() -> void:
 		_check(not store.can_open() and store.unlocked_count() == 0, "Invalid save %d disables openings without partial loading" % index)
 		var result: ChestResult = store.open_chest()
 		_check(result.rewards.is_empty() and result.error_message == store.error_message, "Invalid save %d cannot grant towers" % index)
+		_check(not store.reset_progress(), "Invalid save %d cannot be overwritten by reset" % index)
 		_check(FileAccess.get_file_as_string(path) == fixtures[index], "Invalid save %d remains untouched" % index)
 		_check(not FileAccess.file_exists(path + ".tmp"), "Invalid save %d never attempts a write" % index)
 

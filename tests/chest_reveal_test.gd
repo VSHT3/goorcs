@@ -42,6 +42,9 @@ func _run() -> void:
 			for other: int in range(index + 1, cards.size()):
 				_check(not card.get_rect().intersects((cards[other] as Control).get_rect()), "Result cards do not cover one another")
 	_check(completions == 3, "Each presentation finishes exactly once despite repeated skips")
+	_check(reveal.clear() and not reveal.is_revealing(), "Clearing leaves the chest ready for a new presentation")
+	_check(reveal.get_node("Results").get_child_count() == 0, "Clearing removes the previous reward display")
+	_check(completions == 3, "Clearing completed results does not emit another completion")
 	if failures == 0:
 		print("PASS: one/three/five reward cards fit without overlap; completion is idempotent")
 	quit(1 if failures > 0 else 0)

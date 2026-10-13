@@ -100,6 +100,11 @@ size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 30
 text = "GOORCS / Collection"
 
+[node name="Reset" type="Button" parent="Margin/Content/Header"]
+custom_minimum_size = Vector2(180, 40)
+layout_mode = 2
+text = "Reset progress"
+
 [node name="Back" type="Button" parent="Margin/Content/Header"]
 custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
@@ -195,3 +200,13 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
 theme_override_font_sizes/font_size = 13
 text = "Free local collection openings. Prototype identities only; no combat or stats. Workshop layouts are separate."
+
+[node name="ResetConfirmation" type="ConfirmationDialog" parent="."]
+visible = false
+title = "Reset collection progress"
+size = Vector2i(480, 180)
+min_size = Vector2i(480, 180)
+exclusive = true
+dialog_text = "Reset all tower unlocks on this computer?\nThis cannot be undone. Your workshop layout will stay."
+dialog_autowrap = true
+ok_button_text = "Reset progress"

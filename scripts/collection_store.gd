@@ -88,6 +88,17 @@ func open_chest() -> ChestResult:
 	return result
 
 
+func reset_progress() -> bool:
+	if not error_message.is_empty():
+		return false
+	var empty: Dictionary[StringName, bool] = {}
+	error_message = _persist(empty)
+	if not error_message.is_empty():
+		return false
+	_unlocked = empty
+	return true
+
+
 func _load(known_ids: Dictionary[StringName, bool]) -> void:
 	var file := FileAccess.open(_save_path, FileAccess.READ)
 	if file == null:
@@ -149,17 +160,17 @@ func _persist(next_unlocked: Dictionary[StringName, bool]) -> String:
 	var temporary_path: String = _save_path + ".tmp"
 	var file := FileAccess.open(temporary_path, FileAccess.WRITE)
 	if file == null:
-		return "Cannot write collection temporary save '%s': %s. Check the folder and write permissions, then reopen the game. No towers were granted; the previous save is unchanged." % [temporary_path, error_string(FileAccess.get_open_error())]
+		return "Cannot write collection temporary save '%s': %s. Check the folder and write permissions, then reopen the game. Collection progress and the previous save are unchanged." % [temporary_path, error_string(FileAccess.get_open_error())]
 	file.store_string(JSON.stringify({"version": SAVE_VERSION, "unlocked": ids}))
 	file.flush()
 	var write_error: Error = file.get_error()
 	file.close()
 	if write_error != OK:
 		DirAccess.remove_absolute(temporary_path)
-		return "Cannot finish writing collection save '%s': %s. Check free disk space and write permissions, then reopen the game. No towers were granted; the previous save is unchanged." % [temporary_path, error_string(write_error)]
+		return "Cannot finish writing collection save '%s': %s. Check free disk space and write permissions, then reopen the game. Collection progress and the previous save are unchanged." % [temporary_path, error_string(write_error)]
 	var rename_error: Error = DirAccess.rename_absolute(
 		ProjectSettings.globalize_path(temporary_path), ProjectSettings.globalize_path(_save_path))
 	if rename_error != OK:
 		DirAccess.remove_absolute(temporary_path)
-		return "Cannot replace collection save '%s': %s. Check the destination and folder permissions, then reopen the game. No towers were granted; the previous save is unchanged." % [_save_path, error_string(rename_error)]
+		return "Cannot replace collection save '%s': %s. Check the destination and folder permissions, then reopen the game. Collection progress and the previous save are unchanged." % [_save_path, error_string(rename_error)]
 	return ""

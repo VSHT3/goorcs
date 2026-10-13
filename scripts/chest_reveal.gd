@@ -55,14 +55,13 @@ func _ready() -> void:
 	queue_redraw()
 
 
-func present(rewards: Array[TowerReward]) -> void:
-	# A replacement completes the old presentation, never a second grant.
+func clear() -> bool:
 	var previous_id: int = _presentation_id
 	skip()
 	if previous_id != _presentation_id:
-		return # A finished listener supplied a newer presentation.
+		return false # A finished listener supplied a newer presentation.
 	_presentation_id += 1
-	_rewards = rewards.duplicate()
+	_rewards.clear()
 	for card: Control in _cards:
 		_results.remove_child(card)
 		card.queue_free()
@@ -73,6 +72,16 @@ func present(rewards: Array[TowerReward]) -> void:
 	_burst = 0.0
 	_rise = 0.0
 	_coins = 0.0
+	_heading.text = "SEALED CHEST"
+	queue_redraw()
+	return true
+
+
+func present(rewards: Array[TowerReward]) -> void:
+	# Clearing a replacement completes its presentation, never a second grant.
+	if not clear():
+		return
+	_rewards = rewards.duplicate()
 	_active = true
 	_heading.text = "THE CHEST IS STIRRING..."
 	for reward: TowerReward in _rewards:

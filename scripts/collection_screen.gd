@@ -14,6 +14,8 @@ var _catalog_icons: Array[ChestReveal.RewardIcon] = []
 @onready var open_button: Button = $Margin/Content/Workspace/ChestPanel/ChestContent/Actions/Open
 @onready var skip_button: Button = $Margin/Content/Workspace/ChestPanel/ChestContent/Actions/Skip
 @onready var back_button: Button = $Margin/Content/Header/Back
+@onready var reset_button: Button = $Margin/Content/Header/Reset
+@onready var reset_confirmation: ConfirmationDialog = $ResetConfirmation
 @onready var _count: Label = $Margin/Content/Workspace/Archive/Count
 @onready var _catalog: VBoxContainer = $Margin/Content/Workspace/Archive/Catalog
 @onready var _status: RichTextLabel = $Margin/Content/Workspace/Archive/Status
@@ -24,6 +26,9 @@ func _ready() -> void:
 	open_button.pressed.connect(_open_chest)
 	skip_button.pressed.connect(reveal.skip)
 	back_button.pressed.connect(_request_back)
+	reset_button.pressed.connect(_request_reset)
+	reset_confirmation.confirmed.connect(_reset_progress)
+	reset_confirmation.canceled.connect(_focus_action)
 	reveal.finished.connect(_reveal_finished)
 	visibility_changed.connect(_visibility_changed)
 	if store != null:
@@ -36,6 +41,7 @@ func _ready() -> void:
 
 func prepare_to_leave() -> void:
 	if is_node_ready():
+		reset_confirmation.hide()
 		reveal.skip()
 
 
@@ -61,6 +67,26 @@ func _focus_action() -> void:
 		open_button.grab_focus()
 	else:
 		back_button.grab_focus()
+
+
+func _request_reset() -> void:
+	if not reset_button.disabled:
+		reset_confirmation.popup_centered(Vector2i(480, 180))
+
+
+func _reset_progress() -> void:
+	if store == null or _opening or reveal.is_revealing() or store.unlocked_count() == 0:
+		return
+	if not store.reset_progress():
+		_last_error = store.error_message
+		_refresh()
+		_focus_action()
+		return
+	reveal.clear()
+	_last_error = ""
+	_result_message = "Collection progress reset. You can open chests again."
+	_refresh()
+	_focus_action()
 
 
 func _open_chest() -> void:
@@ -99,6 +125,7 @@ func _refresh() -> void:
 	var active: bool = reveal.is_revealing()
 	skip_button.visible = active
 	skip_button.disabled = not active
+	reset_button.disabled = true
 	_result.text = _result_message if not _result_message.is_empty() else "Saved before the reveal. Coin particles are celebration, not currency."
 	if store == null:
 		_count.text = "Collection unavailable"
@@ -116,9 +143,10 @@ func _refresh() -> void:
 			_catalog_icons[index].locked = not unlocked
 			_catalog_icons[index].queue_redraw()
 	open_button.disabled = _opening or active or not store.can_open()
+	reset_button.disabled = _opening or active or not store.error_message.is_empty() or store.unlocked_count() == 0
 	var error: String = store.error_message if not store.error_message.is_empty() else _last_error
 	if not error.is_empty():
-		_status.text = "Could not open chest.\n" + error
+		_status.text = "Could not update collection.\n" + error
 		_status.modulate = Color("e1a397")
 	elif store.remaining_count() == 0:
 		_status.text = "COLLECTION COMPLETE\nAll tower types are unlocked. No more chests can be opened."

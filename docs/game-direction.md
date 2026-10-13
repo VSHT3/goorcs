@@ -135,6 +135,7 @@ Choose a limited loadout before a run. That loadout determines the known unit ty
 ### Implemented collection chest
 
 - **Approved prototype rules:** free chest openings on the collection screen; unlock only missing tower types, without duplicates. Openings stop when the catalog is exhausted.
+- **Prototype reset:** the collection screen's confirmed Reset progress action clears saved tower unlocks and the previous reveal, enabling fresh chest openings. Cancel leaves progress unchanged; reset does not affect workshop paths. Reset is unavailable during an active reveal or a save error.
 - **Provisional payout odds:** roll one reward 80% of the time, three 15%, and five 5%; cap to the number of types still locked. The initial three-entry catalog means a five-roll can grant at most three actual rewards.
 - **Initial identities:** Arrow tower, Orc ballista, Rune obelisk. The ballista uses the accepted user-supplied PixelLab crossbow-tower sprite unchanged as its base art; the other two icons remain procedural. These are collection identities with no combat stats or behavior.
 - **Ownership:** `CollectionStore` selects the rewards and atomically saves the complete unlocked set before granting it in memory. Invalid saves or write failures disable openings and grant nothing; existing saved data is not silently replaced.
