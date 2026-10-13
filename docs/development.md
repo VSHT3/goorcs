@@ -78,13 +78,22 @@ Keep development automation local, enable available connection authentication, a
 
 ## Pixel-art asset workflow
 
-**Recommendation, pending an output trial:** evaluate PixelLab first, with Retro Diffusion as a comparison if needed. Use Aseprite or Pixelorama for cleanup. No account, paid integration, or generated asset has been added to this project. The assessment checked vendor documentation, not generated output quality.
+**PixelLab chest trial completed with user-supplied outputs.** The game now ships a cleaned closed/open sprite pair; PixelLab API/MCP access is not connected and no credentials were added. Retro Diffusion remains an untested comparison option. Use Aseprite or Pixelorama for further manual cleanup.
 
 - [PixelLab](https://www.pixellab.ai/) documents MCP/API access, directional characters, animation, transparent objects, editor integrations, and Godot tileset guides. Its free trial lists API/MCP access but excludes map tools.
 - [Retro Diffusion](https://retrodiffusion.ai/) also documents a hosted MCP server, API access, reference-based generation, animations, and tilesets. Automation is not exclusive to PixelLab.
 - At the time of assessment, PixelLab listed paid tiers at $12/$24/$50 per month. Retro Diffusion listed images at $0.03/$0.06/$0.18 depending on model, with animations from $0.07 and free starting balance. Recheck current pricing and terms before spending. PixelLab generations are billing units, not necessarily finished images; directional sets and animations may consume several.
 
-### First art trial
+### Imported chest sprite trial
+
+- `assets/chests/orc_chest_closed.png` uses the supplied PixelLab `chest_0016.png`: its 64×64 pixels are unchanged, padded onto a 96×96 transparent canvas at (16, 32).
+- `assets/chests/orc_chest_open.png` uses the first supplied open-chest candidate's lid. Generation had changed the lower body, so cleanup aligns the lid at (+3, +7), redraws the narrow opening rim, and restores the closed sprite's entire lower region from row 55 onward.
+- Both frames have hard transparency. The closed frame and open frame have pixel-identical lower bodies. `CHEST_BODY_Y` (55) and `CHEST_FOOT_Y` (92) in `ChestReveal` describe this specific sprite pair; changing the art requires updating that geometry together.
+- The reveal draws the fixed body once and crossfades only the lid/interior between two poses. This is not a generated frame-by-frame animation. Existing shake, light, decorative coins, reward timing, and skip behavior remain separate; audio is not implemented.
+- Textures are losslessly imported without mipmaps, rendered with nearest filtering, and drawn at integer scale. More than three reward cards use a smaller chest so the open lid does not overlap the cards.
+- Verified the original closed pixels and retained lower-body pixels, then inspected closed, opening, open, compact, and five-card surfaces in the graphical game. The layout regression also rejects reward cards overlapping the chest. Supplied source originals remain untouched.
+
+### Next board-art trial
 
 Choose a shared camera angle, outline style, palette, and pixel scale before generating a small sample:
 

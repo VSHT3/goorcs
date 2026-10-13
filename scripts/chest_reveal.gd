@@ -7,6 +7,11 @@ const INK := Color("141d1c")
 const GOLD := Color("e0bc77")
 const PALE := Color("f6e7b2")
 const TEXT := Color("e6e0cf")
+const CHEST_BODY_Y: int = 55
+const CHEST_FOOT_Y: int = 92
+
+@export var closed_chest: Texture2D
+@export var open_chest: Texture2D
 
 var _rewards: Array[TowerReward] = []
 var _cards: Array[Control] = []
@@ -196,7 +201,7 @@ func _layout_cards() -> void:
 	var rows: int = ceili(float(_cards.size()) / float(columns))
 	var gap: float = 12.0
 	var width: float = minf(184.0, (size.x - 40.0 - gap * (columns - 1)) / columns)
-	var available_height: float = maxf(130.0, size.y - 205.0)
+	var available_height: float = _chest_rect().position.y - 62.0 - 12.0
 	var height: float = minf(190.0, (available_height - gap * (rows - 1)) / rows)
 	_targets.clear()
 	for index: int in range(_cards.size()):
@@ -210,61 +215,70 @@ func _layout_cards() -> void:
 	queue_redraw()
 
 
+func _chest_scale() -> float:
+	return 1.0 if _rewards.size() > 3 else 2.0
+
+
+func _chest_rect() -> Rect2:
+	var sprite_size: Vector2 = closed_chest.get_size() * _chest_scale()
+	return Rect2(Vector2(roundf((size.x - sprite_size.x) * 0.5), roundf(size.y - 10.0 - sprite_size.y)), sprite_size)
+
+
+func _opening_position() -> Vector2:
+	var rect: Rect2 = _chest_rect()
+	return rect.position + Vector2(rect.size.x * 0.5, (CHEST_BODY_Y - 3) * _chest_scale())
+
+
 func _draw() -> void:
-	var center := Vector2(roundf(size.x * 0.5), roundf(size.y - 58.0))
-	var floor_y: float = center.y + 48.0
+	var rect: Rect2 = _chest_rect()
+	var floor_y: float = rect.position.y + CHEST_FOOT_Y * _chest_scale()
 	draw_rect(Rect2(Vector2(24.0, floor_y), Vector2(size.x - 48.0, 2.0)), Color("36483d"))
-	draw_rect(Rect2(center + Vector2(-84.0, 39.0), Vector2(168.0, 8.0)), Color("101917"))
+	draw_rect(Rect2(Vector2(rect.position.x + rect.size.x * 0.15, floor_y - 2.0), Vector2(rect.size.x * 0.7, 6.0)), Color("101917"))
 	if _lid > 0.0:
-		_draw_light(center)
-	_draw_chest(center + Vector2(_shake, 0.0))
+		_draw_light()
+	_draw_chest()
 	if _coins > 0.0 and _coins < 1.0:
-		_draw_coins(center)
+		_draw_coins()
 
 
-func _draw_light(center: Vector2) -> void:
+func _draw_light() -> void:
+	var origin: Vector2 = _opening_position()
 	var intensity: float = 0.16 + sin(_burst * PI) * 0.32
 	for index: int in range(9):
 		var angle: float = -PI + 0.23 + index * 0.335
 		var ray_length: float = 155.0 + float(index % 3) * 35.0
-		var origin: Vector2 = center + Vector2(0.0, -19.0)
 		var ray_color := Color(GOLD, intensity * minf(_lid, 1.0))
 		var points := PackedVector2Array([origin, origin + Vector2.from_angle(angle - 0.055) * ray_length, origin + Vector2.from_angle(angle + 0.055) * ray_length])
 		draw_colored_polygon(points, ray_color)
 	var glow := Color(PALE, 0.15 + sin(_burst * PI) * 0.35)
-	draw_rect(Rect2(center + Vector2(-57.0, -36.0), Vector2(114.0, 18.0)), glow)
+	draw_rect(Rect2(origin + Vector2(-25.0, -3.0) * _chest_scale(), Vector2(50.0, 6.0) * _chest_scale()), glow)
 
 
-func _draw_chest(center: Vector2) -> void:
-	draw_set_transform(center, 0.0, Vector2(2.5, 2.5))
-	_pixel(self, -24, -10, 48, 27, INK)
-	_pixel(self, -22, -8, 44, 23, Color("76552f"))
-	_pixel(self, -20, -6, 40, 6, Color("a57942"))
-	_pixel(self, -20, 2, 40, 2, Color("513d29"))
-	_pixel(self, -20, 10, 40, 2, Color("513d29"))
-	for x: int in [-19, 14]:
-		_pixel(self, x, -8, 5, 23, GOLD)
-		_pixel(self, x + 1, -7, 2, 20, Color("f4d697"))
-	_pixel(self, -5, -10, 10, 12, INK)
-	_pixel(self, -4, -9, 8, 10, GOLD)
-	_pixel(self, -1, -6, 2, 4, INK)
-	var lid_y: int = -17 - roundi(_lid * 14.0)
-	_pixel(self, -24, lid_y, 48, 11, INK)
-	_pixel(self, -22, lid_y + 2, 44, 7, Color("936b38"))
-	_pixel(self, -20, lid_y + 2, 40, 2, Color("c59b56"))
-	for x: int in [-19, 14]:
-		_pixel(self, x, lid_y + 1, 5, 9, GOLD)
-	if _lid > 0.1:
-		_pixel(self, -20, -12, 40, 3, PALE)
-	draw_set_transform(Vector2.ZERO)
+func _draw_chest() -> void:
+	var rect: Rect2 = _chest_rect()
+	rect.position.x += roundf(_shake)
+	var scale: float = _chest_scale()
+	var frame_size: Vector2 = closed_chest.get_size()
+	var body_source := Rect2(Vector2(0.0, CHEST_BODY_Y), Vector2(frame_size.x, frame_size.y - CHEST_BODY_Y))
+	var body_target := Rect2(rect.position + body_source.position * scale, body_source.size * scale)
+	# Draw the original lower body once: only the lid/interior transitions.
+	draw_texture_rect_region(closed_chest, body_target, body_source)
+	var lid_source := Rect2(Vector2.ZERO, Vector2(frame_size.x, CHEST_BODY_Y))
+	var lid_target := Rect2(rect.position, lid_source.size * scale)
+	var progress: float = clampf(_lid, 0.0, 1.0)
+	if progress < 1.0:
+		draw_texture_rect_region(closed_chest, lid_target, lid_source, Color(1.0, 1.0, 1.0, 1.0 - progress))
+	if progress > 0.0:
+		draw_texture_rect_region(open_chest, lid_target, lid_source, Color(1.0, 1.0, 1.0, progress))
 
 
-func _draw_coins(center: Vector2) -> void:
+func _draw_coins() -> void:
+	var origin: Vector2 = _opening_position()
 	for index: int in range(28):
 		var t: float = _coins
 		var sideways: float = sin(float(index) * 2.4) * (80.0 + float(index % 5) * 23.0)
 		var upward: float = 170.0 + float(index % 7) * 16.0
-		var at: Vector2 = center + Vector2(sideways * t, -22.0 - upward * t + 220.0 * t * t)
+		var at: Vector2 = origin + Vector2(sideways * t, -upward * t + 220.0 * t * t)
 		var alpha: float = 1.0 - smoothstep(0.65, 1.0, t)
 		var coin_width: float = 3.0 if index % 3 == 0 else 7.0
 		draw_rect(Rect2(at.round(), Vector2(coin_width, 9.0)), Color(GOLD, alpha))

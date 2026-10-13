@@ -42,6 +42,7 @@ func _run() -> void:
 		for index: int in range(cards.size()):
 			var card := cards[index] as Control
 			_check(bounds.encloses(card.get_rect()), "Result cards stay inside the reveal surface")
+			_check(not card.get_rect().intersects(reveal._chest_rect()), "Reward cards do not cover the opened chest")
 			for other: int in range(index + 1, cards.size()):
 				_check(not card.get_rect().intersects((cards[other] as Control).get_rect()), "Result cards do not cover one another")
 	_check(completions == 3, "Each presentation finishes exactly once despite repeated skips")
