@@ -14,6 +14,7 @@ For command-line launch and verification, see the [development commands](docs/de
 
 ## Documentation
 
+- [Game brief (PDF)](docs/goorcs-brief.pdf): a three-page introduction for friends, with [editable source](docs/goorcs-brief.typ).
 - [Agent instructions](AGENTS.md): required reading, editing rules, state ownership, and completion criteria.
 - [Game direction](docs/game-direction.md): intended experience, technical decisions, and first playable milestone.
 - [Development workflow](docs/development.md): setup, verification, and optional MCP tooling.

@@ -64,3 +64,15 @@ Keep development automation local, enable available connection authentication, a
 ## Initialization verification
 
 The project initialization is checked with a headless resource import and main-scene run. Graphical appearance, input interaction, desktop exports, and internet multiplayer require separate verification.
+
+## Shareable game brief
+
+`docs/goorcs-brief.pdf` is the short, friend-facing summary of the design. Its editable source is `docs/goorcs-brief.typ`; `docs/game-direction.md` remains the design source of truth.
+
+Install Typst and the Anton and Noto Sans fonts to regenerate the PDF from the repository root:
+
+```sh
+typst compile docs/goorcs-brief.typ docs/goorcs-brief.pdf
+```
+
+Check the rendered pages for clipping, overlapping text, and any provisional choice presented as settled. Keep the brief to three readable pages and commit the source with its updated PDF.
