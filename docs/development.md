@@ -61,6 +61,34 @@ Before relying on it, verify actual game screenshots, UI input and state changes
 
 Keep development automation local, enable available connection authentication, and never expose editor-control ports as part of the game's multiplayer service. Ensure development-only tooling is excluded from distributed builds.
 
+## Pixel-art asset workflow
+
+**Recommendation, pending an output trial:** evaluate PixelLab first, with Retro Diffusion as a comparison if needed. Use Aseprite or Pixelorama for cleanup. No account, paid integration, or generated asset has been added to this project. The assessment checked vendor documentation, not generated output quality.
+
+- [PixelLab](https://www.pixellab.ai/) documents MCP/API access, directional characters, animation, transparent objects, editor integrations, and Godot tileset guides. Its free trial lists API/MCP access but excludes map tools.
+- [Retro Diffusion](https://retrodiffusion.ai/) also documents a hosted MCP server, API access, reference-based generation, animations, and tilesets. Automation is not exclusive to PixelLab.
+- At the time of assessment, PixelLab listed paid tiers at $12/$24/$50 per month. Retro Diffusion listed images at $0.03/$0.06/$0.18 depending on model, with animations from $0.07 and free starting balance. Recheck current pricing and terms before spending. PixelLab generations are billing units, not necessarily finished images; directional sets and animations may consume several.
+
+### First art trial
+
+Choose a shared camera angle, outline style, palette, and pixel scale before generating a small sample:
+
+1. One tower and an evolved version, checking that identity survives the change in size and function.
+2. One enemy with a directional walk cycle, checking frame alignment and consistent appearance.
+3. A crystal that remains readable against the terrain.
+4. Ground and connecting path tiles, checking bends and adjacent sections. Defer paid map tooling until the initial asset results justify it.
+
+Judge these together at the intended game zoom, including a crowded arrangement. Inspect silhouettes, animation timing, transparency, palette consistency, and manual cleanup required. Avoid generating the full roster or buying several subscriptions before this trial.
+
+The commander is off-board, so a playable hero sprite is not the first asset priority. Most tower buildings do not need eight directional views; consider a separate aiming-weapon sprite where appropriate.
+
+Tile size, sprite canvas size, and occupied gameplay footprint are separate decisions. Some PixelLab character modes pad the canvas for animation, so requested character size does not guarantee identical frame dimensions. Inspect exported dimensions and pivots before import; use nearest-neighbor filtering.
+
+Generate assets during development and ship ordinary image files. Players should need neither an AI account nor an API key. Keep credentials out of Git and obtain approval before connecting paid services or spending credits.
+
+References: [PixelLab MCP documentation](https://api.pixellab.ai/mcp/docs), [PixelLab API pricing and estimate caveats](https://www.pixellab.ai/pixellab-api), and [Retro Diffusion capabilities and pricing](https://retrodiffusion.ai/).
+
+
 ## Initialization verification
 
 The project initialization is checked with a headless resource import and main-scene run. Graphical appearance, input interaction, desktop exports, and internet multiplayer require separate verification.
