@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project currently contains only a runnable title scene. Gameplay, multiplayer, progression, and final art are not implemented. This specification does not authorize starting gameplay implementation.
+The project contains a playable local path-building workshop. Combat, multiplayer, progression, and final art are not implemented. The workshop was approved as a narrow prototype; the full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -71,10 +71,20 @@ Buildings also use square-grid placement. Building, upgrading, and selling remai
 
 Some major tower upgrades expand their occupied footprint. An expanding upgrade requires surrounding space and cannot overlap another building or obstruct the route. Players therefore need to plan room for future growth.
 
+### Implemented path workshop
+
+- **Confirmed rules:** four-direction edge adjacency; the tile budget is a maximum, so unused tiles are allowed.
+- **Prototype configuration:** a 14×9 board, entrance at (0, 4), base at (13, 4), and 30 placeable tiles. Endpoints are fixed, traversable, and free. These map/balance values are provisional and exported on the main scene.
+- **Connectivity:** disconnected tiles are allowed during editing, but readiness requires every placed tile and the base to connect to the entrance. Connected branches are legal.
+- **Routing convention:** breadth-first shortest path, with right/down/left/up neighbor order resolving equal-length alternatives deterministically. The green preview shows actual shortcuts rather than placement order.
+- **Check:** build a detour, add a shorter connection, and inspect the changed preview; remove a bridge or add an island to invalidate readiness. Headless regressions and graphical checks are described in [development](development.md#path-workshop-verification).
+
+There are no waves in the workshop. Free editing here does not decide combat route locks, between-wave redraw rules, or expansion behavior.
+
 ### Open implementation-shaping decisions
 
-- Initial path-budget size, whether every tile must be used, and the timing and amounts of milestone-based path-tile and whole-board growth.
-- Movement adjacency, equal-length route selection, and how the route preview explains shortcuts.
+- Initial path-budget size and the timing and amounts of milestone-based path-tile and whole-board growth.
+- Final route-preview presentation; equal-length route selection currently uses the workshop's deterministic convention.
 - Whether paths can be redrawn freely between waves and whether unused tiles are retained.
 - Placement relative to path tiles, initial board dimensions, terrain, and the placement of the fixed entrance and crystal.
 - How much of the opposing board is visible at once.
@@ -187,11 +197,11 @@ The first implementation milestone remains deliberately smaller than the full di
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. A simultaneous defeat rule must be chosen before completion.
 
-This milestone is not the finished game and does not discard the requested abilities, other buildings, map interactions, gambling, traits, collection, or escalation. Those systems need concrete rules and later playable milestones. No gameplay implementation begins as part of this specification work.
+This milestone is not the finished game and does not discard the requested abilities, other buildings, map interactions, gambling, traits, collection, or escalation. Those systems need concrete rules and later playable milestones. The approved path workshop proves only local editing and routing, not the multiplayer/combat milestone.
 
 ## Decisions still needed before their implementation
 
-- **Board interaction:** path-budget and map-expansion rules, shortest-route details, placement relative to the path, initial entrance/crystal positions, and sale/refund rules.
+- **Board interaction:** final path-budget and map-expansion rules, placement relative to the path, final entrance/crystal positions, and sale/refund rules.
 - **Run pacing:** confirm board continuity; define round boundaries, wave scheduling, the fixed/ready-up planning timer, send cutoff timing, endgame pressure, and simultaneous defeat.
 - **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules and the initial structure/enemy archetypes, targeting, attacks, defenses, and counters.
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.

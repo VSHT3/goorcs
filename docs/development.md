@@ -4,7 +4,7 @@
 
 1. Install the standard Godot **4.7.2 stable** executable from the [official downloads](https://godotengine.org/download/). Keep collaborators on the same version; upgrade deliberately.
 2. Clone the private repository and import `project.godot` into Godot.
-3. Run the main scene with F5. The initial application displays the Goorcs title.
+3. Run the main scene with F5. The application opens the playable path workshop.
 
 No Node.js, .NET SDK, external packages, export templates, or MCP servers are required to run the current project in Godot. Export templates will be needed when distributing desktop builds.
 
@@ -25,6 +25,9 @@ godot --headless --path . --import
 
 # Smoke-run the current main scene, then quit.
 godot --headless --path . --quit-after 10
+
+# Run path-rule regressions.
+godot --headless --path . --script tests/path_layout_test.gd
 ```
 
 A headless pass verifies that the project loads and runs, not that the visuals or interactions are correct. Inspect runtime errors as well as the exit status.
@@ -89,9 +92,15 @@ Generate assets during development and ship ordinary image files. Players should
 References: [PixelLab MCP documentation](https://api.pixellab.ai/mcp/docs), [PixelLab API pricing and estimate caveats](https://www.pixellab.ai/pixellab-api), and [Retro Diffusion capabilities and pricing](https://retrodiffusion.ai/).
 
 
-## Initialization verification
+## Path workshop verification
 
-The project initialization is checked with a headless resource import and main-scene run. Graphical appearance, input interaction, desktop exports, and internet multiplayer require separate verification.
+The resource import, main-scene headless run, and path-rule regression command above pass. Regressions cover budget rejection/refunds, immutable endpoints, out-of-bounds placement, shortcut selection, disconnected islands, edge-only adjacency, and deterministic equal-length routes.
+
+The graphical scene was exercised through mouse input: placement, dragging, bridge removal, endpoint protection, isolated-tile removal, budget rejection, and the clear button. Rendered screenshots were inspected for clipping and route readability. The desktop run used Intel OpenGL after NVIDIA driver warnings.
+
+For manual verification, connect E to B, create a longer branch and a shortcut, remove a connecting tile, add/remove an isolated tile, exhaust the budget, and clear the board. Check that readiness, budget, and route preview follow each edit. Resize the window and check that controls remain visible and mouse coordinates still match tiles.
+
+Desktop exports, combat, and internet multiplayer are not verified or implemented.
 
 ## Shareable game brief
 

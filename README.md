@@ -4,13 +4,23 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Minimal Godot initialization only: a runnable title scene and project documentation. Gameplay, multiplayer, progression, and assets have not been implemented. No MCP plugin is installed.
+Playable local path-building prototype: place/remove square-grid path tiles, track a maximum budget, validate connectivity, and preview the shortest entrance-to-base route. Combat, multiplayer, progression, and final art are not implemented. No MCP plugin is installed.
 
 ## Run
 
 Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.
 
 For command-line launch and verification, see the [development commands](docs/development.md#setup).
+
+## Path workshop
+
+- Left click or drag to place tiles; right click or drag to remove them. **Clear placed tiles** resets the board.
+- Only shared edges connect. Entrance and base are fixed and do not spend budget.
+- Unused budget is allowed. A ready layout connects the base and every placed tile to the entrance.
+- The green line previews the shortest route, not placement order. Branches and adjacent sections can create shortcuts.
+- The 14×9 board, opposite-side endpoints, and 30-tile maximum are provisional. Adjust the main scene's exported settings together in the Inspector.
+
+This workshop does not simulate waves, enemies, or combat-time route locking.
 
 ## Documentation
 
@@ -24,7 +34,9 @@ For command-line launch and verification, see the [development commands](docs/de
 ```text
 project.godot       Engine settings and main scene
 AGENTS.md          Repository editing instructions
-scenes/main.tscn    Initial title scene
+scenes/main.tscn    Playable path workshop
+scripts/           Path rules, board drawing/input, and UI controller
+tests/             Headless path-rule regressions
 docs/              Project documentation
 ```
 
