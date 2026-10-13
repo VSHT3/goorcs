@@ -11,6 +11,9 @@ No Node.js, .NET SDK, external packages, export templates, or MCP servers are re
 The commands below assume the Godot binary is available as `godot`; substitute its absolute path if necessary.
 
 ```sh
+# Confirm the installed version matches the required release above.
+godot --version
+
 # Open the editor.
 godot --editor --path .
 
@@ -26,15 +29,9 @@ godot --headless --path . --quit-after 10
 
 A headless pass verifies that the project loads and runs, not that the visuals or interactions are correct. Inspect runtime errors as well as the exit status.
 
-## Agent conventions
+## Repository editing rules
 
-- Prefer small, playable changes and recoverable Git commits.
-- Use typed GDScript and ordinary Godot scenes/resources. Do not introduce a custom engine or framework without a concrete need.
-- Keep gameplay data separate from behavior as actual content is introduced.
-- Keep documentation accurate about what exists versus what is only proposed.
-- Do not introduce paid services, MCP plugins, public access, or credentials without an explicit project decision.
-- Do not overwrite unsaved editor changes. Coordinate file edits and editor saves.
-- Commit source scenes, scripts, resources, and Godot UID sidecars. Do not commit `.godot/`, build outputs, or credentials.
+Read [AGENTS.md](../AGENTS.md) before editing. It owns implementation conventions, future state-ownership constraints, scope boundaries, and completion requirements. This document owns the engine release and executable commands; update them here rather than maintaining duplicate copies.
 
 ## Verification as the game grows
 

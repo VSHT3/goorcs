@@ -14,8 +14,7 @@ Goorcs is a private game for its creators and a small group of friends. It combi
 
 ## Technical baseline
 
-- Godot 4.7.2 stable, standard edition.
-- Typed GDScript when gameplay scripts are introduced.
+- Engine release and implementation conventions: [development setup](development.md#setup) and [agent instructions](../AGENTS.md).
 - Compatibility renderer and nearest-neighbor texture filtering as the starting point for 2D pixel art.
 - Text-authored scenes and resources, kept under Git.
 - No required MCP dependency. Editor automation is development tooling, not a game feature.

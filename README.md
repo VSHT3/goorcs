@@ -8,24 +8,21 @@ Minimal Godot initialization only: a runnable title scene and project documentat
 
 ## Run
 
-Use **Godot 4.7.2 stable, standard edition** (not the .NET edition). Import `project.godot` into Godot and press **F6** to run the open scene, or **F5** to run the project.
+Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.
 
-With the Godot executable available as `godot` on your PATH:
-
-```sh
-godot --editor --path .
-godot --path .
-```
+For command-line launch and verification, see the [development commands](docs/development.md#setup).
 
 ## Documentation
 
+- [Agent instructions](AGENTS.md): required reading, editing rules, state ownership, and completion criteria.
 - [Game direction](docs/game-direction.md): intended experience, technical decisions, and first playable milestone.
-- [Development workflow](docs/development.md): setup, agent conventions, verification, and optional MCP tooling.
+- [Development workflow](docs/development.md): setup, verification, and optional MCP tooling.
 
 ## Layout
 
 ```text
 project.godot       Engine settings and main scene
+AGENTS.md          Repository editing instructions
 scenes/main.tscn    Initial title scene
 docs/              Project documentation
 ```
