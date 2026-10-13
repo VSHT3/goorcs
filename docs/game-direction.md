@@ -18,7 +18,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - **Desktop first:** downloadable game; exact desktop operating systems are still open.
 - **1v1:** both players defend against regular waves and opponent-sent enemies while trying to defeat each other.
 - **Two boards:** players can observe both sides and move the camera to inspect the opponent. Camera movement does not imply a playable character walking across the map.
-- **Player-built routes:** placement freedom and shaping the enemy path are central sources of strategy.
+- **Player-authored routes:** each player lays out a connected path from the entrance to the base using an equal budget of path tiles on a square grid. Towers are not the mechanism that defines the route.
 - **Longer runs:** favor substantial build development over a quick duel. Exact duration is open.
 - **Persistent progression:** unlock more options and some lasting stat changes. Equal starting power is not a requirement.
 - **Escalation:** an initially small defense grows into much larger and more intense combat over the course of a run.
@@ -29,6 +29,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 
 - A **run** is the complete 1v1 contest. Enemies reaching a base damage it; a destroyed base ends the entire run.
 - Base health carries between rounds. Losing a base is not merely losing one round or spending a run life.
+- A crystal is the current suggested representation of the base and its health; its exact appearance is not finalized.
 - A **wave** is a group of regular enemies. Opponent-sent enemies provide additional pressure; exact delivery timing is open.
 - The desired format combines a standalone competitive match with development across multiple encounters.
 
@@ -36,7 +37,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 
 Keep and expand the same maze, towers, and upgrades throughout the run. A **round** would be a stage introducing threats, rewards, or modifiers, rather than a fresh scored match. The creator is leaning toward this continuity but has not finalized it.
 
-The number of waves per round, round boundaries, breaks, boss cadence, and what else carries over are open. Breaks may exist, but they are not the only time construction is allowed.
+The number of waves per round, round boundaries, boss cadence, and what else carries over are open. Construction is not limited to breaks. For planning breaks, the creator is considering a fixed timer, a player-ready action that starts a short countdown for the opponent, or a combination. **30 seconds was an example, not a chosen duration.** Neither the trigger nor the final timing is locked.
 
 ## Core player loop
 
@@ -44,7 +45,7 @@ This is the conceptual sequence, not a fixed wave schedule or finalized reward c
 
 1. Outside the run, use earned progression rewards for collection pulls and lasting development.
 2. Choose a limited loadout from the permanent collection before entering the run.
-3. Start with a small defense. Buy known units from the loadout, receive randomized bonuses, and arrange defenses to shape an open route.
+3. Start with a small defense. Lay out a legal entrance-to-base route using the path-tile budget, buy known units from the loadout with randomized bonuses, and position defenses around that route.
 4. During waves, defend and actively develop the board, use available abilities and interactions, scout, and time enemy sends.
 5. Balance immediate defense against spending on sends that increase future income. Develop towers and adapt to random rewards and escalating threats.
 6. Continue the competitive run until a base is destroyed.
@@ -54,18 +55,37 @@ This is the conceptual sequence, not a fixed wave schedule or finalized reward c
 
 ### Confirmed
 
-Players can construct and alter the route enemies must follow. An open route to the base must always exist; reject placements that seal it or trap an enemy. A completely blocked route is not resolved by enemies destroying walls or towers.
+Players lay walkable path tiles on a square grid. Both players start with the same path-tile budget, and the tiles must connect the entrance to the base. **30 tiles was an example, not a chosen balance value.** Whether the full budget must be used is still open.
 
-Building remains available during combat. The map must therefore support legal changes while enemies are already traversing it.
+Enemies take the shortest route across connected path tiles. They do not follow the order in which the player placed the tiles. Adjacent path sections can therefore create shortcuts. This replaces the earlier tower-blocked-maze assumption: towers and walls do not define the enemy route by blocking otherwise walkable ground.
+
+Both the available path tiles and the map's buildable area grow during the run. The whole board expands at milestones rather than the player selecting individual land sections to unlock. Milestone timing, amounts, and whether both players expand at the same time remain open.
+
+The current wave's route is preserved throughout combat. Redesigning the route happens between waves, not as a tactic for repeatedly redirecting moving enemies.
+
+Buildings also use square-grid placement. Building, upgrading, and selling remain available during combat, but must not invalidate the current route. Tower relocation that preserves upgrades and traits is free during breaks only; it is not available during combat.
+
+Some major tower upgrades expand their occupied footprint. An expanding upgrade requires surrounding space and cannot overlap another building or obstruct the route. Players therefore need to plan room for future growth.
 
 ### Open implementation-shaping decisions
 
-- Grid-snapped placement, free-positioned footprints, or another placement representation.
-- Whether towers themselves block movement, dedicated walls shape routes, or both.
-- Whether upgraded towers change their occupied footprint or only their visual size.
-- Whether a placed tower can be moved directly, rather than sold and bought again.
-- The cost and limits of rebuilding so players cannot stall enemies indefinitely by alternating routes. Keeping a route open alone does not prevent that exploit.
-- Board symmetry, terrain, entrances, exits, and how much of the opposing board is visible at once.
+- Initial path-budget size, whether every tile must be used, and the timing and amounts of milestone-based path-tile and whole-board growth.
+- Movement adjacency, equal-length route selection, and how the route preview explains shortcuts.
+- Whether paths can be redrawn freely between waves and whether unused tiles are retained.
+- Placement relative to path tiles, board dimensions, terrain, and entrance/base positions as the map expands.
+- How much of the opposing board is visible at once.
+- Sale refunds, purchase/roll costs, and restrictions needed to prevent unlimited trait rerolls through sale/rebuy.
+
+### Commanders and board identity
+
+**Confirmed:** the starting hero is an off-board commander, not a controllable character or a defender placed on the battlefield. Normal defenses are mostly physical structures. Commanders can provide identity and special rules without adding character movement to the camera-controlled game.
+
+Mechanically meaningful board variety is desired, not just cosmetic recoloring. The relationship between commander and map remains open, with both possibilities retained:
+
+- **Commander-linked boards:** the chosen commander determines or modifies terrain, special zones, expansion behavior, or other board mechanics.
+- **Independent commander and map choices:** a map has its own mechanical identity, while the commander supplies a separate set of rules or abilities. Different combinations are possible rather than each commander being tied to one map.
+
+Matching starting boards with different player-authored paths also remains an available direction. No final symmetry rule or commander/map coupling has been chosen. Concrete commander abilities, selection rules, and board differences still need examples before this system is specified.
 
 ## Active play during combat
 
@@ -81,7 +101,13 @@ The latest decision supersedes the earlier build-only-during-breaks proposal. Pl
 - Gamble during the run.
 - Scout the opposing board.
 
-These are desired action categories, not defined content lists. Ability targeting and costs, map interactions, non-tower building roles, and gambling rules remain open. Free relocation of existing towers has not been confirmed.
+These are desired action categories, not defined content lists. Concrete ability effects and costs, map interactions, non-tower building roles, and gambling rules remain open. Direct relocation is free only during breaks; combat-time construction, upgrades, and selling must preserve the current route.
+
+### Abilities across both boards
+
+**Confirmed:** abilities can affect both the player's own board and the opponent's board. Offense is not restricted to sending enemies or buffing sent units.
+
+Exact effects, eligible targets, resource costs, cooldowns, visibility, and ways to respond remain open. Clear warnings or counterplay for powerful disruption are design proposals to evaluate, not an implemented system. A spell's ability to target the opposing board does not implicitly permit editing its path, violating route locks, or bypassing the open-route requirement.
 
 ## Collection, loadouts, and tower growth
 
@@ -95,15 +121,21 @@ Choose a limited loadout before a run. That loadout determines the known unit ty
 
 **Choose the unit identity, randomize its bonuses.** Buying a tower is not a roll for an unknown tower type. Bonuses should include both numerical stats and meaningful traits that can affect behavior or synergies.
 
-Random upgrade/reward choices also remain part of the desired roguelite direction. Their cadence and relationship to tower traits are open. In-run gambling is desired, but it has not been defined as rerolling, a separate wager, or another mechanic.
+Random upgrade/reward choices also remain part of the desired roguelite direction. Their cadence and relationship to tower traits are open. In-run gambling should include several activities at different risk levels, rather than a single universal reroll action.
 
 When bonuses become visible, whether players can reroll them, what can stack, and how sale/rebuy affects a roll are open. Do not assume a bench or automatic random placement.
 
 ### Tower growth and reset
 
-Buy upgrades for individual towers. Duplicate merging is not the chosen in-run upgrade system. Upgrade branches, costs, and trait interactions are open.
+Buy levels for individual towers, with occasional major branching evolutions that change role, appearance, and sometimes occupied footprint. Duplicate merging is not the chosen in-run upgrade system. Specific evolution branches, commitment or respec rules, costs, and trait interactions are open.
 
 Run-specific towers, traits, upgrades, and perks reset after the run rather than being carried home as items. The enduring reward is currency for collection pulls and permanent progression. How victory, defeat, survival, and run length affect payouts is open.
+
+### Gambling: multiple risk levels
+
+**Confirmed:** the desired system includes several kinds of in-run gambling with different stakes. Candidates discussed are paying to reroll a tower's bonuses, wagering currency for random rewards, and risking an existing tower for a transformation.
+
+The choice of multiple activities does not yet lock in all three candidates or their failure outcomes. Which activities ship, what can be lost, whether an outcome can be declined, odds disclosure, costs, and safeguards against repeatable exploits remain open. This is part of the game's resource economy; no real-money gambling or purchases have been requested.
 
 ## Economy and attacking
 
@@ -122,7 +154,7 @@ These are risks, not decisions to remove progression, income growth, or randomne
 
 ## World, art, and escalation
 
-**Confirmed:** top-down pixel art, broader fantasy, with orcs as the foundation rather than the only possible faction. Exact factions, tone, unit roster, palette, asset sources, and pixel resolution are open.
+**Confirmed:** top-down pixel art, broader fantasy, with orcs as the foundation rather than the only possible faction. Defenses are mostly physical structures rather than stationed characters or creatures. Exact factions, tone, structure roster, palette, asset sources, and pixel resolution are open.
 
 The run should start small and become increasingly extreme: larger towers, stronger and more spectacular spells, and much higher enemy density. This is a desired experience, not a measured engine capacity or a fixed enemy-count target.
 
@@ -145,8 +177,8 @@ The first implementation milestone remains deliberately smaller than the full di
 
 1. Two players connect, each with a board and camera access to inspect the opponent.
 2. At least one known tower type and one enemy type support a basic defense loop.
-3. Tower placement shapes enemy routes; invalid blocking placements are rejected without spending currency.
-4. Construction, individual upgrades, and selling work during combat; route-switching restrictions are explicitly chosen before this is considered complete.
+3. Each player draws a legal path within an equal tile budget. Enemies follow the chosen route; route edits are unavailable during the current wave.
+4. Construction, individual upgrades, and selling work during combat without obstructing the route. Direct relocation is free only during breaks; expanding upgrades require a legal enlarged footprint.
 5. Regular waves threaten both bases. Sending enemies costs currency and increases the sender's future income.
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. A simultaneous defeat rule must be chosen before completion.
@@ -155,10 +187,10 @@ This milestone is not the finished game and does not discard the requested abili
 
 ## Decisions still needed before their implementation
 
-- **Board interaction:** placement representation, what blocks movement, direct relocation, upgrade footprints, refund rules, and route-switching limits.
-- **Run pacing:** confirm board continuity; define round boundaries, wave scheduling, breaks, send delivery timing, endgame pressure, and simultaneous defeat.
-- **Tower and enemy content:** initial archetypes, targeting, attacks, enemy defenses, and counters.
-- **Active systems:** abilities, map interactions, non-tower buildings, and the exact gambling mechanic.
+- **Board interaction:** path-budget and map-expansion rules, shortest-route details, placement relative to the path, entrance/base positions, and sale/refund rules.
+- **Run pacing:** confirm board continuity; define round boundaries, wave scheduling, the fixed/ready-up planning timer, send delivery timing, endgame pressure, and simultaneous defeat.
+- **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules and the initial structure/enemy archetypes, targeting, attacks, defenses, and counters.
+- **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.
 - **Randomness and progression:** trait reveal/reroll rules, run reward choices, loadout limits, starter collection, permanent stat growth, and post-run payouts.
 - **Balance and readability:** intended duration, economic scaling, late-run density, visual hierarchy, and performance targets.
 - **Delivery:** desktop operating systems, save ownership, collection persistence, and connection setup.
