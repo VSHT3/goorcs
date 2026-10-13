@@ -4,7 +4,7 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path-building prototype: place/remove square-grid path tiles, track a maximum budget, validate connectivity, and preview the shortest entrance-to-base route. Combat, multiplayer, progression, and final art are not implemented. No MCP plugin is installed.
+Playable local path-building prototype with a main menu: place/remove square-grid path tiles, track a maximum budget, validate connectivity, and preview the shortest entrance-to-base route. Combat, multiplayer, progression, and final art are not implemented. No MCP plugin is installed.
 
 ## Run
 
@@ -14,6 +14,8 @@ For command-line launch and verification, see the [development commands](docs/de
 
 ## Path workshop
 
+- Choose **Open workshop** from the main menu. **Menu / Esc** returns to it; **Resume workshop** or Esc resumes without clearing tiles.
+- Menu navigation preserves the layout only for this session. **Quit** exits; layouts are not saved after quitting.
 - Left click or drag to place tiles; right click or drag to remove them. **Clear placed tiles** resets the board.
 - Only shared edges connect. Entrance and base are fixed and do not spend budget.
 - Unused budget is allowed. A ready layout connects the base and every placed tile to the entrance.

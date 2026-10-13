@@ -56,11 +56,18 @@ func _gui_input(event: InputEvent) -> void:
 		var motion := event as InputEventMouseMotion
 		_hover = _cell_at(motion.position)
 		# Releases outside the board must not leave painting latched on.
-		if not Input.is_mouse_button_pressed(_paint_button):
+		if _paint_button != MOUSE_BUTTON_NONE and not Input.is_mouse_button_pressed(_paint_button):
 			_paint_button = MOUSE_BUTTON_NONE
 		if _paint_button != MOUSE_BUTTON_NONE:
 			_paint(_hover)
 		queue_redraw()
+
+
+func cancel_stroke() -> void:
+	_paint_button = MOUSE_BUTTON_NONE
+	_last_painted = Vector2i(-1, -1)
+	_hover = Vector2i(-1, -1)
+	queue_redraw()
 
 
 func _paint(cell: Vector2i) -> void:

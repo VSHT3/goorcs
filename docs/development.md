@@ -4,7 +4,7 @@
 
 1. Install the standard Godot **4.7.2 stable** executable from the [official downloads](https://godotengine.org/download/). Keep collaborators on the same version; upgrade deliberately.
 2. Clone the private repository and import `project.godot` into Godot.
-3. Run the main scene with F5. The application opens the playable path workshop.
+3. Run the main scene with F5. Choose **Open workshop** from the main menu.
 
 No Node.js, .NET SDK, external packages, export templates, or MCP servers are required to run the current project in Godot. Export templates will be needed when distributing desktop builds.
 
@@ -28,6 +28,9 @@ godot --headless --path . --quit-after 10
 
 # Run path-rule regressions.
 godot --headless --path . --script tests/path_layout_test.gd
+
+# Run navigation and drawing-state regressions.
+godot --headless --path . --script tests/navigation_test.gd
 ```
 
 A headless pass verifies that the project loads and runs, not that the visuals or interactions are correct. Inspect runtime errors as well as the exit status.
@@ -98,7 +101,13 @@ The resource import, main-scene headless run, and path-rule regression command a
 
 The graphical scene was exercised through mouse input: placement, dragging, bridge removal, endpoint protection, isolated-tile removal, budget rejection, and the clear button. Rendered screenshots were inspected for clipping and route readability. The desktop run used Intel OpenGL after NVIDIA driver warnings.
 
+Navigation regressions pass both headlessly and graphically: keyboard opening/resuming, returning while drawing, preserving the route and budget, rejecting edits on the hidden board, idle hovering, and releasing the mouse outside the board. Idle motion checks the held-button state only when a drawing button is active; passing `MOUSE_BUTTON_NONE` to Godot's button query is invalid. Menu transitions cancel the stroke so returning cannot continue a stale drag.
+
+The main menu, session-resume menu, and compact workshop were visually inspected. The actual Quit button terminated the graphical process. Menu navigation preserves the existing layout but does not save it to disk.
+
 For manual verification, connect E to B, create a longer branch and a shortcut, remove a connecting tile, add/remove an isolated tile, exhaust the budget, and clear the board. Check that readiness, budget, and route preview follow each edit. Resize the window and check that controls remain visible and mouse coordinates still match tiles.
+
+Also open the workshop by keyboard, draw while holding the mouse and press Esc, release outside the board, and resume. Hovering must not draw or emit mouse-button errors. Return through the Menu button and resume again; budget and route must remain unchanged.
 
 Desktop exports, combat, and internet multiplayer are not verified or implemented.
 

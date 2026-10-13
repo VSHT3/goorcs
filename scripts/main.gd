@@ -7,12 +7,16 @@ extends Control
 @export var base_cell := Vector2i(13, 4)
 
 var layout: PathLayout
+var _workshop_opened: bool = false
 
 @onready var board: PathBoard = $Margin/Content/Workspace/Board
 @onready var status: Label = $Margin/Content/Workspace/Sidebar/Status
 @onready var budget_label: Label = $Margin/Content/Workspace/Sidebar/Budget
 @onready var route_label: Label = $Margin/Content/Workspace/Sidebar/Route
 @onready var feedback_label: Label = $Margin/Content/Feedback
+@onready var menu: Control = $Menu
+@onready var workshop: Control = $Margin
+@onready var open_button: Button = $Menu/Center/Panel/Open
 
 
 func _ready() -> void:
@@ -21,8 +25,42 @@ func _ready() -> void:
 	board.edited.connect(_refresh)
 	board.feedback.connect(_show_feedback)
 	$Margin/Content/Workspace/Sidebar/Clear.pressed.connect(_clear)
+	open_button.pressed.connect(_open_workshop)
+	$Menu/Center/Panel/Quit.pressed.connect(_quit)
+	$Margin/Content/Header/Menu.pressed.connect(_show_menu)
 	$Margin/Content/Workspace/Sidebar/Settings.text = "%d × %d board · %d tile maximum\nTemporary prototype settings" % [board_dimensions.x, board_dimensions.y, tile_budget]
 	_refresh()
+	_show_menu()
+
+
+func _open_workshop() -> void:
+	_workshop_opened = true
+	menu.hide()
+	workshop.show()
+	$Margin/Content/Header/Menu.grab_focus()
+
+
+func _show_menu() -> void:
+	board.cancel_stroke()
+	workshop.hide()
+	menu.show()
+	open_button.text = "Resume workshop" if _workshop_opened else "Open workshop"
+	open_button.grab_focus()
+
+
+func _quit() -> void:
+	get_tree().quit()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		var key := event as InputEventKey
+		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
+			if workshop.visible:
+				_show_menu()
+			elif _workshop_opened:
+				_open_workshop()
+			get_viewport().set_input_as_handled()
 
 
 func _refresh() -> void:
