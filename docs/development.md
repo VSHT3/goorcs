@@ -93,6 +93,14 @@ Keep development automation local, enable available connection authentication, a
 - Textures are losslessly imported without mipmaps, rendered with nearest filtering, and drawn at integer scale. More than three reward cards use a smaller chest so the open lid does not overlap the cards.
 - Verified the original closed pixels and retained lower-body pixels, then inspected closed, opening, open, compact, and five-card surfaces in the graphical game. The layout regression also rejects reward cards overlapping the chest. Supplied source originals remain untouched.
 
+### Accepted base crossbow tower sprite
+
+`assets/towers/ballista_tower.png` is the accepted 96×96 PixelLab output `pixellab-A-gigantic-orc-siege-ballista--1791921366109.png`, copied byte-for-byte without refinement. It supplies the existing `orc_ballista` reward's base art; the saved ID, title, reward rules, and unlock state are unchanged.
+
+`TowerReward.icon_texture` holds imported icon art. The shared `RewardIcon` renderer fits it without stretching in both the collection archive and chest rewards, with dimming for locked entries. Arrow tower and Rune obelisk retain their procedural icons; the obsolete procedural ballista drawing was removed.
+
+The source/copy checksums match. Graphical verification inspected locked, unlocked reward, and compact collection states, and reloaded the same saved ballista ID. Layout regressions use the real catalog icons. This establishes collection/base artwork, not combat behavior, a board camera angle, or an upgraded tower.
+
 ### Next board-art trial
 
 Choose a shared camera angle, outline style, palette, and pixel scale before generating a small sample:

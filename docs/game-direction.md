@@ -136,7 +136,7 @@ Choose a limited loadout before a run. That loadout determines the known unit ty
 
 - **Approved prototype rules:** free chest openings on the collection screen; unlock only missing tower types, without duplicates. Openings stop when the catalog is exhausted.
 - **Provisional payout odds:** roll one reward 80% of the time, three 15%, and five 5%; cap to the number of types still locked. The initial three-entry catalog means a five-roll can grant at most three actual rewards.
-- **Initial identities:** Arrow tower, Orc ballista, Rune obelisk. They have resource definitions and original procedural icons, but no combat stats or behavior.
+- **Initial identities:** Arrow tower, Orc ballista, Rune obelisk. The ballista uses the accepted user-supplied PixelLab crossbow-tower sprite unchanged as its base art; the other two icons remain procedural. These are collection identities with no combat stats or behavior.
 - **Ownership:** `CollectionStore` selects the rewards and atomically saves the complete unlocked set before granting it in memory. Invalid saves or write failures disable openings and grant nothing; existing saved data is not silently replaced.
 - **Presentation:** `ChestReveal` only displays a supplied reward list. User-supplied PixelLab chest sprites provide closed/open poses; the fixed body stays unchanged while the lid/interior crossfades. Shake, light, decorative coins, and simultaneous reward cards remain separate. This borrows the chest-reveal idea, not assets or a roulette reel. Skipping or navigation cannot reroll or grant rewards.
 - **Persistence:** a local `user://collection.json` save belongs to one running game instance. There is no cloud sync, account, concurrent-writer coordination, or host-authoritative match reward integration.

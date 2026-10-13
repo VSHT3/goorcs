@@ -25,11 +25,7 @@ func _run() -> void:
 	for count: int in [1, 3, 5]:
 		var rewards: Array[TowerReward] = []
 		for index: int in range(count):
-			var reward := TowerReward.new()
-			reward.id = StringName("presentation_test_%d" % index)
-			reward.title = "Rune obelisk" if index % 2 == 0 else "Orc ballista"
-			reward.icon_kind = index % 3
-			rewards.append(reward)
+			rewards.append(CollectionStore.DEFAULT_CATALOG[index % CollectionStore.DEFAULT_CATALOG.size()])
 		reveal.present(rewards)
 		reveal.skip()
 		reveal.skip()

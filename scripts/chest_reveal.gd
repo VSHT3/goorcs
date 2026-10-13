@@ -36,6 +36,14 @@ class RewardIcon extends Control:
 	func _draw() -> void:
 		if reward == null:
 			return
+		if reward.icon_texture != null:
+			var texture_size: Vector2 = reward.icon_texture.get_size()
+			var scale: float = minf(size.x / texture_size.x, size.y / texture_size.y)
+			var extent: Vector2 = (texture_size * scale).floor()
+			var rect := Rect2(((size - extent) * 0.5).round(), extent)
+			var tint: Color = Color(0.55, 0.55, 0.55) if locked else Color.WHITE
+			draw_texture_rect(reward.icon_texture, rect, false, tint)
+			return
 		var ink: Color = Color("65716a") if locked else reward.accent
 		var pixel_scale: float = minf(size.x, size.y) / 48.0
 		ChestReveal.paint_icon(self, size * 0.5 + Vector2(0.0, 4.0 * pixel_scale), pixel_scale, reward.icon_kind, ink)
@@ -308,19 +316,6 @@ static func paint_icon(canvas: CanvasItem, center: Vector2, pixel_scale: float, 
 			_pixel(canvas, -1, -23, 2, 12, wood)
 			_pixel(canvas, 1, -22, 9, 5, accent)
 		1:
-			_pixel(canvas, -12, 1, 6, 14, INK)
-			_pixel(canvas, 6, 1, 6, 14, INK)
-			_pixel(canvas, -10, 2, 3, 11, wood)
-			_pixel(canvas, 7, 2, 3, 11, wood)
-			_pixel(canvas, -17, -9, 34, 6, INK)
-			_pixel(canvas, -16, -8, 32, 3, wood)
-			_pixel(canvas, -18, -7, 4, 9, accent)
-			_pixel(canvas, 14, -7, 4, 9, accent)
-			_pixel(canvas, -2, -17, 4, 28, INK)
-			_pixel(canvas, -1, -17, 2, 25, stone)
-			_pixel(canvas, -4, -19, 8, 3, accent)
-			_pixel(canvas, -6, 3, 12, 6, wood)
-		2:
 			_pixel(canvas, -12, 10, 24, 6, shadow)
 			_pixel(canvas, -8, -17, 16, 29, INK)
 			_pixel(canvas, -6, -16, 12, 28, stone)

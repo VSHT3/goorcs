@@ -7,5 +7,5 @@ script = ExtResource("1_reward")
 id = &"rune_obelisk"
 title = "Rune obelisk"
 description = "Ancient stone threaded with glowing runes."
-icon_kind = 2
+icon_kind = 1
 accent = Color(0.43, 0.71, 0.69, 1)
