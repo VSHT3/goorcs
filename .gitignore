@@ -1,0 +1,18 @@
+# Godot-generated cache and editor state.
+.godot/
+
+# Exported builds and credentials.
+builds/
+exports/
+export_credentials.cfg
+
+# Local agent configuration, secrets, and research cache.
+.env
+.env.*
+!.env.example
+.mcp.json
+.firecrawl/
+
+# OS-generated files.
+.DS_Store
+Thumbs.db
