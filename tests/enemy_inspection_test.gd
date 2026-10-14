@@ -41,9 +41,9 @@ func _run() -> void:
 	rules.base_health = 100
 	rules.enemy_health = 40
 	rules.enemy_speed = 2.0
-	rules.enemies_per_wave = 3
+	rules.wave_weight = 3
 	rules.spawn_interval = 0.9
-	rules.count_growth = 0
+	rules.wave_weight_growth = 0
 	main.combat_rules = rules
 	root.add_child(main)
 	await _open_match()

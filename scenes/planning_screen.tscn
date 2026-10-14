@@ -1,9 +1,11 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/planning_screen.gd" id="1_planning"]
 [ext_resource type="PackedScene" path="res://scenes/match_world.tscn" id="2_world"]
 [ext_resource type="FontFile" path="res://assets/fonts/silkscreen/Silkscreen-Regular.ttf" id="3_numbers"]
 [ext_resource type="PackedScene" path="res://scenes/enemy_inspector.tscn" id="4_inspector"]
+[ext_resource type="Texture2D" path="res://assets/ui/speed_normal.svg" id="5_speed"]
+[ext_resource type="Texture2D" path="res://assets/ui/autoplay.svg" id="7_autoplay"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_hud"]
 bg_color = Color(0.10, 0.145, 0.13, 0.96)
@@ -107,6 +109,31 @@ tooltip_text = "Waiting for host enemy types and send rules."
 theme_override_fonts/font = ExtResource("3_numbers")
 theme_override_font_sizes/font_size = 16
 text = "Send unavailable"
+
+[node name="Pacing" type="HBoxContainer" parent="HUD/Header/Content/Summary"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Speed" type="Button" parent="HUD/Header/Content/Summary/Pacing"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(42, 34)
+layout_mode = 2
+toggle_mode = true
+icon = ExtResource("5_speed")
+icon_alignment = 1
+theme_override_colors/icon_normal_color = Color(0.878, 0.737, 0.467, 1)
+tooltip_text = "2× speed"
+
+[node name="Autoplay" type="Button" parent="HUD/Header/Content/Summary/Pacing"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(42, 34)
+layout_mode = 2
+toggle_mode = true
+icon = ExtResource("7_autoplay")
+icon_alignment = 1
+theme_override_colors/icon_normal_color = Color(0.878, 0.737, 0.467, 1)
+tooltip_text = "Autoplay"
 
 [node name="Leave" type="Button" parent="HUD/Header/Content/Summary"]
 unique_name_in_owner = true

@@ -7,6 +7,12 @@ extends Resource
 @export_multiline var description: String
 @export var health_multiplier: float = 1.0
 @export var speed_multiplier: float = 1.0
+@export var base_damage: int = 1
+@export var spawn_weight: int = 1
+@export var first_wave: int = 1
+# Zero means unlimited. Share caps this type's total weight, not its head count.
+@export var max_per_wave: int = 0
+@export_range(0.0, 1.0) var max_weight_share: float = 1.0
 @export var send_cost: int = 20
 @export var send_income: int = 2
 @export var texture: Texture2D

@@ -23,6 +23,8 @@ var _base: Vector2i = Vector2i(13, 4)
 var _host_layouts: Array[PathLayout] = []
 var _host_ready: Array[bool] = [false, false]
 var _host_routes: Array[Array] = [[], []]
+var _host_speed_votes: Array[bool] = [false, false]
+var _host_autoplay_votes: Array[bool] = [false, false]
 var _host_locked: bool = false
 var _active_peer_id: int = 0
 var _synced_guest_id: int = 0
@@ -35,13 +37,18 @@ func _physics_process(delta: float) -> void:
 	if not active or (not singleplayer and not session.is_host) or _host_combat.phase != MatchCombat.Phase.WAVE:
 		return
 	var previous_phase: MatchCombat.Phase = _host_combat.phase
-	if not _host_combat.advance(delta):
+	if not _host_combat.advance(delta * _speed_multiplier()):
 		return
 	_combat_publish_elapsed += delta
 	if _host_combat.phase != previous_phase:
 		_host_locked = _host_combat.phase != MatchCombat.Phase.PLANNING
 		_host_ready = [false, false]
-		set_physics_process(false)
+		if _host_combat.phase == MatchCombat.Phase.FINISHED:
+			_host_speed_votes = [false, false]
+			_host_autoplay_votes = [false, false]
+		elif _autoplay_enabled():
+			_try_start_wave()
+		set_physics_process(_host_combat.phase == MatchCombat.Phase.WAVE)
 		_publish_snapshot()
 	elif _combat_publish_elapsed >= 0.1:
 		_combat_publish_elapsed = 0.0
@@ -94,6 +101,12 @@ func request_clear(slot: int) -> void:
 
 func submit_ready(value: bool) -> void:
 	_request_command("ready", local_slot(), Vector2i.ZERO, value)
+
+
+func request_pacing(option: String, enabled: bool) -> void:
+	if option not in ["speed", "autoplay"]:
+		return
+	_request_command(option, local_slot(), Vector2i.ZERO, enabled)
 
 
 func build_tower(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> void:
@@ -183,6 +196,8 @@ func _reset_match() -> void:
 	]
 	_host_ready = [false, false]
 	_host_routes = [[], []]
+	_host_speed_votes = [false, false]
+	_host_autoplay_votes = [false, false]
 	_host_locked = false
 	ready_flags = [false, false]
 	locked_routes = [[], []]
@@ -193,7 +208,7 @@ func _reset_match() -> void:
 	_synced_guest_id = 0
 	_pending_snapshot_peer = 0
 	_host_combat = MatchCombat.new(combat_rules)
-	combat = _host_combat.snapshot()
+	combat = _combat_snapshot()
 	_combat_publish_elapsed = 0.0
 	set_physics_process(false)
 
@@ -300,6 +315,9 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 	if slot != permitted_slot:
 		_reject(sender, "Only your own board can be changed.")
 		return
+	if command in ["speed", "autoplay"]:
+		_apply_pacing(command, permitted_slot, value)
+		return
 	if _host_locked:
 		_reject(sender, "Paths and readiness are locked during a wave or after the run ends.")
 		return
@@ -332,20 +350,62 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 			if _host_ready[permitted_slot] == value:
 				return
 			_host_ready[permitted_slot] = value
-			if _host_ready[0] and _host_ready[1]:
-				# Capture independent copies before publishing the single locked state.
-				_host_routes = [_host_layouts[0].route.duplicate(), _host_layouts[1].route.duplicate()]
-				_host_locked = true
-				_host_combat.start_wave(_host_routes)
-				_combat_publish_elapsed = 0.0
-				set_physics_process(true)
+			# Manual readiness and autoplay capture routes through the same gate.
 		_:
 			_reject(sender, "Unknown planning command.")
 			return
 	if singleplayer and sender == 1:
 		_apply_command(2, command, 1, cell, value)
 		return
+	if (_host_ready[0] and _host_ready[1]) or _autoplay_enabled():
+		_try_start_wave()
 	_publish_snapshot()
+
+
+func _apply_pacing(option: String, slot: int, enabled: bool) -> void:
+	if not active or _host_combat.phase not in [MatchCombat.Phase.PLANNING, MatchCombat.Phase.WAVE]:
+		return
+	var votes: Array[bool] = _host_speed_votes if option == "speed" else _host_autoplay_votes
+	if votes[slot] == enabled:
+		return
+	votes[slot] = enabled
+	if singleplayer:
+		votes[1 - slot] = enabled
+	if option == "autoplay" and _autoplay_enabled():
+		_try_start_wave()
+	_publish_snapshot()
+
+
+func _speed_multiplier() -> float:
+	return 2.0 if _host_speed_votes[0] and _host_speed_votes[1] else 1.0
+
+
+func _autoplay_enabled() -> bool:
+	return _host_autoplay_votes[0] and _host_autoplay_votes[1]
+
+
+func _try_start_wave() -> bool:
+	if not active or _host_combat.phase != MatchCombat.Phase.PLANNING:
+		return false
+	if not _host_layouts[0].is_ready() or not _host_layouts[1].is_ready():
+		return false
+	var routes: Array[Array] = [_host_layouts[0].route.duplicate(), _host_layouts[1].route.duplicate()]
+	if not _host_combat.start_wave(routes):
+		return false
+	_host_routes = routes
+	_host_locked = true
+	_combat_publish_elapsed = 0.0
+	set_physics_process(true)
+	return true
+
+
+func _combat_snapshot() -> Dictionary:
+	var snapshot: Dictionary = _host_combat.snapshot()
+	snapshot["speed_votes"] = _host_speed_votes.duplicate()
+	snapshot["autoplay_votes"] = _host_autoplay_votes.duplicate()
+	snapshot["speed_multiplier"] = _speed_multiplier()
+	snapshot["autoplay"] = _autoplay_enabled()
+	return snapshot
 
 
 func _reject(sender: int, message: String) -> void:
@@ -379,7 +439,7 @@ func _snapshot() -> Dictionary:
 		"ready": _host_ready.duplicate(),
 		"locked": _host_locked,
 		"routes": [_host_routes[0].duplicate(), _host_routes[1].duplicate()],
-		"combat": _host_combat.snapshot(),
+		"combat": _combat_snapshot(),
 	}
 
 
@@ -393,7 +453,7 @@ func _publish_snapshot() -> void:
 
 
 func _publish_combat() -> void:
-	combat = _host_combat.snapshot()
+	combat = _combat_snapshot()
 	changed.emit()
 	if _synced_guest_id != 0 and _can_accept(_synced_guest_id):
 		_receive_combat.rpc_id(_synced_guest_id, combat)

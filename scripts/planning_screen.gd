@@ -27,6 +27,8 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var ready_button: Button = %Ready
 @onready var send_button: Button = %SendEnemy
 @onready var enemy_selector: OptionButton = %EnemyType
+@onready var speed_button: Button = %Speed
+@onready var autoplay_button: Button = %Autoplay
 @onready var _palette: HBoxContainer = %TowerPalette
 @onready var _coins: Label = %Coins
 @onready var _income: Label = %Income
@@ -75,6 +77,8 @@ func _ready() -> void:
 	ready_button.pressed.connect(_toggle_ready)
 	send_button.pressed.connect(_send_enemy)
 	enemy_selector.item_selected.connect(_enemy_type_selected)
+	speed_button.pressed.connect(_request_pacing.bind("speed"))
+	autoplay_button.pressed.connect(_request_pacing.bind("autoplay"))
 	leave_button.pressed.connect(leave_requested.emit)
 	visibility_changed.connect(_visibility_changed)
 	_feedback_timer.timeout.connect(_clear_feedback)
@@ -380,6 +384,40 @@ func _target_selected(index: int) -> void:
 	_refresh_targeting()
 
 
+func _request_pacing(option: String) -> void:
+	if planning == null or not planning.active:
+		return
+	var votes: Array = planning.combat.get(option + "_votes", [false, false])
+	planning.request_pacing(option, not bool(votes[planning.local_slot()]))
+
+
+func _refresh_pacing() -> void:
+	var state: Dictionary = planning.combat if planning != null else {}
+	var available: bool = planning != null and planning.active and int(state.get("phase", MatchCombat.Phase.PLANNING)) != MatchCombat.Phase.FINISHED
+	var slot: int = planning.local_slot() if planning != null else 0
+	for option: String in ["speed", "autoplay"]:
+		var button: Button = speed_button if option == "speed" else autoplay_button
+		var votes: Array = state.get(option + "_votes", [false, false])
+		var enabled: bool = bool(votes[slot])
+		var agreed: bool = float(state.get("speed_multiplier", 1.0)) > 1.0 if option == "speed" else bool(state.get("autoplay", false))
+		button.disabled = not available
+		button.set_pressed_no_signal(enabled)
+		var color := Color("b5e2b7") if agreed else Color("e0bc77")
+		for theme_color: String in ["icon_normal_color", "icon_pressed_color", "icon_hover_color", "icon_hover_pressed_color"]:
+			button.add_theme_color_override(theme_color, color)
+		if option == "speed":
+			button.icon = preload("res://assets/ui/speed_double.svg") if enabled else preload("res://assets/ui/speed_normal.svg")
+		button.tooltip_text = "2× speed" if option == "speed" else "Autoplay"
+		if agreed:
+			button.tooltip_text += " · On"
+		elif enabled:
+			button.tooltip_text += " · Waiting for opponent"
+		elif bool(votes[1 - slot]):
+			button.tooltip_text += " · Opponent enabled"
+		if option == "autoplay" and agreed and not planning.locked and (not planning.layouts[0].is_ready() or not planning.layouts[1].is_ready()):
+			button.tooltip_text += "\nWaiting for legal paths"
+
+
 func _enemy_clicked(enemy_id: int, slot: int) -> void:
 	if planning == null or not planning.active or _placement_id != &"":
 		return
@@ -480,6 +518,7 @@ func _refresh() -> void:
 		_clear_feedback()
 		clear_button.disabled = true
 		ready_button.disabled = true
+		_refresh_pacing()
 		_refresh_palette()
 		_management.hide()
 		selected_enemy_id = -1
@@ -580,6 +619,7 @@ func _refresh() -> void:
 		_status.text = "Wave %d" % (int(state.get("wave", 0)) + 1)
 		_status.tooltip_text = "Planning: build a legal route, then ready for the next wave."
 	_refresh_targeting()
+	_refresh_pacing()
 	_refresh_enemy_inspector()
 	if not planning.active:
 		cancel_strokes()

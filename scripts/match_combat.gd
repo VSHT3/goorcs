@@ -4,8 +4,6 @@ extends RefCounted
 enum Phase { PLANNING, WAVE, FINISHED }
 enum TargetMode { FURTHEST, CLOSEST, STRONGEST }
 
-const ENEMY_BASE_DAMAGE: int = 1
-
 var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
@@ -19,6 +17,8 @@ var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
 var enemies: Array[Array] = [[], []]
+# One host-generated ordered regular stream, replayed independently on both boards.
+var wave_roster: Array[String] = []
 
 var _rules: CombatRules
 # Captured once from resources so commands, attacks, and snapshots share host-owned stats.
@@ -26,6 +26,8 @@ var _tower_types: Dictionary = {}
 var _enemy_types: Dictionary = {}
 var _send_queues: Array[Array] = [[], []]
 var _random: RandomNumberGenerator
+var _wave_random: RandomNumberGenerator
+var _roster_configuration_valid: bool = true
 var _routes: Array[Array] = [[], []]
 var _spawned: Array[int] = [0, 0]
 var _elapsed: float = 0.0
@@ -33,31 +35,47 @@ var _next_tower_id: int = 1
 var _next_enemy_id: int = 1
 
 
-func _init(rules: CombatRules, random: RandomNumberGenerator = null) -> void:
+func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null) -> void:
 	_rules = rules
 	_random = random
 	if _random == null:
 		_random = RandomNumberGenerator.new()
 		_random.randomize()
+	_wave_random = wave_random
+	if _wave_random == null:
+		_wave_random = RandomNumberGenerator.new()
+		_wave_random.randomize()
+	if rules.wave_weight <= 0 or rules.wave_weight_growth < 0 or not is_finite(rules.spawn_interval) or rules.spawn_interval < 0.0:
+		push_error("Combat waves require positive weight, nonnegative growth and a finite nonnegative spawn interval")
+		_roster_configuration_valid = false
 	base_health = [rules.base_health, rules.base_health]
 	coins = [rules.starting_coins, rules.starting_coins]
 	for definition: EnemyDefinition in rules.enemy_definitions:
 		if definition == null:
 			push_error("Combat enemy_definitions contains a null entry")
+			_roster_configuration_valid = false
 			continue
 		var type_id: String = String(definition.id)
-		if type_id.is_empty() or definition.title.is_empty() or not is_finite(definition.health_multiplier) or definition.health_multiplier <= 0.0 or not is_finite(definition.speed_multiplier) or definition.speed_multiplier <= 0.0 or definition.send_cost <= 0 or definition.send_income < 0:
-			push_error("Invalid combat enemy definition '%s': positive multipliers/price and nonnegative income are required" % type_id)
+		if type_id.is_empty() or definition.title.is_empty() or not is_finite(definition.health_multiplier) or definition.health_multiplier <= 0.0 or not is_finite(definition.speed_multiplier) or definition.speed_multiplier <= 0.0 or definition.send_cost <= 0 or definition.send_income < 0 or definition.base_damage <= 0 or definition.spawn_weight <= 0 or definition.first_wave < 1 or definition.max_per_wave < 0 or not is_finite(definition.max_weight_share) or definition.max_weight_share < 0.0 or definition.max_weight_share > 1.0:
+			push_error("Invalid combat enemy definition '%s': require positive multipliers/price/damage/weight/unlock, nonnegative income/count cap, and finite share in [0, 1]" % type_id)
+			_roster_configuration_valid = false
 			continue
 		if _enemy_types.has(type_id):
-			push_error("Duplicate combat enemy definition '%s': keeping the first valid definition" % type_id)
+			push_error("Duplicate combat enemy definition '%s'" % type_id)
+			_roster_configuration_valid = false
 			continue
 		_enemy_types[type_id] = {
 			"title": definition.title, "health_multiplier": definition.health_multiplier,
 			"description": definition.description,
 			"speed_multiplier": definition.speed_multiplier,
 			"send_cost": definition.send_cost, "send_income": definition.send_income,
+			"base_damage": definition.base_damage, "spawn_weight": definition.spawn_weight,
+			"first_wave": definition.first_wave, "max_per_wave": definition.max_per_wave,
+			"max_weight_share": definition.max_weight_share,
 		}
+	if not _enemy_types.has("grunt") or int(_enemy_types["grunt"]["spawn_weight"]) != 1 or int(_enemy_types["grunt"]["first_wave"]) != 1 or int(_enemy_types["grunt"]["max_per_wave"]) != 0 or float(_enemy_types["grunt"]["max_weight_share"]) != 1.0:
+		push_error("Combat regular waves require an always-unlocked weight-one Grunt with unlimited count and full weight share")
+		_roster_configuration_valid = false
 	for definition: TowerDefinition in rules.tower_definitions:
 		if definition == null:
 			push_error("Combat tower_definitions contains a null entry")
@@ -193,8 +211,12 @@ func _sends_open() -> bool:
 
 
 func start_wave(routes: Array[Array]) -> bool:
-	if phase != Phase.PLANNING or routes.size() != 2 or routes[0].size() < 2 or routes[1].size() < 2:
+	if phase != Phase.PLANNING or not _roster_configuration_valid or routes.size() != 2 or routes[0].size() < 2 or routes[1].size() < 2:
 		return false
+	var roster: Array[String] = _generate_wave_roster(wave + 1)
+	if roster.is_empty():
+		return false
+	wave_roster = roster
 	_routes = routes.duplicate(true)
 	_spawned = [0, 0]
 	_elapsed = 0.0
@@ -223,7 +245,7 @@ func advance(delta: float) -> bool:
 		phase = Phase.FINISHED
 		coin_flip = base_health[0] == 0 and base_health[1] == 0
 		winner = _random.randi_range(0, 1) if coin_flip else (1 if base_health[0] == 0 else 0)
-	elif _spawned[0] == _wave_count() and _spawned[1] == _wave_count() and enemies[0].is_empty() and enemies[1].is_empty():
+	elif _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and enemies[0].is_empty() and enemies[1].is_empty():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
 		coins[0] += reward + income[0]
 		coins[1] += reward + income[1]
@@ -241,7 +263,8 @@ func snapshot() -> Dictionary:
 		"enemy_types": _enemy_types_snapshot(),
 		"sends_open": _sends_open(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
-		"spawned": _spawned.duplicate(), "total": _wave_count(),
+		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
+		"wave_roster": wave_roster.duplicate(), "wave_weight": _wave_weight(maxi(1, wave)),
 		"tower_types": _tower_types.duplicate(true),
 		"rules": {
 			"enemy_speed": _wave_speed(wave), "enemy_health": _wave_health(wave),
@@ -280,8 +303,35 @@ func _wave_speed(wave_number: int) -> float:
 	return _rules.enemy_speed + maxi(0, wave_number - 1) * _rules.speed_growth
 
 
-func _wave_count() -> int:
-	return _rules.enemies_per_wave + maxi(0, wave - 1) * _rules.count_growth
+func _wave_weight(wave_number: int) -> int:
+	return _rules.wave_weight + maxi(0, wave_number - 1) * _rules.wave_weight_growth
+
+
+func _generate_wave_roster(wave_number: int) -> Array[String]:
+	var budget: int = _wave_weight(wave_number)
+	var remaining: int = budget
+	var counts: Dictionary = {}
+	var roster: Array[String] = []
+	var eligible: Array[String] = []
+	while remaining > 0:
+		eligible.clear()
+		for type_id: String in _enemy_types:
+			var definition: Dictionary = _enemy_types[type_id]
+			var weight: int = definition["spawn_weight"]
+			var count: int = counts.get(type_id, 0)
+			var count_cap: int = definition["max_per_wave"]
+			var share_cap: int = floori(float(budget) * float(definition["max_weight_share"]))
+			if wave_number >= int(definition["first_wave"]) and weight <= remaining and (count_cap == 0 or count < count_cap) and (count + 1) * weight <= share_cap:
+				eligible.append(type_id)
+		# The validated weight-one Grunt invariant guarantees exact fill.
+		if eligible.is_empty():
+			push_error("Combat wave %d cannot fill its remaining weight %d" % [wave_number, remaining])
+			return []
+		var selected: String = eligible[_wave_random.randi_range(0, eligible.size() - 1)]
+		roster.append(selected)
+		counts[selected] = int(counts.get(selected, 0)) + 1
+		remaining -= int(_enemy_types[selected]["spawn_weight"])
+	return roster
 
 
 func _valid_slot(slot: int) -> bool:
@@ -299,15 +349,15 @@ func _move_enemies(slot: int, delta: float) -> void:
 
 
 func _spawn_enemies(slot: int) -> void:
-	var total: int = _wave_count()
-	var speed: float = _enemy_speed("grunt", wave)
+	var total: int = wave_roster.size()
 	while _spawned[slot] < total:
 		var spawn_time: float = _spawned[slot] * _rules.spawn_interval
 		if spawn_time > _elapsed:
 			break
 		# Account for the fraction of this tick after the scheduled spawn time.
-		var progress: float = (_elapsed - spawn_time) * speed
-		_spawn_enemy(slot, "grunt", progress)
+		var type_id: String = wave_roster[_spawned[slot]]
+		var progress: float = (_elapsed - spawn_time) * _enemy_speed(type_id, wave)
+		_spawn_enemy(slot, type_id, progress)
 		_spawned[slot] += 1
 
 
@@ -315,7 +365,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float) -> void:
 	var hp: int = _enemy_health(type_id, wave)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
-		"type_id": type_id, "speed": _enemy_speed(type_id, wave), "damage": ENEMY_BASE_DAMAGE,
+		"type_id": type_id, "speed": _enemy_speed(type_id, wave), "damage": _enemy_types[type_id]["base_damage"],
 		"progress": progress, "pos": _position(slot, progress),
 	})
 	_next_enemy_id += 1

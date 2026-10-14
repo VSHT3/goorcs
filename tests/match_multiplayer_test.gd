@@ -294,7 +294,7 @@ func _peer_typed_sends(code: String) -> void:
 	for lane: String in ["host", "guest"]:
 		await _command(lane, {"action": "typed_send_scenario"})
 	await _connect_guest("guest", "host", code)
-	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "health": [7, 7], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []]}, "Typed scenario starts with empty ordered queues")
+	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "health": [12, 12], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []]}, "Typed scenario starts with empty ordered queues")
 	for type_id: String in ["runner", "brute"]:
 		var definition: Dictionary = fresh["enemy_types"][type_id]
 		_check(definition["send_cost"] == (25 if type_id == "runner" else 40) and definition["send_income"] == (2 if type_id == "runner" else 4), "Guest receives host-owned %s economy despite different local resources" % type_id)
@@ -323,12 +323,12 @@ func _peer_typed_sends(code: String) -> void:
 			var brute: Dictionary = moving["enemies"][slot][1]
 			_check(float(brute["progress"]) > 0.0 and is_equal_approx(float(runner["progress"]) / float(brute["progress"]), 1.7 / 0.65), "Host movement advances simultaneous Runner and Brute at independent actual speeds on %s" % lane)
 	for lane: String in ["host", "guest"]:
-		var runner_leaked: Dictionary = await _wait_combat(lane, {"phase": 1, "health": [6, 6]}, "Runner leaks before Grunt or Brute on %s" % lane)
+		var runner_leaked: Dictionary = await _wait_combat(lane, {"phase": 1, "health": [11, 11]}, "Runner leaks before Grunt or Brute on %s" % lane)
 		_check_peer_enemy_types(runner_leaked, [["brute", "grunt"], ["brute", "grunt"]], 4, "Fast Runner is removed, not just relabeled")
 	for lane: String in ["host", "guest"]:
-		var grunt_leaked: Dictionary = await _wait_combat(lane, {"phase": 1, "health": [5, 5]}, "Baseline Grunt leaks while slow Brute still travels on %s" % lane)
+		var grunt_leaked: Dictionary = await _wait_combat(lane, {"phase": 1, "health": [10, 10]}, "Baseline Grunt leaks while slow Brute still travels on %s" % lane)
 		_check_peer_enemy_types(grunt_leaked, [["brute"], ["brute"]], 4, "Slow Brute remains independently alive")
-	await _wait_combat("guest", {"phase": 0, "wave": 1, "health": [4, 4], "coins": [176, 176], "income": [6, 6]}, "Brutes finally leak and one clear pays each accumulated income")
+	await _wait_combat("guest", {"phase": 0, "wave": 1, "health": [7, 7], "coins": [176, 176], "income": [6, 6]}, "Brutes leak three damage and one clear pays each accumulated income")
 	await _both_ready()
 	await _wait_enemy_counts("guest", [1, 1], "Wave two first spawns its baseline Grunts")
 	await _command("host", {"action": "send", "slot": 0, "type_id": "runner"})
@@ -341,21 +341,21 @@ func _peer_typed_sends(code: String) -> void:
 	for type_id: String in ["runner", "brute"]:
 		await _command("guest", {"action": "send", "slot": 1, "type_id": type_id})
 	await _wait_combat("guest", {"phase": 1, "coins": [86, 71], "income": [14, 16], "queued_sends": [2, 2], "send_queues": [["runner", "brute"], ["brute", "runner"]]}, "Cutoff queues retain each target's independent mixed-type order")
-	await _wait_combat("host", {"phase": 0, "wave": 2, "health": [2, 2], "coins": [140, 127], "send_queues": [["runner", "brute"], ["brute", "runner"]]}, "Queued types survive wave clear and recurring income pays again")
-	await _wait_combat("guest", {"phase": 0, "health": [2, 2], "coins": [140, 127]}, "Guest agrees on typed leak outcomes and recurring rewards")
+	await _wait_combat("host", {"phase": 0, "wave": 2, "health": [3, 5], "coins": [140, 127], "send_queues": [["runner", "brute"], ["brute", "runner"]]}, "Queued types survive wave clear and recurring income pays again")
+	await _wait_combat("guest", {"phase": 0, "health": [3, 5], "coins": [140, 127]}, "Guest agrees on typed leak outcomes and recurring rewards")
 	await _both_ready()
 	await _wait_enemy_counts("guest", [3, 3], "Next-wave mixed queues drain once alongside regular Grunts")
 	for lane: String in ["host", "guest"]:
 		var delivered: Dictionary = _snapshot(lane)["combat"]
 		_check_peer_enemy_types(delivered, [["runner", "brute", "grunt"], ["brute", "runner", "grunt"]], 8, "Deferred sends recompute next-wave HP without losing type or order")
 		_check(_matches(delivered, {"send_queues": [[], []], "queued_sends": [0, 0]}), "Typed deliveries drain ordered queues and HUD counts together")
-	var finished: Dictionary = await _wait_combat("host", {"phase": 2, "wave": 3, "health": [0, 0], "coins": [140, 127], "income": [14, 16], "coin_flip": true}, "Independent typed pressure reaches a frozen normal terminal outcome without another payout")
+	var finished: Dictionary = await _wait_combat("host", {"phase": 2, "wave": 3, "health": [0, 0], "coins": [140, 127], "income": [14, 16], "coin_flip": true}, "Brutes arrive together and clamp both bases after faster leaks, freezing the terminal outcome without payout")
 	await _wait_combat("guest", {"phase": 2, "winner": finished.get("winner", -1), "health": [0, 0], "coins": [140, 127]}, "Both ENet peers agree on typed-send terminal result")
 	await _assert_terminal(-1)
 	await _command("guest", {"action": "leave"})
 	await _wait_for("host", {"active": false}, "Leaving clears typed enemy state")
 	await _connect_guest("guest", "host", code)
-	await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [7, 7], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []], "queued_sends": [0, 0], "enemies": [[], []], "sends_open": false}, "Rejoin resets both typed queues, income, enemies and delivery window")
+	await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [12, 12], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []], "queued_sends": [0, 0], "enemies": [[], []], "sends_open": false}, "Rejoin resets both typed queues, income, enemies and delivery window")
 	for lane: String in ["host", "guest"]:
 		for type_id: String in ["brute", "brute", "brute", "brute", "runner"]:
 			await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": type_id})
@@ -378,5 +378,6 @@ func _check_peer_enemy_types(combat: Dictionary, expected: Array, wave_health: i
 			var hp_multiplier: float = 0.6 if type_id == "runner" else (2.5 if type_id == "brute" else 1.0)
 			var speed_multiplier: float = 1.7 if type_id == "runner" else (0.65 if type_id == "brute" else 1.0)
 			_check(enemy["hp"] == ceili(wave_health * hp_multiplier) and enemy["max_hp"] == ceili(wave_health * hp_multiplier) and is_equal_approx(float(enemy.get("speed", 0.0)), 6.5 * speed_multiplier), "%s: %s carries authoritative HP and speed on board %d" % [description, type_id, slot])
+			_check(int(enemy["damage"]) == (3 if type_id == "brute" else 1), "%s: %s carries resource-owned base damage" % [description, type_id])
 		_check(identities == expected[slot], "%s: board %d keeps ordered typed identities; observed %s" % [description, slot, identities])
 

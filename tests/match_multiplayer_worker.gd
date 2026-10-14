@@ -7,8 +7,8 @@ func _planning_rules() -> CombatRules:
 	rules.enemy_health = 4
 	rules.health_growth = 0
 	rules.speed_growth = 0.0
-	rules.count_growth = 0
-	rules.enemies_per_wave = 1
+	rules.wave_weight_growth = 0
+	rules.wave_weight = 1
 	rules.enemy_speed = 6.5
 	rules.spawn_interval = 0.05
 	var definitions: Array[TowerDefinition] = []
@@ -50,7 +50,7 @@ func _execute_command(command: Dictionary) -> void:
 	if action in ["send_scenario", "typed_send_scenario"]:
 		var rules: CombatRules = _planning_rules()
 		var typed: bool = action == "typed_send_scenario"
-		rules.base_health = (7 if typed else 6) if _lane == "host" else 99
+		rules.base_health = (12 if typed else 6) if _lane == "host" else 99
 		rules.starting_coins = (200 if typed else 45) if _lane == "host" else 999
 		rules.health_growth = 2
 		rules.send_cutoff_seconds = (0.8 if typed else 0.5) if _lane == "host" else 99.0

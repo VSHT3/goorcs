@@ -11,7 +11,7 @@ const DEFAULT_ENEMIES: Array[EnemyDefinition] = [
 @export var base_health: int = 10
 @export var enemy_health: int = 8
 @export var enemy_speed: float = 2.0
-@export var enemies_per_wave: int = 6
+@export var wave_weight: int = 6
 @export var spawn_interval: float = 0.75
 @export var enemy_definitions: Array[EnemyDefinition] = DEFAULT_ENEMIES
 @export var tower_definitions: Array[TowerDefinition] = [
@@ -21,7 +21,7 @@ const DEFAULT_ENEMIES: Array[EnemyDefinition] = [
 ]
 @export var health_growth: int = 2
 @export var speed_growth: float = 0.15
-@export var count_growth: int = 2
+@export var wave_weight_growth: int = 2
 @export var starting_coins: int = 200
 @export var kill_bounty: int = 3
 @export var wave_reward: int = 30

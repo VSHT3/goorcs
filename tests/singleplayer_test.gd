@@ -106,8 +106,8 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	var rules := CombatRules.new()
 	rules.base_health = 7
 	rules.starting_coins = 45
-	rules.enemies_per_wave = 1
-	rules.count_growth = 0
+	rules.wave_weight = 1
+	rules.wave_weight_growth = 0
 	rules.enemy_health = 4
 	rules.health_growth = 2
 	rules.enemy_speed = 10.0
@@ -176,10 +176,10 @@ func _advance_send_wave(planning: MatchPlanning) -> void:
 
 func _solo_typed_sends(planning: MatchPlanning) -> void:
 	var rules := CombatRules.new()
-	rules.base_health = 7
+	rules.base_health = 11
 	rules.starting_coins = 200
-	rules.enemies_per_wave = 1
-	rules.count_growth = 0
+	rules.wave_weight = 1
+	rules.wave_weight_growth = 0
 	rules.enemy_health = 4
 	rules.health_growth = 2
 	rules.enemy_speed = 10.0
@@ -212,12 +212,12 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	for slot: int in range(2):
 		var enemies: Array = planning.combat["enemies"][slot]
 		_check(is_equal_approx(float(enemies[0]["progress"]), 1.7) and is_equal_approx(float(enemies[1]["progress"]), 0.65) and is_equal_approx(float(enemies[2]["progress"]), 1.0), "Actual mirrored movement advances Runner, Brute and Grunt independently")
-	_advance_solo_health(planning, [6, 6])
+	_advance_solo_health(planning, [10, 10])
 	_check_solo_enemy_types(planning, ["brute", "grunt"], 4, "Runner actually leaks before the others")
-	_advance_solo_health(planning, [5, 5])
+	_advance_solo_health(planning, [9, 9])
 	_check_solo_enemy_types(planning, ["brute"], 4, "Baseline Grunt leaks while Brute still travels")
 	_advance_send_wave(planning)
-	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [4, 4] and planning.combat["coins"] == [176, 176], "Both Brutes finally leak and typed recurring income pays with one clear")
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [6, 6] and planning.combat["coins"] == [176, 176], "Both Brutes leak three damage and typed recurring income pays with one clear")
 	planning.submit_ready(true)
 	planning.send_enemy(0, &"runner")
 	planning.send_enemy(0, &"brute")
@@ -243,7 +243,7 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	_check(planning.combat == before, "Terminal typed sends cannot spend affordable Coins, create enemies, grow income or mirror")
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
-	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 0 and planning.combat["health"] == [7, 7] and planning.combat["coins"] == [200, 200] and planning.combat["income"] == [0, 0] and planning.combat["send_queues"] == [[], []] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []] and not planning.combat["sends_open"], "Solo restart clears both typed queues, income, enemies, health and cutoff")
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 0 and planning.combat["health"] == [11, 11] and planning.combat["coins"] == [200, 200] and planning.combat["income"] == [0, 0] and planning.combat["send_queues"] == [[], []] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []] and not planning.combat["sends_open"], "Solo restart clears both typed queues, income, enemies, health and cutoff")
 	for type_id: StringName in [&"brute", &"brute", &"brute", &"brute", &"runner"]:
 		planning.send_enemy(0, type_id)
 	_check(planning.combat["coins"] == [15, 15] and planning.combat["income"] == [18, 18], "Typed affordability setup independently pays each mirror")

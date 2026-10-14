@@ -18,6 +18,9 @@ func _init() -> void:
 	_test_enemy_sends()
 	_test_typed_enemy_sends()
 	_test_typed_enemy_defense()
+	_test_weighted_wave_constraints_and_streams()
+	_test_weighted_wave_randomness_and_extension()
+	_test_resource_damage_and_roster_clearance()
 	_test_simultaneous_and_ordinary_outcomes()
 	if failures == 0:
 		print("PASS: authoritative purchases/upgrades/sales, currency and reward atomicity, per-tower kills, tile range/AoE, scaling, resource stats, targeting, captured routes and frozen outcomes")
@@ -35,12 +38,12 @@ func _rules() -> CombatRules:
 	rules.base_health = 10
 	rules.enemy_health = 8
 	rules.enemy_speed = 1.0
-	rules.enemies_per_wave = 3
+	rules.wave_weight = 3
 	rules.spawn_interval = 0.5
 	rules.tower_definitions = [_definition(&"arrow_tower", 2, 20.0, 0.5)]
 	rules.health_growth = 2
 	rules.speed_growth = 0.0
-	rules.count_growth = 0
+	rules.wave_weight_growth = 0
 	return rules
 
 
@@ -141,7 +144,7 @@ func _test_targeting_policies() -> void:
 func _test_range_and_ties() -> void:
 	var rules := _rules()
 	rules.enemy_speed = 0.0
-	rules.enemies_per_wave = 1
+	rules.wave_weight = 1
 	rules.tower_definitions[0].range_cells = 3.0
 	var combat := MatchCombat.new(rules)
 	combat.build(0, Vector2i(0, 3), &"arrow_tower", 0)
@@ -172,7 +175,7 @@ func _test_range_and_ties() -> void:
 
 func _test_routes_and_both_board_clear() -> void:
 	var rules := _rules()
-	rules.enemies_per_wave = 1
+	rules.wave_weight = 1
 	var combat := MatchCombat.new(rules)
 	var routes: Array[Array] = [[Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(2, 1)], _line(5)]
 	combat.start_wave(routes)
@@ -189,7 +192,7 @@ func _test_routes_and_both_board_clear() -> void:
 	_check(combat.wave == 1 and combat.snapshot()["spawned"] == [1, 1], "Wave and spawn totals remain readable after completion")
 	# A gap with no alive enemies is not a clear while scheduled spawns remain.
 	rules.spawn_interval = 4.0
-	rules.enemies_per_wave = 2
+	rules.wave_weight = 2
 	combat = MatchCombat.new(rules)
 	combat.start_wave(_routes(1, 1))
 	combat.advance(1.0)
@@ -200,7 +203,7 @@ func _test_routes_and_both_board_clear() -> void:
 
 func _test_kills_and_persistence() -> void:
 	var rules := _rules()
-	rules.enemies_per_wave = 2
+	rules.wave_weight = 2
 	rules.enemy_health = 2
 	rules.health_growth = 2
 	rules.tower_definitions[0].damage = 20
@@ -220,7 +223,7 @@ func _test_kills_and_persistence() -> void:
 	_run_wave(combat)
 	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.base_health == [10, 6] and combat.towers[0][0]["id"] == tower_id and combat.towers[0][0]["shot"] == before + 2, "Bases, fixed-stat towers, and monotonic shot counters persist across waves")
 	# A lethal hit at the endpoint is resolved before leak bookkeeping.
-	rules.enemies_per_wave = 1
+	rules.wave_weight = 1
 	combat = MatchCombat.new(rules)
 	combat.build(0, Vector2i(1, 1), &"arrow_tower", 0)
 	combat.start_wave(_routes(1, 1))
@@ -238,7 +241,7 @@ func _test_tower_type_stats() -> void:
 		var rules := CombatRules.new()
 		rules.enemy_health = 100
 		rules.enemy_speed = 0.0
-		rules.enemies_per_wave = 2
+		rules.wave_weight = 2
 		rules.spawn_interval = 0.0
 		var combat := MatchCombat.new(rules)
 		var type_id: StringName = type_ids[index]
@@ -263,7 +266,7 @@ func _test_custom_tower_definition() -> void:
 	var rules := CombatRules.new()
 	rules.enemy_health = 20
 	rules.enemy_speed = 0.0
-	rules.enemies_per_wave = 1
+	rules.wave_weight = 1
 	# Detach the default array before adding a local definition; never mutate shared resources.
 	rules.tower_definitions = rules.tower_definitions.duplicate()
 	var custom := _definition(&"test_fourth_tower", 9, 6.0, 0.2)
@@ -296,7 +299,7 @@ func _test_custom_tower_definition() -> void:
 func _test_simultaneous_and_ordinary_outcomes() -> void:
 	var rules := _rules()
 	rules.base_health = 1
-	rules.enemies_per_wave = 2
+	rules.wave_weight = 2
 	rules.spawn_interval = 0.0
 	var random := RandomNumberGenerator.new()
 	random.seed = 982451653
@@ -410,18 +413,22 @@ func _test_wave_scaling_and_rewards() -> void:
 	rules.base_health = 100
 	rules.enemy_health = 8
 	rules.enemy_speed = 2.0
-	rules.enemies_per_wave = 6
+	rules.wave_weight = 6
 	rules.spawn_interval = 0.0
 	var combat := MatchCombat.new(rules)
 	for wave_number: int in range(1, 4):
 		combat.start_wave(_routes(5, 5))
 		combat.advance(0.1)
-		var count: int = 6 + (wave_number - 1) * 2
+		var budget: int = 6 + (wave_number - 1) * 2
+		var count: int = combat.wave_roster.size()
 		var speed: float = 2.0 + (wave_number - 1) * 0.15
 		var hp: int = 8 + (wave_number - 1) * 2
 		var state: Dictionary = combat.snapshot()
-		_check(state["total"] == count and state["spawned"] == [count, count] and combat.enemies[0].size() == count and combat.enemies[1].size() == count, "Wave %d schedules equal growing enemy counts" % wave_number)
-		_check(state["rules"]["enemy_health"] == hp and combat.enemies[0][0]["max_hp"] == hp and is_equal_approx(state["rules"]["enemy_speed"], speed) and is_equal_approx(combat.enemies[0][0]["progress"], speed * 0.1), "Wave %d applies health and speed growth to real spawns/movement" % wave_number)
+		_check(state["wave_weight"] == budget and state["total"] == count and state["spawned"] == [count, count] and combat.enemies[0].size() == count and combat.enemies[1].size() == count, "Wave %d schedules the shared actual roster within its growing weight budget" % wave_number)
+		_check(state["rules"]["enemy_health"] == hp and is_equal_approx(state["rules"]["enemy_speed"], speed), "Wave %d preserves baseline health and speed growth" % wave_number)
+		for enemy: Dictionary in combat.enemies[0]:
+			var type_stats: Dictionary = state["enemy_types"][enemy["type_id"]]
+			_check(enemy["max_hp"] == ceili(hp * float(type_stats["health_multiplier"])) and is_equal_approx(float(enemy["progress"]), float(enemy["speed"]) * 0.1), "Real spawns apply delivery-wave per-type health and fractional-tick speed")
 		var before: int = combat.coins[0]
 		_run_wave(combat)
 		_check(combat.coins == [before + 30 + 5 * wave_number, before + 30 + 5 * wave_number], "Both surviving boards receive one wave-clear reward, including a board that leaked")
@@ -444,7 +451,7 @@ func _test_builtin_upgrade_values() -> void:
 		var rules := CombatRules.new()
 		rules.enemy_health = 100
 		rules.enemy_speed = 0.0
-		rules.enemies_per_wave = 1
+		rules.wave_weight = 1
 		var combat := MatchCombat.new(rules)
 		combat.build(0, Vector2i(0, 1), ids[index], 0)
 		var id: int = combat.towers[0][0]["id"]
@@ -461,8 +468,8 @@ func _test_builtin_upgrade_values() -> void:
 func _test_enemy_sends() -> void:
 	var rules := _rules()
 	rules.starting_coins = 40
-	rules.enemies_per_wave = 1
-	rules.count_growth = 0
+	rules.wave_weight = 1
+	rules.wave_weight_growth = 0
 	rules.send_cutoff_seconds = 1.0
 	var combat := MatchCombat.new(rules)
 	var frozen: Dictionary = combat.snapshot()
@@ -514,7 +521,7 @@ func _test_enemy_sends() -> void:
 
 func _test_typed_enemy_sends() -> void:
 	var rules := _rules()
-	rules.enemies_per_wave = 1
+	rules.wave_weight = 1
 	rules.spawn_interval = 0.0
 	rules.speed_growth = 0.15
 	rules.send_cutoff_seconds = 1.0
@@ -532,11 +539,11 @@ func _test_typed_enemy_sends() -> void:
 	var brute: Dictionary = combat.enemies[1][1]
 	_check(runner["type_id"] == "runner" and runner["hp"] == 5 and is_equal_approx(runner["speed"], 1.7) and brute["type_id"] == "brute" and brute["hp"] == 20 and is_equal_approx(brute["speed"], 0.65), "Queued types spawn with rounded Runner health and durable Brute health plus independent wave-scaled speeds")
 	combat.advance(1.0)
-	_check(is_equal_approx(runner["progress"], 1.7) and is_equal_approx(brute["progress"], 0.65) and is_equal_approx(combat.enemies[1][2]["progress"], 1.0) and combat.enemies[1][2]["type_id"] == "grunt", "Mixed enemies advance by their own host-captured speeds; regular waves stay Grunts")
+	_check(is_equal_approx(runner["progress"], 1.7) and is_equal_approx(brute["progress"], 0.65) and is_equal_approx(combat.enemies[1][2]["progress"], 1.0) and combat.enemies[1][2]["type_id"] == "grunt", "Mixed enemies advance by their own host-captured speeds; first-wave regular enemies are Grunts")
 	combat.advance(1.4)
 	_check(combat.base_health == [10, 9] and combat.enemies[1].size() == 2 and combat.enemies[1][0]["type_id"] == "brute", "Runner reaches the base first while slower Brute and regular Grunt remain in combat")
 	_run_wave(combat)
-	_check(combat.base_health == [9, 7] and combat.coins == [176, 235], "Every typed leak damages once and clear pays only sender's purchased income bonus")
+	_check(combat.base_health == [9, 5] and combat.coins == [176, 235], "Brute leaks three damage once and clear pays only sender's purchased income bonus")
 	var preview: Dictionary = combat.snapshot()["enemy_types"]
 	_check(preview["runner"]["health"] == 6 and preview["brute"]["health"] == 25 and is_equal_approx(preview["runner"]["speed"], 1.15 * 1.7), "Planning previews the next wave's effective typed stats, not the cleared wave")
 	combat.start_wave(_routes(4, 4))
@@ -568,7 +575,7 @@ func _test_typed_enemy_sends() -> void:
 
 func _test_typed_enemy_defense() -> void:
 	var rules := _rules()
-	rules.enemies_per_wave = 1
+	rules.wave_weight = 1
 	rules.spawn_interval = 0.0
 	rules.enemy_speed = 0.0
 	rules.tower_definitions[0].damage = 5
@@ -593,3 +600,145 @@ func _test_typed_enemy_defense() -> void:
 	combat.build(1, Vector2i(0, 1), &"test_area", 0)
 	combat.advance(0.01)
 	_check(combat.enemies[1].size() == 2 and combat.enemies[1][0]["type_id"] == "brute" and combat.enemies[1][0]["hp"] == 15 and combat.towers[1][0]["kills"] == 1, "Area attacks hit the whole mixed footprint, killing the fragile Runner while Brute survives")
+
+
+func _wave_rng(seed_value: int) -> RandomNumberGenerator:
+	var random := RandomNumberGenerator.new()
+	random.seed = seed_value
+	return random
+
+
+func _check_roster_constraints(state: Dictionary, wave_number: int) -> void:
+	var counts: Dictionary = {}
+	var weight: int = 0
+	var budget: int = state["wave_weight"]
+	for type_id: String in state["wave_roster"]:
+		var definition: Dictionary = state["enemy_types"][type_id]
+		counts[type_id] = int(counts.get(type_id, 0)) + 1
+		weight += int(definition["spawn_weight"])
+		_check(wave_number >= int(definition["first_wave"]), "Regular roster never draws a locked type")
+	for type_id: String in counts:
+		var definition: Dictionary = state["enemy_types"][type_id]
+		var count: int = counts[type_id]
+		_check(int(definition["max_per_wave"]) == 0 or count <= int(definition["max_per_wave"]), "Regular type respects its hard count cap")
+		_check(count * int(definition["spawn_weight"]) <= floori(budget * float(definition["max_weight_share"])), "Regular type respects floored total-weight share")
+	_check(weight == budget and state["total"] == state["wave_roster"].size(), "Regular roster fills exact integer budget and reports actual count")
+
+
+func _test_weighted_wave_constraints_and_streams() -> void:
+	var saw_runner: bool = false
+	var saw_brute: bool = false
+	for seed_value: int in range(16):
+		var rules := CombatRules.new()
+		rules.base_health = 10000
+		var tie_random: RandomNumberGenerator = _wave_rng(999)
+		var frozen_tie_state: int = tie_random.state
+		var combat := MatchCombat.new(rules, tie_random, _wave_rng(seed_value))
+		for wave_number: int in range(1, 21):
+			_check(combat.start_wave(_routes(1000, 1000)), "Weighted wave starts through the normal route-capture API")
+			var state: Dictionary = combat.snapshot()
+			_check_roster_constraints(state, wave_number)
+			var roster: Array = state["wave_roster"].duplicate()
+			if wave_number <= 2:
+				_check(roster.count("grunt") == roster.size(), "First two waves contain only Grunts")
+			saw_runner = saw_runner or roster.has("runner")
+			saw_brute = saw_brute or roster.has("brute")
+			if roster.has("runner") or roster.has("brute"):
+				_check(roster.size() < int(state["wave_weight"]), "Heavier regular types replace head count within the budget instead of stacking extra enemies")
+			state["wave_roster"].clear()
+			state["enemy_types"]["brute"]["base_damage"] = 99
+			_check(combat.wave_roster == roster and combat.snapshot()["enemy_types"]["brute"]["base_damage"] == 3, "Roster and resource-rule snapshots are detached from authority")
+			# Observe every scheduled spawn on both boards before any can leak.
+			for index: int in range(roster.size()):
+				combat.advance(0.01 if index == 0 else rules.spawn_interval)
+				for slot: int in range(2):
+					_check(combat.enemies[slot].size() == index + 1, "Actual regular spawn stream follows roster cadence")
+					var enemy: Dictionary = combat.enemies[slot][index]
+					var type_id: String = roster[index]
+					var definition: Dictionary = combat.snapshot()["enemy_types"][type_id]
+					var hp: int = ceili((8 + 2 * (wave_number - 1)) * float(definition["health_multiplier"]))
+					var speed: float = (2.0 + 0.15 * (wave_number - 1)) * float(definition["speed_multiplier"])
+					_check(enemy["type_id"] == type_id and enemy["max_hp"] == hp and is_equal_approx(float(enemy["speed"]), speed) and is_equal_approx(float(enemy["progress"]), speed * 0.01), "Both real streams share order and delivery-wave stats including fractional-tick type travel")
+					_check(int(enemy["damage"]) == int(definition["base_damage"]), "Regular spawns capture the same per-resource damage as sends")
+				_check(combat.enemies[0][index]["id"] != combat.enemies[1][index]["id"], "Shared roster never shares mutable enemy identity between boards")
+			combat.advance(2000.0)
+			_check(combat.phase == MatchCombat.Phase.PLANNING, "Both actual roster streams clear into the next break")
+			_check(tie_random.state == frozen_tie_state, "Regular wave choices never consume terminal coin-flip randomness")
+	_check(saw_runner and saw_brute, "Unlocked weighted waves actually include both heavier shipped types")
+
+
+func _test_weighted_wave_randomness_and_extension() -> void:
+	var variants: Dictionary = {}
+	var rules := CombatRules.new()
+	rules.enemy_definitions = rules.enemy_definitions.duplicate()
+	var fourth := EnemyDefinition.new()
+	fourth.id = &"test_fourth_enemy"
+	fourth.title = "Fourth"
+	fourth.spawn_weight = 3
+	fourth.first_wave = 4
+	fourth.max_per_wave = 2
+	fourth.max_weight_share = 0.4
+	fourth.base_damage = 2
+	fourth.health_multiplier = 1.25
+	fourth.speed_multiplier = 0.9
+	rules.enemy_definitions.append(fourth)
+	var saw_fourth: bool = false
+	for seed_value: int in range(32):
+		var first := MatchCombat.new(rules, null, _wave_rng(seed_value))
+		var second := MatchCombat.new(rules, null, _wave_rng(seed_value))
+		first.wave = 11
+		second.wave = 11
+		first.start_wave(_routes(1000, 1000))
+		second.start_wave(_routes(1000, 1000))
+		_check(first.wave_roster == second.wave_roster, "Equal wave seeds repeat the ordered roster exactly")
+		var state: Dictionary = first.snapshot()
+		_check_roster_constraints(state, 12)
+		variants[str(first.wave_roster)] = true
+		var regular_roster: Array = first.wave_roster.duplicate()
+		_check(first.send_enemy(0, fourth.id), "Fourth resource sends without a type-specific command branch")
+		var sent: Dictionary = first.enemies[1][0]
+		_check(sent["type_id"] == String(fourth.id) and sent["damage"] == 2 and sent["max_hp"] == ceili(30 * 1.25) and is_equal_approx(float(sent["speed"]), 3.65 * 0.9), "Fourth resource controls sent damage and delivery-wave multipliers")
+		_check(first.wave_roster == regular_roster and first.snapshot()["total"] == regular_roster.size() and first.snapshot()["wave_weight"] == 28, "Immediate sends remain extra and consume no regular roster budget")
+		first.advance(0.01)
+		_check(first.enemies[1][1]["type_id"] == regular_roster[0], "Sent order does not replace the first regular scheduled type")
+		first.advance(regular_roster.size() * rules.spawn_interval)
+		for slot: int in range(2):
+			for index: int in range(regular_roster.size()):
+				var enemy: Dictionary = first.enemies[slot][index + (1 if slot == 1 else 0)]
+				_check(enemy["type_id"] == regular_roster[index], "Fourth resource participates in the same actual ordered stream on both boards")
+				if enemy["type_id"] == String(fourth.id):
+					_check(enemy["damage"] == 2 and enemy["max_hp"] == ceili(30 * 1.25) and is_equal_approx(float(enemy["speed"]), 3.65 * 0.9), "Fourth regular spawn uses its resource damage and scaled stats without a spawning branch")
+		saw_fourth = saw_fourth or regular_roster.has(String(fourth.id))
+		var locked := MatchCombat.new(rules, null, _wave_rng(seed_value))
+		locked.wave = 2
+		locked.start_wave(_routes())
+		_check(not locked.wave_roster.has(String(fourth.id)), "Fourth resource unlock is enforced without a special branch")
+	_check(variants.size() > 1 and saw_fourth, "Distinct seeds vary ordered composition and include the constrained fourth resource")
+
+
+func _test_resource_damage_and_roster_clearance() -> void:
+	var rules := CombatRules.new()
+	rules.base_health = 2
+	rules.wave_weight = 1
+	rules.wave_weight_growth = 0
+	rules.spawn_interval = 5.0
+	var combat := MatchCombat.new(rules, null, _wave_rng(13))
+	combat.send_enemy(0, &"brute")
+	combat.start_wave(_routes(100, 1))
+	_check(combat.enemies[1][0]["damage"] == 3, "Queued Brute captures resource damage before movement")
+	combat.advance(0.8)
+	_check(combat.base_health == [2, 0] and combat.phase == MatchCombat.Phase.FINISHED and combat.winner == 0, "Brute leak applies three damage once and clamps the target base at zero")
+	var frozen: Dictionary = combat.snapshot()
+	combat.advance(100.0)
+	_check(combat.snapshot() == frozen, "Removed Brute cannot damage a finished base a second time")
+	rules.base_health = 100
+	rules.wave_weight = 16
+	combat = MatchCombat.new(rules, null, _wave_rng(17))
+	combat.wave = 5
+	combat.start_wave(_routes(1, 1))
+	var total: int = combat.wave_roster.size()
+	_check(total <= rules.wave_weight, "Regular head count cannot exceed its integer weight budget")
+	combat.advance(2.0)
+	_check(combat.enemies[0].is_empty() and combat.enemies[1].is_empty() and combat.phase == MatchCombat.Phase.WAVE, "Empty alive gap cannot clear while actual roster entries remain scheduled")
+	combat.advance((total - 1) * rules.spawn_interval + 2.0)
+	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.snapshot()["spawned"] == [total, total], "Clearance uses actual mixed roster length rather than weight budget")
