@@ -61,6 +61,7 @@ func _run() -> void:
 	_check_drop_input(board)
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
+	await _check_source_facing(board, viewport)
 	viewport.queue_free()
 	if failures == 0:
 		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, tile ranges, attacks and mixed mirrored enemy sprites")
@@ -246,17 +247,13 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 					and absf(mirrored_offset.x + original_offset.x) <= 2.0 and absf(mirrored_offset.y - original_offset.y) <= 1.0,
 					"Mirroring preserves each typed silhouette's footprint and centered alignment, type=%s" % enemy["type_id"])
 			var scale: float = 0.84 if enemy["type_id"] == "brute" else 0.70
-			var visual_top: float = center.y - 16.0 if enemy["type_id"] == "grunt" else center.y + (0.10 - scale * 0.5) * 80.0
+			var visual_top: float = center.y + (0.10 - scale * 0.5) * 80.0
 			var bar_y: int = floori(visual_top - 3.0 - 7.2 * 0.5)
 			_check(image.get_pixel(center.x - 12, bar_y).is_equal_approx(PathBoard.ROUTE_LINE)
 				and image.get_pixel(center.x + 12, bar_y).is_equal_approx(Color("172120")),
 				"Half-health bars remain clear and unflipped above every typed body, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
 		_check(int(geometry[2]["pixels"]) > int(geometry[1]["pixels"]) * 1.4,
 			"Brute's bulky armored silhouette is visibly larger than Runner, mirrored=%s" % mirrored)
-		var runner_bounds: Rect2i = geometry[1]["bounds"]
-		var grunt_bounds: Rect2i = geometry[0]["bounds"]
-		_check(runner_bounds.size.y > grunt_bounds.size.y,
-			"Runner renders a full lean limb silhouette rather than the baseline circle")
 		if not mirrored:
 			normal_geometry = geometry
 	board.combat_enemies = []
@@ -267,6 +264,32 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			"Facing follows the displayed horizontal leg and remains stable along vertical turns")
 		_check(board._enemy_faces_left(2.5) != mirrored,
 			"Facing reverses on leftward route segments in either board orientation")
+
+
+func _check_source_facing(board: PathBoard, viewport: SubViewport) -> void:
+	# An asymmetric marker makes facing observable without pinning sprite pixels.
+	var marker := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	marker.fill(Color.TRANSPARENT)
+	marker.fill_rect(Rect2i(0, 1, 3, 6), Color.MAGENTA)
+	var artwork := EnemyDefinition.new()
+	artwork.texture = ImageTexture.create_from_image(marker)
+	artwork.source_faces_left = true
+	var original: EnemyDefinition = board._enemy_art["grunt"]
+	board._enemy_art["grunt"] = artwork
+	board.enemy_route = [Vector2i(0, 2), Vector2i(1, 2)]
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_enemies = []
+		var baseline: Image = await _board_image(board, viewport)
+		board.combat_enemies = [_enemy(104, 1.0, Vector2(1, 2))]
+		var image: Image = await _board_image(board, viewport)
+		var center := Vector2i(board.cell_center(Vector2i(1, 2)))
+		var geometry: Dictionary = _changed_geometry(baseline, image, Rect2i(center + Vector2i(-40, -20), Vector2i(80, 60)))
+		var bounds: Rect2i = geometry["bounds"]
+		var offset: int = bounds.get_center().x - center.x
+		_check(offset < -8 if mirrored else offset > 8, "Left-authored artwork faces along the route on either board, not backward")
+	board._enemy_art["grunt"] = original
+	board.combat_enemies = []
 
 
 func _changed_geometry(before: Image, after: Image, region: Rect2i) -> Dictionary:

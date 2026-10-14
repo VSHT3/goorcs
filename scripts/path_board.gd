@@ -60,7 +60,7 @@ var _shot_traces: Array[Dictionary] = []
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 var _tower_textures: Dictionary[String, Texture2D] = {}
-var _enemy_textures: Dictionary[String, Texture2D] = {}
+var _enemy_art: Dictionary[String, EnemyDefinition] = {}
 var _endpoint_textures_loaded: bool = false
 var _portal_texture: Texture2D
 var _crystal_texture: Texture2D
@@ -69,7 +69,7 @@ var _crystal_texture: Texture2D
 func _ready() -> void:
 	tower_catalog = tower_catalog
 	for definition: EnemyDefinition in CombatRules.DEFAULT_ENEMIES:
-		_enemy_textures[String(definition.id)] = definition.texture
+		_enemy_art[String(definition.id)] = definition
 	mouse_exited.connect(_on_mouse_exited)
 	resized.connect(queue_redraw)
 	set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
@@ -338,23 +338,17 @@ func _draw_combat() -> void:
 		var progress: float = _enemy_route_progress(enemy) if enemy_route.size() >= 2 else 0.0
 		var position: Vector2 = _route_position(progress) if enemy_route.size() >= 2 else enemy["pos"]
 		var center: Vector2 = _position_center(position)
-		var texture: Texture2D = _enemy_textures[enemy["type_id"]]
-		var visual_top: float
-		if texture != null:
-			var texture_size: Vector2 = texture.get_size()
-			var scale: float = 0.84 if enemy["type_id"] == "brute" else 0.70
-			var icon_size: Vector2 = texture_size * (cell_size * scale / maxf(texture_size.x, texture_size.y))
-			var sprite_center: Vector2 = center + Vector2(0.0, cell_size * 0.10)
-			var rect := Rect2(sprite_center - icon_size * 0.5, icon_size)
-			if _enemy_faces_left(progress):
-				rect.size.x = -rect.size.x
-			draw_texture_rect(texture, rect, false)
-			visual_top = sprite_center.y - icon_size.y * 0.5
-		else:
-			var radius: float = maxf(4.0, cell_size * 0.20)
-			draw_circle(center, radius + 1.5, Color("172120"))
-			draw_circle(center, radius, Color("d99578"))
-			visual_top = center.y - radius
+		var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
+		var texture: Texture2D = artwork.texture
+		var texture_size: Vector2 = texture.get_size()
+		var scale: float = 0.84 if enemy["type_id"] == "brute" else 0.70
+		var icon_size: Vector2 = texture_size * (cell_size * scale / maxf(texture_size.x, texture_size.y))
+		var sprite_center: Vector2 = center + Vector2(0.0, cell_size * 0.10)
+		var rect := Rect2(sprite_center - icon_size * 0.5, icon_size)
+		if _enemy_faces_left(progress) != artwork.source_faces_left:
+			rect.size.x = -rect.size.x
+		draw_texture_rect(texture, rect, false)
+		var visual_top: float = sprite_center.y - icon_size.y * 0.5
 		var bar_size: Vector2 = Vector2(cell_size * 0.62, maxf(3.0, cell_size * 0.09))
 		var bar_position: Vector2 = Vector2(center.x - bar_size.x * 0.5, visual_top - bar_size.y - 3.0)
 		draw_rect(Rect2(bar_position, bar_size), Color("172120"))

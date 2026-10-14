@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/grunt.png" id="2_sprite"]
 
 [resource]
 script = ExtResource("1_enemy")
@@ -10,3 +11,5 @@ health_multiplier = 1.0
 speed_multiplier = 1.0
 send_cost = 20
 send_income = 2
+texture = ExtResource("2_sprite")
+source_faces_left = true

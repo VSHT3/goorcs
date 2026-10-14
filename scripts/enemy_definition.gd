@@ -9,3 +9,4 @@ extends Resource
 @export var send_cost: int = 20
 @export var send_income: int = 2
 @export var texture: Texture2D
+@export var source_faces_left: bool = false
