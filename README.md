@@ -26,7 +26,7 @@ For command-line launch and verification, see the [development commands](docs/de
 
 - Choose **Collection & chests**, then **Open free chest**. The chest shakes, opens with light and decorative coins, and reveals the actual rewards together. There is no roulette reel.
 - Unlock Arrow tower, Orc ballista, and Rune obelisk. These are collection identities with original icons, not implemented combat units.
-- Orc ballista and Rune obelisk use accepted PixelLab sprites; the original PNGs are unchanged. Arrow tower still uses a procedural icon. All three share a consistent square display size in the collection and chest cards, preserving proportions.
+- All three towers use accepted PixelLab sprites with unchanged source PNGs. Arrow tower is the selected green-bannered stone-and-timber tower with a pink-haired archer and bow. All three share a consistent square display size in the collection and chest cards, preserving proportions.
 - The orc chest uses cleaned user-supplied PixelLab sprites. Its lid transitions between closed/open poses; light and coin effects remain native Godot effects. Sound is not implemented yet.
 - Provisional reward-count odds are 80% for one, 15% for three, and 5% for five. Draws contain only locked types and are capped to those remaining; the three-type roster cannot grant five actual rewards.
 - **Skip reveal** changes only the animation. Rewards are saved before it starts; leaving and returning cannot reroll or grant them again.
@@ -52,6 +52,7 @@ This workshop does not simulate waves, enemies, or combat-time route locking.
 - [Agent instructions](AGENTS.md): required reading, editing rules, state ownership, and completion criteria.
 - [Game direction](docs/game-direction.md): intended experience, technical decisions, and first playable milestone.
 - [Development workflow](docs/development.md): setup, verification, and optional MCP tooling.
+- [Pixel-art archive](archive_assets/README.md): original candidates, prepared sprites, searchable tags, and source provenance; excluded from Godot imports.
 
 ## Layout
 
@@ -62,6 +63,7 @@ scenes/            Main navigation, connection lobby, shared planning, path work
 scripts/           Rule owners, networking, persistence, input, and presentation
 resources/collection/  Tower reward definitions
 assets/            Imported chest and base ballista sprites
+archive_assets/    Archived pixel-art variants and sources, with per-image catalog and tags
 tests/             Path, navigation, collection, chest, real peer-session and shared-planning regressions
 docs/              Project documentation
 ```

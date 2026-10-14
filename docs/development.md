@@ -118,7 +118,7 @@ Keep development automation local, enable available connection authentication, a
 
 ## Pixel-art asset workflow
 
-**PixelLab chest trial completed with user-supplied outputs.** The game now ships a cleaned closed/open sprite pair; PixelLab API/MCP access is not connected and no credentials were added. Retro Diffusion remains an untested comparison option. Use Aseprite or Pixelorama for further manual cleanup.
+**PixelLab sprites are development-time assets.** The game ships a cleaned user-supplied chest pair and accepted tower PNGs. Arrow tower was generated through the PixelLab API using locally supplied credentials; there is no persistent API/MCP integration or runtime network dependency. `API.txt` is ignored and must never be committed or distributed. Retro Diffusion remains an untested comparison option. Use Aseprite or Pixelorama for further manual cleanup.
 
 - [PixelLab](https://www.pixellab.ai/) documents MCP/API access, directional characters, animation, transparent objects, editor integrations, and Godot tileset guides. Its free trial lists API/MCP access but excludes map tools.
 - [Retro Diffusion](https://retrodiffusion.ai/) also documents a hosted MCP server, API access, reference-based generation, animations, and tilesets. Automation is not exclusive to PixelLab.
@@ -139,7 +139,7 @@ Keep development automation local, enable available connection authentication, a
 
 The icon uses an `AtlasTexture` region `Rect2(12, 5, 74, 89)` to exclude its transparent border. The source PNG remains unchanged. Update the region if the sprite changes so its visible bounds remain comparable with the other towers.
 
-`TowerReward.icon_texture` holds imported icon art. The shared `RewardIcon` renderer fits it without stretching in both the collection archive and chest rewards, with dimming for locked entries. Arrow tower retains its procedural icon; the obsolete procedural ballista and Rune obelisk drawings and their icon selector were removed.
+`TowerReward.icon_texture` holds imported icon art. The shared `RewardIcon` renderer fits all three towers without stretching in both the collection archive and chest rewards, with dimming for locked entries. The obsolete procedural tower drawings and their icon selector were removed.
 
 The source/copy checksums match. Graphical verification inspected locked, unlocked reward, and compact collection states, and reloaded the same saved ballista ID. Layout regressions use the real catalog icons. This establishes collection/base artwork, not combat behavior, a board camera angle, or an upgraded tower.
 
@@ -151,9 +151,23 @@ The existing `rune_obelisk` reward's `icon_texture` uses an ordinary `AtlasTextu
 
 The reward ID, resource UID, title, unlock/save format, and chest grant rules are unchanged. Collection/persistence, reveal-layout, and chest-flow regressions pass. Graphical verification inspected locked/unlocked Rune icons, a natural Rune-only reveal, and an actual two-reward Rune/ballista reveal at standard and compact window sizes; the same saved Rune ID reloaded successfully. Verification used isolated saves and did not change real player progress. This is collection artwork, not implemented combat behavior.
 
+### Accepted Arrow tower sprite
+
+`assets/towers/arrow_tower.png` is the creator-selected second variation from one PixelLab reference-based Pro generation: a green-bannered timber lookout on a visible stone base, with a pink-haired archer holding a bow. The 128×128 RGBA PNG is saved byte-for-byte from the API response with hard transparency. SHA-256: `8d28e2a2abcf49778de0195d189a0e451b1b2d7af01ed343b9c7df41448ea8ed`.
+
+Generation used [`POST /v2/generate-image-v2`](https://api.pixellab.ai/v2/docs), seed `1792000017`, `no_background=true`, 128×128 output, and the existing 96×96 ballista as `style_image`. Outline, detail, and shading copying were enabled; palette copying was disabled to allow pink hair. The job returned four variations and reported a charge of 10 subscription generations. Job ID: `1d26bf5c-d23b-45ff-ad8f-573d44516c8b`; generation ID: `9bfba4ea-7868-4eac-b5fa-4277b645fb1e`. Earlier Bitforge candidates were rejected and never imported.
+
+The generation description was:
+
+> A complete fantasy archer tower sprite with its entire base clearly visible. A square pale stone foundation supports a sturdy brown timber watchtower with an open battlement platform. A clearly visible pink-haired female archer stands on top, holding a curved wooden bow with a nocked arrow, aiming to the right. Show her pink hair, head, arms, bow and upper body above the railing. One complete tower plus its archer, centered, with transparent margin on all sides; do not crop the foundation, bow or hair. Three-quarter low top-down viewpoint matching the supplied ballista. Copy its crisp pixel clusters, selective dark outline, light gray stone and warm wood shading, but not its crossbow. Keep the pink hair a distinct color accent. Transparent background, no terrain, no text.
+
+The existing `arrow_tower` reward retains its ID and resource UID. Its ordinary `AtlasTexture` uses `Rect2(28, 24, 70, 86)`, excluding only transparent padding; the source pixels are neither resized nor retouched. Lossless import, no mipmaps, nearest filtering, and the shared 52×52 visual frame match the other towers. The old procedural Arrow drawing and its unused pixel helper were removed.
+
+Import, main-scene smoke, collection/persistence, reveal-layout, chest-flow, and rendered icon-size regressions pass. Graphical verification exercised actual Collection/Open controls, locked and unlocked catalog entries, an actual three-reward reveal, a remaining-only Arrow reveal, 1280×720 and 1000×720 rendered collection surfaces, and reloading the same saved Arrow ID. Verification used isolated saves and did not change real progress. This is collection artwork, not an implemented combat unit.
+
 ### Consistent tower icon sizing
 
-Every tower uses a shared maximum 52×52 logical-pixel visual frame in both the archive and chest rewards, shrinking only when its available area is smaller. Imported icons fit their visible atlas bounds without stretching; the procedural Arrow tower is fitted using its actual drawing bounds. Icons stay centered, and an expanding row or reward card cannot enlarge their artwork. PNG canvas dimensions do not determine display size.
+Every tower uses a shared maximum 52×52 logical-pixel visual frame in both the archive and chest rewards, shrinking only when its available area is smaller. All icons fit their visible atlas bounds without stretching. Icons stay centered, and an expanding row or reward card cannot enlarge their artwork. PNG canvas dimensions do not determine display size.
 
 The graphical `tower_icon_test.gd` regression renders all catalog icons into transparent viewports and compares their actual visible pixel bounds. It checks equal size across identities, containment, centering, compact areas, and unchanged artwork size when a card expands. Run it without `--headless`; a dummy renderer cannot prove pixel output. The rendered regression and the standard/compact collection and reward smoke passed after correcting the oversized obelisk.
 

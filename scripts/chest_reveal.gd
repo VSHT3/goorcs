@@ -3,7 +3,6 @@ extends Control
 
 signal finished
 
-const INK := Color("141d1c")
 const GOLD := Color("e0bc77")
 const PALE := Color("f6e7b2")
 const TEXT := Color("e6e0cf")
@@ -31,30 +30,23 @@ var _coins: float = 0.0
 
 class RewardIcon extends Control:
 	const DISPLAY_SIZE: float = 52.0
-	const ARROW_BOUNDS := Rect2(-16.0, -23.0, 32.0, 41.0)
 
 	var reward: TowerReward
 	var locked: bool = false
 
 	func _draw() -> void:
-		if reward == null:
+		if reward == null or reward.icon_texture == null:
 			return
 		# Expanding rows/cards must not enlarge one tower's visible artwork.
 		var side: float = minf(DISPLAY_SIZE, minf(size.x, size.y))
 		if side <= 0.0:
 			return
-		if reward.icon_texture != null:
-			var texture_size: Vector2 = reward.icon_texture.get_size()
-			var scale: float = side / maxf(texture_size.x, texture_size.y)
-			var extent: Vector2 = (texture_size * scale).floor()
-			var rect := Rect2(((size - extent) * 0.5).round(), extent)
-			var tint: Color = Color(0.55, 0.55, 0.55) if locked else Color.WHITE
-			draw_texture_rect(reward.icon_texture, rect, false, tint)
-			return
-		var ink: Color = Color("65716a") if locked else reward.accent
-		var pixel_scale: float = side / ARROW_BOUNDS.size.y
-		var center: Vector2 = size * 0.5 - ARROW_BOUNDS.get_center() * pixel_scale
-		ChestReveal.paint_arrow_icon(self, center, pixel_scale, ink)
+		var texture_size: Vector2 = reward.icon_texture.get_size()
+		var scale: float = side / maxf(texture_size.x, texture_size.y)
+		var extent: Vector2 = (texture_size * scale).floor()
+		var rect := Rect2(((size - extent) * 0.5).round(), extent)
+		var tint: Color = Color(0.55, 0.55, 0.55) if locked else Color.WHITE
+		draw_texture_rect(reward.icon_texture, rect, false, tint)
 
 
 func _ready() -> void:
@@ -310,24 +302,3 @@ func _draw_coins() -> void:
 		draw_rect(Rect2(at.round() + Vector2(1.0, 2.0), Vector2(2.0, 4.0)), Color(PALE, alpha))
 
 
-static func _pixel(canvas: CanvasItem, x: int, y: int, width: int, height: int, color: Color) -> void:
-	canvas.draw_rect(Rect2(x, y, width, height), color)
-
-
-static func paint_arrow_icon(canvas: CanvasItem, center: Vector2, pixel_scale: float, accent: Color) -> void:
-	canvas.draw_set_transform(center.round(), 0.0, Vector2.ONE * pixel_scale)
-	var stone := Color("a3ac98")
-	var shadow := Color("46574d")
-	var wood := Color("a98350")
-	_pixel(canvas, -16, 13, 32, 5, INK)
-	_pixel(canvas, -10, -7, 20, 21, INK)
-	_pixel(canvas, -8, -5, 16, 19, stone)
-	_pixel(canvas, 3, -5, 5, 19, shadow)
-	_pixel(canvas, -13, -12, 26, 9, INK)
-	_pixel(canvas, -11, -11, 22, 6, accent)
-	for x: int in [-11, -2, 7]:
-		_pixel(canvas, x, -16, 4, 6, stone)
-	_pixel(canvas, -3, 0, 5, 8, INK)
-	_pixel(canvas, -1, -23, 2, 12, wood)
-	_pixel(canvas, 1, -22, 9, 5, accent)
-	canvas.draw_set_transform(Vector2.ZERO)
