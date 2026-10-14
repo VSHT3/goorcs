@@ -188,6 +188,8 @@ These are risks, not decisions to remove progression, income growth, or randomne
 
 **Confirmed:** top-down pixel art, broader fantasy, with orcs as the foundation rather than the only possible faction. Defenses are mostly physical structures rather than stationed characters or creatures. Exact factions, tone, structure roster, palette, asset sources, and pixel resolution are open.
 
+The creator approved the board composition study's overall visual direction: stronger tower/enemy proportions, grounded sprites, layered terrain/path materials, and quieter contextual highlights. This is not implemented yet. [Visual TODO](../TODO.md) preserves the reference and work list. A shared elevated three-quarter top-down drawing angle is recommended for buildings and enemies, with facing allowed to differ; validate the final angle/detail standard in an actual-size lineup before another sprite batch. The existing square-grid gameplay camera is unchanged.
+
 The run should start small and become increasingly extreme: larger towers, stronger and more spectacular spells, and much higher enemy density. This is a desired experience, not a measured engine capacity or a fixed enemy-count target.
 
 **Design constraints to validate:** players should still be able to understand routes, important threats, and the results of their actions during late-run spectacle. Visual size and simulation footprint are separate decisions. Representative late-run scenes must be measured on the chosen target hardware before performance is claimed.
