@@ -1,0 +1,40 @@
+{
+  "status": "Unapproved static shared-scene comparison. Not runtime integration, final art acceptance, or animation.",
+  "date": "2026-10-14",
+  "comparison": "coherent-candidates.png",
+  "comparison_source": "candidate-identity-locked-comparison.png",
+  "comparison_sha256": "c12f265ef12740cb80787b66326903608bdd0869984acbb342c68c7d80a290d6",
+  "original_source_manifest": "asset-lineup.provenance.json",
+  "local_artifact_directory": "~/Pictures/Gorcs-PixelArt/asset-lineup-20261014/coherent-refinement/",
+  "full_provenance_sha256": "6f4f35e61b6fa6cf3f939576dd4cf47978dad4203f5378d771817fcd4b6b822f",
+  "preserved_locally": ["original sources and shared reference", "requests and API/canvas graphs", "raw outputs and successful histories", "unrestricted and transparent exports", "cleanup/composition scripts", "source-facing and anchor proposals", "artifact-sha256.json"],
+  "model": {
+    "diffusion": "flux-2-klein-9b-fp8.safetensors",
+    "encoder": "qwen_3_8b_fp8mixed.safetensors",
+    "vae": "flux2-vae.safetensors",
+    "comfyui_version": "0.40.0",
+    "steps": 4,
+    "cfg": 1,
+    "sampler": "euler",
+    "scheduler": "Flux2Scheduler",
+    "render_size_px": [1024, 512],
+    "seeds": [202610143201, 202610143202]
+  },
+  "actual_size_basis": {
+    "cell_world_px": 48,
+    "camera_scale": 1.1684434968017057,
+    "cell_screen_px": 56.085287846481876,
+    "formula": "548 / (432 + 37)",
+    "opaque_height_cells": {"Grunt": 0.84, "Runner": 0.74, "Brute": 1.02, "Rune": 1.5},
+    "note": "Comparison has additional rows, not a fabricated gameplay viewport. Scene fitting uses opaque heights; nearest rasterization may differ at individual edge pixels."
+  },
+  "preferred": {
+    "runner": {"file": "runner-candidate-01.png", "sha256": "e947afb0593da5ced077cbf9a07cdefb50167ebb4a94ee6cb87ddf194f752669"},
+    "brute": {"file": "brute-candidate-01.png", "sha256": "f420aaaa151e08842b86d87d8b9b95f516ee1173201b1b303dfb37cad9423932"},
+    "rune": {"file": "rune-identity-locked.png", "sha256": "0c3481f41ddaec3f96b121c9b8d1a9f7c98ec2ed02b03cc5441e126c047212ff", "method": "CPU nearest-native, subdued palette and cluster cleanup of the original level-one Rune; architecture/crystal/holder/glyph layout preserved. Not a newly generated camera angle."}
+  },
+  "processing": "Exact crop/mask coordinates, nearest resizing, hard 0/255 alpha, palette/no-dither choices, isolated bright-pixel/cluster cleanup and source-facing/anchor proposals are retained in local export records and scripts. Unrestricted exports remain separate. Other lineup assets were restored to the original PNGs after model changes.",
+  "rejected": "Model Rune alternatives drifted from level-one architecture and lost engraving. They remain diagnostic artifacts, not recommended runtime replacements.",
+  "limitations": "Brute interior detail/contour weight remains finer than Grunt. CPU Rune retains dense engraving/spark clusters and loses some tiny marks through nearest sampling. Neither the static comparison nor generation success proves coherent final art or in-game behavior.",
+  "approval_gate": "Explicit creator approval required before importing replacements. All current runtime PNGs/resources remain unchanged."
+}

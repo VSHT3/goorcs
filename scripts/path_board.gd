@@ -7,8 +7,19 @@ signal edit_requested(cell: Vector2i, place: bool)
 signal cell_clicked(cell: Vector2i, button: MouseButton)
 signal tower_dropped(cell: Vector2i, type_id: StringName)
 
-const GROUND := Color("2f3c30")
-const TILE := Color("626650")
+const GROUND := Color("344336")
+const GROUND_PATCH_LIGHT := Color("374638")
+const GROUND_PATCH_DARK := Color("314032")
+const GRASS := Color("46513c")
+const APRON := Color("2b362b")
+const EARTH_RIM := Color("3c4030")
+const FIELD_EDGE := Color("263429")
+const PATH_SOIL := Color("454a36")
+const PATH_CONTACT := Color("394332")
+const TILE := Color("5f6450")
+const STONE := Color("696d57")
+const STONE_LIGHT := Color("6c705a")
+const STONE_DARK := Color("676b55")
 const ENEMY_BLEND_DURATION: float = 0.1
 const ENTRY_COLOR := Color("e0bc77")
 const BASE_COLOR := Color("96c8dc")
@@ -356,31 +367,47 @@ func _draw_ground() -> void:
 		return
 	var cell_size: float = _cell_size()
 	var origin: Vector2 = _board_origin()
-	_ground_canvas.draw_rect(Rect2(origin, Vector2(layout.dimensions) * cell_size), GROUND if command_mode else Color("222c2b"))
+	var field := Rect2(origin, Vector2(layout.dimensions) * cell_size)
 	if command_mode:
+		# A subdued earth apron is entirely outside the legal rectangular field.
+		_ground_canvas.draw_rect(field.grow(cell_size * 0.375), APRON)
+		_ground_canvas.draw_rect(field.grow(cell_size * 0.18), EARTH_RIM)
+		_ground_canvas.draw_rect(field.grow(cell_size * 0.055), FIELD_EDGE)
+	_ground_canvas.draw_rect(field, GROUND if command_mode else Color("222c2b"))
+	if command_mode:
+		# Broad stepped sod masses, not a mark repeated inside every grid cell.
+		var patch_size := Vector2(cell_size * 3.4, cell_size * 2.3)
+		for row: int in range(ceili(field.size.y / patch_size.y)):
+			for column: int in range(ceili(field.size.x / patch_size.x)):
+				var pattern: int = absi(column * 47 + row * 83)
+				var point: Vector2 = origin + Vector2(column, row) * patch_size
+				point += Vector2((pattern % 7) * 0.10 - 0.3, (pattern % 5) * 0.08 - 0.2) * cell_size
+				var color: Color = GROUND_PATCH_LIGHT if pattern % 3 else GROUND_PATCH_DARK
+				var patch := Rect2(point, patch_size * Vector2(0.78, 0.66))
+				_ground_canvas.draw_rect(patch.intersection(field), color)
+				patch = Rect2(point + Vector2(cell_size * 0.5, patch_size.y * 0.66),
+					patch_size * Vector2(0.51, 0.20))
+				_ground_canvas.draw_rect(patch.intersection(field), color)
 		for y: int in range(layout.dimensions.y):
 			for x: int in range(layout.dimensions.x):
 				var pattern: int = absi(x * 37 + y * 61)
-				var point: Vector2 = origin + Vector2(x, y) * cell_size
-				var patch := Rect2(point + Vector2(0.04 + (pattern % 5) * 0.07, 0.05 + (pattern % 4) * 0.13) * cell_size,
-					Vector2(cell_size * (0.43 + (pattern % 3) * 0.10), cell_size * 0.24))
-				_ground_canvas.draw_rect(patch, Color("354232") if pattern % 3 else Color("3b4232"))
-				var tuft: Vector2 = point + Vector2(0.22 + (pattern % 4) * 0.16, 0.60 + (pattern % 3) * 0.10) * cell_size
-				_ground_canvas.draw_line(tuft, tuft + Vector2(-2, -3), Color("435039"), 1.0)
-				_ground_canvas.draw_line(tuft + Vector2(3, 0), tuft + Vector2(2, -2), Color("435039"), 1.0)
-	# Draw all connected edge silhouettes first, then stonework over their union.
-	for layer: int in range(2):
-		var material: bool = layer == 1
+				if pattern % 7 != 2:
+					continue
+				var tuft: Vector2 = origin + (Vector2(x, y) + Vector2(0.28 + (pattern % 3) * 0.16, 0.73)) * cell_size
+				_ground_canvas.draw_line(tuft, tuft + Vector2(-2, -3), GRASS, 1.0)
+				_ground_canvas.draw_line(tuft + Vector2(3, 0), tuft + Vector2(2, -2), GRASS, 1.0)
+	# Soil and contact silhouettes precede the stone union, preserving every join.
+	for layer: int in range(3):
 		for y: int in range(layout.dimensions.y):
 			for x: int in range(layout.dimensions.x):
 				var cell := Vector2i(x, y)
 				if not layout.has_path(cell):
 					continue
 				var center: Vector2 = cell_center(cell)
-				var width: float = cell_size * (0.72 if material else 0.84)
+				var width: float = cell_size * (0.72 if layer == 2 else (0.84 if layer == 1 else 0.92))
 				if not command_mode:
 					width = cell_size * 0.64
-				_draw_pavement_piece(Rect2(center - Vector2.ONE * width * 0.5, Vector2.ONE * width), material)
+				_draw_pavement_piece(Rect2(center - Vector2.ONE * width * 0.5, Vector2.ONE * width), layer)
 				for direction: Vector2i in PathLayout.DIRECTIONS:
 					if not layout.contains(cell + direction) or not layout.has_path(cell + direction):
 						continue
@@ -394,20 +421,20 @@ func _draw_ground() -> void:
 					else:
 						arm = Rect2(center + Vector2(-width * 0.5, -cell_size * 0.5 if direction.y < 0 else 0.0),
 							Vector2(width, cell_size * 0.5))
-					_draw_pavement_piece(arm, material)
+					_draw_pavement_piece(arm, layer)
 
 
-func _draw_pavement_piece(rect: Rect2, material: bool) -> void:
+func _draw_pavement_piece(rect: Rect2, layer: int) -> void:
 	if not command_mode:
 		_ground_canvas.draw_rect(rect, Color("6e7465"))
 		return
-	_ground_canvas.draw_rect(rect, TILE if material else Color("424b39"))
-	if not material:
+	_ground_canvas.draw_rect(rect, TILE if layer == 2 else (PATH_CONTACT if layer == 1 else PATH_SOIL))
+	if layer != 2:
 		return
 	# World-aligned staggered stones are clipped to the connected pavement mask.
 	# Their pattern never restarts at a tile boundary, bend, or branch.
-	var brick_height: float = maxf(5.0, floorf(_cell_size() * 0.20))
-	var brick_width: float = brick_height * 2.5
+	var brick_height: float = maxf(6.0, floorf(_cell_size() * 0.24))
+	var brick_width: float = brick_height * 2.7
 	for row: int in range(floori(rect.position.y / brick_height), ceili(rect.end.y / brick_height)):
 		var stagger: float = brick_width * 0.5 if row % 2 else 0.0
 		for column: int in range(floori((rect.position.x - stagger) / brick_width), ceili((rect.end.x - stagger) / brick_width)):
@@ -415,7 +442,8 @@ func _draw_pavement_piece(rect: Rect2, material: bool) -> void:
 				Vector2(brick_width - 1.0, brick_height - 1.0))
 			var clipped: Rect2 = brick.intersection(rect)
 			if clipped.has_area():
-				_ground_canvas.draw_rect(clipped, Color("6a6d57") if absi(column * 7 + row * 11) % 3 else Color("585e4a"))
+				var variation: int = absi(column * 7 + row * 11) % 7
+				_ground_canvas.draw_rect(clipped, STONE_LIGHT if variation == 0 else (STONE_DARK if variation == 1 else STONE))
 
 
 func _draw_ranges() -> void:

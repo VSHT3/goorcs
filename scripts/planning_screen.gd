@@ -28,8 +28,6 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var _palette: HBoxContainer = %TowerPalette
 @onready var _coins: Label = %Coins
 @onready var _income: Label = %Income
-@onready var _placement_status: Label = %PlacementStatus
-@onready var _placement_cost: Label = %PlacementCost
 @onready var _cancel_placement: Button = %CancelPlacement
 @onready var _management: PanelContainer = %TowerManagement
 @onready var _tower_title: Label = %TowerTitle
@@ -219,31 +217,24 @@ func _refresh_palette() -> void:
 		if not unlocked:
 			status = "Locked"
 		elif stats.is_empty():
-			status = "Unavailable in this match"
-		elif coins < button.cost:
-			status = "Need %d" % (button.cost - coins)
-		elif not available:
-			status = "Match finished" if planning != null and planning.active else "Waiting for match"
+			status = "Unavailable"
 		button.disabled = not available or not unlocked or stats.is_empty() or coins < button.cost
 		button.set_pressed_no_signal(id == _placement_id)
-		var price: String = "%d Coins" % button.cost if not stats.is_empty() else "Unavailable"
-		button.refresh_caption(price, status if not stats.is_empty() else "")
-		button.tooltip_text = "%d damage · %.2fs · %d tile range" % [int(stats.get("damage", 0)), float(stats.get("interval", 0.0)), int(stats.get("range", 0))] if not stats.is_empty() else ""
+		var price: String = str(button.cost) if not stats.is_empty() else ""
+		button.refresh_caption(price, status)
+		button.tooltip_text = "%d Coins · %d damage · %.2fs · %d tile range" % [button.cost, int(stats.get("damage", 0)), float(stats.get("interval", 0.0)), int(stats.get("range", 0))] if not stats.is_empty() else "This tower is unavailable in the host's match catalog."
 		if coins < button.cost:
 			button.tooltip_text += "\nNeed %d more Coins." % (button.cost - coins)
+		if not unlocked:
+			button.tooltip_text = "Unlock this tower in Collection before buying it."
+		elif not available:
+			button.tooltip_text += "\nPurchases are unavailable outside an active run."
 		if id == _placement_id and button.disabled:
 			_placement_id = &""
 			button.set_pressed_no_signal(false)
 	_coins.text = "Coins %d" % coins
 	_refresh_sends()
 	_cancel_placement.visible = _placement_id != &""
-	if _placement_id != &"":
-		var button: TowerShopButton = shop_buttons[_placement_id]
-		_placement_status.text = button.tower_title
-		_placement_cost.text = "· %d Coins" % button.cost
-	else:
-		_placement_status.text = ""
-		_placement_cost.text = ""
 
 
 func _own_coins() -> int:
@@ -275,7 +266,16 @@ func _refresh_sends() -> void:
 	send_button.text = "%s · %d/+%d" % ["Send now" if delivers_now else "Send next", cost, gain] if configured else "Send unavailable"
 	if finished:
 		send_button.text = "Match finished"
-	_income.text = "Income +%d/clear · Q%d/%d" % [int(income[own_slot]), int(queued[own_slot]), int(queued[1 - own_slot])]
+	var recurring: int = int(income[own_slot])
+	var incoming: int = int(queued[own_slot])
+	var outgoing: int = int(queued[1 - own_slot])
+	var summary: String = "Income +%d" % recurring if recurring > 0 else ""
+	if incoming > 0:
+		summary += (" · " if not summary.is_empty() else "") + "In %d" % incoming
+	if outgoing > 0:
+		summary += (" · " if not summary.is_empty() else "") + "Out %d" % outgoing
+	_income.text = summary
+	_income.visible = not finished and not summary.is_empty()
 	var queue_feedback: String = "Next-wave queues:\nIncoming to you: %d (%s).\nOutgoing to opponent: %d (%s)." % [int(queued[own_slot]), _queue_composition(queues[own_slot], types), int(queued[1 - own_slot]), _queue_composition(queues[1 - own_slot], types)]
 	if finished:
 		queue_feedback += "\nMatch finished; no further delivery or income payouts."
@@ -386,7 +386,7 @@ func _refresh_targeting() -> void:
 	targeting_button.disabled = not planning.active or int(planning.combat.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.FINISHED
 	_refresh_upgrade(damage_upgrade, tower, stats, "damage")
 	_refresh_upgrade(speed_upgrade, tower, stats, "speed")
-	sell_button.text = "Sell · +%d Coins" % int(tower.get("sell_value", 0))
+	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
 	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
 	sell_button.disabled = targeting_button.disabled
 
@@ -395,11 +395,11 @@ func _refresh_upgrade(button: Button, tower: Dictionary, stats: Dictionary, upgr
 	var purchased: bool = bool(tower.get(upgrade + "_upgraded", false))
 	var price: int = int(stats.get(upgrade + "_upgrade_cost", 0))
 	var benefit: String = "+%d damage" % int(stats.get("damage_upgrade_bonus", 0)) if upgrade == "damage" else "%.0f%% faster" % ((1.0 / float(stats.get("speed_upgrade_multiplier", 1.0)) - 1.0) * 100.0)
-	button.text = "%s\nPurchased" % benefit if purchased else "%s\n%d Coins" % [benefit, price]
+	button.text = "%s\nPurchased" % benefit if purchased else "%s\n%d" % [benefit, price]
 	button.disabled = purchased or targeting_button.disabled or _own_coins() < price
 	button.tooltip_text = "One-time upgrade"
 	if not purchased and _own_coins() < price:
-		button.text += "\nNeed %d more Coins" % (price - _own_coins())
+		button.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
 
 
 func _upgrade(upgrade: String) -> void:
@@ -481,26 +481,32 @@ func _refresh() -> void:
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
 		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")
 		_titles[slot].tooltip_text = role
-		var legality: String = "Legal"
-		if layout.route.is_empty():
-			legality = "Route missing"
-		var isolated: bool = not layout.route.is_empty() and layout.disconnected_count > 0
-		var readiness: String = "Ready" if planning.ready_flags[slot] else "Not ready"
-		_states[slot].text = "HP %d/%d" % [int(health[slot]), int(rules.get("base_health", 10))]
+		var path_state: String = "Legal route." if layout.is_ready() else \
+			("No route to base." if layout.route.is_empty() else "%d disconnected tiles." % layout.disconnected_count)
+		_states[slot].tooltip_text = "Base health. %s\n%s" % [role, path_state]
 		_states[slot].modulate = Color("d99578") if int(health[slot]) <= 0 else Color("b5e2b7")
-		if in_wave or finished:
-			_budgets[slot].text = ("Destroyed" if int(health[slot]) <= 0 else "Survived") if finished else ""
-			_counts[slot].text = "Alive %d · Regular %d/%d" % [all_enemies[slot].size(), int(spawned[slot]), int(state.get("total", 0))]
-			_budgets[slot].tooltip_text = ""
+		_states[slot].text = "HP %d/%d" % [int(health[slot]), int(rules.get("base_health", 10))]
+		_budgets[slot].text = "Ready" if editable and slot != own_slot and planning.ready_flags[slot] else ""
+		_budgets[slot].modulate = Color("b5e2b7")
+		_counts[slot].visible = not finished and (in_wave or slot == own_slot)
+		if in_wave:
+			_counts[slot].text = "Alive %d" % all_enemies[slot].size()
+			_counts[slot].tooltip_text = "Regular enemies spawned: %d/%d.\nHold A / D to scout." % [int(spawned[slot]), int(state.get("total", 0))]
+			_counts[slot].modulate = Color("b5e2b7")
 		else:
-			_budgets[slot].text = "%s · %s" % [readiness, legality] if not isolated else readiness
-			_counts[slot].text = ("%d isolated · " % layout.disconnected_count if isolated else "") + "%d/%d tiles" % [layout.used_tiles(), layout.budget]
-			_budgets[slot].tooltip_text = "Shortest route: %d steps" % (layout.route.size() - 1) if not layout.route.is_empty() else "No route to base"
-		_budgets[slot].modulate = Color("b5e2b7") if in_wave or planning.ready_flags[slot] else Color("e0bc77")
-		_counts[slot].modulate = _budgets[slot].modulate
+			_counts[slot].text = "%d/%d tiles" % [layout.used_tiles(), layout.budget]
+			_counts[slot].tooltip_text = "%s\nOnly your board accepts edits. Hold A / D to scout." % path_state
+			_counts[slot].modulate = Color("b5e2b7") if layout.is_ready() else Color("e0bc77")
 	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
 	ready_button.disabled = not editable or (not planning.ready_flags[own_slot] and not planning.layouts[own_slot].is_ready())
-	ready_button.text = "Match finished" if finished else ("Wave running" if in_wave else ("Unready" if planning.ready_flags[own_slot] else "Ready for wave %d" % (int(state.get("wave", 0)) + 1)))
+	clear_button.visible = editable and phase == MatchCombat.Phase.PLANNING
+	ready_button.visible = editable and phase == MatchCombat.Phase.PLANNING
+	ready_button.text = "Unready" if planning.ready_flags[own_slot] else "Ready"
+	var own_layout: PathLayout = planning.layouts[own_slot]
+	if own_layout.is_ready():
+		ready_button.tooltip_text = "Both players must ready for wave %d. Edits clear readiness." % (int(state.get("wave", 0)) + 1)
+	else:
+		ready_button.tooltip_text = "Connect the entrance to the base and all placed path tiles before readying."
 	if finished:
 		var winning_slot: int = int(state.get("winner", -1))
 		_status.text = "%s · Wave %d" % ["Victory" if winning_slot == own_slot else "Defeat", int(state.get("wave", 0))]
@@ -513,8 +519,8 @@ func _refresh() -> void:
 		_status.text = "Wave %d" % int(state.get("wave", 0))
 		_status.tooltip_text = ""
 	else:
-		_status.text = "Planning · Wave %d" % (int(state.get("wave", 0)) + 1)
-		_status.tooltip_text = ""
+		_status.text = "Wave %d" % (int(state.get("wave", 0)) + 1)
+		_status.tooltip_text = "Planning: build a legal route, then ready for the next wave."
 	_refresh_targeting()
 	if not planning.active:
 		cancel_strokes()

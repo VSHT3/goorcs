@@ -35,14 +35,12 @@ func _get_minimum_size() -> Vector2:
 
 func refresh_caption(price: String, status: String) -> void:
 	(_presentation.get_node("Caption/Title") as Label).text = tower_title
-	(_presentation.get_node("Caption/Details/Price") as Label).text = price
+	var price_label := _presentation.get_node("Caption/Details/Price") as Label
+	price_label.text = price
+	price_label.visible = not price.is_empty()
 	var status_label := _presentation.get_node("Caption/Details/Status") as Label
-	status_label.text = "· " + status if not status.is_empty() else ""
+	status_label.text = ("· " if not price.is_empty() else "") + status if not status.is_empty() else ""
 	status_label.visible = not status.is_empty()
-	if status.begins_with("Need "):
-		status_label.add_theme_font_override("font", NUMBER_FONT)
-	else:
-		status_label.remove_theme_font_override("font")
 	queue_redraw()
 
 

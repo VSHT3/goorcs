@@ -31,20 +31,42 @@
     "shadow_color": "#233025"
   },
   "terrain": {
-    "base": "#2f3c30",
-    "grass": [
-      "#354232",
-      "#324031"
+    "board": "#344336",
+    "world": "#253329",
+    "grass_dark": "#314032",
+    "grass_light": "#46513c",
+    "board_patch_light": "#374638",
+    "world_patch_light": "#28362b",
+    "world_patch_dark": "#233127",
+    "world_grass": "#35412f",
+    "path": "#696d57",
+    "stone_light": "#6c705a",
+    "stone_dark": "#676b55",
+    "seam": "#5f6450",
+    "soil": "#454a36",
+    "edge": "#394332",
+    "board_edge": "#263429",
+    "apron": "#2b362b",
+    "earth_rim": "#3c4030",
+    "shadow": "#233025",
+    "runtime_material_dimensions_world_px": {
+      "stone_width": 34.56,
+      "contact_width": 40.32,
+      "soil_width": 44.16,
+      "masonry_row": 11,
+      "brick_width": 29.7,
+      "seam_width": 1,
+      "apron": 18,
+      "earth_rim": 8.64,
+      "board_edge": 2.64
+    },
+    "runtime_board_patch_size_world_px": [
+      163.2,
+      110.4
     ],
-    "soil": "#3b4232",
-    "path": "#626650",
-    "stones": [
-      "#6a6d57",
-      "#585e4a"
-    ],
-    "seam": "#474e3e",
-    "edge": "#424b39",
-    "description": "Static proposed layered terrain/path, using BoardPresentation supplied palette; no new gameplay cells."
+    "runtime_world_patch_size_world_px": 240,
+    "source": "Exact ReadableMaterials final colors and dimensions delivered by peer. This compositor approximates the materials and labels itself static; it does not recreate board geometry or claim runtime capture.",
+    "description": "CPU static material approximation of ReadableMaterials final palette, including distinct outer terrain/board/path. NOT captured game geometry or rendered runtime proof."
   },
   "assets": [
     {
@@ -605,18 +627,70 @@
     "shared_reference_sha256": "1b582325108857b2e423831bfffa3a948b7f5641f5fc51db056d8413f3e7e4ee",
     "graph_source": "/home/vsht/Pictures/Gorcs-PixelArt/rune-level-2-klein/klein9-next-prompt.json",
     "model": "FLUX.2 Klein 9B FP8 distilled, Qwen3 8B mixed-FP8 encoder, Flux2 VAE",
-    "sampling": {"steps": 4, "cfg": 1, "sampler": "euler", "scheduler": "Flux2Scheduler", "batch_size": 1, "size_px": [1024, 512]},
-    "seeds": [202610143101, 202610143102],
-    "successful_prompt_ids": ["e1f7138d-e46a-4568-b885-bf08bd16b5e7", "f7c3b047-d446-431c-8878-7826bf44fa4c"],
+    "sampling": {
+      "steps": 4,
+      "cfg": 1,
+      "sampler": "euler",
+      "scheduler": "Flux2Scheduler",
+      "batch_size": 1,
+      "size_px": [
+        1024,
+        512
+      ]
+    },
+    "seeds": [
+      202610143101,
+      202610143102
+    ],
+    "successful_prompt_ids": [
+      "e1f7138d-e46a-4568-b885-bf08bd16b5e7",
+      "f7c3b047-d446-431c-8878-7826bf44fa4c"
+    ],
     "generation_manifest": "generation-results.json",
-    "requests": ["request-01.json", "request-02.json"],
-    "histories": ["history-01.json", "history-02.json"],
+    "requests": [
+      "request-01.json",
+      "request-02.json"
+    ],
+    "histories": [
+      "history-01.json",
+      "history-02.json"
+    ],
     "exports_manifest": "candidate-exports.json",
     "comparison": "candidate-comparison.png",
     "native_details": "candidate-native-details.png",
     "processing": "Original raw PNGs with API prompt metadata retained. Lower white-row Runner/Brute crops only: edge-connected near-white flood removal, neutral model-added floor cleanup limited to Runner lower half / Brute lower quarter, repeat white flood through exposed transparent gaps, nearest 48x48 export, hard alpha, optional combined original-enemy-palette matching without dithering. Full crop, unrestricted and palette-matched versions retained; precise thresholds/geometry/hashes in export manifest and export_candidates.py.",
     "candidate_assessment": "Candidate 01 is the more useful direction: Brute has olive skin, an angled helmet top and asymmetrical shoulders rather than a flat frontal breastplate; Runner retains a red headband and lean running silhouette with a three-quarter face. Both remain more finely shaded than the Grunt, with some bright contour flecks, so no final coherence or approval is claimed. Candidate 02 is not preferred: Brute skin shifts toward warm human flesh and a narrower mass. Generated raw full-lineup images also altered assets that were requested unchanged (notably Grunt/Rune in 02); the comparison deliberately uses untouched originals for every non-Runner/Brute asset.",
     "gpu_window": "Parent granted exclusive generation window; both requests finished, queue empty, model caches unloaded using /free. Existing service left running. Parent notified before graphical Godot resumed.",
-    "approval_gate": "Candidates stay outside assets. User approval required before import."
+    "approval_gate": "Candidates stay outside assets. User approval required before import.",
+    "coherent_followup_directory": "/home/vsht/Pictures/Gorcs-PixelArt/asset-lineup-20261014/coherent-refinement",
+    "coherent_followup": {
+      "directory": "/home/vsht/Pictures/Gorcs-PixelArt/asset-lineup-20261014/coherent-refinement",
+      "manifest": "provenance.json",
+      "manifest_sha256": "6f4f35e61b6fa6cf3f939576dd4cf47978dad4203f5378d771817fcd4b6b822f",
+      "seeds": [
+        202610143201,
+        202610143202
+      ],
+      "prompt_ids": [
+        "a4570454-e660-44d5-b224-209f6e484abd",
+        "f3d9375b-2fee-4702-9721-49bd81928f73"
+      ],
+      "preferred_comparison": "candidate-identity-locked-comparison.png",
+      "model_only_comparison": "candidate-comparison.png",
+      "assessment": {
+        "observed": "Both raw renders and final native/actual-size comparison images inspected. Seed01 Runner is brighter/more legible than seed02, preserves red bandana and lean stride; dark contour cleanup removed pale fringe. Seed01 Brute has broad sloping armor crown/shoulder planes and heavier mass, with restrained slate material instead of previous bright white contour flecks. Seed02 Runner is too dark and Brute armor still more busy than Grunt. Seed01 is preferred as a direction, not a finished acceptance.",
+        "model_failures": "Full-scene conditioning did not constrain editing perfectly: both raw outputs altered supposedly fixed assets and displaced the broad Brute into Arrow fourth slot. Export explicitly extracts that displaced Brute and restores original Arrow/Grunt/Ballista/Portal/Crystal. No raw gallery is presented as faithful final composition.",
+        "rune_gate": "Model Rune alternatives over-simplified level-one stone/cap/crystal-holder detail and removed blue engraved runes; two recorded blue clusters were restored for diagnostic model exports, but architecture drift remains visible. They are NOT recommended replacements. Preferred shared-scene comparison instead uses a clearly labelled CPU identity-locked original Rune (nearest native export, subdued palette and cluster cleanup). It preserves source architecture/crystal/holder/glyph layout without upgrades/rocks; some fine detail remains and camera is not newly generated.",
+        "limitations": "Color quantization and local isolated-pixel cleanup do not repair every rounded/model-smoothed form. Brute interior armor/skin detail remains finer and contour weight more uneven than Grunt; seed02 dark torso is less readable. Identity-locked Rune still has denser engraving/spark clusters than Grunt, and nearest native sampling loses some original tiny marks. No claim of fully coherent final art, walk cycles, generated animation or in-game visual verification."
+      },
+      "approval_gate": "Explicit user approval required before any runtime import. Original runtime PNGs/resources/scripts untouched. Native export anchor/facing records are proposals for a future approved import, not new resource values."
+    }
+  },
+  "palette_update": {
+    "basis": "ReadableMaterials supplied final runtime colors; procedural static comparator uses deliberate light texture, not a screenshot clone.",
+    "processing_script": "/home/vsht/Pictures/Gorcs-PixelArt/asset-lineup-20261014/coherent-refinement/compose_lineup.py",
+    "script_sha256": "9de00d642904bccd100fbdb4cfefc0ddd760acd1867bdfb0be116392cd5dea4f",
+    "original_scene_sha256": "389df53a651c049e9b037e9fadebbb918738bbf373f8b1c6df240c313971c0b0",
+    "lineup_sha256": "f074ebf8087bb9afeddf9b1a0119079073416a7a15311932c024711e8c27f050"
   }
 }

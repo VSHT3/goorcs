@@ -41,6 +41,8 @@ The portable reference is copied unchanged from `~/Pictures/Gorcs-PixelArt/board
 - [x] Limit routine health-bar clutter and replace overpowering attack highlights with clearer transient effects. Keep damage/AoE information understandable.
 - [x] Keep the fixed HUD, compact-width usability, local camera scouting, and opponent read-only input intact.
 
+The creator's `swappy-20261014_211722.png` rejected the first pass's weak board/exterior separation and redundant HUD prose. The corrected runtime now has a distinct playable field, darker exterior, external earth rim, continuous jagged central ravine, broad quiet terrain patches, and orderly stone paths. Repeated Not ready/Route missing, opponent planning budgets, always-on pan instructions, zero income/queues, disabled wave captions, duplicate placement title/price, and inline affordability prose are removed or moved into tooltips. Positive gameplay state and actual controls remain available.
+
 ### 2. Coherent sprite pass
 
 - [x] Make an actual-game-size lineup of Grunt, Runner, Brute, Arrow, Ballista, Rune, portal, and crystal against the proposed terrain. Choose one camera-elevation/light/pixel-detail standard from that lineup.
@@ -52,7 +54,9 @@ The [full actual-size lineup](docs/visual-reference/asset-lineup.png) and [prove
 
 Two shared-scene ComfyUI refinement batches produced Runner/Brute alternatives at `~/Pictures/Gorcs-PixelArt/asset-lineup-20261014/`, with original PNGs, references, raw outputs, exact requests/history, seeds, processing scripts, and hashes preserved. The candidates are not imported or approved. They improve some perspective cues but still have finer shading/bright contour flecks than Grunt; refinement and replacement approval remain unchecked.
 
-Creator chose **Keep current sprites** for this change. Existing runtime artwork remains installed; the candidate refinements and replacement approval above are future work, not a pending import or a claimed completed coherent-art pass.
+Creator chose **Keep current sprites** for the initial presentation change. Existing runtime artwork remains installed; no replacement is approved by that decision. Continuing refinement produced two new shared-scene seed proposals under `~/Pictures/Gorcs-PixelArt/asset-lineup-20261014/coherent-refinement/`, with graphs, histories, raw outputs, source-facing/anchor metadata, cleanup scripts, and hashes preserved. `candidate-identity-locked-comparison.png` is the preferred review: seed-one Runner/Brute with an explicitly labelled CPU simplification of the original level-one Rune. Model-generated Rune architecture drift was rejected, not substituted for the accepted sprite. Brute interior detail and Rune density still need judgment; this is a static still-pose proposal, not installed art or animation. Refinement/approval boxes remain unchecked.
+
+Portable review artifacts: [shared-scene candidate comparison](docs/visual-reference/coherent-candidates.png) and [provenance](docs/visual-reference/coherent-candidates.provenance.json). These are unapproved static proposals, kept outside Godot imports; the updated original-asset lineup uses the corrected terrain palette.
 
 ### 3. Verification and acceptance
 
@@ -62,7 +66,7 @@ Creator chose **Keep current sprites** for this change. Existing runtime artwork
 - [x] Run applicable checks from [development](docs/development.md#setup); preserve authoritative gameplay/network state and update affected behavior regressions where needed.
 - [x] Update current-state documentation only after implementation and visual verification; keep these boxes unchecked until their behavior is actually delivered.
 
-Runtime evidence: [1280×720 bent path and adjacent Rune towers](docs/visual-reference/gameplay-presentation.png), [1000×720 mixed damaged/full-health combat](docs/visual-reference/gameplay-compact.png), and [1000×720 top-row towers clearing the HUD](docs/visual-reference/gameplay-top-row.png). These are direct Godot main-scene viewport captures, not composites. Regular enemy count/spawn spacing were not changed for the comparison. Top-row clipping was reproduced and fixed by resource-derived camera headroom; the HUD, board dimensions, placement/hit rules, range, and authoritative state are unchanged. See [verification details](docs/development.md#match-soundtrack-and-presentation).
+Current corrected runtime evidence: [1280×720 empty board separation](docs/visual-reference/gameplay-empty.png), [1280×720 bent path and adjacent Rune towers](docs/visual-reference/gameplay-presentation.png), [1000×720 mixed combat](docs/visual-reference/gameplay-compact.png), and [1000×720 top-row towers clearing the HUD](docs/visual-reference/gameplay-top-row.png). These direct Godot main-scene viewport captures replace the first material/HUD pass; they are not composites. Regular enemy count/spawn spacing, board dimensions, placement/hit rules, range, and authoritative state are unchanged. See [verification details](docs/development.md#match-soundtrack-and-presentation).
 
 ## Scope boundaries
 

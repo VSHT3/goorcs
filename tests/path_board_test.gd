@@ -59,6 +59,10 @@ func _run() -> void:
 			_check(_pixels_changed_near(ground, pavement, edge + offset), "Stone pavement covers horizontal, vertical, branch and endpoint joins, mirrored=%s" % mirrored)
 		_check(not _pixels_changed_near(ground, pavement, board.cell_center(Vector2i(3, 2))),
 			"Connecting paths does not pave empty buildable ground, mirrored=%s" % mirrored)
+		var gap_region := Rect2i(Vector2i(board.cell_center(Vector2i(3, 2))) - Vector2i(30, 30), Vector2i(60, 60))
+		_check(int(_changed_geometry(ground, pavement, gap_region)["pixels"]) == 0,
+			"Branch stonework and soil edges leave the whole intervening cell unfilled, mirrored=%s" % mirrored)
+	await _check_ground_materials()
 	_check_drop_input(board)
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
@@ -69,6 +73,71 @@ func _run() -> void:
 	if failures == 0:
 		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, tile ranges, attacks and mixed mirrored enemy sprites")
 	quit(1 if failures else 0)
+
+
+func _check_ground_materials() -> void:
+	var dimensions := Vector2i(14, 9)
+	var board_size := Vector2(dimensions) * 48.0
+	var board_gap: float = 96.0
+	var scale_factor: float = 548.0 / 469.0
+	for width: int in [1000, 1280]:
+		var viewport := SubViewport.new()
+		viewport.size = Vector2i(width, 720)
+		viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		root.add_child(viewport)
+		var map := Node2D.new()
+		map.scale = Vector2.ONE * scale_factor
+		viewport.add_child(map)
+		var terrain := MatchTerrain.new()
+		terrain.configure(board_size, board_gap, Rect2(Vector2(-1000, -1000), Vector2(3500, 2500)))
+		map.add_child(terrain)
+		for mirrored: bool in [false, true]:
+			var board := PathBoard.new()
+			board.command_mode = true
+			board.mirror_horizontal = mirrored
+			board.input_enabled = false
+			board.layout = PathLayout.new(dimensions, 30, Vector2i(0, 4), Vector2i(13, 4))
+			board.size = board_size
+			board.position.x = board_size.x + board_gap if mirrored else 0.0
+			map.add_child(board)
+			map.position = Vector2(width * 0.5, 340.0) - (board.position + board_size * 0.5) * scale_factor
+			var empty: Image = await _board_image(board, viewport)
+			for edge: Array in [
+				[Vector2(14, 110), Vector2(-38, 110)],
+				[Vector2(board_size.x - 14, 110), Vector2(board_size.x + 38, 110)],
+				[Vector2(400, 14), Vector2(400, -38)],
+				[Vector2(400, board_size.y - 14), Vector2(400, board_size.y + 38)]
+			]:
+				var inside: Vector2 = map.position + (board.position + edge[0]) * scale_factor
+				var outside: Vector2 = map.position + (board.position + edge[1]) * scale_factor
+				_check(_region_luminance(empty, inside) > _region_luminance(empty, outside) + 0.025,
+					"Empty playable footprint stays lighter than scenery at every edge, width=%s mirrored=%s" % [width, mirrored])
+			board.layout.place(Vector2i(6, 2))
+			var paved: Image = await _board_image(board, viewport)
+			var stone: Vector2 = map.position + (board.position + board.cell_center(Vector2i(6, 2))) * scale_factor
+			_check(_region_luminance(paved, stone) > _region_luminance(empty, stone) + 0.08,
+				"Stone is a third readable material above the buildable field, width=%s mirrored=%s" % [width, mirrored])
+			# Scouting the central gap must reveal a ravine, not a paved crossing.
+			map.position = Vector2(width * 0.5, 340.0) - Vector2(board_size.x + board_gap * 0.5, board_size.y * 0.5) * scale_factor
+			var gap: Image = await _board_image(board, viewport)
+			for y: float in [60.0, board_size.y * 0.5, board_size.y - 60.0]:
+				var center: Vector2 = map.position + Vector2(board_size.x + board_gap * 0.5, y) * scale_factor
+				var bank: Vector2 = map.position + Vector2(board_size.x + board_gap * 0.5 - 110.0, y) * scale_factor
+				_check(_region_luminance(gap, center) + 0.025 < _region_luminance(gap, bank),
+					"Central crevasse stays dark and uninterrupted through entrance height, width=%s" % width)
+			map.remove_child(board)
+			board.queue_free()
+		viewport.queue_free()
+		await process_frame
+
+
+func _region_luminance(image: Image, center: Vector2) -> float:
+	var total: float = 0.0
+	var point := Vector2i(center)
+	for y: int in range(point.y - 4, point.y + 4):
+		for x: int in range(point.x - 4, point.x + 4):
+			total += image.get_pixel(x, y).get_luminance()
+	return total / 64.0
 
 
 func _check_drop_input(board: PathBoard) -> void:

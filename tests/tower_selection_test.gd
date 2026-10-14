@@ -74,6 +74,7 @@ func _run() -> void:
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
 	_check(screen.shop_buttons[&"orc_ballista"].disabled and screen._placement_type() == &"", "Insufficient host funds disable purchase and cancel stale placement")
+	_check_send_visibility(main, screen)
 	main.queue_free()
 	await process_frame
 	DirAccess.remove_absolute(save_path)
@@ -81,6 +82,36 @@ func _run() -> void:
 	if failures == 0:
 		print("PASS: visible locked palette, click/cancel ownership, unlock/reset, effective owned stats, upgrades, close, sale and affordability snapshots")
 	quit(1 if failures else 0)
+
+
+func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:
+	var model := MatchCombat.new(main.combat_rules)
+	var income: Control = screen.get_node("%Income")
+	_check(model.send_enemy(1, &"grunt"), "Opponent purchase creates a real incoming-only planning queue")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(income.visible, "An incoming queue remains discoverable even without local recurring income")
+	var layout := PathLayout.new()
+	for x: int in range(1, 13):
+		layout.place(Vector2i(x, 4))
+	var routes: Array[Array] = [layout.route, layout.route]
+	_check(model.start_wave(routes), "Legal routes deliver the accepted queue")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(not income.visible, "Delivered queues with no local income remove their obsolete HUD summary")
+	_check(model.send_enemy(0, &"grunt"), "Real local send earns recurring income")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(income.visible, "Earned recurring income remains visible after immediate delivery clears queues")
+	for tick: int in range(5000):
+		if model.phase == MatchCombat.Phase.PLANNING:
+			model.start_wave(routes)
+		model.advance(1.0 / 60.0)
+		if model.phase == MatchCombat.Phase.FINISHED:
+			break
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(model.phase == MatchCombat.Phase.FINISHED and not income.visible, "Terminal results hide income that can no longer pay out")
 
 
 func _check(condition: bool, description: String) -> void:
