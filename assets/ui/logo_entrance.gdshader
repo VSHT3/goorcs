@@ -18,9 +18,9 @@ void fragment() {
 	float assembled = smoothstep(arrival, arrival + 0.09, intro_time);
 	// The complete mark remains readable underneath the arriving pixel blocks.
 	ink.a *= mix(0.16, 1.0, assembled);
-	float sweep_x = logo_center - 180.0 + (intro_time - 0.60) * 850.0;
+	float sweep_x = logo_center - 180.0 + (intro_time - 1.35) * 850.0;
 	float band = 1.0 - step(9.0, abs(local_position.x + local_position.y * 0.28 - sweep_x));
-	float sweep = band * step(0.60, intro_time) * (1.0 - step(1.06, intro_time));
+	float sweep = band * step(1.35, intro_time) * (1.0 - step(1.81, intro_time));
 	ink.rgb = mix(ink.rgb, vec3(0.98, 0.94, 0.72), sweep * 0.65);
 	COLOR = ink;
 }

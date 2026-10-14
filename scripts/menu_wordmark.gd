@@ -10,6 +10,9 @@ const GREEN: Color = Color(0.48, 0.66, 0.34, 1.0)
 const GREEN_LIGHT: Color = Color(0.61, 0.76, 0.43, 1.0)
 const GREEN_DARK: Color = Color(0.29, 0.44, 0.24, 1.0)
 const INK: Color = Color(0.085, 0.15, 0.105, 1.0)
+
+enum FacePose { NEUTRAL, BRACED, OPEN, ROARING }
+
 const FACE_ROWS: Array[String] = [
 	"......LLLLLL......",
 	"....LLGGGGGGLL....",
@@ -29,12 +32,54 @@ const FACE_ROWS: Array[String] = [
 	"....LDDDDDDDDL....",
 	".....LLLLLLLL.....",
 ]
+# Jaw frames share the original brow/nose; the tusks move with the lower jaw.
+const JAW_START_ROW: int = 10
+const CLOSED_EYE_ROWS: Array[String] = [
+	".DLGIIGGGGGGIIGLD.",
+	"..LGGGIGDDGIGGGL..",
+]
+const BRACED_JAW: Array[String] = [
+	"..LGGTGGGGGGTGGL..",
+	"..LGGTITTTTITGGL..",
+	"..LGTTIIIIIITTGL..",
+	"..LDTTGGGGGGTTDL..",
+	"...LDGGGGGGGGDL...",
+	"....LDDDDDDDDL....",
+	".....LLLLLLLL.....",
+]
+const OPEN_JAW: Array[String] = [
+	"..LGGIIIIIIIIGGL..",
+	"..LGIIIIIIIIIIGL..",
+	"..LGGTIIIIIITGGL..",
+	"..LGGTIIIIIITGGL..",
+	"..LGTTIIMMIITTGL..",
+	"..LDTTGMMMMGTTDL..",
+	"...LDGGGGGGGGDL...",
+	"....LDDDDDDDDL....",
+	".....LLLLLLLL.....",
+]
+const ROARING_JAW: Array[String] = [
+	"..LGGIIIIIIIIGGL..",
+	"..LGIIIIIIIIIIGL..",
+	"..LGIIIIIIIIIIGL..",
+	"..LGGTIIIIIITGGL..",
+	"..LGGTIIIIIITGGL..",
+	"..LGTTIIIIIITTGL..",
+	"..LGTTIMMMMITTGL..",
+	"..LDTTGMMMMGTTDL..",
+	"...LDGGGGGGGGDL...",
+	"....LDDDDDDDDL....",
+	".....LLLLLLLL.....",
+]
+const JAW_POSES: Array[Array] = [[], BRACED_JAW, OPEN_JAW, ROARING_JAW]
+const TONGUE: Color = Color("945953")
+
 const BLINK_START: float = 4.3
 const BLINK_END: float = 4.46
 const IDLE_START: float = 2.1
 const IDLE_END: float = 2.65
 const CYCLE_SECONDS: float = 6.8
-const INTRO_DURATION: float = 1.1
+const INTRO_DURATION: float = 1.86
 const FACE_LIFT: float = 2.0
 const SUFFIX: Array[String] = ["R", "C", "S"]
 
@@ -47,6 +92,8 @@ var _intro_time: float = 0.0
 var _intro_finished: bool = false
 var _entrance_material: ShaderMaterial
 var _letter_advances: PackedFloat32Array = []
+var _face_pose: FacePose = FacePose.NEUTRAL
+var _face_offset := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -68,7 +115,7 @@ func _process(delta: float) -> void:
 		_intro_time = minf(_intro_time + delta, INTRO_DURATION)
 		_entrance_material.set_shader_parameter("intro_time", _intro_time)
 		_entrance_material.set_shader_parameter("logo_center", size.x * 0.5)
-		_eyes_closed = _intro_time < 0.62
+		_update_intro_pose()
 		_intro_finished = _intro_time >= INTRO_DURATION
 		if _intro_finished:
 			material = null
@@ -82,6 +129,25 @@ func _process(delta: float) -> void:
 		_eyes_closed = eyes_closed
 		_idle_offset = idle_offset
 		queue_redraw()
+
+
+func _update_intro_pose() -> void:
+	_eyes_closed = _intro_time >= 0.50 and _intro_time < 1.46
+	_face_offset = Vector2.ZERO
+	if _intro_time < 0.50 or _intro_time >= 1.34:
+		_face_pose = FacePose.NEUTRAL
+	elif _intro_time < 0.64:
+		_face_pose = FacePose.BRACED
+		_face_offset.y = 2.0
+	elif _intro_time < 0.76:
+		_face_pose = FacePose.OPEN
+	elif _intro_time < 1.10:
+		_face_pose = FacePose.ROARING
+		_face_offset.y = -2.0
+	elif _intro_time < 1.24:
+		_face_pose = FacePose.OPEN
+	else:
+		_face_pose = FacePose.BRACED
 
 
 func _draw() -> void:
@@ -110,14 +176,18 @@ func _draw() -> void:
 		draw_string(TITLE_FONT, position, letter, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, IVORY)
 		advance += _letter_advances[index]
 	draw_set_transform(Vector2.ZERO)
-	var face_origin: Vector2 = Vector2(floorf(origin_x + _g_width + gap), baseline - FACE_ROWS.size() * PIXEL - FACE_LIFT)
+	var face_origin: Vector2 = Vector2(floorf(origin_x + _g_width + gap), baseline - FACE_ROWS.size() * PIXEL - FACE_LIFT) + _face_offset
 	_draw_face(face_origin + Vector2(2, 3), true)
 	_draw_face(face_origin, false)
 
 
 func _draw_face(origin: Vector2, shadow: bool) -> void:
-	for row_index in FACE_ROWS.size():
-		var row: String = FACE_ROWS[row_index]
+	var jaw: Array = JAW_POSES[_face_pose]
+	var row_count: int = FACE_ROWS.size() if jaw.is_empty() else JAW_START_ROW + jaw.size()
+	for row_index: int in range(row_count):
+		var row: String = jaw[row_index - JAW_START_ROW] if row_index >= JAW_START_ROW and not jaw.is_empty() else FACE_ROWS[row_index]
+		if _eyes_closed and row_index >= 6 and row_index <= 7:
+			row = CLOSED_EYE_ROWS[row_index - 6]
 		for column in row.length():
 			var pixel: String = row.substr(column, 1)
 			if pixel == ".":
@@ -128,8 +198,7 @@ func _draw_face(origin: Vector2, shadow: bool) -> void:
 				"D": color = GREEN_DARK
 				"I": color = INK
 				"E", "T": color = IVORY
-			if _eyes_closed and pixel == "E":
-				color = INK
+				"M": color = TONGUE
 			if shadow:
 				color = SHADOW
 			draw_rect(Rect2(origin + Vector2(column * PIXEL, row_index * PIXEL), Vector2(PIXEL, PIXEL)), color)
@@ -145,5 +214,7 @@ func _on_visibility_changed() -> void:
 		_entrance_material = null
 		_elapsed = 0.0
 		_eyes_closed = false
+		_face_pose = FacePose.NEUTRAL
+		_face_offset = Vector2.ZERO
 		_idle_offset = 0.0
 	queue_redraw()
