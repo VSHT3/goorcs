@@ -15,6 +15,7 @@ func _init() -> void:
 	_test_area_kills_and_bounties()
 	_test_builtin_upgrade_values()
 	_test_wave_scaling_and_rewards()
+	_test_enemy_sends()
 	_test_simultaneous_and_ordinary_outcomes()
 	if failures == 0:
 		print("PASS: authoritative purchases/upgrades/sales, currency and reward atomicity, per-tower kills, tile range/AoE, scaling, resource stats, targeting, captured routes and frozen outcomes")
@@ -453,3 +454,59 @@ func _test_builtin_upgrade_values() -> void:
 		var tower: Dictionary = combat.towers[0][0]
 		_check(tower["damage"] == effective_damage[index] and combat.enemies[0][0]["hp"] == 100 - effective_damage[index] and is_equal_approx(tower["cooldown"], type_stats["interval"] * multipliers[index]), "Tower %s attacks using purchased effective damage and interval" % ids[index])
 		_check(combat.coins[0] == 200 - costs[index] - 2 * upgrade_costs[index] and tower["invested"] == costs[index] + 2 * upgrade_costs[index], "Tower %s accounts for each paid upgrade exactly once" % ids[index])
+
+
+func _test_enemy_sends() -> void:
+	var rules := _rules()
+	rules.starting_coins = 40
+	rules.enemies_per_wave = 1
+	rules.count_growth = 0
+	rules.send_cost = 20
+	rules.send_income = 2
+	rules.send_cutoff_seconds = 1.0
+	var combat := MatchCombat.new(rules)
+	var frozen: Dictionary = combat.snapshot()
+	_check(not combat.send_enemy(-1) and not combat.send_enemy(2) and combat.snapshot() == frozen, "Invalid send payer changes no Coins, income, queues or enemies")
+	_check(combat.send_enemy(0) and combat.coins == [20, 40] and combat.income == [2, 0] and combat.queued_sends == [0, 1] and combat.enemies == [[], []], "Planning sends pay now and reserve exactly one enemy on the opponent, without route access")
+	var copy: Dictionary = combat.snapshot()
+	copy["income"][0] = 999
+	copy["queued_sends"][1] = 999
+	_check(combat.income == [2, 0] and combat.queued_sends == [0, 1], "Client snapshot income/queue mutations cannot affect the host")
+	var invalid_routes: Array[Array] = [[], _line(4)]
+	frozen = combat.snapshot()
+	_check(not combat.start_wave(invalid_routes) and combat.snapshot() == frozen, "Invalid wave start preserves paid queued delivery")
+	combat.start_wave(_routes(4, 4))
+	_check(combat.queued_sends == [0, 0] and combat.enemies[0].is_empty() and combat.enemies[1].size() == 1 and combat.enemies[1][0]["pos"] == Vector2.ZERO and combat.enemies[1][0]["hp"] == 8, "Starting a legal wave delivers the paid enemy at the opponent entrance with existing wave stats")
+	_check(combat.send_enemy(0) and combat.coins == [0, 40] and combat.income == [4, 0] and combat.enemies[1].size() == 2, "Exact funds send immediately during the delivery window and grow only sender income")
+	frozen = combat.snapshot()
+	_check(not combat.send_enemy(0) and combat.snapshot() == frozen, "Unaffordable send cannot create a free enemy or income, nor consume IDs")
+	combat.advance(1.0)
+	_check(not combat.snapshot()["sends_open"] and combat.enemies[0].size() == 1 and combat.enemies[1].size() == 3, "Cutoff closes at its exact boundary; sent enemies coexist with regular spawns")
+	_check(combat.send_enemy(1) and combat.coins == [0, 20] and combat.income == [4, 2] and combat.queued_sends == [1, 0] and combat.enemies[0].size() == 1, "A cutoff order pays once and waits for the next wave, never extending current delivery")
+	_run_wave(combat)
+	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.base_health == [9, 7], "Both boards clear including sent enemies; each sent enemy causes the usual base damage")
+	_check(combat.coins == [39, 57] and combat.queued_sends == [1, 0], "Clear pays shared reward plus each sender's recurring bonus once and preserves late orders")
+	frozen = combat.snapshot()
+	_check(not combat.advance(10.0) and combat.snapshot() == frozen, "Idle planning cannot pay income or deliver queued enemies again")
+	combat.start_wave(_routes(4, 4))
+	_check(combat.enemies[0].size() == 1 and combat.enemies[0][0]["hp"] == 10 and combat.enemies[0][0]["id"] == 5 and combat.queued_sends == [0, 0], "Deferred order delivers exactly once with next-wave scaling and the next unconsumed ID")
+	_run_wave(combat)
+	_check(combat.coins == [83, 99] and combat.base_health == [7, 6], "The same income bonus pays again on a later clear without another send")
+	# Sent enemies use ordinary attack, kill attribution and bounty rules.
+	rules.starting_coins = 200
+	rules.tower_definitions[0].damage = 100
+	rules.tower_definitions[0].interval = 0.01
+	combat = MatchCombat.new(rules)
+	combat.send_enemy(0)
+	combat.build(1, Vector2i(0, 1), &"arrow_tower", 0)
+	combat.start_wave(_routes(4, 4))
+	_run_wave(combat)
+	_check(combat.base_health == [9, 10] and combat.towers[1][0]["kills"] == 2 and combat.coins == [217, 196], "Defenses kill sent and regular enemies through the same bounty and wave-clear rules")
+	rules.base_health = 1
+	combat = MatchCombat.new(rules)
+	combat.send_enemy(0)
+	combat.start_wave(_routes(4, 4))
+	_run_wave(combat)
+	_check(combat.phase == MatchCombat.Phase.FINISHED and combat.coins == [180, 200], "Terminal defeat pays no wave income even when a send earned a bonus")
+	frozen = combat.snapshot()
+	_check(not combat.send_enemy(0) and not combat.send_enemy(1) and not combat.advance(10.0) and combat.snapshot() == frozen, "Finished matches reject sends without charging, spawning, rerolling or paying income")

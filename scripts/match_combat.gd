@@ -8,6 +8,9 @@ var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
 var coins: Array[int] = []
+# Recurring bonus on each surviving wave clear; queues belong to the target board.
+var income: Array[int] = [0, 0]
+var queued_sends: Array[int] = [0, 0]
 var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
@@ -143,6 +146,25 @@ func has_tower(slot: int, cell: Vector2i) -> bool:
 	return false
 
 
+func send_enemy(slot: int) -> bool:
+	if phase == Phase.FINISHED or not _valid_slot(slot) or coins[slot] < _rules.send_cost:
+		return false
+	var target: int = 1 - slot
+	# No state changes before every precondition passes. Late/planning orders reserve
+	# delivery instead of requiring an editable or even currently legal route.
+	coins[slot] -= _rules.send_cost
+	income[slot] += _rules.send_income
+	if _sends_open():
+		_spawn_enemy(target, 0.0)
+	else:
+		queued_sends[target] += 1
+	return true
+
+
+func _sends_open() -> bool:
+	return phase == Phase.WAVE and _elapsed < _rules.send_cutoff_seconds
+
+
 func start_wave(routes: Array[Array]) -> bool:
 	if phase != Phase.PLANNING or routes.size() != 2 or routes[0].size() < 2 or routes[1].size() < 2:
 		return false
@@ -151,6 +173,10 @@ func start_wave(routes: Array[Array]) -> bool:
 	_elapsed = 0.0
 	wave += 1
 	phase = Phase.WAVE
+	for slot: int in range(2):
+		for sent: int in range(queued_sends[slot]):
+			_spawn_enemy(slot, 0.0)
+		queued_sends[slot] = 0
 	return true
 
 
@@ -172,8 +198,8 @@ func advance(delta: float) -> bool:
 		winner = _random.randi_range(0, 1) if coin_flip else (1 if base_health[0] == 0 else 0)
 	elif _spawned[0] == _wave_count() and _spawned[1] == _wave_count() and enemies[0].is_empty() and enemies[1].is_empty():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
-		coins[0] += reward
-		coins[1] += reward
+		coins[0] += reward + income[0]
+		coins[1] += reward + income[1]
 		phase = Phase.PLANNING
 	return true
 
@@ -183,6 +209,8 @@ func snapshot() -> Dictionary:
 		"phase": phase, "wave": wave, "health": base_health.duplicate(),
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
+		"income": income.duplicate(), "queued_sends": queued_sends.duplicate(),
+		"sends_open": _sends_open(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"spawned": _spawned.duplicate(), "total": _wave_count(),
 		"tower_types": _tower_types.duplicate(true),
@@ -191,6 +219,8 @@ func snapshot() -> Dictionary:
 			"starting_coins": _rules.starting_coins, "kill_bounty": _rules.kill_bounty,
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
+			"send_cost": _rules.send_cost, "send_income": _rules.send_income,
+			"send_cutoff_seconds": _rules.send_cutoff_seconds,
 		},
 	}
 
@@ -225,19 +255,23 @@ func _move_enemies(slot: int, delta: float) -> void:
 func _spawn_enemies(slot: int) -> void:
 	var total: int = _wave_count()
 	var speed: float = _wave_speed()
-	var hp: int = _wave_health()
 	while _spawned[slot] < total:
 		var spawn_time: float = _spawned[slot] * _rules.spawn_interval
 		if spawn_time > _elapsed:
 			break
 		# Account for the fraction of this tick after the scheduled spawn time.
 		var progress: float = (_elapsed - spawn_time) * speed
-		enemies[slot].append({
-			"id": _next_enemy_id, "hp": hp, "max_hp": hp,
-			"progress": progress, "pos": _position(slot, progress),
-		})
-		_next_enemy_id += 1
+		_spawn_enemy(slot, progress)
 		_spawned[slot] += 1
+
+
+func _spawn_enemy(slot: int, progress: float) -> void:
+	var hp: int = _wave_health()
+	enemies[slot].append({
+		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
+		"progress": progress, "pos": _position(slot, progress),
+	})
+	_next_enemy_id += 1
 
 
 func _position(slot: int, progress: float) -> Vector2:

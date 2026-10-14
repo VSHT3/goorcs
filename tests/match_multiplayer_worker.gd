@@ -33,3 +33,17 @@ func _planning_rules() -> CombatRules:
 		rules.wave_reward = 99
 		rules.wave_reward_growth = 99
 	return rules
+
+
+func _execute_command(command: Dictionary) -> void:
+	if String(command.get("action", "")) == "send_scenario":
+		var rules: CombatRules = _planning_rules()
+		rules.base_health = 6 if _lane == "host" else 99
+		rules.starting_coins = 45 if _lane == "host" else 999
+		rules.health_growth = 2
+		rules.send_cost = 20 if _lane == "host" else 1
+		rules.send_income = 2 if _lane == "host" else 99
+		rules.send_cutoff_seconds = 0.5 if _lane == "host" else 99.0
+		planning.combat_rules = rules
+	else:
+		super._execute_command(command)

@@ -16,3 +16,6 @@ starting_coins = 200
 kill_bounty = 3
 wave_reward = 30
 wave_reward_growth = 5
+send_cost = 20
+send_income = 2
+send_cutoff_seconds = 3.0

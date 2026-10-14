@@ -2,7 +2,7 @@ extends "res://tests/match_planning_test.gd"
 
 
 func _run() -> void:
-	success_message = "PASS: real peers agree on authoritative Coins, purchases/upgrades/sales and ownership, live combat commands, reward/kills, readiness, waves, persistent damage and terminal results"
+	success_message = "PASS: real peers agree on authoritative economy, enemy sends/income/delivery, ownership, live combat, readiness, waves, persistent damage and terminal results"
 	planning_worker_path = "res://tests/match_multiplayer_worker.gd"
 	_suite_deadline_msec = Time.get_ticks_msec() + 60000
 	_directory = OS.get_temp_dir().path_join("goorcs_combat_test_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
@@ -94,6 +94,7 @@ func _run() -> void:
 		_check(typed_guest.get("type_id") == type_id, "Host accepts the guest's chosen tower identity")
 	_check(_snapshot("host")["combat"]["tower_types"] == _snapshot("guest")["combat"]["tower_types"], "Both peers use detached host-owned per-type stats")
 	await _peer_economy()
+	await _peer_sends(code)
 	await _finish()
 
 
@@ -146,6 +147,8 @@ func _assert_terminal(tower_id: int) -> void:
 	await _command("host", {"action": "upgrade", "slot": 0, "tower_id": tower_id, "upgrade": "damage"})
 	await _command("host", {"action": "sell", "slot": 0, "tower_id": tower_id})
 	await _edit("host", 0, 1, 4, false)
+	await _command("host", {"action": "send", "slot": 0})
+	await _command("guest", {"action": "send", "slot": 1})
 	await create_timer(0.2).timeout
 	_check(_snapshot("host")["combat"] == outcome and _snapshot("guest")["combat"] == outcome, "Finished run rejects commands and cannot reroll or resume")
 
@@ -211,3 +214,71 @@ func _peer_economy() -> void:
 	await _wait_combat("guest", {"phase": 1, "coins": [11, 69]}, "Damage upgrade also remains available during combat")
 	live_tower = await _wait_tower("guest", 0, Vector2i(5, 2), 0)
 	_check(live_tower["damage_upgraded"] and live_tower["damage"] == 100 and live_tower["invested"] == 105 and live_tower["sell_value"] == 63, "Live damage upgrade replicates effective stats and full investment")
+
+
+func _peer_sends(code: String) -> void:
+	# A fresh admission isolates the send economy from the exact tower assertions.
+	await _command("guest", {"action": "leave"})
+	await _wait_for("host", {"active": false}, "Disconnect clears the preceding economy scenario")
+	for lane: String in ["host", "guest"]:
+		await _command(lane, {"action": "send_scenario"})
+	await _connect_guest("guest", "host", code)
+	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0], "sends_open": false}, "Fresh send scenario uses host resources and zero income")
+	_check(fresh["rules"]["send_cost"] == 20 and fresh["rules"]["send_income"] == 2 and fresh["rules"]["send_cutoff_seconds"] == 0.5, "Guest receives host send rules instead of its cheap/high-income/long-cutoff local rules")
+	var before: Dictionary = _snapshot("host")["combat"]
+	await _command("guest", {"action": "send", "slot": 0})
+	await _command("host", {"action": "send", "slot": 1})
+	await _command("guest", {"action": "send", "slot": -1})
+	await _command("host", {"action": "send", "slot": 2})
+	await create_timer(0.15).timeout
+	_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Authenticated remote/host payers cannot spoof the other slot or use invalid slots")
+	await _command("host", {"action": "send", "slot": 0})
+	await _wait_combat("guest", {"coins": [25, 45], "income": [2, 0], "queued_sends": [0, 1], "enemies": [[], []]}, "Host pays exactly once and queues only on the opponent before any route exists")
+	await _command("guest", {"action": "send", "slot": 1})
+	await _wait_combat("host", {"coins": [25, 25], "income": [2, 2], "queued_sends": [1, 1]}, "Remote payer spends host price and queues on host, not its own board")
+	await _command("host", {"action": "send", "slot": 0})
+	await _wait_combat("guest", {"coins": [5, 25], "income": [4, 2], "queued_sends": [1, 2]}, "Accepted sends accumulate future income without immediate Coins")
+	before = _snapshot("host")["combat"]
+	await _command("host", {"action": "send", "slot": 0})
+	await create_timer(0.15).timeout
+	_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Insufficient funds change neither Coins, income, queued delivery nor enemies")
+	await _paths()
+	await _both_ready()
+	await _wait_combat("guest", {"phase": 1, "wave": 1, "queued_sends": [0, 0], "spawned": [1, 1], "total": 1}, "Starting the wave drains queues without counting sends as regular spawns")
+	await _wait_enemy_counts("guest", [2, 3], "Queued orders become real enemies on their captured target routes")
+	await _wait_combat("host", {"phase": 0, "wave": 1, "health": [4, 3], "coins": [44, 62], "income": [4, 2]}, "Regular plus sent leaks affect only their target, and first clear pays base reward plus accumulated income")
+	await _wait_combat("guest", {"phase": 0, "health": [4, 3], "coins": [44, 62]}, "Remote sees exact authoritative target damage and first income payout")
+	await _both_ready()
+	await _wait_combat("host", {"phase": 1, "wave": 2, "sends_open": true}, "Next wave reopens immediate send delivery")
+	await _command("host", {"action": "send", "slot": 0})
+	var immediate: Dictionary = await _wait_combat("guest", {"phase": 1, "coins": [24, 62], "income": [6, 2], "queued_sends": [0, 0], "spawned": [1, 1], "total": 1}, "An early live send debits now and enters combat instead of a queue")
+	await _wait_enemy_counts("guest", [1, 2], "Immediate host order appears only on the guest board")
+	for enemy: Dictionary in immediate["enemies"][1]:
+		_check(enemy["hp"] == 6 and enemy["max_hp"] == 6, "Live sent enemies reuse the current wave-scaled enemy health")
+	await _wait_combat("guest", {"phase": 1, "sends_open": false}, "Host cutoff closes delivery despite the guest's longer local cutoff")
+	await _command("guest", {"action": "send", "slot": 1})
+	await _wait_combat("host", {"phase": 1, "coins": [24, 42], "income": [6, 4], "queued_sends": [1, 0]}, "Late remote order pays and gains income now but queues for the host's next wave")
+	await _wait_enemy_counts("host", [1, 2], "Late send creates no extra current-wave enemy")
+	await _wait_combat("host", {"phase": 0, "wave": 2, "health": [3, 1], "coins": [70, 86], "income": [6, 4], "queued_sends": [1, 0]}, "Second clear pays recurring income again without consuming next-wave delivery")
+	await _wait_combat("guest", {"phase": 0, "coins": [70, 86], "income": [6, 4], "queued_sends": [1, 0]}, "Both peers agree on repeated income and the deferred send")
+	await _both_ready()
+	await _wait_combat("guest", {"phase": 1, "wave": 3, "queued_sends": [0, 0], "spawned": [1, 1], "total": 1}, "Deferred send drains at the following wave start")
+	await _wait_enemy_counts("guest", [2, 1], "Deferred remote send becomes a real host-board enemy")
+	await _wait_combat("host", {"phase": 2, "wave": 3, "health": [1, 0], "winner": 0, "coins": [70, 86], "income": [6, 4]}, "Terminal leaks finish the run without a wave or recurring-income payout")
+	await _wait_combat("guest", {"phase": 2, "winner": 0, "coins": [70, 86]}, "Guest agrees on terminal send scenario")
+	await _assert_terminal(-1)
+	await _command("guest", {"action": "leave"})
+	await _wait_for("host", {"active": false}, "Leaving removes send state")
+	await _connect_guest("guest", "host", code)
+	await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0], "sends_open": false, "enemies": [[], []]}, "Rejoin resets Coins, recurring income, queues, delivery cutoff and enemies")
+
+
+func _wait_enemy_counts(lane: String, expected: Array, description: String) -> void:
+	var deadline: int = Time.get_ticks_msec() + 5000
+	while Time.get_ticks_msec() < deadline:
+		var combat: Dictionary = _snapshot(lane).get("combat", {})
+		var enemies: Array = combat.get("enemies", [[], []])
+		if combat.get("phase") == 1 and [enemies[0].size(), enemies[1].size()] == expected:
+			return
+		await create_timer(0.02).timeout
+	_check(false, "%s; expected enemy counts %s observed %s" % [description, expected, _snapshot(lane).get("combat", {})])

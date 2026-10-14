@@ -83,15 +83,89 @@ func _run() -> void:
 	var final_state: Dictionary = planning.combat.duplicate(true)
 	planning.build_tower(0, Vector2i(4, 3), &"arrow_tower", 0)
 	planning.submit_ready(true)
+	planning.send_enemy(0)
+	planning.send_enemy(1)
 	_check(planning.combat == final_state, "Finished solo runs reject mutations")
 	planning.stop_singleplayer()
 	_check(not planning.active and not planning.singleplayer and not planning.is_physics_processing(), "Leaving clears solo mode and stops simulation")
 	planning.start_singleplayer()
-	_check(planning.layouts[0].used_tiles() == 0 and planning.combat["wave"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["coins"] == initial_coins, "Reopening starts a fresh match")
+	_check(planning.layouts[0].used_tiles() == 0 and planning.combat["wave"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["coins"] == initial_coins and planning.combat["income"] == [0, 0] and planning.combat["queued_sends"] == [0, 0] and not planning.combat["sends_open"], "Reopening starts a fresh match")
 	planning.stop_singleplayer()
+	_solo_sends(planning)
 	planning.queue_free()
 	session.queue_free()
 	await process_frame
 	if failures == 0:
-		print("PASS: offline mirrored commands, ownership, transactions, waves, results, and fresh restart")
+		print("PASS: offline mirrored commands, enemy sends/income/delivery, ownership, transactions, waves, results, and fresh restart")
 	quit(1 if failures > 0 else 0)
+
+
+func _solo_sends(planning: MatchPlanning) -> void:
+	# Keep send balances isolated from the preceding tower/mirroring scenario.
+	var rules := CombatRules.new()
+	rules.base_health = 7
+	rules.starting_coins = 45
+	rules.enemies_per_wave = 1
+	rules.count_growth = 0
+	rules.enemy_health = 4
+	rules.health_growth = 2
+	rules.enemy_speed = 10.0
+	rules.speed_growth = 0.0
+	rules.spawn_interval = 0.05
+	rules.send_cost = 20
+	rules.send_income = 2
+	rules.send_cutoff_seconds = 0.25
+	planning.combat_rules = rules
+	planning.start_singleplayer()
+	var before: Dictionary = planning.combat.duplicate(true)
+	for slot: int in [1, -1, 2]:
+		planning.send_enemy(slot)
+	_check(planning.combat == before, "Solo sends cannot pay from the read-only opponent or an invalid slot")
+	planning.send_enemy(0)
+	_check(planning.combat["coins"] == [25, 25] and planning.combat["income"] == [2, 2] and planning.combat["queued_sends"] == [1, 1] and planning.combat["enemies"] == [[], []], "Accepted planning send mirrors exactly one paid order and income gain per payer without requiring legal routes")
+	planning.send_enemy(0)
+	_check(planning.combat["coins"] == [5, 5] and planning.combat["income"] == [4, 4] and planning.combat["queued_sends"] == [2, 2], "Mirrored sends spend Coins now but only accumulate future income")
+	before = planning.combat.duplicate(true)
+	planning.send_enemy(0)
+	_check(planning.combat == before, "Unaffordable solo send cannot charge, grow income or mirror a free order")
+	for x: int in range(1, 13):
+		planning.request_edit(0, Vector2i(x, 4), true)
+	planning.submit_ready(true)
+	_check(planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"][0].size() == 2 and planning.combat["enemies"][1].size() == 2, "Both mirrored target queues drain onto captured routes at wave start")
+	planning._physics_process(0.1)
+	_check(planning.combat["spawned"] == [1, 1] and planning.combat["total"] == 1 and planning.combat["enemies"][0].size() == 3 and planning.combat["enemies"][1].size() == 3, "Sent enemies are real additional enemies, never extra regular-spawn counts")
+	_advance_send_wave(planning)
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [4, 4] and planning.combat["coins"] == [44, 44] and planning.combat["income"] == [4, 4], "Mirrored sent enemies leak on both targets and first clear pays accumulated income exactly once")
+	planning.submit_ready(true)
+	planning.send_enemy(0)
+	_check(planning.combat["coins"] == [24, 24] and planning.combat["income"] == [6, 6] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"][0].size() == 1 and planning.combat["enemies"][1].size() == 1, "Early live send mirrors immediate delivery rather than queueing")
+	for slot: int in range(2):
+		var enemy: Dictionary = planning.combat["enemies"][slot][0]
+		_check(enemy["hp"] == 6 and enemy["max_hp"] == 6, "Mirrored live sends reuse wave-scaled existing enemies")
+	planning._physics_process(0.3)
+	_check(planning.combat["phase"] == MatchCombat.Phase.WAVE and not planning.combat["sends_open"], "The host clock closes solo delivery at its cutoff")
+	var counts: Array[int] = [planning.combat["enemies"][0].size(), planning.combat["enemies"][1].size()]
+	planning.send_enemy(0)
+	_check(planning.combat["coins"] == [4, 4] and planning.combat["income"] == [8, 8] and planning.combat["queued_sends"] == [1, 1] and [planning.combat["enemies"][0].size(), planning.combat["enemies"][1].size()] == counts, "Late solo send mirrors paid next-wave queues without adding current enemies")
+	_advance_send_wave(planning)
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [2, 2] and planning.combat["coins"] == [52, 52] and planning.combat["income"] == [8, 8] and planning.combat["queued_sends"] == [1, 1], "Second solo clear pays recurring income again and preserves late delivery")
+	planning.submit_ready(true)
+	_check(planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"][0].size() == 1 and planning.combat["enemies"][1].size() == 1, "Late mirrored queues deliver at the next wave start")
+	_advance_send_wave(planning)
+	_check(planning.combat["phase"] == MatchCombat.Phase.FINISHED and planning.combat["health"] == [0, 0] and planning.combat["coins"] == [52, 52] and planning.combat["income"] == [8, 8] and planning.combat["coin_flip"], "Mirrored send pressure reaches the normal terminal coin flip with no terminal income payout")
+	before = planning.combat.duplicate(true)
+	planning.send_enemy(0)
+	planning.send_enemy(1)
+	planning.submit_ready(true)
+	_check(planning.combat == before, "Finished solo sends cannot spend remaining affordable Coins, gain income, create enemies or reroll")
+	planning.stop_singleplayer()
+	planning.start_singleplayer()
+	_check(planning.combat["wave"] == 0 and planning.combat["health"] == [7, 7] and planning.combat["coins"] == [45, 45] and planning.combat["income"] == [0, 0] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []] and not planning.combat["sends_open"] and planning.layouts[0].used_tiles() == 0 and planning.layouts[1].used_tiles() == 0, "Restart clears mirrored send income, deliveries, enemies, health, routes and currency")
+	planning.stop_singleplayer()
+
+
+func _advance_send_wave(planning: MatchPlanning) -> void:
+	for tick: int in range(2400):
+		planning._physics_process(1.0 / 60.0)
+		if planning.combat["phase"] != MatchCombat.Phase.WAVE:
+			break

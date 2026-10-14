@@ -115,6 +115,10 @@ func sell_tower(slot: int, tower_id: int) -> void:
 	_request_tower_command("sell", slot, Vector2i.ZERO, tower_id, -1, "")
 
 
+func send_enemy(slot: int) -> void:
+	_request_tower_command("send", slot, Vector2i.ZERO, -1, -1, "")
+
+
 func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
 	if singleplayer:
 		_apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
@@ -230,14 +234,14 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 		return
 	var permitted_slot: int = 0 if sender == 1 else 1
 	if slot != permitted_slot:
-		_reject(sender, "Only your own towers can be changed.")
+		_reject(sender, "Only your own Coins and towers can be changed.")
 		return
 	if _host_combat.phase == MatchCombat.Phase.FINISHED:
 		_reject(sender, "The run has ended. Leave to start another room.")
 		return
 	# IDs are globally unique, so resolve the counterpart by cell before a sale.
 	var mirror_id: int = -1
-	if singleplayer and sender == 1 and command != "build":
+	if singleplayer and sender == 1 and command not in ["build", "send"]:
 		for tower: Dictionary in _host_combat.towers[0]:
 			if tower["id"] == tower_id:
 				for opponent: Dictionary in _host_combat.towers[1]:
@@ -245,7 +249,11 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 						mirror_id = opponent["id"]
 						break
 				break
-	if command == "build":
+	if command == "send":
+		if not _host_combat.send_enemy(slot):
+			_reject(sender, "Not enough Coins to send an enemy.")
+			return
+	elif command == "build":
 		var layout: PathLayout = _host_layouts[slot]
 		if not layout.contains(cell) or layout.has_path(cell):
 			_reject(sender, "Build towers on empty ground, never on a path or endpoint.")

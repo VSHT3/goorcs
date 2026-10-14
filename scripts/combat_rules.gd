@@ -19,3 +19,6 @@ extends Resource
 @export var kill_bounty: int = 3
 @export var wave_reward: int = 30
 @export var wave_reward_growth: int = 5
+@export var send_cost: int = 20
+@export var send_income: int = 2
+@export var send_cutoff_seconds: float = 3.0

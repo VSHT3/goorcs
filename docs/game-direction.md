@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Matches now place both boards in one continuous world with smooth local A/D camera scouting and a fixed HUD. Match Coins, paid towers, kill/wave rewards, upgrades, and selling are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Sends, loadouts, permanent stat growth, map expansion, and final art are not implemented. The full first playable milestone below is not complete.
+The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Matches now place both boards in one continuous world with smooth local A/D camera scouting and a fixed HUD. Match Coins, paid towers, kill/wave rewards, upgrades, selling, and enemy sends with recurring income are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Loadouts, permanent stat growth, map expansion, and final art are not implemented. The full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -30,7 +30,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - A **run** is the complete 1v1 contest. Enemies reaching a base damage it; a destroyed base ends the entire run.
 - Base health carries between rounds. Losing a base is not merely losing one round or spending a run life.
 - A crystal represents the base and its health. The current match sprite is a blue faceted crystal on a stone pedestal; final art is not settled.
-- A **wave** is a group of regular enemies. Opponent-sent enemies join the current wave until a delivery cutoff. Later orders wait for the next wave. The cutoff allows both boards to clear before the planning break; its timing is still open.
+- A **wave** is a group of regular enemies. Opponent-sent enemies join the current wave until a delivery cutoff. Later orders wait for the next wave. The implemented provisional cutoff is 3 seconds after wave start; it prevents sending from indefinitely extending delivery. Both boards may clear earlier; there is no minimum combat timer.
 - The desired format combines a standalone competitive match with development across multiple encounters.
 - **Confirmed simultaneous defeat:** if both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the run winner. The result is shared and terminal; clients do not roll independently.
 
@@ -58,7 +58,7 @@ This is the conceptual sequence, not a fixed wave schedule or finalized reward c
 
 Players lay walkable path tiles on a square grid. Both players start with the same path-tile budget, and the tiles must connect the entrance to the base. **30 tiles was an example, not a chosen balance value.** Whether the full budget must be used is still open.
 
-The implemented presentation places the host board on the left and the guest board on the right in one continuous world, with both enemy streams entering from the middle toward outer bases. The left board mirrors rendering and input, not authoritative route coordinates. Each player initially views their own board; holding A/D pans continuously across the map, rather than switching between two screen-visible panels. A separate world viewport keeps the HUD fixed, including when tower management or notices appear. Camera scouting is available in multiplayer and mirrored Singleplayer, but input remains restricted to the owned board. Regular waves and future opponent-sent enemies join each board's own stream. This visual arrangement does not require identical player-built paths, map mechanics, or commanders.
+The implemented presentation places the host board on the left and the guest board on the right in one continuous world, with both enemy streams entering from the middle toward outer bases. The left board mirrors rendering and input, not authoritative route coordinates. Each player initially views their own board; holding A/D pans continuously across the map, rather than switching between two screen-visible panels. A separate world viewport keeps the HUD fixed, including when tower management or notices appear. Camera scouting is available in multiplayer and mirrored Singleplayer, but input remains restricted to the owned board. Regular waves and opponent-sent enemies join each board's own stream. This visual arrangement does not require identical player-built paths, map mechanics, or commanders.
 
 Current matches retain the fixed grid dimensions and equal path-tile budget; camera travel exposes the opposing board, not new buildable territory. Match bases use a blue crystal and entrances use a red stone-ring portal, both locally authored transparent PNGs without external generation costs. Workshop endpoint letters and its editing presentation remain unchanged.
 
@@ -173,7 +173,7 @@ The choice of multiple activities does not yet lock in all three candidates or t
 
 Sending enemies spends match currency now and increases future income. This creates a tradeoff between immediate defensive investment, economic growth, and pressure on the opponent.
 
-The creator authorized provisional playtest Coins and balance values: host-owned paid towers, kill and wave-clear income, two one-time damage/speed upgrades, and a partial invested-cost sale refund. These do not settle the future send-to-grow-income economy, gambling, purchase randomness, or long-run progression.
+The creator authorized provisional playtest Coins and balance values: host-owned paid towers, kill and wave-clear income, two one-time damage/speed upgrades, and a partial invested-cost sale refund. One send now spends 20 Coins on the existing enemy and increases the sender's recurring wave-clear bonus by 2 Coins. Income starts at zero and is paid with the existing both-board clear reward, not on a wall-clock timer or immediately on purchase. Each accepted send grows that bonus, including a late queued order; terminal defeat pays no clear reward or bonus. These prototype values/cadence do not settle final balance, gambling, purchase randomness, or long-run progression.
 
 Important design risks to address:
 
@@ -199,7 +199,7 @@ The run should start small and become increasingly extreme: larger towers, stron
 - Godot's Compatibility renderer, text-authored scenes/resources, and nearest-neighbor texture filtering are the current starting configuration.
 - One authoritative host validates both players' commands and simulates captured routes, regular enemies, Arrow attacks, base damage, and results. Clients display detached accepted snapshots; camera position, selection, tool choice, target defaults for future placement, and visual effects stay local.
 - **Implemented connection setup:** Play offers Host and Join using Godot ENet. The creator chose no game-hosted online infrastructure. A shared invite contains a numeric host address, UDP port, and fresh random room credential; it admits only one guest. LAN, a private VPN/network, or a reachable public address with UDP forwarding/firewall access is required. The invite is not a short-code lookup service and cannot bypass NAT.
-- **Local testing:** Play also offers Singleplayer, with no network connection. A mirror opponent repeats accepted path/tower commands and readiness through the same authoritative rules; no independent AI or progression bypass is added.
+- **Local testing:** Play also offers Singleplayer, with no network connection. A mirror opponent repeats accepted path/tower/send commands and readiness through the same authoritative rules; no independent AI or progression bypass is added.
 - MCP/editor bridges are optional development tools, not something players must run.
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.
@@ -208,9 +208,11 @@ Admission opens shared planning with the local camera focused on the owned side 
 
 **Implemented defense slice:** Arrow, Ballista, and Rune use resource-defined prices and stats. Coins pay for towers and one damage plus one speed upgrade per tower, with distinct gains/costs. Kills belong to the final attacking tower and pay its board once. Clearing both boards grants wave income once; selling refunds 60% of actual purchase/upgrade investment. All three targeting policies remain available. Range uses tile neighborhoods; Rune range one covers the center and eight neighbors, damages all enemies inside, and displays a circular pulse. Range itself uses tile highlights.
 
+**Implemented send slice:** one button requests one existing enemy using only the payer's slot. The host derives the opposing target, checks ownership/funds/phase, then charges Coins and applies delivery plus income in one accepted transaction. During the first 3 seconds of combat it spawns at the opponent's captured-route entrance; planning and later orders queue by target board. Both-ready delivers all queued orders exactly once using the new wave's enemy stats, even if routes were edited during the break. Sent enemies share normal movement, attacks, bounties, base damage, and clearance. Queued next-wave orders do not keep the current wave open. Planning sends clear readiness. Snapshots include detached Coins, income, target queues, delivery-window status, and host send prices; Singleplayer mirrors accepted sends.
+
 All tower types remain visible in a normal palette, with locked/unaffordable entries disabled. Placement supports both click-then-place and native drag/drop. Clicking an owned tower opens kills, effective stats, targeting, upgrade prices/status, and Sell. Close dismisses selection; right-click/Escape cancels placement. Without placement selected, breaks enable path editing and combat permits inspection only.
 
-One enemy type scales health, speed, and count with each wave. Resources own provisional values. Match state persists across waves but resets on disconnect/rejoin; collection saves and workshop drafts remain separate. Camera movement is local and ordinary snapshots do not reset its position. Sends, relocation, expanding footprints, loadouts, map growth, host migration, and relay fallback remain unimplemented. Internet reachability is still unverified on separate networks.
+One enemy type scales health, speed, and count with each wave. Resources own provisional values. Match state persists across waves but resets on disconnect/rejoin; collection saves and workshop drafts remain separate. Camera movement is local and ordinary snapshots do not reset its position. Relocation, expanding footprints, loadouts, map growth, host migration, and relay fallback remain unimplemented. Internet reachability is still unverified on separate networks.
 
 ## First playable proof of the core rules
 
@@ -224,12 +226,12 @@ The first implementation milestone remains deliberately smaller than the full di
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. Same-tick destruction of both bases is resolved by one host-owned random coin flip.
 
-The current slice implements authoritative planning, paid construction, tower management, upgrades/sales, kill and wave income, escalating regular waves, route locks, results, and local camera scouting across a continuous world behind a fixed HUD. It does not implement enemy sends, randomized purchases, relocation, expanding footprints, loadouts, or map growth.
+The current slice implements authoritative planning, paid construction, tower management, upgrades/sales, kill and wave income, enemy sends with recurring income and a delivery cutoff/next-wave queue, escalating regular waves, route locks, results, and local camera scouting across a continuous world behind a fixed HUD. It does not implement randomized purchases, relocation, expanding footprints, loadouts, or map growth.
 
 ## Decisions still needed before their implementation
 
 - **Board interaction:** final path-budget and map-expansion rules, placement relative to the path, final entrance/crystal positions, and sale/refund rules.
-- **Run pacing:** confirm continuity across rounds; define round boundaries, wave scheduling beyond the current regular-wave prototype, send cutoff timing, and endgame pressure. Both-ready wave starts and host coin-flip simultaneous defeat are now confirmed.
+- **Run pacing:** confirm continuity across rounds; define round boundaries, wave scheduling beyond the current regular-wave prototype, final send cutoff/income balance, and endgame pressure. Both-ready wave starts and host coin-flip simultaneous defeat are now confirmed.
 - **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules, additional structure/enemy archetypes, defenses, and counters. Arrow now supports Furthest/Closest/Strongest targeting; fixed stats and the single regular enemy remain provisional.
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.
 - **Randomness and progression:** trait reveal/reroll rules, run reward choices, loadout limits, starter collection, permanent stat growth, and post-run payouts.
