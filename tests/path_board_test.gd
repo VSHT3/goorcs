@@ -53,7 +53,7 @@ func _run() -> void:
 		var image := viewport.get_texture().get_image()
 		for pair: Array in [[Vector2i(1, 1), Vector2i(2, 1)], [Vector2i(2, 1), Vector2i(2, 2)], [Vector2i(1, 1), Vector2i(1, 2)], [Vector2i(3, 3), Vector2i(4, 3)]]:
 			var edge: Vector2 = (board.cell_center(pair[0]) + board.cell_center(pair[1])) * 0.5
-			# Offset from the thin route preview to check the pavement itself.
+			# Sample away from the center to check pavement width across the join.
 			var offset := Vector2(0, 12) if pair[0].y == pair[1].y else Vector2(12, 0)
 			_check(image.get_pixelv(Vector2i(edge + offset)).is_equal_approx(PathBoard.TILE), "Pavement connects across horizontal, vertical, branch and endpoint edges, mirrored=%s" % mirrored)
 		var empty: Vector2 = board.cell_center(Vector2i(3, 2))

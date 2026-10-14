@@ -234,8 +234,6 @@ func _draw() -> void:
 	if input_enabled and layout.contains(_hover):
 		var rect := Rect2(cell_center(_hover) - Vector2.ONE * cell_size * 0.5 + Vector2.ONE * 3, Vector2.ONE * (cell_size - 6))
 		draw_rect(rect, Color("e6e0cf"), false, 2.0)
-	for i: int in range(1, layout.route.size()):
-		draw_line(cell_center(layout.route[i - 1]), cell_center(layout.route[i]), ROUTE_LINE, 4.0, true)
 	_draw_endpoint(layout.entrance, ENTRY_COLOR, "E")
 	_draw_endpoint(layout.base, BASE_COLOR, "B")
 	_draw_combat()

@@ -21,7 +21,7 @@ For command-line launch and verification, see the [development commands](docs/de
 - During planning breaks, no tower selected automatically enables path editing: left-drag places tiles, right-drag removes them. Existing towers remain inspectable. During waves, no tower selected only inspects; paths stay locked. Only your own board accepts commands; building and target changes remain available during combat.
 - **Ready for wave N** requires a legal path. Editing paths, building, or changing targeting during planning clears your readiness; **Unready** withdraws it. Both players ready starts each regular wave and captures its routes. Paths cannot change until all scheduled enemies and both boards clear.
 - Arrow attacks deal instant-hit damage in circular range. Enemies follow the captured shortest routes; a leak deals one base damage. Paths, towers, and base health persist between waves. Both players must ready again.
-- Enemy visuals move smoothly between host snapshots along the captured route, including corners. Adjacent path tiles form continuous pavement through straights, bends, and branches; the green line still marks the shortest route.
+- Enemy visuals move smoothly between host snapshots along the captured route, including corners. Adjacent path tiles form continuous pavement through straights, bends, and branches, without a route-line overlay.
 - A destroyed base ends the run. If both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the winner and both players see that result. The finished run cannot restart; leave/rejoin begins fresh.
 - Combat numbers are provisional settings in `resources/combat/prototype.tres`, referenced by the main scene's exported combat rules. Arrow access is independent of collection unlocks. Free placement proves defense, not the unimplemented match economy.
 - The code contains the host's address and a random room credential. There is no online room lookup or NAT traversal service. Use the same LAN, a private network/VPN, or a public host address with UDP forwarding and firewall access.
@@ -47,7 +47,7 @@ For command-line launch and verification, see the [development commands](docs/de
 - Left click or drag to place tiles; right click or drag to remove them. **Clear tiles** resets the board.
 - Only shared edges connect. Entrance and base are fixed and do not spend budget.
 - Unused budget is allowed. A ready layout connects the base and every placed tile to the entrance.
-- The green line previews the shortest route, not placement order. Branches and adjacent sections can create shortcuts.
+- Enemies use the shortest route, not placement order. Branches and adjacent sections can create shortcuts; there is no route-line overlay.
 - The 14×9 board, opposite-side endpoints, and 30-tile maximum are provisional. Adjust the main scene's exported settings together in the Inspector.
 
 This workshop does not simulate waves, enemies, or combat-time route locking.

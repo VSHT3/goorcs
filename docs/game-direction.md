@@ -77,9 +77,9 @@ Some major tower upgrades expand their occupied footprint. An expanding upgrade 
 - **Confirmed rules:** four-direction edge adjacency; the tile budget is a maximum, so unused tiles are allowed.
 - **Prototype configuration:** a 14×9 board, entrance at (0, 4), base at (13, 4), and 30 placeable tiles. Endpoints are fixed, traversable, and free. These map/balance values are provisional and exported on the main scene.
 - **Connectivity:** disconnected tiles are allowed during editing, but readiness requires every placed tile and the base to connect to the entrance. Connected branches are legal.
-- **Routing convention:** breadth-first shortest path, with right/down/left/up neighbor order resolving equal-length alternatives deterministically. The green preview shows actual shortcuts rather than placement order.
+- **Routing convention:** breadth-first shortest path, with right/down/left/up neighbor order resolving equal-length alternatives deterministically. Connected pavement is shown without a shortest-route overlay.
 - **Navigation:** the main menu opens/resumes the workshop or quits. Esc and the workshop's Menu button return to navigation without changing the layout. Layouts persist only within the running session, not after quitting.
-- **Check:** build a detour, add a shorter connection, and inspect the changed preview; remove a bridge or add an island to invalidate readiness. Headless regressions and graphical checks are described in [development](development.md#path-workshop-verification).
+- **Check:** build a detour and add a shorter connection; remove a bridge or add an island to invalidate readiness. Headless regressions and graphical checks are described in [development](development.md#path-workshop-verification).
 
 There are no waves in the workshop. Free editing here does not decide combat route locks, between-wave redraw rules, or expansion behavior.
 
