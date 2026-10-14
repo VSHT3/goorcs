@@ -1,6 +1,7 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/multiplayer_lobby.gd" id="1_lobby"]
+[ext_resource type="FontFile" path="res://assets/fonts/silkscreen/Silkscreen-Regular.ttf" id="2_digits"]
 
 [sub_resource type="StyleBoxFlat" id="StyleButton"]
 bg_color = Color(0.24, 0.34, 0.27, 1)
@@ -202,6 +203,7 @@ text = "Host IP"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
+theme_override_fonts/font = ExtResource("2_digits")
 tooltip_text = "Use an IP your friend can reach over the same LAN or a private VPN / Tailscale. 127.0.0.1 works only on this computer."
 placeholder_text = "192.168.1.20"
 max_length = 45

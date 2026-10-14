@@ -20,6 +20,10 @@ window/size/min_width=1000
 window/size/min_height=720
 window/stretch/mode="canvas_items"
 
+[gui]
+
+theme/custom_font="res://assets/fonts/PixelifySans.ttf"
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

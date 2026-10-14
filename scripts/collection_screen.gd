@@ -180,7 +180,7 @@ func _add_catalog_entry(reward: TowerReward) -> void:
 	title.add_theme_font_size_override("font_size", 18)
 	text.add_child(title)
 	var status := Label.new()
-	status.add_theme_font_size_override("font_size", 12)
+	status.add_theme_font_size_override("font_size", 16)
 	text.add_child(status)
 	_catalog_statuses.append(status)
 	_catalog.add_child(card)

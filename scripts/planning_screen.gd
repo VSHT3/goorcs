@@ -25,6 +25,7 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var _palette: HBoxContainer = %TowerPalette
 @onready var _coins: Label = %Coins
 @onready var _placement_status: Label = %PlacementStatus
+@onready var _placement_cost: Label = %PlacementCost
 @onready var _cancel_placement: Button = %CancelPlacement
 @onready var _management: PanelContainer = %TowerManagement
 @onready var _tower_title: Label = %TowerTitle
@@ -40,6 +41,7 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var _titles: Array[Label] = [$HUD/Header/Content/Players/Host/Heading/Title, $HUD/Header/Content/Players/Guest/Heading/Title]
 @onready var _states: Array[Label] = [$HUD/Header/Content/Players/Host/Heading/State, $HUD/Header/Content/Players/Guest/Heading/State]
 @onready var _budgets: Array[Label] = [$HUD/Header/Content/Players/Host/Budget, $HUD/Header/Content/Players/Guest/Budget]
+@onready var _counts: Array[Label] = [$HUD/Header/Content/Players/Host/Count, $HUD/Header/Content/Players/Guest/Count]
 
 
 func _ready() -> void:
@@ -180,10 +182,7 @@ func _create_palette() -> void:
 		button.name = String(reward.id)
 		button.tower_type = reward.id
 		button.tower_title = reward.title
-		button.icon = reward.icon_texture
-		button.expand_icon = true
-		button.add_theme_constant_override("icon_max_width", 32)
-		button.add_theme_font_size_override("font_size", 14)
+		button.tower_artwork = reward.icon_texture
 		button.custom_minimum_size = Vector2(0, 52)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.toggle_mode = true
@@ -216,7 +215,7 @@ func _refresh_palette() -> void:
 		button.disabled = not available or not unlocked or stats.is_empty() or coins < button.cost
 		button.set_pressed_no_signal(id == _placement_id)
 		var price: String = "%d Coins" % button.cost if not stats.is_empty() else "Unavailable"
-		button.text = "%s\n%s" % [title, price + (" · " + status if not status.is_empty() and not stats.is_empty() else "")]
+		button.refresh_caption(price, status if not stats.is_empty() else "")
 		button.tooltip_text = "%d damage · %.2fs · %d tile range" % [int(stats.get("damage", 0)), float(stats.get("interval", 0.0)), int(stats.get("range", 0))] if not stats.is_empty() else ""
 		if id == _placement_id and button.disabled:
 			_placement_id = &""
@@ -225,9 +224,11 @@ func _refresh_palette() -> void:
 	_cancel_placement.visible = _placement_id != &""
 	if _placement_id != &"":
 		var button: TowerShopButton = shop_buttons[_placement_id]
-		_placement_status.text = "%s · %d Coins" % [button.tower_title, button.cost]
+		_placement_status.text = button.tower_title
+		_placement_cost.text = "· %d Coins" % button.cost
 	else:
 		_placement_status.text = ""
+		_placement_cost.text = ""
 
 
 func _own_coins() -> int:
@@ -265,7 +266,7 @@ func _refresh_targeting() -> void:
 	var stats: Dictionary = types.get(String(tower["type_id"]), {})
 	var interval: float = float(tower.get("interval", stats.get("interval", 1.0)))
 	_tower_title.text = String(stats.get("title", "Tower"))
-	_tower_stats.text = "Kills %d · Damage %d · %.2f attacks/s · Range %d" % [
+	_tower_stats.text = "Kills %d · Damage %d\n%.2f attacks/s · Range %d" % [
 		int(tower.get("kills", 0)), int(tower.get("damage", stats.get("damage", 0))),
 		1.0 / interval, int(stats.get("range", 0)),
 	]
@@ -282,7 +283,7 @@ func _refresh_upgrade(button: Button, tower: Dictionary, stats: Dictionary, upgr
 	var purchased: bool = bool(tower.get(upgrade + "_upgraded", false))
 	var price: int = int(stats.get(upgrade + "_upgrade_cost", 0))
 	var benefit: String = "+%d damage" % int(stats.get("damage_upgrade_bonus", 0)) if upgrade == "damage" else "%.0f%% faster" % ((1.0 / float(stats.get("speed_upgrade_multiplier", 1.0)) - 1.0) * 100.0)
-	button.text = "%s · Purchased" % benefit if purchased else "%s · %d Coins" % [benefit, price]
+	button.text = "%s\nPurchased" % benefit if purchased else "%s\n%d Coins" % [benefit, price]
 	button.disabled = purchased or targeting_button.disabled or _own_coins() < price
 	button.tooltip_text = "One-time upgrade"
 	if not purchased and _own_coins() < price:
@@ -369,20 +370,20 @@ func _refresh() -> void:
 		var legality: String = "Legal"
 		if layout.route.is_empty():
 			legality = "Route missing"
-		elif layout.disconnected_count > 0:
-			legality = "%d isolated" % layout.disconnected_count
+		var isolated: bool = not layout.route.is_empty() and layout.disconnected_count > 0
 		var readiness: String = "Ready" if planning.ready_flags[slot] else "Not ready"
-		_states[slot].text = "HP %d / %d" % [int(health[slot]), int(rules.get("base_health", 10))]
+		_states[slot].text = "HP %d/%d" % [int(health[slot]), int(rules.get("base_health", 10))]
 		_states[slot].modulate = Color("d99578") if int(health[slot]) <= 0 else Color("b5e2b7")
 		if in_wave or finished:
-			_budgets[slot].text = "Alive %d · Spawned %d / %d" % [all_enemies[slot].size(), int(spawned[slot]), int(state.get("total", 0))]
-			if finished:
-				_budgets[slot].text = "%s · %s" % ["Destroyed" if int(health[slot]) <= 0 else "Survived", _budgets[slot].text]
+			_budgets[slot].text = ("Destroyed" if int(health[slot]) <= 0 else "Survived") if finished else ""
+			_counts[slot].text = "Alive %d · Spawned %d/%d" % [all_enemies[slot].size(), int(spawned[slot]), int(state.get("total", 0))]
 			_budgets[slot].tooltip_text = ""
 		else:
-			_budgets[slot].text = "%s · %s · %d / %d tiles" % [readiness, legality, layout.used_tiles(), layout.budget]
+			_budgets[slot].text = "%s · %s" % [readiness, legality] if not isolated else readiness
+			_counts[slot].text = ("%d isolated · " % layout.disconnected_count if isolated else "") + "%d/%d tiles" % [layout.used_tiles(), layout.budget]
 			_budgets[slot].tooltip_text = "Shortest route: %d steps" % (layout.route.size() - 1) if not layout.route.is_empty() else "No route to base"
 		_budgets[slot].modulate = Color("b5e2b7") if in_wave or planning.ready_flags[slot] else Color("e0bc77")
+		_counts[slot].modulate = _budgets[slot].modulate
 	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
 	ready_button.disabled = not editable or (not planning.ready_flags[own_slot] and not planning.layouts[own_slot].is_ready())
 	ready_button.text = "Match finished" if finished else ("Wave running" if in_wave else ("Unready" if planning.ready_flags[own_slot] else "Ready for wave %d" % (int(state.get("wave", 0)) + 1)))

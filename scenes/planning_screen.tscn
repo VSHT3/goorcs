@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/planning_screen.gd" id="1_planning"]
 [ext_resource type="PackedScene" path="res://scenes/match_world.tscn" id="2_world"]
+[ext_resource type="FontFile" path="res://assets/fonts/silkscreen/Silkscreen-Regular.ttf" id="3_numbers"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_hud"]
 bg_color = Color(0.10, 0.145, 0.13, 0.96)
@@ -70,7 +71,8 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 text = "Planning · Wave 1"
 
 [node name="Coins" type="Label" parent="HUD/Header/Content/Summary"]
@@ -78,7 +80,8 @@ unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
-theme_override_font_sizes/font_size = 20
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 text = "Coins 0"
 
 [node name="PanHint" type="Label" parent="HUD/Header/Content/Summary"]
@@ -96,65 +99,83 @@ text = "Leave / Esc"
 [node name="Players" type="HBoxContainer" parent="HUD/Header/Content"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 12
 
 [node name="Host" type="HBoxContainer" parent="HUD/Header/Content/Players"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="Heading" type="HBoxContainer" parent="HUD/Header/Content/Players/Host"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="Title" type="Label" parent="HUD/Header/Content/Players/Host/Heading"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 16
 text = "You"
 
 [node name="State" type="Label" parent="HUD/Header/Content/Players/Host/Heading"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_font_sizes/font_size = 14
-text = "HP 10 / 10"
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+text = "HP 10/10"
 
 [node name="Budget" type="Label" parent="HUD/Header/Content/Players/Host"]
 layout_mode = 2
+size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Not ready · Route missing · 0 / 30 tiles"
+theme_override_font_sizes/font_size = 16
+text = "Not ready · Route missing"
+
+[node name="Count" type="Label" parent="HUD/Header/Content/Players/Host"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+text = "0/30 tiles"
 
 [node name="Guest" type="HBoxContainer" parent="HUD/Header/Content/Players"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="Heading" type="HBoxContainer" parent="HUD/Header/Content/Players/Guest"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="Title" type="Label" parent="HUD/Header/Content/Players/Guest/Heading"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 16
 text = "Opponent"
 
 [node name="State" type="Label" parent="HUD/Header/Content/Players/Guest/Heading"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_font_sizes/font_size = 14
-text = "HP 10 / 10"
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+text = "HP 10/10"
 
 [node name="Budget" type="Label" parent="HUD/Header/Content/Players/Guest"]
 layout_mode = 2
+size_flags_horizontal = 3
 mouse_filter = 2
-theme_override_font_sizes/font_size = 12
-text = "Not ready · Route missing · 0 / 30 tiles"
+theme_override_font_sizes/font_size = 16
+text = "Not ready · Route missing"
+
+[node name="Count" type="Label" parent="HUD/Header/Content/Players/Guest"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+text = "0/30 tiles"
 
 [node name="Bottom" type="PanelContainer" parent="HUD"]
 layout_mode = 1
@@ -200,6 +221,8 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(176, 34)
 layout_mode = 2
 tooltip_text = "Both players ready starts the wave. Edits clear your ready state."
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 text = "Ready for wave 1"
 
 [node name="PlacementStatus" type="Label" parent="HUD/Bottom/Content/Actions"]
@@ -208,10 +231,18 @@ layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 16
 text = ""
 autowrap_mode = 2
 
+
+[node name="PlacementCost" type="Label" parent="HUD/Bottom/Content/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 [node name="CancelPlacement" type="Button" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true
 visible = false
@@ -226,10 +257,10 @@ layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -382.0
+offset_left = -486.0
 offset_top = 84.0
 offset_right = -14.0
-offset_bottom = 312.0
+offset_bottom = 340.0
 grow_horizontal = 0
 mouse_filter = 0
 theme_override_styles/panel = SubResource("StyleBox_hud")
@@ -246,12 +277,14 @@ mouse_filter = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
 theme_override_font_sizes/font_size = 18
 text = "Selected tower"
+autowrap_mode = 2
 
 [node name="TowerStats" type="Label" parent="HUD/TowerManagement/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_override_font_sizes/font_size = 14
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 autowrap_mode = 2
 
 [node name="TargetRow" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
@@ -277,15 +310,19 @@ theme_override_constants/separation = 8
 
 [node name="DamageUpgrade" type="Button" parent="HUD/TowerManagement/Content/Upgrades"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 38)
+custom_minimum_size = Vector2(140, 72)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 
 [node name="SpeedUpgrade" type="Button" parent="HUD/TowerManagement/Content/Upgrades"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 38)
+custom_minimum_size = Vector2(140, 72)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 
 [node name="Actions" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
 layout_mode = 2
@@ -297,6 +334,8 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 38)
 layout_mode = 2
 size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
 
 [node name="CloseTower" type="Button" parent="HUD/TowerManagement/Content/Actions"]
 unique_name_in_owner = true
@@ -317,7 +356,7 @@ theme_override_colors/font_color = Color(0.95, 0.85, 0.61, 1)
 theme_override_colors/font_shadow_color = Color(0.04, 0.06, 0.05, 1)
 theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
-theme_override_font_sizes/font_size = 14
+theme_override_font_sizes/font_size = 16
 autowrap_mode = 2
 
 [node name="FeedbackTimer" type="Timer" parent="."]

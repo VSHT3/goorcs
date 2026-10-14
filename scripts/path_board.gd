@@ -348,7 +348,7 @@ func _draw_endpoint(cell: Vector2i, color: Color, letter: String) -> void:
 		return
 	var extent: float = _cell_size() * 0.29
 	draw_rect(Rect2(center - Vector2.ONE * extent, Vector2.ONE * extent * 2), color)
-	var font: Font = ThemeDB.fallback_font
+	var font: Font = get_theme_default_font()
 	var font_size: int = 22
 	var text_size: Vector2 = font.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 	draw_string(font, center + Vector2(-text_size.x * 0.5, font.get_ascent(font_size) * 0.35), letter,

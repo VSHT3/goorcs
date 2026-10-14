@@ -51,6 +51,7 @@ func _ready() -> void:
 	host_create_button.pressed.connect(_create_host)
 	join_connect_button.pressed.connect(_join_host)
 	address_input.text_submitted.connect(_submit_address)
+	port_input.get_line_edit().add_theme_font_override("font", address_input.get_theme_font("font"))
 	port_input.get_line_edit().text_submitted.connect(_submit_address)
 	join_code_input.text_submitted.connect(_submit_code)
 	copy_button.pressed.connect(_copy_code)

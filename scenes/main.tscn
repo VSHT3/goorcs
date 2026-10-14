@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/path_board.gd" id="2_board"]
+[ext_resource type="FontFile" path="res://assets/fonts/silkscreen/Silkscreen-Regular.ttf" id="3_digits"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -71,10 +72,12 @@ tooltip_text = "The base and every placed tile must connect to the entrance."
 
 [node name="Budget" type="Label" parent="Margin/Content/Workspace/Sidebar"]
 layout_mode = 2
+theme_override_fonts/font = ExtResource("3_digits")
 theme_override_font_sizes/font_size = 26
 
 [node name="Route" type="Label" parent="Margin/Content/Workspace/Sidebar"]
 layout_mode = 2
+theme_override_fonts/font = ExtResource("3_digits")
 theme_override_font_sizes/font_size = 16
 
 [node name="Spacer" type="Control" parent="Margin/Content/Workspace/Sidebar"]

@@ -6,6 +6,8 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**, with a local **Singleplayer** mirror opponent for testing. Matches use one continuous camera-scrolled world behind a fixed HUD; each player starts looking at their own side and holds **A / D** to scout across it. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, persistent base health, and results are implemented. Enemy sends, loadouts, permanent stat growth, map expansion, and final art are not implemented.
 
+The UI pairs bundled **Pixelify Sans** labels with crisper **Silkscreen** pixel numerals for prices, health, stats, and counts. Small interface text stays at least 16px. Both fonts work offline and include their [Pixelify](assets/fonts/OFL.txt) and [Silkscreen](assets/fonts/silkscreen/OFL.txt) licenses.
+
 ## Run
 
 Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.

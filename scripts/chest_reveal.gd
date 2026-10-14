@@ -8,6 +8,7 @@ const PALE := Color("f6e7b2")
 const TEXT := Color("e6e0cf")
 const CHEST_BODY_Y: int = 55
 const CHEST_FOOT_Y: int = 92
+const NUMERIC_FONT: Font = preload("res://assets/fonts/silkscreen/Silkscreen-Regular.ttf")
 
 @export var closed_chest: Texture2D
 @export var open_chest: Texture2D
@@ -18,6 +19,7 @@ var _targets: Array[Vector2] = []
 var _tween: Tween
 var _active: bool = false
 var _presentation_id: int = 0
+var _card_layout_queued: bool = false
 var _shake: float = 0.0
 var _lid: float = 0.0
 var _burst: float = 0.0
@@ -72,6 +74,7 @@ func clear() -> bool:
 	_burst = 0.0
 	_rise = 0.0
 	_coins = 0.0
+	_heading.remove_theme_font_override("font")
 	_heading.text = "Chest"
 	queue_redraw()
 	return true
@@ -87,6 +90,7 @@ func present(rewards: Array[TowerReward]) -> void:
 	for reward: TowerReward in _rewards:
 		_cards.append(_make_card(reward))
 	_layout_cards()
+	_queue_card_layout()
 	queue_redraw()
 	if _rewards.is_empty():
 		_complete()
@@ -126,9 +130,11 @@ func _complete() -> void:
 	_burst = 1.0
 	_coins = 1.0
 	_set_rise(1.0)
-	_heading.text = "1 tower unlocked" if _rewards.size() == 1 else "%d towers unlocked" % _rewards.size()
 	if _rewards.is_empty():
 		_heading.text = "No rewards"
+	else:
+		_heading.add_theme_font_override("font", NUMERIC_FONT)
+		_heading.text = "1 tower unlocked" if _rewards.size() == 1 else "%d towers unlocked" % _rewards.size()
 	queue_redraw()
 	finished.emit()
 
@@ -192,20 +198,35 @@ func _make_card(reward: TowerReward) -> Control:
 	var title := Label.new()
 	title.text = reward.title
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.clip_text = true
-	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	title.tooltip_text = reward.title
-	title.add_theme_font_size_override("font_size", 17)
+	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", TEXT)
 	content.add_child(title)
 	var tag := Label.new()
 	tag.text = "UNLOCKED"
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	tag.add_theme_font_size_override("font_size", 12)
+	tag.add_theme_font_size_override("font_size", 16)
 	tag.add_theme_color_override("font_color", GOLD)
 	content.add_child(tag)
+	card.minimum_size_changed.connect(_queue_card_layout)
 	_results.add_child(card)
 	return card
+
+
+func _queue_card_layout() -> void:
+	if _card_layout_queued:
+		return
+	_card_layout_queued = true
+	_finish_card_layout.call_deferred()
+
+
+func _finish_card_layout() -> void:
+	_card_layout_queued = false
+	# Wrapped labels measure height after their containers assign the final width.
+	# Reapply the intended size once that minimum settles, rather than retaining
+	# the tall panel produced by the label's initial zero-width measurement.
+	_layout_cards()
 
 
 func _layout_cards() -> void:
