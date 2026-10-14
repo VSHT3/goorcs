@@ -10,6 +10,8 @@ Gorcs is a private, desktop-first 2D tower-defense game for friends. Development
 
 Read all three for the first task in a session. Add area-specific guidance only when an implemented subsystem needs it; link it here rather than expanding this file into a full design document.
 
+A single commit with a lot of work is acceptable. No need to produce multiple hunks or stuff, just a singular commit for convenience.
+
 ## Sources of truth
 
 - Engine release and executable commands: `docs/development.md`. Reference them elsewhere instead of copying version numbers or command lists.
