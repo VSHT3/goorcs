@@ -16,7 +16,7 @@ Use the standard Godot edition and the [required engine release](docs/developmen
 
 For command-line launch and verification, see the [development commands](docs/development.md#setup).
 
-The centered main-menu wordmark uses a green pixel-orc face for the O, with eyes, tusks, an occasional blink, and a tiny idle lift. Hover/focus marks animate inside buttons without moving their clickable bounds.
+The centered main-menu wordmark uses a green pixel-orc O with eyes and tusks, raised two pixels above its original alignment. On first load, the whole logo assembles in crisp pixel blocks, the orc opens its eyes, and a short light sweep finishes it. The entrance never blocks buttons or replays on menu return; occasional blinking/tiny idle lift remain afterward. Hover/focus marks stay inside fixed button bounds.
 
 ## Test solo
 
