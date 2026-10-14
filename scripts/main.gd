@@ -21,6 +21,7 @@ var _last_activity: Control
 @onready var budget_label: Label = $Margin/Content/Workspace/Sidebar/Budget
 @onready var route_label: Label = $Margin/Content/Workspace/Sidebar/Route
 @onready var feedback_label: Label = $Margin/Content/Feedback
+@onready var _feedback_timer: Timer = $FeedbackTimer
 @onready var menu: Control = $Menu
 @onready var workshop: Control = $Margin
 @onready var open_button: Button = $Menu/Center/Panel/Open
@@ -32,6 +33,7 @@ func _ready() -> void:
 	board.layout = layout
 	board.edited.connect(_refresh)
 	board.feedback.connect(_show_feedback)
+	_feedback_timer.timeout.connect(_clear_feedback)
 	$Margin/Content/Workspace/Sidebar/Clear.pressed.connect(_clear)
 	open_button.pressed.connect(_open_workshop)
 	$Menu/Center/Panel/Quit.pressed.connect(_quit)
@@ -60,7 +62,7 @@ func _ready() -> void:
 	collection_screen.hide()
 	add_child(collection_screen)
 	collection_screen.back_requested.connect(_show_menu)
-	$Margin/Content/Workspace/Sidebar/Settings.text = "%d × %d board · %d tile maximum\nTemporary prototype settings" % [board_dimensions.x, board_dimensions.y, tile_budget]
+	budget_label.tooltip_text = "%d × %d board. Endpoints are free; unused budget is allowed." % [board_dimensions.x, board_dimensions.y]
 	_refresh()
 	_show_menu()
 
@@ -100,13 +102,15 @@ func _open_play() -> void:
 
 func _show_menu() -> void:
 	board.cancel_stroke()
+	_feedback_timer.stop()
+	_clear_feedback()
 	workshop.hide()
 	collection_screen.prepare_to_leave()
 	collection_screen.hide()
 	play_screen.prepare_to_leave()
 	play_screen.hide()
 	menu.show()
-	open_button.text = "Resume workshop" if _workshop_opened else "Open workshop"
+	open_button.text = "Resume workshop" if _workshop_opened else "Workshop"
 	if _last_activity == workshop:
 		open_button.grab_focus()
 	else:
@@ -143,26 +147,37 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _refresh() -> void:
-	budget_label.text = "%d / %d tiles placed\n%d remaining · endpoints are free" % [layout.used_tiles(), layout.budget, layout.budget - layout.used_tiles()]
+	budget_label.text = "%d / %d tiles" % [layout.used_tiles(), layout.budget]
 	if layout.is_ready():
-		status.text = "READY\nConnected entrance to base"
+		status.text = "Ready"
 		status.modulate = Color("b5e2b7")
 	elif layout.route.is_empty():
-		status.text = "BUILD A ROUTE\nConnect entrance to base"
+		status.text = "No route"
 		status.modulate = Color("e0bc77")
 	else:
-		status.text = "DISCONNECTED TILES\nJoin or remove isolated tiles"
+		status.text = "Disconnected"
 		status.modulate = Color("e0bc77")
 	if layout.route.is_empty():
-		route_label.text = "No route to base yet.\n%d isolated placed tiles." % layout.disconnected_count
+		route_label.text = "%d isolated tiles" % layout.disconnected_count if layout.disconnected_count > 0 else ""
 	else:
-		route_label.text = "Shortest route: %d steps\n%d isolated placed tiles" % [layout.route.size() - 1, layout.disconnected_count]
-	feedback_label.text = "Unused budget is allowed. Every placed tile must connect to the entrance."
+		route_label.text = "%d steps" % [layout.route.size() - 1]
+		if layout.disconnected_count > 0:
+			route_label.text += " · %d isolated" % layout.disconnected_count
+	route_label.visible = not route_label.text.is_empty()
+	_feedback_timer.stop()
+	_clear_feedback()
 	board.queue_redraw()
 
 
 func _show_feedback(message: String) -> void:
 	feedback_label.text = message
+	feedback_label.show()
+	_feedback_timer.start()
+
+
+func _clear_feedback() -> void:
+	feedback_label.text = ""
+	feedback_label.hide()
 
 
 func _clear() -> void:

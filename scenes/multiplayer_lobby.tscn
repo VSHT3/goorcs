@@ -128,7 +128,7 @@ theme_override_constants/separation = 20
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 30
-text = "GOORCS / Play"
+text = "Play"
 
 [node name="Back" type="Button" parent="Margin/Content/Header"]
 unique_name_in_owner = true
@@ -153,7 +153,6 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
 theme_override_font_sizes/font_size = 26
-text = "Play with a friend"
 autowrap_mode = 2
 
 [node name="Players" type="Label" parent="Margin/Content/Scroll/Body"]
@@ -187,29 +186,18 @@ visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Heading" type="Label" parent="Margin/Content/Scroll/Body/HostForm"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Create a private room"
-
 [node name="AddressLabel" type="Label" parent="Margin/Content/Scroll/Body/HostForm"]
 layout_mode = 2
-text = "Host address your friend can reach (numeric IP)"
+text = "Host IP"
 
 [node name="Address" type="LineEdit" parent="Margin/Content/Scroll/Body/HostForm"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
+tooltip_text = "Use an IP your friend can reach over the same LAN or a private VPN / Tailscale. 127.0.0.1 works only on this computer."
 placeholder_text = "192.168.1.20"
 max_length = 45
 keep_editing_on_text_submit = true
-
-[node name="Hint" type="Label" parent="Margin/Content/Scroll/Body/HostForm"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
-theme_override_font_sizes/font_size = 14
-text = "Use a LAN, public, or private VPN / Tailscale IP. 127.0.0.1 works only on this computer."
-autowrap_mode = 2
 
 [node name="PortRow" type="HBoxContainer" parent="Margin/Content/Scroll/Body/HostForm"]
 layout_mode = 2
@@ -217,12 +205,13 @@ theme_override_constants/separation = 12
 
 [node name="PortLabel" type="Label" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
 layout_mode = 2
-text = "UDP port"
+text = "Port"
 
 [node name="Port" type="SpinBox" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(140, 42)
 layout_mode = 2
+tooltip_text = "Allow this UDP port through the host firewall. Internet connections also need a reachable IP and UDP port forwarding."
 min_value = 1.0
 max_value = 65535.0
 value = 7000.0
@@ -239,20 +228,16 @@ visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Heading" type="Label" parent="Margin/Content/Scroll/Body/JoinForm"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Join your friend's room"
-
 [node name="CodeLabel" type="Label" parent="Margin/Content/Scroll/Body/JoinForm"]
 layout_mode = 2
-text = "Paste the complete invite code"
+text = "Invite code"
 
 [node name="JoinCode" type="LineEdit" parent="Margin/Content/Scroll/Body/JoinForm"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-placeholder_text = "GOORCS1/host IP/port/room credential"
+tooltip_text = "Paste the complete invite code. It includes the host IP and a private room credential; share it only with your friend."
+placeholder_text = "Paste invite code"
 keep_editing_on_text_submit = true
 
 [node name="Connect" type="Button" parent="Margin/Content/Scroll/Body/JoinForm"]
@@ -270,12 +255,13 @@ theme_override_constants/separation = 8
 
 [node name="Label" type="Label" parent="Margin/Content/Scroll/Body/Invitation"]
 layout_mode = 2
-text = "Your invite code · share privately with one friend"
+text = "Invite code"
 
 [node name="Code" type="TextEdit" parent="Margin/Content/Scroll/Body/Invitation"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
+tooltip_text = "Share this code privately with one friend. It contains your IP and room credential and expires when you leave."
 editable = false
 wrap_mode = 1
 scroll_fit_content_height = true
@@ -286,14 +272,7 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(180, 42)
 layout_mode = 2
 size_flags_horizontal = 0
-text = "Copy invite code"
-
-[node name="Validity" type="Label" parent="Margin/Content/Scroll/Body/Invitation"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
-theme_override_font_sizes/font_size = 14
-text = "This code is valid only while you host. Leaving closes the room and invalidates the code."
-autowrap_mode = 2
+text = "Copy code"
 
 [node name="Error" type="RichTextLabel" parent="Margin/Content/Scroll/Body"]
 unique_name_in_owner = true
@@ -304,23 +283,3 @@ scroll_active = false
 selection_enabled = true
 focus_mode = 2
 
-[node name="Divider" type="HSeparator" parent="Margin/Content/Scroll/Body"]
-layout_mode = 2
-
-[node name="ConnectionHeading" type="Label" parent="Margin/Content/Scroll/Body"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Direct connection · no online broker"
-
-[node name="ConnectionHelp" type="Label" parent="Margin/Content/Scroll/Body"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.74, 0.79, 0.73, 1)
-text = "The code contains the host's address and a private room credential, not a server lookup. Use the same LAN or a private VPN. For internet play, the host needs a routable address and UDP port forwarding / firewall access. The code cannot bypass NAT. The host must remain online."
-autowrap_mode = 2
-
-[node name="Scope" type="Label" parent="Margin/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
-theme_override_font_sizes/font_size = 14
-text = "Private duel · Free prototype Arrow defense. Workshop and collection remain local."
-autowrap_mode = 2

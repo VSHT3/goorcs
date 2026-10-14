@@ -139,7 +139,7 @@ func _handle_raw_auth(id: int, data: PackedByteArray, generation: int) -> void:
 	if generation != _raw_generation or _raw_api == null:
 		return
 	_raw_response = data.get_string_from_utf8()
-	if _raw_response == "GOORCS1/ACCEPT":
+	if _raw_response == "GORCS1/ACCEPT":
 		_raw_state = "AUTHENTICATING"
 		if _raw_complete:
 			_raw_api.complete_auth(id)

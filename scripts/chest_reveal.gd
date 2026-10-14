@@ -51,7 +51,7 @@ class RewardIcon extends Control:
 
 func _ready() -> void:
 	resized.connect(_layout_cards)
-	_heading.text = "SEALED CHEST"
+	_heading.text = "Chest"
 	queue_redraw()
 
 
@@ -72,7 +72,7 @@ func clear() -> bool:
 	_burst = 0.0
 	_rise = 0.0
 	_coins = 0.0
-	_heading.text = "SEALED CHEST"
+	_heading.text = "Chest"
 	queue_redraw()
 	return true
 
@@ -83,7 +83,7 @@ func present(rewards: Array[TowerReward]) -> void:
 		return
 	_rewards = rewards.duplicate()
 	_active = true
-	_heading.text = "THE CHEST IS STIRRING..."
+	_heading.text = "Opening…"
 	for reward: TowerReward in _rewards:
 		_cards.append(_make_card(reward))
 	_layout_cards()
@@ -126,16 +126,16 @@ func _complete() -> void:
 	_burst = 1.0
 	_coins = 1.0
 	_set_rise(1.0)
-	_heading.text = "NEW TOWER UNLOCKED" if _rewards.size() == 1 else "%d NEW TOWERS UNLOCKED" % _rewards.size()
+	_heading.text = "1 tower unlocked" if _rewards.size() == 1 else "%d towers unlocked" % _rewards.size()
 	if _rewards.is_empty():
-		_heading.text = "NO REWARDS TO DISPLAY"
+		_heading.text = "No rewards"
 	queue_redraw()
 	finished.emit()
 
 
 func _begin_opening() -> void:
 	_shake = 0.0
-	_heading.text = "YOUR NEW TOWERS"
+	_heading.text = "New towers"
 
 
 func _set_shake(value: float) -> void:

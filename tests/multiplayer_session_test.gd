@@ -35,20 +35,20 @@ func _run() -> void:
 func _test_malformed_invites(port: int) -> void:
 	var token: String = "0123456789abcdef0123456789abcdef"
 	var malformed: Array[String] = [
-		"", "GOORCS1", "GOORCS1/127.0.0.1/%d" % port,
-		"GOORCS2/127.0.0.1/%d/%s" % [port, token],
-		"GOORCS1/localhost/%d/%s" % [port, token],
-		"GOORCS1/999.0.0.1/%d/%s" % [port, token],
-		"GOORCS1/0.0.0.0/%d/%s" % [port, token],
-		"GOORCS1/::/%d/%s" % [port, token],
-		"GOORCS1/127.0.0.1/0/%s" % token,
-		"GOORCS1/127.0.0.1/65536/%s" % token,
-		"GOORCS1/127.0.0.1/+7000/%s" % token,
-		"GOORCS1/127.0.0.1/7e3/%s" % token,
-		"GOORCS1/127.0.0.1/%d/%s" % [port, token.to_upper()],
-		"GOORCS1/127.0.0.1/%d/%s" % [port, token.left(31)],
-		"GOORCS1/127.0.0.1/%d/%sz" % [port, token.left(31)],
-		"GOORCS1/127.0.0.1/%d/%s/extra" % [port, token],
+		"", "GORCS1", "GORCS1/127.0.0.1/%d" % port,
+		"GORCS2/127.0.0.1/%d/%s" % [port, token],
+		"GORCS1/localhost/%d/%s" % [port, token],
+		"GORCS1/999.0.0.1/%d/%s" % [port, token],
+		"GORCS1/0.0.0.0/%d/%s" % [port, token],
+		"GORCS1/::/%d/%s" % [port, token],
+		"GORCS1/127.0.0.1/0/%s" % token,
+		"GORCS1/127.0.0.1/65536/%s" % token,
+		"GORCS1/127.0.0.1/+7000/%s" % token,
+		"GORCS1/127.0.0.1/7e3/%s" % token,
+		"GORCS1/127.0.0.1/%d/%s" % [port, token.to_upper()],
+		"GORCS1/127.0.0.1/%d/%s" % [port, token.left(31)],
+		"GORCS1/127.0.0.1/%d/%sz" % [port, token.left(31)],
+		"GORCS1/127.0.0.1/%d/%s/extra" % [port, token],
 	]
 	for code: String in malformed:
 		var snapshot: Dictionary = await _command("guest", {"action": "join", "code": code})
@@ -80,19 +80,19 @@ func _test_room_lifecycle(port: int) -> void:
 		return
 	var token: String = parts[3]
 	var wrong_token: String = ("1" if token.begins_with("0") else "0") + token.substr(1)
-	var wrong_code: String = "GOORCS1/127.0.0.1/%d/%s" % [port, wrong_token]
+	var wrong_code: String = "GORCS1/127.0.0.1/%d/%s" % [port, wrong_token]
 
 	await _command("third", {"action": "join", "code": wrong_code})
 	var rejected: Dictionary = await _wait_for("third", {"state": "ERROR", "count": 0, "native_peers": []}, "Wrong room credential is rejected")
 	_check(String(rejected.get("error", "")).to_lower().contains("credential"), "Wrong-token failure explains how to obtain a current credential")
 	await _wait_for("host", {"state": "HOSTING", "count": 1, "code": code, "native_peers": []}, "Wrong token does not claim the guest slot")
 
-	await _command("third", {"action": "raw_join", "port": port, "payload": "GOORCS0/" + token})
-	await _wait_for("third", {"raw_state": "REJECTED", "raw_response": "GOORCS1/VERSION", "native_peers": []}, "A real version-mismatched peer is never admitted")
+	await _command("third", {"action": "raw_join", "port": port, "payload": "GORCS0/" + token})
+	await _wait_for("third", {"raw_state": "REJECTED", "raw_response": "GORCS1/VERSION", "native_peers": []}, "A real version-mismatched peer is never admitted")
 	await _wait_for("host", {"state": "HOSTING", "count": 1, "code": code, "native_peers": []}, "Version rejection preserves the waiting host")
 
-	await _command("third", {"action": "raw_join", "port": port, "payload": "GOORCS1/" + token})
-	await _wait_for("third", {"raw_state": "AUTHENTICATING", "raw_response": "GOORCS1/ACCEPT", "native_peers": []}, "Correct credential alone does not count as native admission")
+	await _command("third", {"action": "raw_join", "port": port, "payload": "GORCS1/" + token})
+	await _wait_for("third", {"raw_state": "AUTHENTICATING", "raw_response": "GORCS1/ACCEPT", "native_peers": []}, "Correct credential alone does not count as native admission")
 	await _wait_for("host", {"state": "HOSTING", "count": 1, "authenticating": 1, "native_peers": []}, "An unfinished authentication cannot count as the second player")
 	await _command("guest", {"action": "join", "code": code})
 	var reserved_rejection: Dictionary = await _wait_for("guest", {"state": "ERROR", "count": 0, "native_peers": []}, "A concurrent guest cannot bypass an unfinished admission reservation")

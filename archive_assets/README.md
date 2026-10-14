@@ -1,6 +1,6 @@
 # Pixel-art asset archive
 
-40 PNGs moved from `~/Downloads` and `~/Downloads/goorcs_temp` into the existing Goorcs project. Image bytes are unchanged; filenames are normalized. `assets.json` preserves each original filename and source path.
+40 PNGs moved from `~/Downloads` and `~/Downloads/goorcs_temp` into the existing Gorcs project. Image bytes are unchanged; filenames are normalized. `assets.json` preserves each original filename and source path.
 
 ## Organization
 

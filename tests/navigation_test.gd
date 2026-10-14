@@ -31,7 +31,7 @@ func _run() -> void:
 	_check(main.session.state == MultiplayerSession.State.ERROR, "An invalid invite fails without leaving Play")
 	var unreachable := PacketPeerUDP.new()
 	_check(unreachable.bind(0, "127.0.0.1") == OK, "Reserve an isolated endpoint without an ENet host")
-	main.play_screen.join_code_input.text = "GOORCS1/127.0.0.1/%d/0123456789abcdef0123456789abcdef" % unreachable.get_local_port()
+	main.play_screen.join_code_input.text = "GORCS1/127.0.0.1/%d/0123456789abcdef0123456789abcdef" % unreachable.get_local_port()
 	await _key(KEY_ENTER)
 	_check(main.play_screen.visible and main.session.state == MultiplayerSession.State.CONNECTING, "Correcting an invalid invite and pressing Enter starts a connection without another click")
 	await _key(KEY_ESCAPE)

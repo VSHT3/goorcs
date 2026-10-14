@@ -6,7 +6,6 @@ signal back_requested
 var store: CollectionStore
 var _opening: bool = false
 var _last_error: String = ""
-var _result_message: String = ""
 var _catalog_statuses: Array[Label] = []
 var _catalog_icons: Array[ChestReveal.RewardIcon] = []
 
@@ -19,7 +18,6 @@ var _catalog_icons: Array[ChestReveal.RewardIcon] = []
 @onready var _count: Label = $Margin/Content/Workspace/Archive/Count
 @onready var _catalog: VBoxContainer = $Margin/Content/Workspace/Archive/Catalog
 @onready var _status: RichTextLabel = $Margin/Content/Workspace/Archive/Status
-@onready var _result: Label = $Margin/Content/Workspace/ChestPanel/ChestContent/Result
 
 
 func _ready() -> void:
@@ -84,7 +82,6 @@ func _reset_progress() -> void:
 		return
 	reveal.clear()
 	_last_error = ""
-	_result_message = "Collection progress reset. You can open chests again."
 	_refresh()
 	_focus_action()
 
@@ -104,10 +101,6 @@ func _open_chest() -> void:
 		_refresh()
 		return
 	_last_error = ""
-	var actual_count: int = result.rewards.size()
-	_result_message = "Rolled %d · %d new %s saved locally." % [result.rolled_count, actual_count, "tower" if actual_count == 1 else "towers"]
-	if actual_count < result.rolled_count:
-		_result_message += " Capped to the remaining locked types."
 	# The model has persisted the grant before presentation begins.
 	reveal.present(result.rewards)
 	_refresh()
@@ -126,14 +119,14 @@ func _refresh() -> void:
 	skip_button.visible = active
 	skip_button.disabled = not active
 	reset_button.disabled = true
-	_result.text = _result_message if not _result_message.is_empty() else "Saved before the reveal. Coin particles are celebration, not currency."
 	if store == null:
 		_count.text = "Collection unavailable"
 		_status.text = "No collection store was supplied. Openings are disabled."
+		_status.show()
 		_status.modulate = Color("e1a397")
 		open_button.disabled = true
 		return
-	_count.text = "Rewards saved · revealing..." if active else "%d / %d unlocked" % [store.unlocked_count(), store.catalog.size()]
+	_count.text = "Revealing…" if active else "%d / %d unlocked" % [store.unlocked_count(), store.catalog.size()]
 	# Persist immediately, but don't spoil reward identities before the reveal.
 	if not active:
 		for index: int in range(_catalog_statuses.size()):
@@ -145,24 +138,19 @@ func _refresh() -> void:
 	open_button.disabled = _opening or active or not store.can_open()
 	reset_button.disabled = _opening or active or not store.error_message.is_empty() or store.unlocked_count() == 0
 	var error: String = store.error_message if not store.error_message.is_empty() else _last_error
+	_status.visible = not error.is_empty()
 	if not error.is_empty():
 		_status.text = "Could not update collection.\n" + error
 		_status.modulate = Color("e1a397")
-	elif store.remaining_count() == 0:
-		_status.text = "COLLECTION COMPLETE\nAll tower types are unlocked. No more chests can be opened."
-		_status.modulate = Color("b5e2b7")
-	elif active:
-		_status.text = "New tower types saved.\nSkip changes only the presentation."
-		_status.modulate = Color("e0bc77")
 	else:
-		_status.text = "%d locked %s remaining.\nEvery reward is a new tower type. No duplicates." % [store.remaining_count(), "type" if store.remaining_count() == 1 else "types"]
-		_status.modulate = Color("a6b3a6")
+		_status.text = ""
 	open_button.text = "Collection complete" if store.remaining_count() == 0 else "Open free chest"
 
 
 func _add_catalog_entry(reward: TowerReward) -> void:
 	var card := PanelContainer.new()
 	card.custom_minimum_size = Vector2(0.0, 106.0)
+	card.tooltip_text = reward.description
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color("222e29")
 	style.border_color = Color("3c5042")
@@ -173,6 +161,7 @@ func _add_catalog_entry(reward: TowerReward) -> void:
 	style.content_margin_bottom = 8.0
 	card.add_theme_stylebox_override("panel", style)
 	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 10)
 	card.add_child(row)
 	var icon := ChestReveal.RewardIcon.new()
@@ -182,6 +171,7 @@ func _add_catalog_entry(reward: TowerReward) -> void:
 	row.add_child(icon)
 	_catalog_icons.append(icon)
 	var text := VBoxContainer.new()
+	text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text.add_theme_constant_override("separation", 2)
 	row.add_child(text)
@@ -193,10 +183,4 @@ func _add_catalog_entry(reward: TowerReward) -> void:
 	status.add_theme_font_size_override("font_size", 12)
 	text.add_child(status)
 	_catalog_statuses.append(status)
-	var description := Label.new()
-	description.text = reward.description
-	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	description.add_theme_font_size_override("font_size", 13)
-	description.add_theme_color_override("font_color", Color("a6b3a6"))
-	text.add_child(description)
 	_catalog.add_child(card)

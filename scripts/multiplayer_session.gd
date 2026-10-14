@@ -5,7 +5,7 @@ signal changed
 
 enum State { IDLE, HOSTING, CONNECTING, CONNECTED, ERROR }
 
-const INVITE_VERSION: String = "GOORCS1"
+const INVITE_VERSION: String = "GORCS1"
 const AUTH_ACCEPT: String = INVITE_VERSION + "/ACCEPT"
 const AUTH_FULL: String = INVITE_VERSION + "/FULL"
 const AUTH_INVALID: String = INVITE_VERSION + "/INVALID"
@@ -79,9 +79,9 @@ func join(code: String) -> bool:
 		return _reject_active_action()
 	var parts: PackedStringArray = code.strip_edges().split("/", true)
 	if parts.size() != 4:
-		return _fail("Invalid invite. Paste the complete GOORCS1/address/port/credential code copied by the host.")
+		return _fail("Invalid invite. Paste the complete GORCS1/address/port/credential code copied by the host.")
 	if parts[0] != INVITE_VERSION:
-		return _fail("This invite uses an incompatible version. Both players need the same game version and a fresh GOORCS1 invite.")
+		return _fail("This invite uses an incompatible version. Both players need the same game version and a fresh GORCS1 invite.")
 	if not _valid_address(parts[1]):
 		return _fail("The invite has an invalid numeric IP address. Ask the host to create a code with their reachable LAN, forwarded internet, or private VPN address.")
 	if parts[2].is_empty() or parts[2].length() > 5 or not _only_characters(parts[2], "0123456789"):

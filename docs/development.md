@@ -4,7 +4,7 @@
 
 1. Install the standard Godot **4.7.2 stable** executable from the [official downloads](https://godotengine.org/download/). Keep collaborators on the same version; upgrade deliberately.
 2. Clone the private repository and import `project.godot` into Godot.
-3. Run the main scene with F5. Choose **Open workshop** from the main menu.
+3. Run the main scene with F5. Choose **Workshop** from the main menu.
 
 No Node.js, .NET SDK, external packages, export templates, or MCP servers are required to run the current project in Godot. Export templates will be needed when distributing desktop builds.
 
@@ -71,6 +71,12 @@ For networking changes, launch separate host and client processes and verify the
 
 The first multiplayer milestone should be completed before building extensive progression and content systems.
 
+### Interface hierarchy
+
+Persistent UI text is limited to actions, phase/result, health, readiness, path budget, enemy counts, collection state, and relevant Arrow stats. Instructions, odds, descriptions, and connection guidance live in control tooltips. Gameplay/workshop rejection notices expire after 3.5 seconds, including during idle planning; connection and save errors remain visible.
+
+Cleanup verification exercised menu/workshop/collection/lobby and two real gameplay peers in rendered 1280×720 and 1000×720 subviewports, including live targeting, ordinary/coin-flip results, rejoin, visible errors, and idle notice expiry. The unchanged reset warning was visually inspected; reset/cancellation behavior remains covered by the passing chest-flow regression. Linux save-directory preservation and corrected `GORCS1` peer admission also passed. PDF/brief files were intentionally unchanged.
+
 ## Direct connection lobby
 
 **Play → Host / Join** uses built-in ENet; there is no game-hosted signaling, room-code lookup, or relay service, and no additional runtime package is required. One host admits one guest using native `SceneMultiplayer` authentication. `MultiplayerSession` exclusively owns the tree's default multiplayer API while active; future match networking must reuse that owner rather than install a competing peer.
@@ -82,7 +88,9 @@ Host with a numeric IP address your friend can reach:
 - Public internet: advertise the public/routable address. Forward the chosen UDP port to the host computer if required and allow it through the firewall. Carrier-grade NAT may prevent forwarding; this game does not solve it.
 - Two processes on this computer: use `127.0.0.1`. That address cannot connect a friend on another machine.
 
-The host copies the full `GOORCS1/address/port/credential` invite; the guest pastes it into Join. The default hosting port is UDP 7000, and both sides use the port encoded in the invite. The credential is regenerated for each new hosting attempt. Never publish a live code: it exposes the address and permits room admission. ENet traffic and its authentication exchange are not encrypted; use trusted networks or an encrypted private VPN if confidentiality is needed.
+The host copies the full `GORCS1/address/port/credential` invite; the guest pastes it into Join. The default hosting port is UDP 7000, and both sides use the port encoded in the invite. The credential is regenerated for each new hosting attempt. After the Gorcs name correction, both players need the updated build and a fresh `GORCS1` invite; the former spelling is not accepted. Never publish a live code: it exposes the address and permits room admission. ENet traffic and its authentication exchange are not encrypted; use trusted networks or an encrypted private VPN if confidentiality is needed.
+
+The creator reported successful friend admission over a shared hotspot after allowing the selected UDP port through the host's UFW firewall. This confirms that LAN setup, not reachability across separate internet networks.
 
 Wrong credentials, incompatible invite/authentication versions, malformed endpoints, occupied ports, full rooms, and unreachable hosts fail visibly without admitting another player. Connecting has a bounded deadline and can be cancelled. The guest can leave and rejoin the same waiting host; leaving as host closes the room and invalidates its code. Returning to the menu or closing the lobby releases the connection and listening port. No host migration or automatic reconnect is implemented.
 
@@ -227,7 +235,7 @@ Desktop exports are not implemented or verified. Direct connection, shared plann
 
 ## Collection and chest verification
 
-Collection unlocks are stored in `user://collection.json`, separate from unsaved workshop layouts. On Linux with the current application name, this is normally `~/.local/share/godot/app_userdata/Goorcs/collection.json`; Godot's resolved user-data path is authoritative. Use one game instance at a time for this save. There is no cloud sync or concurrent-writer coordination.
+Collection unlocks are stored in `user://collection.json`, separate from unsaved workshop layouts. Gorcs retains the existing collection directory through Godot's custom user-directory settings so the name correction does not reset progress. On Linux this remains `~/.local/share/godot/app_userdata/Goorcs/collection.json`; Windows/macOS overrides retain their previous `Godot/app_userdata/Goorcs` directories. The legacy directory spelling is internal storage, not displayed branding. Godot's resolved user-data path is authoritative; preservation was verified on Linux. Use one game instance at a time for this save. There is no cloud sync or concurrent-writer coordination.
 
 Opening chooses rewards in `CollectionStore`, writes a sibling temporary file, and renames it over the previous save before committing the in-memory grant. The reveal receives that saved result and cannot change it. Unknown versions/IDs, malformed data, unreadable files, or write failures block openings with a visible error. Long error details are selectable and scrollable. Repair or move aside a damaged save and restart; the game never silently resets it. Moving the file aside starts a new collection, so preserve a copy if its unlocks matter.
 

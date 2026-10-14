@@ -1,6 +1,6 @@
 # Agent instructions
 
-Goorcs is a private, desktop-first 2D tower-defense game for friends. Development is primarily agent implementation plus human playtesting.
+Gorcs is a private, desktop-first 2D tower-defense game for friends. Development is primarily agent implementation plus human playtesting.
 
 ## Read before editing
 

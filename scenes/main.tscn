@@ -37,17 +37,13 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.90, 0.88, 0.81, 1)
 theme_override_font_sizes/font_size = 32
-text = "GOORCS / Path workshop"
+text = "Workshop"
 
 [node name="Menu" type="Button" parent="Margin/Content/Header"]
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
-text = "Menu / Esc"
-
-[node name="Subtitle" type="Label" parent="Margin/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-text = "Draw the maze. Inspect the shortcuts.   •   Local workshop — no combat"
+text = "Menu"
+tooltip_text = "Return to the menu (Esc)."
 
 [node name="Workspace" type="HBoxContainer" parent="Margin/Content"]
 layout_mode = 2
@@ -60,34 +56,26 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 mouse_default_cursor_shape = 2
+tooltip_text = "Left drag: place. Right drag: erase.\nE: entrance · B: base · Green: shortest route."
 script = ExtResource("2_board")
 
 [node name="Sidebar" type="VBoxContainer" parent="Margin/Content/Workspace"]
-custom_minimum_size = Vector2(300, 0)
+custom_minimum_size = Vector2(220, 0)
 layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="Status" type="Label" parent="Margin/Content/Workspace/Sidebar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 24
+tooltip_text = "The base and every placed tile must connect to the entrance."
 
 [node name="Budget" type="Label" parent="Margin/Content/Workspace/Sidebar"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 26
 
 [node name="Route" type="Label" parent="Margin/Content/Workspace/Sidebar"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-
-[node name="Legend" type="Label" parent="Margin/Content/Workspace/Sidebar"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "E   Entrance\nB   Base / crystal\nGreen line   Shortest route\nStone tiles   Branches / unused route"
-
-[node name="Rules" type="Label" parent="Margin/Content/Workspace/Sidebar"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "Edges connect; corners do not.\nAdjacent tiles can create shortcuts.\nPlacement order does not set the route."
 
 [node name="Spacer" type="Control" parent="Margin/Content/Workspace/Sidebar"]
 layout_mode = 2
@@ -97,21 +85,18 @@ mouse_filter = 2
 [node name="Clear" type="Button" parent="Margin/Content/Workspace/Sidebar"]
 custom_minimum_size = Vector2(0, 42)
 layout_mode = 2
-text = "Clear placed tiles"
-
-[node name="Settings" type="Label" parent="Margin/Content/Workspace/Sidebar"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-theme_override_font_sizes/font_size = 13
-
-[node name="Controls" type="Label" parent="Margin/Content"]
-layout_mode = 2
-text = "LEFT CLICK / DRAG   Place tiles       RIGHT CLICK / DRAG   Remove tiles"
+text = "Clear tiles"
+tooltip_text = "Remove placed paths. Entrance and base stay fixed."
 
 [node name="Feedback" type="Label" parent="Margin/Content"]
+visible = false
 layout_mode = 2
 theme_override_colors/font_color = Color(0.80, 0.77, 0.67, 1)
 autowrap_mode = 2
+
+[node name="FeedbackTimer" type="Timer" parent="."]
+wait_time = 3.5
+one_shot = true
 
 [node name="Menu" type="Control" parent="."]
 layout_mode = 1
@@ -134,51 +119,35 @@ custom_minimum_size = Vector2(500, 0)
 layout_mode = 2
 theme_override_constants/separation = 20
 
-[node name="Eyebrow" type="Label" parent="Menu/Center/Panel"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-text = "PRIVATE TOWER DEFENSE / IN DEVELOPMENT"
-
 [node name="Title" type="Label" parent="Menu/Center/Panel"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.90, 0.88, 0.81, 1)
 theme_override_font_sizes/font_size = 64
-text = "GOORCS"
-
-[node name="Description" type="Label" parent="Menu/Center/Panel"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Build your collection. Shape the battlefield."
-
-[node name="Scope" type="Label" parent="Menu/Center/Panel"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-text = "Host or join a private duel, defend your maze,\nopen chests, or explore the local workshop."
+text = "GORCS"
 
 [node name="Play" type="Button" parent="Menu/Center/Panel"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Play"
+tooltip_text = "Host or join a two-player match."
 
 [node name="Open" type="Button" parent="Menu/Center/Panel"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "Open workshop"
+text = "Workshop"
+tooltip_text = "Edit a local maze. The layout lasts until you quit."
 
 [node name="Collection" type="Button" parent="Menu/Center/Panel"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
-text = "Collection & chests"
+text = "Collection"
+tooltip_text = "View tower unlocks and open chests."
 
 [node name="Quit" type="Button" parent="Menu/Center/Panel"]
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Quit"
 
-[node name="Hint" type="Label" parent="Menu/Center/Panel"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-text = "Collection unlocks are saved on this computer.\nWorkshop layouts last only for this session."

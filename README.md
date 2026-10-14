@@ -1,4 +1,4 @@
-# Goorcs
+# Gorcs
 
 A private, desktop-first 2D tower-defense game for friends, developed with AI assistance.
 
@@ -28,7 +28,7 @@ For command-line launch and verification, see the [development commands](docs/de
 
 ## Collection and chests
 
-- Choose **Collection & chests**, then **Open free chest**. The chest shakes, opens with light and decorative coins, and reveals the actual rewards together. There is no roulette reel.
+- Choose **Collection**, then **Open free chest**. The chest shakes, opens with light and decorative coins, and reveals the actual rewards together. There is no roulette reel.
 - Unlock Arrow tower, Orc ballista, and Rune obelisk. Collection resources supply identity/artwork, not combat stats. The match currently implements only Arrow; Ballista and Rune have no combat behavior, and collection progress does not gate prototype placement.
 - All three towers use accepted PixelLab sprites with unchanged source PNGs. Arrow tower is the selected green-bannered stone-and-timber tower with a pink-haired archer and bow. All three share a consistent square display size in the collection and chest cards, preserving proportions.
 - The orc chest uses cleaned user-supplied PixelLab sprites. Its lid transitions between closed/open poses; light and coin effects remain native Godot effects. Sound is not implemented yet.
@@ -40,9 +40,9 @@ For command-line launch and verification, see the [development commands](docs/de
 
 ## Path workshop
 
-- Choose **Open workshop** from the main menu. **Menu / Esc** returns to it; **Resume workshop** or Esc resumes without clearing tiles.
+- Choose **Workshop** from the main menu. **Menu** or Esc returns to it; **Resume workshop** or Esc resumes without clearing tiles.
 - Menu navigation preserves the layout only for this session. **Quit** exits; layouts are not saved after quitting.
-- Left click or drag to place tiles; right click or drag to remove them. **Clear placed tiles** resets the board.
+- Left click or drag to place tiles; right click or drag to remove them. **Clear tiles** resets the board.
 - Only shared edges connect. Entrance and base are fixed and do not spend budget.
 - Unused budget is allowed. A ready layout connects the base and every placed tile to the entrance.
 - The green line previews the shortest route, not placement order. Branches and adjacent sections can create shortcuts.

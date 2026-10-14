@@ -98,7 +98,7 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 30
-text = "GOORCS / Collection"
+text = "Collection"
 
 [node name="Reset" type="Button" parent="Margin/Content/Header"]
 custom_minimum_size = Vector2(180, 40)
@@ -110,12 +110,6 @@ custom_minimum_size = Vector2(120, 40)
 layout_mode = 2
 text = "Back / Esc"
 
-[node name="Subtitle" type="Label" parent="Margin/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-theme_override_font_sizes/font_size = 14
-text = "Your local tower archive. Open a chest to unlock something new."
-
 [node name="Workspace" type="HBoxContainer" parent="Margin/Content"]
 layout_mode = 2
 size_flags_vertical = 3
@@ -125,11 +119,6 @@ theme_override_constants/separation = 24
 custom_minimum_size = Vector2(302, 0)
 layout_mode = 2
 theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Margin/Content/Workspace/Archive"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 22
-text = "Tower archive"
 
 [node name="Count" type="Label" parent="Margin/Content/Workspace/Archive"]
 layout_mode = 2
@@ -171,6 +160,7 @@ alignment = 1
 [node name="Open" type="Button" parent="Margin/Content/Workspace/ChestPanel/ChestContent/Actions"]
 custom_minimum_size = Vector2(220, 42)
 layout_mode = 2
+tooltip_text = "Chest odds: 1 reward 80% · 3 rewards 15% · 5 rewards 5%.\nNew towers only, up to the number still locked."
 text = "Open free chest"
 
 [node name="Skip" type="Button" parent="Margin/Content/Workspace/ChestPanel/ChestContent/Actions"]
@@ -178,28 +168,6 @@ visible = false
 custom_minimum_size = Vector2(150, 42)
 layout_mode = 2
 text = "Skip reveal"
-
-[node name="Result" type="Label" parent="Margin/Content/Workspace/ChestPanel/ChestContent"]
-custom_minimum_size = Vector2(0, 34)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-theme_override_font_sizes/font_size = 13
-horizontal_alignment = 1
-autowrap_mode = 2
-
-[node name="Odds" type="Label" parent="Margin/Content"]
-custom_minimum_size = Vector2(0, 52)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
-theme_override_font_sizes/font_size = 14
-text = "Provisional odds: 1 reward 80% · 3 rewards 15% · 5 rewards 5%. Only locked types, no duplicates.\nRewards are capped to the remaining locked types. With this 3-type catalog, a 5-roll grants at most 3."
-autowrap_mode = 2
-
-[node name="Scope" type="Label" parent="Margin/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-theme_override_font_sizes/font_size = 13
-text = "Free local collection openings. Match Arrow access is independent of unlocks. Workshop layouts are separate."
 
 [node name="ResetConfirmation" type="ConfirmationDialog" parent="."]
 visible = false

@@ -32,7 +32,6 @@ var _planning_was_active: bool = false
 @onready var _error: RichTextLabel = %Error
 @onready var _scroll: ScrollContainer = %Scroll
 @onready var _content: VBoxContainer = $Margin/Content
-@onready var _scope: Label = $Margin/Content/Scope
 
 
 func _ready() -> void:
@@ -43,7 +42,6 @@ func _ready() -> void:
 	_content.move_child(planning_screen, _scroll.get_index() + 1)
 	if planning != null:
 		planning.changed.connect(_planning_changed)
-	_scope.text = "Private defense room · Free prototype towers, provisional stats. Workshop and collection remain local."
 	host_button.pressed.connect(_show_host)
 	join_button.pressed.connect(_show_join)
 	host_create_button.pressed.connect(_create_host)
@@ -175,7 +173,6 @@ func _planning_changed() -> void:
 func _refresh() -> void:
 	var planning_active: bool = planning != null and planning.active
 	_scroll.visible = not planning_active
-	_scope.visible = not planning_active
 	planning_screen.visible = planning_active
 	var available: bool = _can_start()
 	var active: bool = session != null and session.state in [MultiplayerSession.State.HOSTING, MultiplayerSession.State.CONNECTING, MultiplayerSession.State.CONNECTED]
@@ -196,30 +193,33 @@ func _refresh() -> void:
 	var code: String = session.invite_code if has_code else ""
 	if code_output.text != code:
 		code_output.text = code
-		copy_button.text = "Copy invite code"
+		copy_button.text = "Copy code"
 	_error.text = session.error_message if session != null else "No session was supplied. Return to the menu and reopen Play."
 	_error.visible = not _error.text.is_empty()
 	back_button.text = "Leave / Esc" if active else "Back / Esc"
 	_players.text = ""
+	_players.hide()
+	_status.visible = session == null or session.state != MultiplayerSession.State.IDLE
 	if session == null:
 		_status.text = "Connection unavailable"
 		return
 	_last_state = session.state
 	match session.state:
 		MultiplayerSession.State.IDLE:
-			_status.text = "Play with a friend"
+			_status.text = ""
 		MultiplayerSession.State.ERROR:
 			_status.text = "Connection unsuccessful"
 		MultiplayerSession.State.HOSTING:
 			_status.text = "Waiting for friend"
-			_players.text = "Host · %d of 2 players · Keep this game open" % session.player_count()
+			_players.text = "Host · %d / 2 players" % session.player_count()
 		MultiplayerSession.State.CONNECTING:
 			_status.text = "Connecting to host…"
-			_players.text = "Guest · Waiting for admission. You can cancel at any time."
+			_players.text = "Guest · Awaiting admission"
 			back_button.text = "Cancel / Esc"
 		MultiplayerSession.State.CONNECTED:
 			_status.text = "Connected"
-			_players.text = "%s · %d of 2 players" % ["Host" if session.is_host else "Guest", session.player_count()]
+			_players.text = "%s · %d / 2 players" % ["Host" if session.is_host else "Guest", session.player_count()]
+	_players.visible = not _players.text.is_empty()
 
 
 func _focus_action() -> void:
