@@ -26,6 +26,7 @@ var _last_activity: Control
 @onready var workshop: Control = $Margin
 @onready var open_button: Button = $Menu/Center/Panel/Open
 @onready var play_button: Button = $Menu/Center/Panel/Play
+@onready var _match_music: AudioStreamPlayer = $MatchMusic
 
 
 func _ready() -> void:
@@ -57,6 +58,9 @@ func _ready() -> void:
 	play_screen.planning = planning
 	play_screen.hide()
 	add_child(play_screen)
+	(_match_music.stream as AudioStreamMP3).loop = true
+	planning.changed.connect(_sync_match_music)
+	play_screen.visibility_changed.connect(_sync_match_music)
 	play_screen.back_requested.connect(_show_menu)
 	collection_screen = preload("res://scenes/collection_screen.tscn").instantiate()
 	collection_screen.store = collection_store
@@ -116,6 +120,16 @@ func _show_menu() -> void:
 		open_button.grab_focus()
 	else:
 		play_button.grab_focus()
+
+
+func _sync_match_music() -> void:
+	var playing_match: bool = planning.active and play_screen.is_visible_in_tree() \
+		and int(planning.combat.get("phase", MatchCombat.Phase.PLANNING)) != MatchCombat.Phase.FINISHED
+	if playing_match:
+		if not _match_music.playing:
+			_match_music.play()
+	else:
+		_match_music.stop()
 
 
 func _quit() -> void:

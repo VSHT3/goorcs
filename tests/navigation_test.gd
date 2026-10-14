@@ -69,9 +69,52 @@ func _run() -> void:
 	await _key(KEY_ESCAPE)
 	await _key(KEY_ENTER)
 	_check(main.workshop.visible and main.layout.route == saved_route, "Keyboard resume preserves layout")
+	await _check_match_music()
+	main.queue_free()
+	await process_frame
+	# Stopped playbacks retire on the audio mix thread, not the scene frame.
+	await create_timer(maxf(0.0, AudioServer.get_time_to_next_mix()) + 0.025).timeout
 	if failures == 0:
 		print("PASS: navigation preserves layout, hidden board rejects edits, idle hover is safe, interrupted/outside-release strokes end")
 	quit(1 if failures > 0 else 0)
+
+
+func _check_match_music() -> void:
+	var music: AudioStreamPlayer = main.get_node("MatchMusic")
+	_check(not music.playing, "Workshop and menu do not play the match soundtrack")
+	main.play_button.pressed.emit()
+	await process_frame
+	_check(not music.playing, "Connection choices do not start match music")
+	main.play_screen.singleplayer_button.pressed.emit()
+	await process_frame
+	_check(music.playing, "Entering a match starts the soundtrack during planning")
+	music.seek(5.0)
+	for x: int in range(1, 13):
+		main.planning.request_edit(0, Vector2i(x, 4), true)
+	main.planning.submit_ready(true)
+	await process_frame
+	_check(music.playing and music.get_playback_position() >= 4.0, "Path snapshots and wave start cannot restart the song")
+	for tick: int in range(5000):
+		main.planning._physics_process(1.0 / 60.0)
+		if main.planning.combat["phase"] != MatchCombat.Phase.WAVE:
+			break
+	_check(main.planning.combat["phase"] == MatchCombat.Phase.PLANNING and music.playing, "The song continues through the wave break")
+	main.planning.submit_ready(true)
+	for tick: int in range(5000):
+		main.planning._physics_process(1.0 / 60.0)
+		if main.planning.combat["phase"] == MatchCombat.Phase.FINISHED:
+			break
+	_check(main.planning.combat["phase"] == MatchCombat.Phase.FINISHED and not music.playing, "Match results stop the soundtrack")
+	await _key(KEY_ESCAPE)
+	main.play_button.pressed.emit()
+	main.play_screen.singleplayer_button.pressed.emit()
+	await process_frame
+	_check(music.playing, "A fresh match starts the song again after results")
+	await _key(KEY_ESCAPE)
+	_check(main.menu.visible and not music.playing, "Leaving an active match stops its soundtrack")
+	main.open_button.pressed.emit()
+	await process_frame
+	_check(main.workshop.visible and not music.playing, "Returning to the workshop leaves match music stopped")
 
 
 func _cell_point(cell: Vector2i) -> Vector2:

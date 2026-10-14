@@ -14,3 +14,5 @@ title = "Rune obelisk"
 description = "Ancient stone threaded with glowing runes."
 icon_texture = SubResource("AtlasRune")
 accent = Color(0.43, 0.71, 0.69, 1)
+board_height = 1.50
+board_anchor = Vector2(0.5, 0.94)

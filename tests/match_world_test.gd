@@ -48,6 +48,7 @@ func _run() -> void:
 		return
 	screen.cancel_interaction()
 	await _check_camera_and_input(0)
+	await _check_top_row_visibility(0)
 	await _check_stroke_cancellation()
 	await _check_focus_and_visibility()
 	await _check_leave_and_reopen()
@@ -61,7 +62,29 @@ func _run() -> void:
 	await _settle()
 	world.set_process(false)
 	await _check_camera_and_input(1)
+	await _check_top_row_visibility(1)
 	await _finish(saved_bytes)
+
+
+func _check_top_row_visibility(own_slot: int) -> void:
+	var old_size: Vector2i = root.size
+	var old_scale: Vector2i = root.content_scale_size
+	for width: int in [1280, 1000]:
+		root.content_scale_size = Vector2i(width, 720)
+		root.size = Vector2i(width, 720)
+		await _settle()
+		var board: PathBoard = world.boards[own_slot]
+		var header: Control = screen.get_node("HUD/Header")
+		for artwork: TowerReward in board.tower_catalog:
+			var rect: Rect2 = board._sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor,
+				board.cell_center(Vector2i(6, 0)) + Vector2(0, board._cell_size() * 0.28))
+			var bounds: Rect2 = board._texture_bounds[artwork.icon_texture]
+			var visible_top := Vector2(rect.position.x, rect.position.y + bounds.position.y * rect.size.y / artwork.icon_texture.get_height())
+			var top: Vector2 = board.get_global_transform_with_canvas() * visible_top
+			_check(top.y >= header.get_global_rect().end.y, "Top-row %s clears the fixed HUD at width=%d slot=%d" % [artwork.id, width, own_slot])
+	root.content_scale_size = old_scale
+	root.size = old_size
+	await _settle()
 
 
 func _check_camera_and_input(own_slot: int) -> void:
@@ -389,6 +412,8 @@ func _finish(saved_bytes: String) -> void:
 	_check(FileAccess.get_file_as_string(save_path) == saved_bytes, "Match interactions leave isolated collection save unchanged")
 	main.queue_free()
 	await process_frame
+	# Let the audio mix thread retire the stopped match playback before exit.
+	await create_timer(maxf(0.0, AudioServer.get_time_to_next_mix()) + 0.025).timeout
 	_check(DirAccess.remove_absolute(save_path) == OK, "Remove isolated match collection save")
 	_check(DirAccess.remove_absolute(directory) == OK, "Remove isolated match collection directory")
 	if failures == 0:

@@ -1,0 +1,622 @@
+{
+  "status": "Static composited art-direction reference, not a running-game capture. Original PNGs only; no replacement imported.",
+  "created_date": "2026-10-14",
+  "canvas_px": [
+    1280,
+    900
+  ],
+  "actual_size_scene_rect_px": [
+    42,
+    80,
+    1196,
+    206
+  ],
+  "actual_size_basis": {
+    "cell_world_px": 48,
+    "camera_scale": 1.1684434968017057,
+    "cell_screen_px": 56.085287846481876,
+    "camera_scale_formula": "548 / (432 + 37): final 37px opaque tower headroom, shared by 1280x720 and 1000x720 camera height-fit",
+    "reference_viewport_px": [
+      1280,
+      720
+    ],
+    "note": "Lineup canvas includes extra detail rows; it is not a fabricated 1280x720 game screenshot. Floating draw sizes are rounded once for Pillow composition then camera-rasterized nearest. Godot may differ at individual nearest-sampled edge pixels."
+  },
+  "grounding": {
+    "foot_from_cell_center_world_px": [
+      0,
+      13.44
+    ],
+    "shadow_policy": "Restrained contact ellipse at foot, offset right/down; no persistent range or tower box.",
+    "shadow_color": "#233025"
+  },
+  "terrain": {
+    "base": "#2f3c30",
+    "grass": [
+      "#354232",
+      "#324031"
+    ],
+    "soil": "#3b4232",
+    "path": "#626650",
+    "stones": [
+      "#6a6d57",
+      "#585e4a"
+    ],
+    "seam": "#474e3e",
+    "edge": "#424b39",
+    "description": "Static proposed layered terrain/path, using BoardPresentation supplied palette; no new gameplay cells."
+  },
+  "assets": [
+    {
+      "name": "Grunt",
+      "source_path": "assets/enemies/grunt.png",
+      "source_sha256": "7005092f2216a6d57556010196978f57213f5a8e98a359cad9055959bb0927ca",
+      "source_size": [
+        64,
+        64
+      ],
+      "source_opaque_bounds": [
+        10,
+        6,
+        55,
+        58
+      ],
+      "atlas_region_xyxy": null,
+      "display_texture_size": [
+        64,
+        64
+      ],
+      "display_opaque_bounds": [
+        10,
+        6,
+        55,
+        58
+      ],
+      "board_height": 0.84,
+      "normalized_anchor": [
+        0.5,
+        0.90625
+      ],
+      "source_facing": "west",
+      "texture_to_world_scale": 0.7753846153846153,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 40.32,
+      "world_draw_size_px": [
+        50,
+        50
+      ],
+      "world_opaque_height_px": 40.625,
+      "center_world": [
+        64,
+        108
+      ],
+      "foot_world": [
+        64,
+        121.44
+      ],
+      "draw_top_left_world": [
+        39,
+        76
+      ],
+      "draw_size_world": [
+        50,
+        50
+      ],
+      "opaque_rgb_color_count": 23,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 47.111641791044775
+    },
+    {
+      "name": "Runner",
+      "source_path": "assets/enemies/runner.png",
+      "source_sha256": "d12be7b4067e10b475896409572cab1b563ad5c6e4a65a828ca4e8a2fdb3f545",
+      "source_size": [
+        48,
+        48
+      ],
+      "source_opaque_bounds": [
+        7,
+        5,
+        43,
+        44
+      ],
+      "atlas_region_xyxy": null,
+      "display_texture_size": [
+        48,
+        48
+      ],
+      "display_opaque_bounds": [
+        7,
+        5,
+        43,
+        44
+      ],
+      "board_height": 0.74,
+      "normalized_anchor": [
+        0.5,
+        0.9
+      ],
+      "source_facing": "east",
+      "texture_to_world_scale": 0.9107692307692307,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 35.519999999999996,
+      "world_draw_size_px": [
+        44,
+        44
+      ],
+      "world_opaque_height_px": 35.75,
+      "center_world": [
+        192,
+        108
+      ],
+      "foot_world": [
+        192,
+        121.44
+      ],
+      "draw_top_left_world": [
+        170,
+        82
+      ],
+      "draw_size_world": [
+        44,
+        44
+      ],
+      "opaque_rgb_color_count": 19,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 41.50311300639658
+    },
+    {
+      "name": "Brute",
+      "source_path": "assets/enemies/brute.png",
+      "source_sha256": "b2b2e7a4ffd6f0752783ff08c6a239dd1ac5537d703c02bbb32c34612ce42095",
+      "source_size": [
+        48,
+        48
+      ],
+      "source_opaque_bounds": [
+        5,
+        3,
+        44,
+        45
+      ],
+      "atlas_region_xyxy": null,
+      "display_texture_size": [
+        48,
+        48
+      ],
+      "display_opaque_bounds": [
+        5,
+        3,
+        44,
+        45
+      ],
+      "board_height": 1.02,
+      "normalized_anchor": [
+        0.5,
+        0.92
+      ],
+      "source_facing": "east",
+      "texture_to_world_scale": 1.1657142857142857,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 48.96,
+      "world_draw_size_px": [
+        56,
+        56
+      ],
+      "world_opaque_height_px": 49.0,
+      "center_world": [
+        320,
+        108
+      ],
+      "foot_world": [
+        320,
+        121.44
+      ],
+      "draw_top_left_world": [
+        292,
+        70
+      ],
+      "draw_size_world": [
+        56,
+        56
+      ],
+      "opaque_rgb_color_count": 20,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 57.20699360341151
+    },
+    {
+      "name": "Arrow",
+      "source_path": "assets/towers/arrow_tower.png",
+      "source_sha256": "8d28e2a2abcf49778de0195d189a0e451b1b2d7af01ed343b9c7df41448ea8ed",
+      "source_size": [
+        128,
+        128
+      ],
+      "source_opaque_bounds": [
+        28,
+        24,
+        98,
+        110
+      ],
+      "atlas_region_xyxy": [
+        28,
+        24,
+        98,
+        110
+      ],
+      "display_texture_size": [
+        70,
+        86
+      ],
+      "display_opaque_bounds": [
+        0,
+        0,
+        70,
+        86
+      ],
+      "board_height": 1.42,
+      "normalized_anchor": [
+        0.5,
+        0.94
+      ],
+      "source_facing": "fixed three-quarter",
+      "texture_to_world_scale": 0.7925581395348836,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 68.16,
+      "world_draw_size_px": [
+        55,
+        68
+      ],
+      "world_opaque_height_px": 68.0,
+      "center_world": [
+        448,
+        108
+      ],
+      "foot_world": [
+        448,
+        121.44
+      ],
+      "draw_top_left_world": [
+        420,
+        58
+      ],
+      "draw_size_world": [
+        55,
+        68
+      ],
+      "opaque_rgb_color_count": 56,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 79.64110874200425
+    },
+    {
+      "name": "Ballista",
+      "source_path": "assets/towers/ballista_tower.png",
+      "source_sha256": "9ac5e953f4e02e4f18aa20064b392a09f6c5b6938b69248fd6720c68f79ae38a",
+      "source_size": [
+        96,
+        96
+      ],
+      "source_opaque_bounds": [
+        12,
+        5,
+        86,
+        94
+      ],
+      "atlas_region_xyxy": [
+        12,
+        5,
+        86,
+        94
+      ],
+      "display_texture_size": [
+        74,
+        89
+      ],
+      "display_opaque_bounds": [
+        0,
+        0,
+        74,
+        89
+      ],
+      "board_height": 1.4,
+      "normalized_anchor": [
+        0.5,
+        0.94
+      ],
+      "source_facing": "fixed three-quarter",
+      "texture_to_world_scale": 0.7550561797752807,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 67.19999999999999,
+      "world_draw_size_px": [
+        56,
+        67
+      ],
+      "world_opaque_height_px": 67.0,
+      "center_world": [
+        576,
+        108
+      ],
+      "foot_world": [
+        576,
+        121.44
+      ],
+      "draw_top_left_world": [
+        548,
+        58
+      ],
+      "draw_size_world": [
+        56,
+        67
+      ],
+      "opaque_rgb_color_count": 48,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 78.5194029850746
+    },
+    {
+      "name": "Rune",
+      "source_path": "assets/towers/rune_obelisk.png",
+      "source_sha256": "c4c3a6b6a2caa470ecd81962c63289753bcdbdad40ced44ddb784a705ec177b8",
+      "source_size": [
+        256,
+        256
+      ],
+      "source_opaque_bounds": [
+        78,
+        41,
+        176,
+        201
+      ],
+      "atlas_region_xyxy": [
+        78,
+        41,
+        176,
+        201
+      ],
+      "display_texture_size": [
+        98,
+        160
+      ],
+      "display_opaque_bounds": [
+        0,
+        0,
+        98,
+        160
+      ],
+      "board_height": 1.5,
+      "normalized_anchor": [
+        0.5,
+        0.94
+      ],
+      "source_facing": "fixed three-quarter",
+      "texture_to_world_scale": 0.45,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 72.0,
+      "world_draw_size_px": [
+        44,
+        72
+      ],
+      "world_opaque_height_px": 72.0,
+      "center_world": [
+        704,
+        108
+      ],
+      "foot_world": [
+        704,
+        121.44
+      ],
+      "draw_top_left_world": [
+        682,
+        54
+      ],
+      "draw_size_world": [
+        44,
+        72
+      ],
+      "opaque_rgb_color_count": 58,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 84.1279317697228
+    },
+    {
+      "name": "Portal",
+      "source_path": "assets/world/enemy_portal.png",
+      "source_sha256": "23b00e15a1f497559c0524965e67d1a53e622027e7e520accff611bc5a1b7488",
+      "source_size": [
+        96,
+        96
+      ],
+      "source_opaque_bounds": [
+        15,
+        9,
+        87,
+        95
+      ],
+      "atlas_region_xyxy": null,
+      "display_texture_size": [
+        96,
+        96
+      ],
+      "display_opaque_bounds": [
+        15,
+        9,
+        87,
+        95
+      ],
+      "board_height": 1.05,
+      "normalized_anchor": [
+        0.5,
+        0.97
+      ],
+      "source_facing": "fixed three-quarter",
+      "texture_to_world_scale": 0.586046511627907,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 50.400000000000006,
+      "world_draw_size_px": [
+        56,
+        56
+      ],
+      "world_opaque_height_px": 50.166666666666664,
+      "center_world": [
+        832,
+        108
+      ],
+      "foot_world": [
+        832,
+        121.44
+      ],
+      "draw_top_left_world": [
+        804,
+        67
+      ],
+      "draw_size_world": [
+        56,
+        56
+      ],
+      "opaque_rgb_color_count": 44,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 58.889552238805976
+    },
+    {
+      "name": "Crystal",
+      "source_path": "assets/world/health_crystal.png",
+      "source_sha256": "fb314b7bb26b886f287613418c49829d57e797590a2c749bfbf77c2d2ab6beac",
+      "source_size": [
+        96,
+        96
+      ],
+      "source_opaque_bounds": [
+        16,
+        9,
+        80,
+        95
+      ],
+      "atlas_region_xyxy": null,
+      "display_texture_size": [
+        96,
+        96
+      ],
+      "display_opaque_bounds": [
+        16,
+        9,
+        80,
+        95
+      ],
+      "board_height": 1.05,
+      "normalized_anchor": [
+        0.5,
+        0.97
+      ],
+      "source_facing": "fixed three-quarter",
+      "texture_to_world_scale": 0.586046511627907,
+      "camera_scale": 1.1684434968017057,
+      "requested_opaque_height_world_px": 50.400000000000006,
+      "world_draw_size_px": [
+        56,
+        56
+      ],
+      "world_opaque_height_px": 50.166666666666664,
+      "center_world": [
+        960,
+        108
+      ],
+      "foot_world": [
+        960,
+        121.44
+      ],
+      "draw_top_left_world": [
+        932,
+        67
+      ],
+      "draw_size_world": [
+        56,
+        56
+      ],
+      "opaque_rgb_color_count": 32,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_screen_height_target_px": 58.889552238805976
+    }
+  ],
+  "render_policy": {
+    "source_preservation": "Read-only source PNGs; atlas cropping exists only in composite. No palette remapping or perspective transform.",
+    "filter": "nearest-neighbor",
+    "facing": "Preserved original authored facing: Grunt west, Runner/Brute east. Still poses only; this composite does not exercise runtime mirroring or walking.",
+    "details": "Two 2x nearest-neighbor crops of the same actual-size scene; all eight complete silhouettes retained."
+  },
+  "chosen_working_standard": {
+    "camera": "Shared elevated three-quarter top-down artwork: visible top of head/shoulders and building bases, with readable face/torso/legs. Keep axis-aligned gameplay grid. Pose/facing may differ. No measured 3D camera angle claimed.",
+    "light": "Upper-left key light; top/left planes lighter, right/lower planes darker.",
+    "outline": "Dark one-screen-pixel-scale outer contour at game size; larger silhouettes permit limited interior dark separation. Avoid thick disconnected front-facing blocks.",
+    "detail": "Use Grunt readability and the existing tower/endpoint ground planes together as scene reference; simplify subpixel Rune engraving/sparks into stable clusters if refining Rune. Do not force every source to the same canvas dimensions.",
+    "proportion": "Opaque Rune/Grunt height ratio 1.50/.84 = 1.786, with .74 Runner and 1.02 Brute; presentation-only."
+  },
+  "observed_mismatches": [
+    {
+      "assets": [
+        "Runner",
+        "Brute"
+      ],
+      "evidence": "At the actual-size row and nearest details, Brute has an almost symmetric frontal shoulder bar, flat rectangular breastplate and straight front-on belt; Runner has a side-running limb silhouette with little visible crown/shoulder top plane. Their planes do not match the clearly receding stone bases or the Grunt three-quarter face.",
+      "action": "Refine these two first using the complete shared scene, preserving identities, right-facing metadata and relative opaque heights."
+    },
+    {
+      "assets": [
+        "Rune",
+        "Grunt"
+      ],
+      "evidence": "Rune displayed crop is 98x160 reduced by 0.45 world pixels per source pixel; Grunt opaque height is 52 reduced by 0.7754. Rune retains much finer multi-color engraving/spark clusters than the Grunt. The 2x detail shows these dense interior flecks; resizing changes apparent density, not drawing perspective.",
+      "action": "For a future Rune refinement, retain architecture/crystal/runic identity but use fewer larger deliberate clusters and align visible top/base planes to the shared elevated scene."
+    },
+    {
+      "assets": [
+        "Arrow",
+        "Ballista"
+      ],
+      "evidence": "Arrow and Ballista source displayed heights are 86/89 at scales about .793/.755; their major wood/stone forms survive actual-size reduction more coherently than Rune160 at.45. Their bases and upper platforms supply the scene ground-plane reference.",
+      "action": "Keep original art for this presentation pass; do not independently regenerate accepted towers merely to homogenize palettes."
+    }
+  ],
+  "generation": {
+    "state": "Two actual local ComfyUI GPU renders completed successfully; four cleaned transparent Runner/Brute alternatives remain local and unapproved. Native and shared-scene comparisons visually inspected.",
+    "directory": "/home/vsht/Pictures/Gorcs-PixelArt/asset-lineup-20261014",
+    "shared_reference": "shared-lineup-reference.png",
+    "shared_reference_sha256": "1b582325108857b2e423831bfffa3a948b7f5641f5fc51db056d8413f3e7e4ee",
+    "graph_source": "/home/vsht/Pictures/Gorcs-PixelArt/rune-level-2-klein/klein9-next-prompt.json",
+    "model": "FLUX.2 Klein 9B FP8 distilled, Qwen3 8B mixed-FP8 encoder, Flux2 VAE",
+    "sampling": {"steps": 4, "cfg": 1, "sampler": "euler", "scheduler": "Flux2Scheduler", "batch_size": 1, "size_px": [1024, 512]},
+    "seeds": [202610143101, 202610143102],
+    "successful_prompt_ids": ["e1f7138d-e46a-4568-b885-bf08bd16b5e7", "f7c3b047-d446-431c-8878-7826bf44fa4c"],
+    "generation_manifest": "generation-results.json",
+    "requests": ["request-01.json", "request-02.json"],
+    "histories": ["history-01.json", "history-02.json"],
+    "exports_manifest": "candidate-exports.json",
+    "comparison": "candidate-comparison.png",
+    "native_details": "candidate-native-details.png",
+    "processing": "Original raw PNGs with API prompt metadata retained. Lower white-row Runner/Brute crops only: edge-connected near-white flood removal, neutral model-added floor cleanup limited to Runner lower half / Brute lower quarter, repeat white flood through exposed transparent gaps, nearest 48x48 export, hard alpha, optional combined original-enemy-palette matching without dithering. Full crop, unrestricted and palette-matched versions retained; precise thresholds/geometry/hashes in export manifest and export_candidates.py.",
+    "candidate_assessment": "Candidate 01 is the more useful direction: Brute has olive skin, an angled helmet top and asymmetrical shoulders rather than a flat frontal breastplate; Runner retains a red headband and lean running silhouette with a three-quarter face. Both remain more finely shaded than the Grunt, with some bright contour flecks, so no final coherence or approval is claimed. Candidate 02 is not preferred: Brute skin shifts toward warm human flesh and a narrower mass. Generated raw full-lineup images also altered assets that were requested unchanged (notably Grunt/Rune in 02); the comparison deliberately uses untouched originals for every non-Runner/Brute asset.",
+    "gpu_window": "Parent granted exclusive generation window; both requests finished, queue empty, model caches unloaded using /free. Existing service left running. Parent notified before graphical Godot resumed.",
+    "approval_gate": "Candidates stay outside assets. User approval required before import."
+  }
+}

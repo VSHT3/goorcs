@@ -191,6 +191,8 @@ func _finish() -> void:
 	_check(FileAccess.get_file_as_string(save_path) == saved_bytes, "Native match drags leave the isolated collection save unchanged")
 	fixture_viewport.queue_free()
 	await process_frame
+	# Let the audio mix thread retire the stopped match playback before exit.
+	await create_timer(maxf(0.0, AudioServer.get_time_to_next_mix()) + 0.025).timeout
 	_check(DirAccess.remove_absolute(save_path) == OK, "Remove isolated native drag collection save")
 	_check(DirAccess.remove_absolute(directory) == OK, "Remove isolated native drag collection directory")
 	if failures == 0:

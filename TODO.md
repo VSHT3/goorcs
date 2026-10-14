@@ -3,7 +3,7 @@
 ## Status and reference
 
 - [x] Creator approved the direction of the board composition study on 2026-10-14.
-- [ ] Implement the approved presentation in the running game.
+- [x] Implement the approved presentation in the running game using existing artwork; coherent replacements remain approval-gated below.
 
 ![Approved board composition study](docs/visual-reference/board-target.png)
 
@@ -34,27 +34,35 @@ The portable reference is copied unchanged from `~/Pictures/Gorcs-PixelArt/board
 
 ### 1. Presentation pass using existing artwork
 
-- [ ] Establish resource-driven visual sizing and base/foot anchors for towers and enemies; avoid a one-size-fits-all canvas fit.
-- [ ] Apply the approved tower/enemy hierarchy without changing tower footprints, placement cells, hit rules, range, or path legality.
-- [ ] Add restrained terrain/path materials and grounding shadows; retain continuous path junctions and readable endpoints.
-- [ ] Remove always-on tower rectangles and irrelevant idle combat hover outlines; preserve explicit selection, placement legality, and selected range feedback.
-- [ ] Limit routine health-bar clutter and replace overpowering attack highlights with clearer transient effects. Keep damage/AoE information understandable.
-- [ ] Keep the fixed HUD, compact-width usability, local camera scouting, and opponent read-only input intact.
+- [x] Establish resource-driven visual sizing and base/foot anchors for towers and enemies; avoid a one-size-fits-all canvas fit.
+- [x] Apply the approved tower/enemy hierarchy without changing tower footprints, placement cells, hit rules, range, or path legality.
+- [x] Add restrained terrain/path materials and grounding shadows; retain continuous path junctions and readable endpoints.
+- [x] Remove always-on tower rectangles and irrelevant idle combat hover outlines; preserve explicit selection, placement legality, and selected range feedback.
+- [x] Limit routine health-bar clutter and replace overpowering attack highlights with clearer transient effects. Keep damage/AoE information understandable.
+- [x] Keep the fixed HUD, compact-width usability, local camera scouting, and opponent read-only input intact.
 
 ### 2. Coherent sprite pass
 
-- [ ] Make an actual-game-size lineup of Grunt, Runner, Brute, Arrow, Ballista, Rune, portal, and crystal against the proposed terrain. Choose one camera-elevation/light/pixel-detail standard from that lineup.
+- [x] Make an actual-game-size lineup of Grunt, Runner, Brute, Arrow, Ballista, Rune, portal, and crystal against the proposed terrain. Choose one camera-elevation/light/pixel-detail standard from that lineup.
 - [ ] Refine mismatched assets against that shared scene reference; do not generate each asset with an independent style or camera prompt.
 - [ ] Preserve original PNGs and provenance; obtain approval for replacements before importing them. Follow the [sprite pipeline](docs/sprite-pipeline.md#approval-and-game-integration).
-- [ ] Verify source-facing metadata and mirrored-board facing. Start with usable still poses; decide directional poses and animation separately rather than claiming a still is a walk cycle.
+- [x] Verify source-facing metadata and mirrored-board facing. Start with usable still poses; decide directional poses and animation separately rather than claiming a still is a walk cycle.
+
+The [full actual-size lineup](docs/visual-reference/asset-lineup.png) and [provenance](docs/visual-reference/asset-lineup.provenance.json) use original artwork together against the proposed terrain. This is a **static composite**, not runtime proof. The working standard is elevated three-quarter forms, upper-left lighting, dark readable contours, restrained contact shadows, and deliberate pixel clusters. Runner's head/shoulder planes, Brute's frontal pose, and Rune's finer detail remain visible mismatches.
+
+Two shared-scene ComfyUI refinement batches produced Runner/Brute alternatives at `~/Pictures/Gorcs-PixelArt/asset-lineup-20261014/`, with original PNGs, references, raw outputs, exact requests/history, seeds, processing scripts, and hashes preserved. The candidates are not imported or approved. They improve some perspective cues but still have finer shading/bright contour flecks than Grunt; refinement and replacement approval remain unchecked.
+
+Creator chose **Keep current sprites** for this change. Existing runtime artwork remains installed; the candidate refinements and replacement approval above are future work, not a pending import or a claimed completed coherent-art pass.
 
 ### 3. Verification and acceptance
 
-- [ ] Exercise the actual game at 1280×720 and 1000×720, on both board orientations and while panning, with representative bent paths and adjacent towers.
-- [ ] Inspect idle, hover, placement, selection, attacks, damaged/full health, mixed-enemy streams, and crowded combat. Check overlap, depth sorting, clipping, and health/endpoint visibility.
-- [ ] Compare a real gameplay capture against the approved reference with comparable counts and layout. Do not present a static composite as runtime proof.
-- [ ] Run applicable checks from [development](docs/development.md#setup); preserve authoritative gameplay/network state and update affected behavior regressions where needed.
-- [ ] Update current-state documentation only after implementation and visual verification; keep these boxes unchecked until their behavior is actually delivered.
+- [x] Exercise the actual game at 1280×720 and 1000×720, on both board orientations and while panning, with representative bent paths and adjacent towers.
+- [x] Inspect idle, hover, placement, selection, attacks, damaged/full health, mixed-enemy streams, and crowded combat. Check overlap, depth sorting, clipping, and health/endpoint visibility.
+- [x] Compare a real gameplay capture against the approved reference with comparable counts and layout. Do not present a static composite as runtime proof.
+- [x] Run applicable checks from [development](docs/development.md#setup); preserve authoritative gameplay/network state and update affected behavior regressions where needed.
+- [x] Update current-state documentation only after implementation and visual verification; keep these boxes unchecked until their behavior is actually delivered.
+
+Runtime evidence: [1280×720 bent path and adjacent Rune towers](docs/visual-reference/gameplay-presentation.png), [1000×720 mixed damaged/full-health combat](docs/visual-reference/gameplay-compact.png), and [1000×720 top-row towers clearing the HUD](docs/visual-reference/gameplay-top-row.png). These are direct Godot main-scene viewport captures, not composites. Regular enemy count/spawn spacing were not changed for the comparison. Top-row clipping was reproduced and fixed by resource-derived camera headroom; the HUD, board dimensions, placement/hit rules, range, and authoritative state are unchanged. See [verification details](docs/development.md#match-soundtrack-and-presentation).
 
 ## Scope boundaries
 

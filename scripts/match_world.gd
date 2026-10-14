@@ -168,10 +168,11 @@ func _fit_camera() -> void:
 		return
 	_cancel_strokes()
 	var board_size := Vector2(_dimensions) * CELL_SIZE
+	var headroom: float = maxf(boards[0].visual_headroom(), boards[1].visual_headroom())
 	var gameplay_height: float = maxf(size.y - HUD_TOP - HUD_BOTTOM, 1.0)
-	var zoom_factor: float = minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / board_size.x, gameplay_height / board_size.y)
+	var zoom_factor: float = minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / board_size.x, gameplay_height / (board_size.y + headroom))
 	camera.zoom = Vector2.ONE * zoom_factor
-	camera.position.y = board_size.y * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / zoom_factor
+	camera.position.y = (board_size.y - headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / zoom_factor
 	camera.position.x = clampf(camera.position.x, camera_bounds.x, camera_bounds.y)
 	camera.force_update_scroll()
 	var half_view: Vector2 = size / camera.zoom * 0.5

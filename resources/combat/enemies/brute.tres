@@ -12,3 +12,5 @@ speed_multiplier = 0.65
 send_cost = 40
 send_income = 4
 texture = ExtResource("2_sprite")
+board_height = 1.02
+board_anchor = Vector2(0.5, 0.92)

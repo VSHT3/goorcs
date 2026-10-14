@@ -14,3 +14,5 @@ title = "Arrow tower"
 description = "A bannered lookout with a pink-haired archer and a stone base."
 icon_texture = SubResource("AtlasArrow")
 accent = Color(0.78, 0.69, 0.43, 1)
+board_height = 1.42
+board_anchor = Vector2(0.5, 0.94)

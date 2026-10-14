@@ -81,6 +81,12 @@ func _ready() -> void:
 	_refresh()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DRAG_END and is_node_ready():
+		for board: PathBoard in boards:
+			board.clear_drag_preview()
+
+
 func cancel_strokes() -> void:
 	if not is_node_ready():
 		return
@@ -431,6 +437,8 @@ func _refresh() -> void:
 		_status.text = "Planning unavailable"
 		return
 	var own_slot: int = planning.local_slot()
+	for slot: int in range(boards.size()):
+		boards[slot].layout = planning.layouts[slot]
 	world.configure(planning.layouts[0].dimensions, own_slot)
 	if not planning.active:
 		_clear_feedback()
@@ -460,9 +468,9 @@ func _refresh() -> void:
 	for slot: int in range(boards.size()):
 		var layout: PathLayout = planning.layouts[slot]
 		var board: PathBoard = boards[slot]
-		board.layout = layout
 		board.cell_click_mode = _placement_id != &"" or not editable
 		board.input_enabled = planning.active and not finished and slot == own_slot and (editable or board.cell_click_mode)
+		board.placement_id = _placement_id if slot == own_slot else &""
 		board.selected_tower_id = selected_tower_id if slot == own_slot else -1
 		board.tower_types = state.get("tower_types", {})
 		board.enemy_route = planning.locked_routes[slot]

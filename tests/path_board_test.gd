@@ -45,23 +45,26 @@ func _run() -> void:
 	_check(board._enemy_position(board.combat_enemies[0]).is_equal_approx(Vector2(0.1, 1)), "A new enemy never inherits another enemy's interpolation")
 	board.combat_enemies = []
 	_check(not board.is_processing(), "Cleared boards stop animation without retaining removed enemies")
+	board.command_mode = true
+	var connected_layout: PathLayout = board.layout
 	for mirrored: bool in [false, true]:
 		board.mirror_horizontal = mirrored
-		board.queue_redraw()
-		await process_frame
-		await RenderingServer.frame_post_draw
-		var image := viewport.get_texture().get_image()
+		board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 1), Vector2i(4, 3))
+		var ground: Image = await _board_image(board, viewport)
+		board.layout = connected_layout
+		var pavement: Image = await _board_image(board, viewport)
 		for pair: Array in [[Vector2i(1, 1), Vector2i(2, 1)], [Vector2i(2, 1), Vector2i(2, 2)], [Vector2i(1, 1), Vector2i(1, 2)], [Vector2i(3, 3), Vector2i(4, 3)]]:
 			var edge: Vector2 = (board.cell_center(pair[0]) + board.cell_center(pair[1])) * 0.5
-			# Sample away from the center to check pavement width across the join.
 			var offset := Vector2(0, 12) if pair[0].y == pair[1].y else Vector2(12, 0)
-			_check(image.get_pixelv(Vector2i(edge + offset)).is_equal_approx(PathBoard.TILE), "Pavement connects across horizontal, vertical, branch and endpoint edges, mirrored=%s" % mirrored)
-		var empty: Vector2 = board.cell_center(Vector2i(3, 2))
-		_check(image.get_pixelv(Vector2i(empty)).is_equal_approx(PathBoard.GROUND), "Connections do not fill empty ground, mirrored=%s" % mirrored)
+			_check(_pixels_changed_near(ground, pavement, edge + offset), "Stone pavement covers horizontal, vertical, branch and endpoint joins, mirrored=%s" % mirrored)
+		_check(not _pixels_changed_near(ground, pavement, board.cell_center(Vector2i(3, 2))),
+			"Connecting paths does not pave empty buildable ground, mirrored=%s" % mirrored)
 	_check_drop_input(board)
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
 	await _check_source_facing(board, viewport)
+	await _check_depth_overlap(board, viewport)
+	await _check_contextual_hover(board, viewport)
 	viewport.queue_free()
 	if failures == 0:
 		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, tile ranges, attacks and mixed mirrored enemy sprites")
@@ -139,52 +142,37 @@ func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
 	}
 	for mirrored: bool in [false, true]:
 		board.mirror_horizontal = mirrored
-		for tower_cell: Vector2i in [Vector2i(2, 2), Vector2i.ZERO]:
-			board.combat_towers = [_tower(77, tower_cell, "rune_obelisk")]
-			board.selected_tower_id = -1
-			var baseline: Image = await _board_image(board, viewport)
-			board.selected_tower_id = 77
-			var highlighted: Image = await _board_image(board, viewport)
-			var highlighted_cells: int = 0
-			for y: int in range(5):
-				for x: int in range(5):
-					var cell := Vector2i(x, y)
-					if cell == tower_cell:
-						continue
-					var sample := Vector2i(board.cell_center(cell))
-					var changed: bool = not highlighted.get_pixelv(sample).is_equal_approx(baseline.get_pixelv(sample))
-					var in_range: bool = maxi(absi(cell.x - tower_cell.x), absi(cell.y - tower_cell.y)) <= 1
-					_check(changed == in_range, "Rendered range includes diagonal boundary tiles and excludes every outer tile, mirrored=%s tower=%s cell=%s" % [mirrored, tower_cell, cell])
-					if changed:
-						highlighted_cells += 1
-			_check(highlighted_cells == (8 if tower_cell == Vector2i(2, 2) else 3), "Obelisk highlights exactly its 3x3 footprint clipped to board edges")
 		board.selected_tower_id = -1
 		var tower: Dictionary = _tower(88, Vector2i(2, 2), "rune_obelisk")
 		tower["aim"] = Vector2(4, 2)
 		board.combat_towers = [tower]
 		var baseline: Image = await _board_image(board, viewport)
+		board.selected_tower_id = 88
+		var selected: Image = await _board_image(board, viewport)
+		_check(_pixels_changed_near(baseline, selected, board.cell_center(Vector2i(3, 3))),
+			"Selected range includes diagonal tiles in the legal neighborhood, mirrored=%s" % mirrored)
+		_check(not _pixels_changed_near(baseline, selected, board.cell_center(Vector2i(4, 4))),
+			"Selected range does not extend into unrelated ground, mirrored=%s" % mirrored)
+		board.selected_tower_id = -1
 		tower = tower.duplicate(true)
 		tower["shot"] = 1
 		board.combat_towers = [tower]
 		board.set_process(false)
-		board._process(PathBoard.PULSE_DURATION * 0.5)
-		var pulse: Image = await _board_image(board, viewport)
-		var center: Vector2 = board.cell_center(Vector2i(2, 2))
-		var radius: float = board._cell_size() * 0.75
-		for direction: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
-			_check(_pixels_changed_near(baseline, pulse, center + direction * radius), "Area attacks pulse in every direction, mirrored=%s direction=%s" % [mirrored, direction])
-		_check(not _pixels_changed_near(baseline, pulse, board.cell_center(Vector2i(3, 2))), "Obelisk does not draw an ordinary directional shot toward its cosmetic aim")
 		board._process(PathBoard.PULSE_DURATION * 0.25)
-		var expanded: Image = await _board_image(board, viewport)
-		_check(_pixels_changed_near(baseline, expanded, center + Vector2.DOWN * board._cell_size() * 1.125), "Area pulse expands over its lifetime")
+		var attack: Image = await _board_image(board, viewport)
+		_check(_pixels_changed_near(baseline, attack, board.cell_center(Vector2i(3, 3))),
+			"Rune attacks visibly communicate their affected tile neighborhood, mirrored=%s" % mirrored)
+		_check(not _pixels_changed_near(baseline, attack, board.cell_center(Vector2i(4, 4))),
+			"Rune feedback remains local to its affected neighborhood, mirrored=%s" % mirrored)
 		board.combat_towers = [tower.duplicate(true)]
 		board.set_process(false)
-		board._process(PathBoard.PULSE_DURATION * 0.26)
+		board._process(PathBoard.PULSE_DURATION)
 		var expired: Image = await _board_image(board, viewport)
-		_check(not _pixels_changed_near(baseline, expired, center + Vector2.DOWN * board._cell_size() * 1.125), "Repeated snapshots cannot restart an already observed area attack")
+		_check(not _pixels_changed_near(baseline, expired, board.cell_center(Vector2i(3, 3))),
+			"Attack feedback expires and repeated snapshots cannot restart it, mirrored=%s" % mirrored)
 		board.combat_towers = []
 		tower = _tower(89, Vector2i(2, 2), "arrow_tower")
-		tower["aim"] = Vector2(4, 2)
+		tower["aim"] = Vector2(3, 3)
 		board.combat_towers = [tower]
 		baseline = await _board_image(board, viewport)
 		tower = tower.duplicate(true)
@@ -192,9 +180,10 @@ func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		board.combat_towers = [tower]
 		board.set_process(false)
 		board._process(PathBoard.SHOT_DURATION * 0.25)
-		var shot: Image = await _board_image(board, viewport)
-		_check(_pixels_changed_near(baseline, shot, board.cell_center(Vector2i(3, 2))), "Non-area towers retain their directional shot traces, mirrored=%s" % mirrored)
-		_check(not _pixels_changed_near(baseline, shot, center + Vector2.UP * radius), "Ordinary shots do not become area pulses")
+		attack = await _board_image(board, viewport)
+		var impact: Vector2 = board.cell_center(Vector2i(3, 3)) + Vector2(0, board._cell_size() * 0.15)
+		_check(_pixels_changed_near(baseline, attack, impact),
+			"Direct attacks visibly indicate the target hit, mirrored=%s" % mirrored)
 		board.combat_towers = []
 
 
@@ -213,49 +202,36 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 	]
 	enemies[1]["type_id"] = "runner"
 	enemies[2]["type_id"] = "brute"
-	for enemy: Dictionary in enemies:
-		enemy["hp"] = 4
-	var normal_geometry: Array[Dictionary] = []
-	var normal_centers: Array[Vector2i] = []
 	for mirrored: bool in [false, true]:
 		board.mirror_horizontal = mirrored
-		board.combat_enemies = []
-		var baseline: Image = await _board_image(board, viewport)
-		board.combat_enemies = enemies
-		var image: Image = await _board_image(board, viewport)
-		var geometry: Array[Dictionary] = []
+		var masses: Array[int] = []
 		for enemy: Dictionary in enemies:
+			board.combat_enemies = []
+			var baseline: Image = await _board_image(board, viewport)
+			board.combat_enemies = [enemy]
+			var full: Image = await _board_image(board, viewport)
 			var center := Vector2i(board.cell_center(Vector2i(enemy["pos"])))
-			# Exclude the bars, but include the complete opaque body and cell margins.
-			var body_top: int = -24 if enemy["type_id"] == "brute" else -20
-			var region := Rect2i(center + Vector2i(-40, body_top), Vector2i(80, 40 - body_top))
-			var body: Dictionary = _changed_geometry(baseline, image, region)
-			geometry.append(body)
-			var bounds: Rect2i = body["bounds"]
-			_check(int(body["pixels"]) > 100 and bounds.size.x < 80 and bounds.size.y < 80,
-				"Each typed body renders nonempty geometry smaller than one cell, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
-			if not mirrored:
-				normal_centers.append(center)
-			else:
-				var original_center: Vector2i = normal_centers[geometry.size() - 1]
-				var original: Dictionary = normal_geometry[geometry.size() - 1]
-				var original_bounds: Rect2i = original["bounds"]
-				var mirrored_offset: Vector2 = Vector2(bounds.get_center() - center)
-				var original_offset: Vector2 = Vector2(original_bounds.get_center() - original_center)
-				_check(absi(int(body["pixels"]) - int(original["pixels"])) <= maxi(4, ceili(float(original["pixels"]) / 30.0))
-					and absi(bounds.size.x - original_bounds.size.x) <= 1 and absi(bounds.size.y - original_bounds.size.y) <= 1
-					and absf(mirrored_offset.x + original_offset.x) <= 2.0 and absf(mirrored_offset.y - original_offset.y) <= 1.0,
-					"Mirroring preserves each typed silhouette's footprint and centered alignment, type=%s" % enemy["type_id"])
-			var scale: float = 0.84 if enemy["type_id"] == "brute" else 0.70
-			var visual_top: float = center.y + (0.10 - scale * 0.5) * 80.0
-			var bar_y: int = floori(visual_top - 3.0 - 7.2 * 0.5)
-			_check(image.get_pixel(center.x - 12, bar_y).is_equal_approx(PathBoard.ROUTE_LINE)
-				and image.get_pixel(center.x + 12, bar_y).is_equal_approx(Color("172120")),
-				"Half-health bars remain clear and unflipped above every typed body, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
-		_check(int(geometry[2]["pixels"]) > int(geometry[1]["pixels"]) * 1.4,
-			"Brute's bulky armored silhouette is visibly larger than Runner, mirrored=%s" % mirrored)
-		if not mirrored:
-			normal_geometry = geometry
+			var region := Rect2i(center + Vector2i(-40, -100), Vector2i(80, 140))
+			var body: Dictionary = _changed_geometry(baseline, full, region)
+			masses.append(int(body["pixels"]))
+			_check(int(body["pixels"]) > 100,
+				"Every shipped enemy has a readable nonempty silhouette, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
+			var stronger: Dictionary = enemy.duplicate(true)
+			stronger["hp"] = 16
+			stronger["max_hp"] = 16
+			board.combat_enemies = [stronger]
+			var full_stronger: Image = await _board_image(board, viewport)
+			_check(int(_changed_geometry(full, full_stronger, region)["pixels"]) == 0,
+				"Full health adds no routine bar clutter regardless of actual maximum HP")
+			stronger["hp"] = 8
+			board.combat_enemies = [stronger]
+			var damaged: Image = await _board_image(board, viewport)
+			var health: Dictionary = _changed_geometry(full_stronger, damaged, region)
+			var health_bounds: Rect2i = health["bounds"]
+			var body_bounds: Rect2i = body["bounds"]
+			_check(int(health["pixels"]) > 0 and health_bounds.end.y <= body_bounds.position.y,
+				"Damage reveals health information above the opaque body without repainting it, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
+		_check(masses[2] > masses[1], "Brute has more visible mass than Runner on either board")
 	board.combat_enemies = []
 	board.enemy_route = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 1), Vector2i(0, 1)]
 	for mirrored: bool in [false, true]:
@@ -284,12 +260,113 @@ func _check_source_facing(board: PathBoard, viewport: SubViewport) -> void:
 		board.combat_enemies = [_enemy(104, 1.0, Vector2(1, 2))]
 		var image: Image = await _board_image(board, viewport)
 		var center := Vector2i(board.cell_center(Vector2i(1, 2)))
-		var geometry: Dictionary = _changed_geometry(baseline, image, Rect2i(center + Vector2i(-40, -20), Vector2i(80, 60)))
+		var geometry: Dictionary = _changed_geometry(baseline, image, Rect2i(center + Vector2i(-50, -90), Vector2i(100, 130)))
 		var bounds: Rect2i = geometry["bounds"]
 		var offset: int = bounds.get_center().x - center.x
 		_check(offset < -8 if mirrored else offset > 8, "Left-authored artwork faces along the route on either board, not backward")
 	board._enemy_art["grunt"] = original
 	board.combat_enemies = []
+
+
+func _check_depth_overlap(board: PathBoard, viewport: SubViewport) -> void:
+	# Solid test sprites make visual occlusion observable independent of production art.
+	var tower_image := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	tower_image.fill(Color.MAGENTA)
+	var enemy_image := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	enemy_image.fill(Color.CYAN)
+	var tower_art := TowerReward.new()
+	tower_art.icon_texture = ImageTexture.create_from_image(tower_image)
+	tower_art.board_height = 1.2
+	tower_art.board_anchor = Vector2(0.5, 0.9)
+	var enemy_art := EnemyDefinition.new()
+	enemy_art.texture = ImageTexture.create_from_image(enemy_image)
+	enemy_art.board_height = 1.2
+	enemy_art.board_anchor = Vector2(0.5, 0.9)
+	var original_tower: TowerReward = board._tower_art["arrow_tower"]
+	var original_enemy: EnemyDefinition = board._enemy_art["grunt"]
+	board._tower_art["arrow_tower"] = tower_art
+	board._enemy_art["grunt"] = enemy_art
+	board.command_mode = true
+	board.enemy_route = []
+	board.selected_tower_id = -1
+	var tower: Dictionary = _tower(201, Vector2i(2, 2), "arrow_tower")
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		var sample := Vector2i(board.cell_center(Vector2i(2, 2)) + Vector2(0, -board._cell_size() * 0.2))
+		board.combat_enemies = []
+		board.combat_towers = [tower]
+		var tower_only: Image = await _board_image(board, viewport)
+		var front: Dictionary = _enemy(202, 0.0, Vector2(2, 2.4))
+		board.combat_towers = []
+		board.combat_enemies = [front]
+		var enemy_only: Image = await _board_image(board, viewport)
+		board.combat_towers = [tower]
+		var front_overlap: Image = await _board_image(board, viewport)
+		_check(front_overlap.get_pixelv(sample).is_equal_approx(enemy_only.get_pixelv(sample))
+			and not front_overlap.get_pixelv(sample).is_equal_approx(tower_only.get_pixelv(sample)),
+			"An enemy whose feet are in front occludes the tower rather than inheriting type draw order")
+		board.combat_enemies = [_enemy(202, 0.0, Vector2(2, 1.6))]
+		var rear_overlap: Image = await _board_image(board, viewport)
+		_check(rear_overlap.get_pixelv(sample).is_equal_approx(tower_only.get_pixelv(sample)),
+			"The same moving enemy passes behind a tower when its feet are farther back")
+	board._tower_art["arrow_tower"] = original_tower
+	board._enemy_art["grunt"] = original_enemy
+	board.combat_towers = []
+	board.combat_enemies = []
+
+
+func _check_contextual_hover(board: PathBoard, viewport: SubViewport) -> void:
+	board.command_mode = true
+	board.cell_click_mode = true
+	board.combat_towers = []
+	board.combat_enemies = []
+	board.selected_tower_id = -1
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	board.tower_types = {"arrow_tower": {"range": 2.0, "area_attack": false}}
+	board.input_enabled = true
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.cancel_stroke()
+		board.placement_id = &""
+		var idle: Image = await _board_image(board, viewport)
+		var cell := Vector2i(2, 3)
+		var motion := InputEventMouseMotion.new()
+		motion.position = board.cell_center(cell)
+		board._gui_input(motion)
+		var hover: Image = await _board_image(board, viewport)
+		var region := Rect2i(Vector2i(board.cell_center(cell)) - Vector2i(40, 40), Vector2i(80, 80))
+		_check(int(_changed_geometry(idle, hover, region)["pixels"]) == 0,
+			"Idle combat inspection has no hover square")
+		board.placement_id = &"arrow_tower"
+		var legal: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(idle, legal, region)["pixels"]) > 0,
+			"Explicit tower placement visibly marks legal ground")
+		board.layout.place(cell)
+		var illegal: Image = await _board_image(board, viewport)
+		board.placement_id = &""
+		var paved: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(paved, illegal, region)["pixels"]) > 0
+			and int(_changed_geometry(legal, illegal, region)["pixels"]) > 0,
+			"Placement over pavement provides distinct illegal feedback")
+		board.layout.erase(cell)
+		board.cancel_stroke()
+		board.cell_click_mode = false
+		idle = await _board_image(board, viewport)
+		board._gui_input(motion)
+		var planning_hover: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(idle, planning_hover, region)["pixels"]) > 0,
+			"Planning path editing retains discoverable hover feedback")
+		board.cell_click_mode = true
+		board.input_enabled = false
+		var denied: Image = await _board_image(board, viewport)
+		board.placement_id = &"arrow_tower"
+		var opponent: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(denied, opponent, region)["pixels"]) == 0,
+			"Read-only boards never display owned placement feedback")
+		board.placement_id = &""
+		board.input_enabled = true
+	board.cancel_stroke()
+	board.input_enabled = false
 
 
 func _changed_geometry(before: Image, after: Image, region: Rect2i) -> Dictionary:

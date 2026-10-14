@@ -1,11 +1,11 @@
 class_name MatchTerrain
 extends Node2D
 
-const GROUND := Color("202b27")
-const GRASS := Color("29362e")
-const EARTH := Color("343b30")
-const STONE := Color("414638")
-const PATCH_SPACING: float = 96.0
+const GROUND := Color("2f3c30")
+const GRASS := Color("354232")
+const EARTH := Color("3b4232")
+const STONE := Color("435039")
+const PATCH_SPACING: float = 72.0
 
 var _extents := Rect2()
 var _corridor := Rect2()
@@ -30,10 +30,9 @@ func _draw() -> void:
 		for column: int in range(first_column, last_column):
 			var pattern: int = absi(column * 37 + row * 61)
 			var point := Vector2(column, row) * PATCH_SPACING + Vector2(16 + pattern % 41, 12 + pattern % 53)
-			draw_rect(Rect2(point, Vector2(18.0, 3.0)), GRASS)
-			draw_rect(Rect2(point + Vector2(7.0, -5.0), Vector2(3.0, 8.0)), GRASS)
-			if pattern % 3 == 0:
-				draw_rect(Rect2(point + Vector2(31.0, 23.0), Vector2(5.0, 3.0)), STONE)
+			draw_rect(Rect2(point - Vector2(12, 8), Vector2(43.0 + pattern % 29, 18.0)), GRASS if pattern % 3 else EARTH)
+			draw_line(point, point + Vector2(-2.0, -3.0), STONE, 1.0)
+			draw_line(point + Vector2(4.0, 0.0), point + Vector2(3.0, -2.0), STONE, 1.0)
 	# A neutral earth crossing joins the boards without adding path cells or rules.
 	draw_rect(_corridor.grow(8.0), GRASS)
 	draw_rect(_corridor, EARTH)
