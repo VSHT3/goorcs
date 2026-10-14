@@ -68,6 +68,9 @@ godot --path . --script tests/tower_icon_test.gd
 # Run movement interpolation and rendered path-junction regressions.
 godot --path . --script tests/path_board_test.gd
 
+# Run rendered enemy-inspection and live-instance UI regressions.
+godot --path . --script tests/enemy_inspection_test.gd
+
 # Run collection-driven tower-selection and resource-extension regressions.
 godot --headless --path . --script tests/tower_selection_test.gd
 ```
@@ -121,6 +124,18 @@ Camera keys are handled by a separate root-viewport input node because `SubViewp
 For graphical verification, exercise Play/Singleplayer and separate ENet host/guest processes. Hold and release physical A/D keys, inspect the intermediate view and both outer stops, open targeting while panning, lose/recover window focus, and leave/reopen. Draw paths, click/place/select towers, and perform native HUD-to-world drag/drop after panning and resizing. Check that notices and management never move the world or Ready button, opponent input is denied, endpoints remain readable, and accepted paths/Coins/health are unaffected by camera movement.
 
 Resource import, main-scene startup, and all headless regressions in Setup passed, including continuous-world input/camera coverage and real separate-process admission, planning, and combat. Rendered board and tower-icon regressions passed. Graphical Singleplayer and two separate ENet host/guest processes exercised owned mouse-built routes, click purchases, upgrades, actual native HUD-to-world drag/drop, held physical A/D with intermediate views and both endpoints, read-only opponent clicks, and live waves. Singleplayer also exercised Leave/Escape, fresh reopen, and a compact 1000×720 logical viewport. Initial, intermediate, opponent, management, wave, compact, and both-peer screenshots were inspected. Isolated collection saves preserved real progress. The graphical runtime used Intel OpenGL after NVIDIA initialization warnings; internet reachability remains unverified.
+
+### Enemy inspection
+
+`MatchPlanningScreen` owns one local `(board slot, enemy ID)` selection. `PathBoard` hit-tests the interpolated sprite's opaque bounds in draw order, excluding transparent canvas padding, and draws corner highlights around only that instance. Either board permits inspection, but opponent commands remain read-only and active tower placement takes input priority. The fixed right-side `EnemyInspector` overlay never changes the world viewport or camera framing.
+
+The panel displays the host catalog's title/short description and that enemy instance's current HP, maximum-backed health bar, effective movement speed (cells/second), and base damage. Icons carry tooltip meanings without permanent stat labels or future-property placeholders. Speed comes from the same instance field used by movement, not next-wave/type previews. Enemy damage is captured in the instance and consumed by the leak rule; current gameplay remains one point per enemy. No slow/status-effect mechanic is added.
+
+Another enemy replaces selection. Empty-ground clicks, close, right-click, or Escape dismiss it. A missing instance, results, leaving, or hiding the match clears it rather than following another same-type enemy. Inspection never sends a gameplay command or changes tower targeting.
+
+Graphical smoke used actual main-scene enemy clicks and inspected 1280×720 and 1000×720 captures. Resource import, combat rules, mirrored Singleplayer, real separate-process peer combat, rendered board, camera/input, tower selection, and navigation regressions passed.
+
+The rendered enemy-inspection regression also passed: same-type ID isolation, accepted per-instance HP/speed/damage changes, interpolation-following hit tests and highlight pixels, both board orientations, opponent read-only input, stable overlay anchoring, placement priority, Close/Escape, real kills/leaks, results, and leave/reopen with reused IDs. Native tower drag/drop and main-scene startup checks passed.
 
 ### Match soundtrack and presentation
 

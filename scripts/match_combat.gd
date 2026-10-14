@@ -4,6 +4,8 @@ extends RefCounted
 enum Phase { PLANNING, WAVE, FINISHED }
 enum TargetMode { FURTHEST, CLOSEST, STRONGEST }
 
+const ENEMY_BASE_DAMAGE: int = 1
+
 var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
@@ -52,6 +54,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null) -> void:
 			continue
 		_enemy_types[type_id] = {
 			"title": definition.title, "health_multiplier": definition.health_multiplier,
+			"description": definition.description,
 			"speed_multiplier": definition.speed_multiplier,
 			"send_cost": definition.send_cost, "send_income": definition.send_income,
 		}
@@ -312,7 +315,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float) -> void:
 	var hp: int = _enemy_health(type_id, wave)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
-		"type_id": type_id, "speed": _enemy_speed(type_id, wave),
+		"type_id": type_id, "speed": _enemy_speed(type_id, wave), "damage": ENEMY_BASE_DAMAGE,
 		"progress": progress, "pos": _position(slot, progress),
 	})
 	_next_enemy_id += 1
@@ -390,6 +393,6 @@ func _apply_leaks(slot: int) -> void:
 	var last: int = _routes[slot].size() - 1
 	while index >= 0:
 		if enemies[slot][index]["progress"] >= last:
-			base_health[slot] = maxi(0, base_health[slot] - 1)
+			base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
 			enemies[slot].remove_at(index)
 		index -= 1

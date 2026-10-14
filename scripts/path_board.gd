@@ -6,6 +6,7 @@ signal feedback(message: String)
 signal edit_requested(cell: Vector2i, place: bool)
 signal cell_clicked(cell: Vector2i, button: MouseButton)
 signal tower_dropped(cell: Vector2i, type_id: StringName)
+signal enemy_clicked(enemy_id: int)
 
 const GROUND := Color("344336")
 const GROUND_PATCH_LIGHT := Color("374638")
@@ -49,6 +50,14 @@ var combat_enemies: Array = []:
 		set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
 		queue_redraw()
 var selected_tower_id: int = -1
+var selected_enemy_id: int = -1:
+	set(value):
+		selected_enemy_id = value
+		queue_redraw()
+var enemy_inspection_enabled: bool = false:
+	set(value):
+		enemy_inspection_enabled = value
+		_update_input_filter()
 var tower_types: Dictionary = {}
 var placement_id: StringName = &"":
 	set(value):
@@ -66,7 +75,7 @@ var enemy_route: Array = []
 var input_enabled: bool = true:
 	set(value):
 		input_enabled = value
-		mouse_filter = Control.MOUSE_FILTER_STOP if value else Control.MOUSE_FILTER_IGNORE
+		_update_input_filter()
 		if not value:
 			cancel_stroke()
 var _hover := Vector2i(-1, -1)
@@ -255,12 +264,42 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 	tower_dropped.emit(_cell_at(at_position), StringName(data["tower_type"]))
 
 
+func _update_input_filter() -> void:
+	mouse_filter = Control.MOUSE_FILTER_STOP if input_enabled or enemy_inspection_enabled else Control.MOUSE_FILTER_IGNORE
+
+
+func enemy_at(position: Vector2) -> int:
+	# Match the interpolated sprite and front-to-back drawing order, not its path cell.
+	for index: int in range(_draw_order.size() - 1, -1, -1):
+		var item: Dictionary = _draw_order[index]
+		if int(item["kind"]) != 2:
+			continue
+		var enemy: Dictionary = item["data"]
+		var foot: Vector2 = _position_center(_enemy_position(enemy)) + Vector2(0, _cell_size() * 0.28)
+		var progress: float = _enemy_route_progress(enemy) if enemy_route.size() >= 2 else 0.0
+		if _enemy_sprite_bounds(enemy, foot, progress).has_point(position):
+			return int(enemy["id"])
+	return -1
+
+
 func _gui_input(event: InputEvent) -> void:
-	if layout == null or not input_enabled:
+	if layout == null or not (input_enabled or enemy_inspection_enabled):
 		return
 	if event is InputEventMouseButton:
 		var click := event as InputEventMouseButton
 		if click.button_index != MOUSE_BUTTON_LEFT and click.button_index != MOUSE_BUTTON_RIGHT:
+			return
+		if click.pressed and click.button_index == MOUSE_BUTTON_LEFT and enemy_inspection_enabled:
+			var enemy_id: int = enemy_at(click.position)
+			if enemy_id >= 0:
+				cancel_stroke()
+				enemy_clicked.emit(enemy_id)
+				accept_event()
+				return
+		if not input_enabled:
+			if click.pressed:
+				cell_clicked.emit(_cell_at(click.position), click.button_index)
+			accept_event()
 			return
 		if cell_click_mode:
 			if click.pressed:
@@ -582,6 +621,8 @@ func _draw_combat() -> void:
 	# Bars are an information overlay; foreground bodies must not cover them.
 	for item: Dictionary in _draw_order:
 		if int(item["kind"]) == 2:
+			if int(item["data"]["id"]) == selected_enemy_id:
+				_draw_enemy_selection(item)
 			_draw_enemy_health(item)
 
 
@@ -593,6 +634,27 @@ func _draw_enemy(item: Dictionary) -> void:
 	if flip:
 		rect.size.x = -rect.size.x
 	draw_texture_rect(artwork.texture, rect, false)
+
+
+func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
+	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
+	var flip: bool = _enemy_faces_left(progress) != artwork.source_faces_left
+	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, foot, flip)
+	var bounds: Rect2 = _texture_bounds[artwork.texture]
+	if flip:
+		bounds.position.x = artwork.texture.get_width() - bounds.end.x
+	var scale: Vector2 = rect.size / artwork.texture.get_size()
+	return Rect2(rect.position + bounds.position * scale, bounds.size * scale)
+
+
+func _draw_enemy_selection(item: Dictionary) -> void:
+	var rect: Rect2 = _enemy_sprite_bounds(item["data"], item["foot"], item["progress"]).grow(3.0)
+	var color := Color("e0bc77")
+	var corner: float = minf(7.0, rect.size.x * 0.25)
+	for point: Vector2 in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
+		var direction := Vector2(1.0 if point.x == rect.position.x else -1.0, 1.0 if point.y == rect.position.y else -1.0)
+		draw_line(point, point + Vector2(direction.x * corner, 0), color, 2.0)
+		draw_line(point, point + Vector2(0, direction.y * corner), color, 2.0)
 
 
 func _draw_enemy_health(item: Dictionary) -> void:

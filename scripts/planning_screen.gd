@@ -12,6 +12,8 @@ const TARGET_HELP: Array[String] = [
 
 var planning: MatchPlanning
 var selected_tower_id: int = -1
+var selected_enemy_id: int = -1
+var selected_enemy_slot: int = -1
 var _default_targeting: int = 0
 var _pending_tower_cell := Vector2i(-1, -1)
 var _placement_id: StringName = &""
@@ -30,6 +32,7 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var _income: Label = %Income
 @onready var _cancel_placement: Button = %CancelPlacement
 @onready var _management: PanelContainer = %TowerManagement
+@onready var _enemy_inspector: EnemyInspector = %EnemyInspector
 @onready var _tower_title: Label = %TowerTitle
 @onready var damage_upgrade: Button = %DamageUpgrade
 @onready var speed_upgrade: Button = %SpeedUpgrade
@@ -51,6 +54,7 @@ func _ready() -> void:
 		boards[slot].edit_requested.connect(_request_edit.bind(slot))
 		boards[slot].cell_clicked.connect(_cell_clicked.bind(slot))
 		boards[slot].tower_dropped.connect(_tower_dropped.bind(slot))
+		boards[slot].enemy_clicked.connect(_enemy_clicked.bind(slot))
 		boards[slot].command_mode = true
 		if planning != null and planning.collection_store != null:
 			boards[slot].tower_catalog = planning.collection_store.catalog
@@ -62,6 +66,7 @@ func _ready() -> void:
 	_create_palette()
 	_cancel_placement.pressed.connect(cancel_interaction)
 	close_button.pressed.connect(cancel_interaction)
+	_enemy_inspector.close_requested.connect(cancel_interaction)
 	damage_upgrade.pressed.connect(_upgrade.bind("damage"))
 	speed_upgrade.pressed.connect(_upgrade.bind("speed"))
 	sell_button.pressed.connect(_sell)
@@ -98,13 +103,18 @@ func _visibility_changed() -> void:
 	if not is_visible_in_tree():
 		world.set_active(false)
 		cancel_strokes()
+		selected_enemy_id = -1
+		selected_enemy_slot = -1
+		_enemy_inspector.hide()
+		for board: PathBoard in boards:
+			board.selected_enemy_id = -1
 		_clear_feedback()
 	else:
 		_refresh()
 
 
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or _placement_id == &"":
+	if not is_visible_in_tree() or (_placement_id == &"" and selected_enemy_id < 0):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		cancel_interaction()
@@ -112,11 +122,13 @@ func _input(event: InputEvent) -> void:
 
 
 func cancel_interaction() -> bool:
-	if _placement_id == &"" and selected_tower_id < 0:
+	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0:
 		return false
 	cancel_strokes()
 	_placement_id = &""
 	selected_tower_id = -1
+	selected_enemy_id = -1
+	selected_enemy_slot = -1
 	_pending_tower_cell = Vector2i(-1, -1)
 	_refresh()
 	return true
@@ -128,10 +140,15 @@ func _request_edit(cell: Vector2i, place: bool, slot: int) -> void:
 
 
 func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
-	if planning == null or not planning.active or slot != planning.local_slot():
+	if planning == null or not planning.active:
 		return
 	if button == MOUSE_BUTTON_RIGHT:
 		cancel_interaction()
+		return
+	selected_enemy_id = -1
+	selected_enemy_slot = -1
+	if slot != planning.local_slot():
+		_refresh()
 		return
 	if button != MOUSE_BUTTON_LEFT:
 		return
@@ -160,6 +177,8 @@ func _tower_dropped(cell: Vector2i, type_id: StringName, slot: int) -> void:
 	cancel_strokes()
 	_placement_id = &""
 	selected_tower_id = -1
+	selected_enemy_id = -1
+	selected_enemy_slot = -1
 	_buy_tower(cell, type_id, slot)
 
 
@@ -175,6 +194,8 @@ func _select_placement(type_id: StringName) -> void:
 	cancel_strokes()
 	_pending_tower_cell = Vector2i(-1, -1)
 	selected_tower_id = -1
+	selected_enemy_id = -1
+	selected_enemy_slot = -1
 	_placement_id = type_id
 	_refresh()
 
@@ -359,6 +380,33 @@ func _target_selected(index: int) -> void:
 	_refresh_targeting()
 
 
+func _enemy_clicked(enemy_id: int, slot: int) -> void:
+	if planning == null or not planning.active or _placement_id != &"":
+		return
+	cancel_strokes()
+	selected_tower_id = -1
+	_pending_tower_cell = Vector2i(-1, -1)
+	selected_enemy_id = enemy_id
+	selected_enemy_slot = slot
+	_refresh()
+
+
+func _selected_enemy() -> Dictionary:
+	if planning == null or selected_enemy_id < 0 or selected_enemy_slot < 0:
+		return {}
+	var enemies: Array = planning.combat.get("enemies", [[], []])
+	for enemy: Dictionary in enemies[selected_enemy_slot]:
+		if int(enemy["id"]) == selected_enemy_id:
+			return enemy
+	return {}
+
+
+func _refresh_enemy_inspector() -> void:
+	var enemy: Dictionary = _selected_enemy()
+	var types: Dictionary = planning.combat.get("enemy_types", {}) if planning != null else {}
+	_enemy_inspector.refresh(enemy, types.get(String(enemy.get("type_id", "")), {}))
+
+
 func _selected_tower() -> Dictionary:
 	if planning == null or selected_tower_id < 0:
 		return {}
@@ -434,6 +482,9 @@ func _refresh() -> void:
 		ready_button.disabled = true
 		_refresh_palette()
 		_management.hide()
+		selected_enemy_id = -1
+		selected_enemy_slot = -1
+		_enemy_inspector.hide()
 		_status.text = "Planning unavailable"
 		return
 	var own_slot: int = planning.local_slot()
@@ -444,6 +495,8 @@ func _refresh() -> void:
 		_clear_feedback()
 		selected_tower_id = -1
 		_placement_id = &""
+		selected_enemy_id = -1
+		selected_enemy_slot = -1
 		_pending_tower_cell = Vector2i(-1, -1)
 	var state: Dictionary = planning.combat
 	var phase: int = int(state.get("phase", MatchCombat.Phase.PLANNING))
@@ -465,18 +518,23 @@ func _refresh() -> void:
 	_refresh_palette()
 	if selected_tower_id >= 0 and _selected_tower().is_empty():
 		selected_tower_id = -1
+	if finished or _selected_enemy().is_empty():
+		selected_enemy_id = -1
+		selected_enemy_slot = -1
 	for slot: int in range(boards.size()):
 		var layout: PathLayout = planning.layouts[slot]
 		var board: PathBoard = boards[slot]
 		board.cell_click_mode = _placement_id != &"" or not editable
 		board.input_enabled = planning.active and not finished and slot == own_slot and (editable or board.cell_click_mode)
+		board.enemy_inspection_enabled = planning.active and in_wave and _placement_id == &""
+		board.selected_enemy_id = selected_enemy_id if slot == selected_enemy_slot else -1
 		board.placement_id = _placement_id if slot == own_slot else &""
 		board.selected_tower_id = selected_tower_id if slot == own_slot else -1
 		board.tower_types = state.get("tower_types", {})
 		board.enemy_route = planning.locked_routes[slot]
 		board.combat_towers = all_towers[slot]
 		board.combat_enemies = all_enemies[slot]
-		board.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if board.input_enabled else Control.CURSOR_ARROW
+		board.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if board.input_enabled or board.enemy_inspection_enabled else Control.CURSOR_ARROW
 		board.queue_redraw()
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
 		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")
@@ -522,6 +580,7 @@ func _refresh() -> void:
 		_status.text = "Wave %d" % (int(state.get("wave", 0)) + 1)
 		_status.tooltip_text = "Planning: build a legal route, then ready for the next wave."
 	_refresh_targeting()
+	_refresh_enemy_inspector()
 	if not planning.active:
 		cancel_strokes()
 	world.set_active(planning.active and is_visible_in_tree())

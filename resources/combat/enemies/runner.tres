@@ -7,6 +7,7 @@
 script = ExtResource("1_enemy")
 id = &"runner"
 title = "Runner"
+description = "A fast, fragile orc."
 health_multiplier = 0.6
 speed_multiplier = 1.7
 send_cost = 25
