@@ -1,11 +1,16 @@
-[gd_resource type="Resource" script_class="TowerReward" load_steps=2 format=3 uid="uid://bqsgjcasvhktk"]
+[gd_resource type="Resource" script_class="TowerReward" load_steps=4 format=3 uid="uid://bqsgjcasvhktk"]
 
 [ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
+[ext_resource type="Texture2D" path="res://assets/towers/rune_obelisk.png" id="2_icon"]
+
+[sub_resource type="AtlasTexture" id="AtlasRune"]
+atlas = ExtResource("2_icon")
+region = Rect2(78, 41, 98, 160)
 
 [resource]
 script = ExtResource("1_reward")
 id = &"rune_obelisk"
 title = "Rune obelisk"
 description = "Ancient stone threaded with glowing runes."
-icon_kind = 1
+icon_texture = SubResource("AtlasRune")
 accent = Color(0.43, 0.71, 0.69, 1)

@@ -7,5 +7,4 @@ script = ExtResource("1_reward")
 id = &"arrow_tower"
 title = "Arrow tower"
 description = "A timber lookout with a stone foundation."
-icon_kind = 0
 accent = Color(0.78, 0.69, 0.43, 1)

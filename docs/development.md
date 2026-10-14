@@ -43,6 +43,9 @@ godot --headless --path . --script tests/chest_flow_test.gd
 
 # Run real multi-process connection/authentication regressions.
 godot --headless --path . --script tests/multiplayer_session_test.gd
+
+# Run rendered tower-size regressions (requires a graphical renderer).
+godot --path . --script tests/tower_icon_test.gd
 ```
 
 A headless pass verifies that the project loads and runs, not that the visuals or interactions are correct. Inspect runtime errors as well as the exit status.
@@ -123,9 +126,25 @@ Keep development automation local, enable available connection authentication, a
 
 `assets/towers/ballista_tower.png` is the accepted 96×96 PixelLab output `pixellab-A-gigantic-orc-siege-ballista--1791921366109.png`, copied byte-for-byte without refinement. It supplies the existing `orc_ballista` reward's base art; the saved ID, title, reward rules, and unlock state are unchanged.
 
-`TowerReward.icon_texture` holds imported icon art. The shared `RewardIcon` renderer fits it without stretching in both the collection archive and chest rewards, with dimming for locked entries. Arrow tower and Rune obelisk retain their procedural icons; the obsolete procedural ballista drawing was removed.
+The icon uses an `AtlasTexture` region `Rect2(12, 5, 74, 89)` to exclude its transparent border. The source PNG remains unchanged. Update the region if the sprite changes so its visible bounds remain comparable with the other towers.
+
+`TowerReward.icon_texture` holds imported icon art. The shared `RewardIcon` renderer fits it without stretching in both the collection archive and chest rewards, with dimming for locked entries. Arrow tower retains its procedural icon; the obsolete procedural ballista and Rune obelisk drawings and their icon selector were removed.
 
 The source/copy checksums match. Graphical verification inspected locked, unlocked reward, and compact collection states, and reloaded the same saved ballista ID. Layout regressions use the real catalog icons. This establishes collection/base artwork, not combat behavior, a board camera angle, or an upgraded tower.
+
+### Accepted Rune obelisk sprite
+
+`assets/towers/rune_obelisk.png` is the user-supplied 256×256 PixelLab file `pixellab-A-rune-obelisk--an-ancient-sto-1791966274141.png`, copied byte-for-byte from the original file, not from the pasted preview. Source and copy SHA-256 match: `c4c3a6b6a2caa470ecd81962c63289753bcdbdad40ced44ddb784a705ec177b8`.
+
+The existing `rune_obelisk` reward's `icon_texture` uses an ordinary `AtlasTexture` over its visible alpha bounds: `Rect2(78, 41, 98, 160)`. This excludes only transparent padding without modifying or resampling the PNG. Update this region if the source art changes. The same renderer fits the atlas into the collection and chest cards alongside the ballista, preserving proportions, nearest filtering, lossless import, and locked-state dimming.
+
+The reward ID, resource UID, title, unlock/save format, and chest grant rules are unchanged. Collection/persistence, reveal-layout, and chest-flow regressions pass. Graphical verification inspected locked/unlocked Rune icons, a natural Rune-only reveal, and an actual two-reward Rune/ballista reveal at standard and compact window sizes; the same saved Rune ID reloaded successfully. Verification used isolated saves and did not change real player progress. This is collection artwork, not implemented combat behavior.
+
+### Consistent tower icon sizing
+
+Every tower uses a shared maximum 52×52 logical-pixel visual frame in both the archive and chest rewards, shrinking only when its available area is smaller. Imported icons fit their visible atlas bounds without stretching; the procedural Arrow tower is fitted using its actual drawing bounds. Icons stay centered, and an expanding row or reward card cannot enlarge their artwork. PNG canvas dimensions do not determine display size.
+
+The graphical `tower_icon_test.gd` regression renders all catalog icons into transparent viewports and compares their actual visible pixel bounds. It checks equal size across identities, containment, centering, compact areas, and unchanged artwork size when a card expands. Run it without `--headless`; a dummy renderer cannot prove pixel output. The rendered regression and the standard/compact collection and reward smoke passed after correcting the oversized obelisk.
 
 ### Next board-art trial
 

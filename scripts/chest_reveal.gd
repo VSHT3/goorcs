@@ -30,23 +30,31 @@ var _coins: float = 0.0
 
 
 class RewardIcon extends Control:
+	const DISPLAY_SIZE: float = 52.0
+	const ARROW_BOUNDS := Rect2(-16.0, -23.0, 32.0, 41.0)
+
 	var reward: TowerReward
 	var locked: bool = false
 
 	func _draw() -> void:
 		if reward == null:
 			return
+		# Expanding rows/cards must not enlarge one tower's visible artwork.
+		var side: float = minf(DISPLAY_SIZE, minf(size.x, size.y))
+		if side <= 0.0:
+			return
 		if reward.icon_texture != null:
 			var texture_size: Vector2 = reward.icon_texture.get_size()
-			var scale: float = minf(size.x / texture_size.x, size.y / texture_size.y)
+			var scale: float = side / maxf(texture_size.x, texture_size.y)
 			var extent: Vector2 = (texture_size * scale).floor()
 			var rect := Rect2(((size - extent) * 0.5).round(), extent)
 			var tint: Color = Color(0.55, 0.55, 0.55) if locked else Color.WHITE
 			draw_texture_rect(reward.icon_texture, rect, false, tint)
 			return
 		var ink: Color = Color("65716a") if locked else reward.accent
-		var pixel_scale: float = minf(size.x, size.y) / 48.0
-		ChestReveal.paint_icon(self, size * 0.5 + Vector2(0.0, 4.0 * pixel_scale), pixel_scale, reward.icon_kind, ink)
+		var pixel_scale: float = side / ARROW_BOUNDS.size.y
+		var center: Vector2 = size * 0.5 - ARROW_BOUNDS.get_center() * pixel_scale
+		ChestReveal.paint_arrow_icon(self, center, pixel_scale, ink)
 
 
 func _ready() -> void:
@@ -306,33 +314,20 @@ static func _pixel(canvas: CanvasItem, x: int, y: int, width: int, height: int, 
 	canvas.draw_rect(Rect2(x, y, width, height), color)
 
 
-static func paint_icon(canvas: CanvasItem, center: Vector2, pixel_scale: float, kind: int, accent: Color) -> void:
+static func paint_arrow_icon(canvas: CanvasItem, center: Vector2, pixel_scale: float, accent: Color) -> void:
 	canvas.draw_set_transform(center.round(), 0.0, Vector2.ONE * pixel_scale)
 	var stone := Color("a3ac98")
 	var shadow := Color("46574d")
 	var wood := Color("a98350")
 	_pixel(canvas, -16, 13, 32, 5, INK)
-	match kind:
-		0:
-			_pixel(canvas, -10, -7, 20, 21, INK)
-			_pixel(canvas, -8, -5, 16, 19, stone)
-			_pixel(canvas, 3, -5, 5, 19, shadow)
-			_pixel(canvas, -13, -12, 26, 9, INK)
-			_pixel(canvas, -11, -11, 22, 6, accent)
-			for x: int in [-11, -2, 7]:
-				_pixel(canvas, x, -16, 4, 6, stone)
-			_pixel(canvas, -3, 0, 5, 8, INK)
-			_pixel(canvas, -1, -23, 2, 12, wood)
-			_pixel(canvas, 1, -22, 9, 5, accent)
-		1:
-			_pixel(canvas, -12, 10, 24, 6, shadow)
-			_pixel(canvas, -8, -17, 16, 29, INK)
-			_pixel(canvas, -6, -16, 12, 28, stone)
-			_pixel(canvas, 3, -14, 3, 26, shadow)
-			_pixel(canvas, -4, -22, 8, 7, stone)
-			_pixel(canvas, -2, -26, 4, 6, accent)
-			_pixel(canvas, -3, -11, 6, 3, accent)
-			_pixel(canvas, 0, -8, 3, 8, accent)
-			_pixel(canvas, -3, -1, 6, 3, accent)
-			_pixel(canvas, -3, 2, 3, 5, accent)
+	_pixel(canvas, -10, -7, 20, 21, INK)
+	_pixel(canvas, -8, -5, 16, 19, stone)
+	_pixel(canvas, 3, -5, 5, 19, shadow)
+	_pixel(canvas, -13, -12, 26, 9, INK)
+	_pixel(canvas, -11, -11, 22, 6, accent)
+	for x: int in [-11, -2, 7]:
+		_pixel(canvas, x, -16, 4, 6, stone)
+	_pixel(canvas, -3, 0, 5, 8, INK)
+	_pixel(canvas, -1, -23, 2, 12, wood)
+	_pixel(canvas, 1, -22, 9, 5, accent)
 	canvas.draw_set_transform(Vector2.ZERO)
