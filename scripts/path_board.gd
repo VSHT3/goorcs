@@ -8,7 +8,7 @@ signal cell_clicked(cell: Vector2i, button: MouseButton)
 
 const GROUND := Color("222c2b")
 const TILE := Color("6e7465")
-const ROUTE_TILE := Color("426957")
+const ENEMY_BLEND_DURATION: float = 0.1
 const ROUTE_LINE := Color("b5e2b7")
 const ENTRY_COLOR := Color("e0bc77")
 const BASE_COLOR := Color("96c8dc")
@@ -29,11 +29,15 @@ var combat_towers: Array = []:
 		_capture_shots()
 		queue_redraw()
 var combat_enemies: Array = []:
+	# Only presentation state is blended; accepted enemy dictionaries stay untouched.
 	set(value):
 		combat_enemies = value
+		_blend_enemies()
+		set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
 		queue_redraw()
 var selected_tower_id: int = -1
 var tower_range: float = 3.0
+var enemy_route: Array = []
 var input_enabled: bool = true:
 	set(value):
 		input_enabled = value
@@ -45,21 +49,24 @@ var _paint_button: MouseButton = MOUSE_BUTTON_NONE
 var _last_painted := Vector2i(-1, -1)
 var _seen_shots: Dictionary = {}
 var _shot_traces: Array[Dictionary] = []
+var _enemy_progress: Dictionary[int, Vector2] = {}
+var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 
 
 func _ready() -> void:
 	mouse_exited.connect(_on_mouse_exited)
 	resized.connect(queue_redraw)
-	set_process(not _shot_traces.is_empty())
+	set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
 
 
 func _process(delta: float) -> void:
+	_enemy_blend_elapsed = minf(_enemy_blend_elapsed + delta, ENEMY_BLEND_DURATION)
 	for index: int in range(_shot_traces.size() - 1, -1, -1):
 		_shot_traces[index]["life"] -= delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
 			_shot_traces.remove_at(index)
 	queue_redraw()
-	if _shot_traces.is_empty():
+	if _shot_traces.is_empty() and combat_enemies.is_empty():
 		set_process(false)
 
 
@@ -67,7 +74,7 @@ func _capture_shots() -> void:
 	if combat_towers.is_empty():
 		_seen_shots.clear()
 		_shot_traces.clear()
-		set_process(false)
+		set_process(not combat_enemies.is_empty())
 		return
 	for tower: Dictionary in combat_towers:
 		var tower_id: int = int(tower["id"])
@@ -80,6 +87,27 @@ func _capture_shots() -> void:
 			})
 			set_process(true)
 		_seen_shots[tower_id] = shot
+
+
+func _blend_enemies() -> void:
+	var next_progress: Dictionary[int, Vector2] = {}
+	for enemy: Dictionary in combat_enemies:
+		var id: int = int(enemy["id"])
+		var target: float = float(enemy["progress"])
+		var previous: Vector2 = _enemy_progress.get(id, Vector2(target, target))
+		var displayed: float = lerpf(previous.x, previous.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION)
+		next_progress[id] = Vector2(displayed, target)
+	_enemy_progress = next_progress
+	_enemy_blend_elapsed = 0.0
+
+
+func _enemy_position(enemy: Dictionary) -> Vector2:
+	if enemy_route.size() < 2:
+		return enemy["pos"]
+	var blend: Vector2 = _enemy_progress.get(int(enemy["id"]), Vector2(enemy["progress"], enemy["progress"]))
+	var progress: float = clampf(lerpf(blend.x, blend.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), 0.0, enemy_route.size() - 1)
+	var index: int = mini(floori(progress), enemy_route.size() - 2)
+	return Vector2(enemy_route[index]).lerp(Vector2(enemy_route[index + 1]), progress - index)
 
 
 func cell_center(cell: Vector2i) -> Vector2:
@@ -187,15 +215,25 @@ func _draw() -> void:
 	var origin: Vector2 = _board_origin()
 	for y: int in range(layout.dimensions.y):
 		for x: int in range(layout.dimensions.x):
+			var rect := Rect2(origin + Vector2(x, y) * cell_size + Vector2.ONE, Vector2.ONE * (cell_size - 2))
+			draw_rect(rect, GROUND)
+	for y: int in range(layout.dimensions.y):
+		for x: int in range(layout.dimensions.x):
 			var cell := Vector2i(x, y)
 			var display_x: int = layout.dimensions.x - 1 - x if mirror_horizontal else x
-			var rect := Rect2(origin + Vector2(display_x, y) * cell_size + Vector2.ONE, Vector2.ONE * (cell_size - 2))
-			var color: Color = GROUND
 			if layout.has_path(cell):
-				color = ROUTE_TILE if layout.route.has(cell) else TILE
-			draw_rect(rect, color)
-			if input_enabled and cell == _hover:
-				draw_rect(rect.grow(-2), Color("e6e0cf"), false, 2.0)
+				var center := origin + (Vector2(display_x, y) + Vector2.ONE * 0.5) * cell_size
+				var width: float = cell_size * 0.64
+				draw_rect(Rect2(center - Vector2.ONE * width * 0.5, Vector2.ONE * width), TILE)
+				if layout.contains(cell + Vector2i.RIGHT) and layout.has_path(cell + Vector2i.RIGHT):
+					var direction: float = -1.0 if mirror_horizontal else 1.0
+					var start := center + Vector2(minf(0.0, direction * cell_size), -width * 0.5)
+					draw_rect(Rect2(start, Vector2(cell_size, width)), TILE)
+				if layout.contains(cell + Vector2i.DOWN) and layout.has_path(cell + Vector2i.DOWN):
+					draw_rect(Rect2(center - Vector2(width * 0.5, 0.0), Vector2(width, cell_size)), TILE)
+	if input_enabled and layout.contains(_hover):
+		var rect := Rect2(cell_center(_hover) - Vector2.ONE * cell_size * 0.5 + Vector2.ONE * 3, Vector2.ONE * (cell_size - 6))
+		draw_rect(rect, Color("e6e0cf"), false, 2.0)
 	for i: int in range(1, layout.route.size()):
 		draw_line(cell_center(layout.route[i - 1]), cell_center(layout.route[i]), ROUTE_LINE, 4.0, true)
 	_draw_endpoint(layout.entrance, ENTRY_COLOR, "E")
@@ -220,7 +258,7 @@ func _draw_combat() -> void:
 			Color("e0bc77") if selected else Color("526353"), false, 2.0)
 		draw_texture_rect(ARROW_REWARD.icon_texture, Rect2(center - icon_size * 0.5, icon_size), false)
 	for enemy: Dictionary in combat_enemies:
-		var position: Vector2 = enemy["pos"]
+		var position: Vector2 = _enemy_position(enemy)
 		var center: Vector2 = _position_center(position)
 		var radius: float = maxf(4.0, cell_size * 0.20)
 		draw_circle(center, radius + 1.5, Color("172120"))
