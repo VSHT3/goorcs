@@ -15,6 +15,7 @@ var _planning_was_active: bool = false
 
 @onready var host_button: Button = %Host
 @onready var join_button: Button = %Join
+@onready var singleplayer_button: Button = %Singleplayer
 @onready var address_input: LineEdit = %Address
 @onready var port_input: SpinBox = %Port
 @onready var host_create_button: Button = %Create
@@ -44,6 +45,7 @@ func _ready() -> void:
 		planning.changed.connect(_planning_changed)
 	host_button.pressed.connect(_show_host)
 	join_button.pressed.connect(_show_join)
+	singleplayer_button.pressed.connect(_start_singleplayer)
 	host_create_button.pressed.connect(_create_host)
 	join_connect_button.pressed.connect(_join_host)
 	address_input.text_submitted.connect(_submit_address)
@@ -72,6 +74,8 @@ func open() -> void:
 func prepare_to_leave() -> void:
 	if is_instance_valid(planning_screen):
 		planning_screen.cancel_strokes()
+	if is_instance_valid(planning):
+		planning.stop_singleplayer()
 	if is_instance_valid(session):
 		session.leave()
 	_form = Form.CHOOSE
@@ -106,6 +110,11 @@ func _show_join() -> void:
 	_form = Form.JOIN
 	_refresh()
 	join_code_input.grab_focus()
+
+
+func _start_singleplayer() -> void:
+	if _can_start() and planning != null:
+		planning.start_singleplayer()
 
 
 func _submit_address(_text: String) -> void:
@@ -181,6 +190,7 @@ func _refresh() -> void:
 	_choices.visible = not active
 	host_button.disabled = not available
 	join_button.disabled = not available
+	singleplayer_button.disabled = not available
 	_host_form.visible = not active and _form == Form.HOST
 	_join_form.visible = not active and _form == Form.JOIN
 	address_input.editable = editable
@@ -196,7 +206,7 @@ func _refresh() -> void:
 		copy_button.text = "Copy code"
 	_error.text = session.error_message if session != null else "No session was supplied. Return to the menu and reopen Play."
 	_error.visible = not _error.text.is_empty()
-	back_button.text = "Leave / Esc" if active else "Back / Esc"
+	back_button.text = "Leave / Esc" if active or planning_active else "Back / Esc"
 	_players.text = ""
 	_players.hide()
 	_status.visible = session == null or session.state != MultiplayerSession.State.IDLE
@@ -226,6 +236,8 @@ func _focus_action() -> void:
 	if not is_visible_in_tree():
 		return
 	if session == null:
+		back_button.grab_focus()
+	elif planning != null and planning.active:
 		back_button.grab_focus()
 	elif session.state in [MultiplayerSession.State.HOSTING, MultiplayerSession.State.CONNECTED]:
 		if _invitation.visible:

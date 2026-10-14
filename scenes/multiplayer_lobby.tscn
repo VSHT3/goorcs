@@ -180,6 +180,13 @@ layout_mode = 2
 text = "Join"
 tooltip_text = "Connect using your friend's complete invite code."
 
+[node name="Singleplayer" type="Button" parent="Margin/Content/Scroll/Body/Choices"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 46)
+layout_mode = 2
+text = "Singleplayer"
+tooltip_text = "Local testing: the opponent mirrors your paths, towers, and readiness. No connection required."
+
 [node name="HostForm" type="VBoxContainer" parent="Margin/Content/Scroll/Body"]
 unique_name_in_owner = true
 visible = false

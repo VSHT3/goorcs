@@ -13,6 +13,7 @@ var ready_flags: Array[bool] = [false, false]
 var locked_routes: Array[Array] = [[], []]
 var locked: bool = false
 var active: bool = false
+var singleplayer: bool = false
 var combat: Dictionary = {}
 
 var _dimensions: Vector2i = Vector2i(14, 9)
@@ -31,7 +32,7 @@ var _combat_publish_elapsed: float = 0.0
 
 
 func _physics_process(delta: float) -> void:
-	if not session.is_host or not active or _host_combat.phase != MatchCombat.Phase.WAVE:
+	if not active or (not singleplayer and not session.is_host) or _host_combat.phase != MatchCombat.Phase.WAVE:
 		return
 	var previous_phase: MatchCombat.Phase = _host_combat.phase
 	if not _host_combat.advance(delta):
@@ -64,8 +65,23 @@ func _ready() -> void:
 	_on_session_changed()
 
 
+func start_singleplayer() -> void:
+	session.leave()
+	_reset_match()
+	singleplayer = true
+	active = true
+	_publish_snapshot()
+
+
+func stop_singleplayer() -> void:
+	if singleplayer:
+		_reset_match()
+		changed.emit()
+
+
+
 func local_slot() -> int:
-	return 0 if session != null and session.is_host else 1
+	return 0 if singleplayer or (session != null and session.is_host) else 1
 
 
 func request_edit(slot: int, cell: Vector2i, place: bool) -> void:
@@ -100,6 +116,9 @@ func sell_tower(slot: int, tower_id: int) -> void:
 
 
 func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
+	if singleplayer:
+		_apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
+		return
 	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
 		feedback.emit("Wait for both players to connect and synchronize their boards.")
 		return
@@ -110,6 +129,9 @@ func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id
 
 
 func _request_command(command: String, slot: int, cell: Vector2i, value: bool) -> void:
+	if singleplayer:
+		_apply_command(1, command, slot, cell, value)
+		return
 	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
 		feedback.emit("Wait for both players to connect and synchronize their boards.")
 		return
@@ -162,6 +184,7 @@ func _reset_match() -> void:
 	locked_routes = [[], []]
 	locked = false
 	active = false
+	singleplayer = false
 	_active_peer_id = 0
 	_synced_guest_id = 0
 	_pending_snapshot_peer = 0
@@ -212,6 +235,16 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	if _host_combat.phase == MatchCombat.Phase.FINISHED:
 		_reject(sender, "The run has ended. Leave to start another room.")
 		return
+	# IDs are globally unique, so resolve the counterpart by cell before a sale.
+	var mirror_id: int = -1
+	if singleplayer and sender == 1 and command != "build":
+		for tower: Dictionary in _host_combat.towers[0]:
+			if tower["id"] == tower_id:
+				for opponent: Dictionary in _host_combat.towers[1]:
+					if opponent["cell"] == tower["cell"]:
+						mirror_id = opponent["id"]
+						break
+				break
 	if command == "build":
 		var layout: PathLayout = _host_layouts[slot]
 		if not layout.contains(cell) or layout.has_path(cell):
@@ -237,10 +270,15 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 		return
 	if _host_combat.phase == MatchCombat.Phase.PLANNING:
 		_host_ready[slot] = false
+	if singleplayer and sender == 1:
+		_apply_tower_command(2, command, 1, cell, mirror_id, mode, argument)
+		return
 	_publish_snapshot()
 
 
 func _can_accept(sender: int) -> bool:
+	if singleplayer:
+		return active and sender in [1, 2]
 	if not session.is_host or session.state != MultiplayerSession.State.CONNECTED:
 		return false
 	var guest_id: int = _admitted_guest()
@@ -261,7 +299,6 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 	match command:
 		"edit":
 			if not layout.contains(cell) or layout.is_endpoint(cell):
-				_reject(sender, "The entrance, base, and cells outside the board cannot be edited.")
 				return
 			if value and _host_combat.has_tower(permitted_slot, cell):
 				_reject(sender, "A path cannot overlap an existing tower.")
@@ -297,11 +334,14 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 		_:
 			_reject(sender, "Unknown planning command.")
 			return
+	if singleplayer and sender == 1:
+		_apply_command(2, command, 1, cell, value)
+		return
 	_publish_snapshot()
 
 
 func _reject(sender: int, message: String) -> void:
-	if sender == 1:
+	if singleplayer or sender == 1:
 		feedback.emit(message)
 	else:
 		_receive_feedback.rpc_id(sender, message)

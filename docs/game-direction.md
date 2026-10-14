@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Match economy, sends, upgrades, selling, loadouts, permanent stat growth, and final art are not implemented. The full first playable milestone below is not complete.
+The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Match Coins, paid towers, kill/wave rewards, upgrades, and selling are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Sends, loadouts, permanent stat growth, and final art are not implemented. The full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -197,6 +197,7 @@ The run should start small and become increasingly extreme: larger towers, stron
 - Godot's Compatibility renderer, text-authored scenes/resources, and nearest-neighbor texture filtering are the current starting configuration.
 - One authoritative host validates both players' commands and simulates captured routes, regular enemies, Arrow attacks, base damage, and results. Clients display detached accepted snapshots; selection, tool choice, target defaults for future placement, and visual effects stay local.
 - **Implemented connection setup:** Play offers Host and Join using Godot ENet. The creator chose no game-hosted online infrastructure. A shared invite contains a numeric host address, UDP port, and fresh random room credential; it admits only one guest. LAN, a private VPN/network, or a reachable public address with UDP forwarding/firewall access is required. The invite is not a short-code lookup service and cannot bypass NAT.
+- **Local testing:** Play also offers Singleplayer, with no network connection. A mirror opponent repeats accepted path/tower commands and readiness through the same authoritative rules; no independent AI or progression bypass is added.
 - MCP/editor bridges are optional development tools, not something players must run.
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.

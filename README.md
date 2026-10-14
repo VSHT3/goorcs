@@ -4,13 +4,20 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, persistent base health, and results are implemented. Enemy sends, loadouts, permanent stat growth, and final art are not implemented.
+Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**, with a local **Singleplayer** mirror opponent for testing. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, persistent base health, and results are implemented. Enemy sends, loadouts, permanent stat growth, and final art are not implemented.
 
 ## Run
 
 Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.
 
 For command-line launch and verification, see the [development commands](docs/development.md#setup).
+
+## Test solo
+
+- Choose **Play → Singleplayer** to start immediately without a connection, port, or invite.
+- The opponent mirrors accepted path edits, tower purchases, targeting, upgrades, sales, and readiness. Pressing **Ready** starts both boards.
+- Collection locks, prices, combat, wave breaks, and results use the same rules as multiplayer. Identical defenses can end in the existing simultaneous-defeat coin flip; this is a testing opponent, not AI.
+- **Leave / Esc** ends the local run. Opening Singleplayer again starts fresh without changing workshop layouts or collection progress.
 
 ## Play with a friend
 

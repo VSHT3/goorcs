@@ -47,6 +47,9 @@ godot --headless --path . --script tests/multiplayer_session_test.gd
 # Run real two-process shared-planning regressions.
 godot --headless --path . --script tests/match_planning_test.gd
 
+# Run offline mirrored-opponent regressions.
+godot --headless --path . --script tests/singleplayer_test.gd
+
 # Run deterministic combat-rule regressions.
 godot --headless --path . --script tests/match_combat_test.gd
 
@@ -81,7 +84,17 @@ The first multiplayer milestone should be completed before building extensive pr
 
 Persistent UI text is limited to actions, phase/result, health, readiness, path budget, enemy counts, collection state, and relevant Arrow stats. Instructions, odds, descriptions, and connection guidance live in control tooltips. Gameplay/workshop rejection notices expire after 3.5 seconds, including during idle planning; connection and save errors remain visible.
 
+Match path strokes on the fixed entrance/base or outside the board are silent no-ops. They remain invalid, but no rejection banner is emitted, avoiding layout jumps during ordinary drawing. Graphical verification clicked both endpoints and checked that the feedback stayed hidden and the board rectangle stayed unchanged; singleplayer and separate-peer planning regressions passed.
+
 Cleanup verification exercised menu/workshop/collection/lobby and two real gameplay peers in rendered 1280×720 and 1000×720 subviewports, including live targeting, ordinary/coin-flip results, rejoin, visible errors, and idle notice expiry. The unchanged reset warning was visually inspected; reset/cancellation behavior remains covered by the passing chest-flow regression. Linux save-directory preservation and corrected `GORCS1` peer admission also passed. PDF/brief files were intentionally unchanged.
+
+## Local singleplayer testing
+
+**Play → Singleplayer** starts the normal two-board match locally, with no ENet peer, listening port, or invite. `MatchPlanning` owns the mode and authoritative simulation; `MultiplayerSession` remains idle. Accepted player commands are replayed for the second board through the same validators. Tower management resolves the counterpart by cell because tower IDs are distinct. The UI still permits editing only the player's board.
+
+The opponent mirrors path edits/clear, purchases, targeting, upgrades, sales, and Ready. One Ready therefore starts both sides; planning breaks, collection gating, prices, rewards, and terminal coin-flip results are unchanged. Leaving clears the local mode and match, so reopening starts fresh and Host/Join remain available.
+
+The singleplayer regression covers silent endpoint/out-of-bounds no-ops, ownership, mirrored transactions and distinct tower IDs, rejected purchases/upgrades, live construction, locked wave routes, both-board leaks, planning breaks, terminal results, and fresh restart. Graphical verification exercised actual Play/Singleplayer, mouse-drawn paths, purchases/upgrades, Ready and live physics, Leave/Escape, fresh restart, and reopening the Host form. Menu, planning, and wave screenshots were inspected. Existing navigation and separate-process planning/combat regressions also passed. The graphical run used Intel OpenGL after NVIDIA initialization warnings; an isolated collection save preserved real progress.
 
 ## Direct connection lobby
 

@@ -352,8 +352,8 @@ func _refresh() -> void:
 		board.combat_enemies = all_enemies[slot]
 		board.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if board.input_enabled else Control.CURSOR_ARROW
 		board.queue_redraw()
-		var role: String = "Host" if slot == 0 else "Guest"
-		_titles[slot].text = "You" if slot == own_slot else "Opponent"
+		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
+		_titles[slot].text = "You" if slot == own_slot else ("Opponent (mirror)" if planning.singleplayer else "Opponent")
 		_titles[slot].tooltip_text = role
 		var legality: String = "Legal"
 		if layout.route.is_empty():
