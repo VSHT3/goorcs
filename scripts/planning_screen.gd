@@ -1,6 +1,8 @@
 class_name MatchPlanningScreen
 extends Control
 
+signal leave_requested
+
 
 const TARGET_HELP: Array[String] = [
 	"Furthest along the route.",
@@ -15,7 +17,9 @@ var _pending_tower_cell := Vector2i(-1, -1)
 var _placement_id: StringName = &""
 var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 
-@onready var boards: Array[PathBoard] = [$Content/Boards/Host/Board, $Content/Boards/Guest/Board]
+@onready var world: MatchWorld = $World
+@onready var boards: Array[PathBoard] = world.boards
+@onready var leave_button: Button = %Leave
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
 @onready var _palette: HBoxContainer = %TowerPalette
@@ -33,9 +37,9 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var _status: Label = %Status
 @onready var _feedback: Label = %Feedback
 @onready var _feedback_timer: Timer = $FeedbackTimer
-@onready var _titles: Array[Label] = [$Content/Boards/Host/Title, $Content/Boards/Guest/Title]
-@onready var _states: Array[Label] = [$Content/Boards/Host/State, $Content/Boards/Guest/State]
-@onready var _budgets: Array[Label] = [$Content/Boards/Host/Budget, $Content/Boards/Guest/Budget]
+@onready var _titles: Array[Label] = [$HUD/Header/Content/Players/Host/Heading/Title, $HUD/Header/Content/Players/Guest/Heading/Title]
+@onready var _states: Array[Label] = [$HUD/Header/Content/Players/Host/Heading/State, $HUD/Header/Content/Players/Guest/Heading/State]
+@onready var _budgets: Array[Label] = [$HUD/Header/Content/Players/Host/Budget, $HUD/Header/Content/Players/Guest/Budget]
 
 
 func _ready() -> void:
@@ -46,7 +50,6 @@ func _ready() -> void:
 		boards[slot].command_mode = true
 		if planning != null and planning.collection_store != null:
 			boards[slot].tower_catalog = planning.collection_store.catalog
-	boards[0].mirror_horizontal = true
 	targeting_button.add_item("Furthest", 0)
 	targeting_button.add_item("Closest", 1)
 	targeting_button.add_item("Strongest", 2)
@@ -61,6 +64,7 @@ func _ready() -> void:
 	targeting_button.item_selected.connect(_target_selected)
 	clear_button.pressed.connect(_clear)
 	ready_button.pressed.connect(_toggle_ready)
+	leave_button.pressed.connect(leave_requested.emit)
 	visibility_changed.connect(_visibility_changed)
 	_feedback_timer.timeout.connect(_clear_feedback)
 	if planning != null:
@@ -77,7 +81,10 @@ func cancel_strokes() -> void:
 
 
 func _visibility_changed() -> void:
+	if not is_node_ready():
+		return
 	if not is_visible_in_tree():
+		world.set_active(false)
 		cancel_strokes()
 		_clear_feedback()
 	else:
@@ -175,8 +182,9 @@ func _create_palette() -> void:
 		button.tower_title = reward.title
 		button.icon = reward.icon_texture
 		button.expand_icon = true
-		button.add_theme_constant_override("icon_max_width", 48)
-		button.custom_minimum_size = Vector2(0, 76)
+		button.add_theme_constant_override("icon_max_width", 32)
+		button.add_theme_font_size_override("font_size", 14)
+		button.custom_minimum_size = Vector2(0, 52)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.toggle_mode = true
 		button.pressed.connect(_select_placement.bind(reward.id))
@@ -207,7 +215,8 @@ func _refresh_palette() -> void:
 			status = "Match finished" if planning != null and planning.active else "Waiting for match"
 		button.disabled = not available or not unlocked or stats.is_empty() or coins < button.cost
 		button.set_pressed_no_signal(id == _placement_id)
-		button.text = "%s\n%s%s" % [title, "%d Coins" % button.cost if not stats.is_empty() else "Unavailable", "\n" + status if not status.is_empty() else ""]
+		var price: String = "%d Coins" % button.cost if not stats.is_empty() else "Unavailable"
+		button.text = "%s\n%s" % [title, price + (" · " + status if not status.is_empty() and not stats.is_empty() else "")]
 		button.tooltip_text = "%d damage · %.2fs · %d tile range" % [int(stats.get("damage", 0)), float(stats.get("interval", 0.0)), int(stats.get("range", 0))] if not stats.is_empty() else ""
 		if id == _placement_id and button.disabled:
 			_placement_id = &""
@@ -305,6 +314,7 @@ func _refresh() -> void:
 	if not is_node_ready():
 		return
 	if planning == null:
+		world.set_active(false)
 		cancel_strokes()
 		_clear_feedback()
 		clear_button.disabled = true
@@ -314,6 +324,7 @@ func _refresh() -> void:
 		_status.text = "Planning unavailable"
 		return
 	var own_slot: int = planning.local_slot()
+	world.configure(planning.layouts[0].dimensions, own_slot)
 	if not planning.active:
 		_clear_feedback()
 		selected_tower_id = -1
@@ -353,13 +364,13 @@ func _refresh() -> void:
 		board.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if board.input_enabled else Control.CURSOR_ARROW
 		board.queue_redraw()
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
-		_titles[slot].text = "You" if slot == own_slot else ("Opponent (mirror)" if planning.singleplayer else "Opponent")
+		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")
 		_titles[slot].tooltip_text = role
 		var legality: String = "Legal"
 		if layout.route.is_empty():
-			legality = "No route to base"
+			legality = "Route missing"
 		elif layout.disconnected_count > 0:
-			legality = "%d isolated tiles" % layout.disconnected_count
+			legality = "%d isolated" % layout.disconnected_count
 		var readiness: String = "Ready" if planning.ready_flags[slot] else "Not ready"
 		_states[slot].text = "HP %d / %d" % [int(health[slot]), int(rules.get("base_health", 10))]
 		_states[slot].modulate = Color("d99578") if int(health[slot]) <= 0 else Color("b5e2b7")
@@ -369,7 +380,7 @@ func _refresh() -> void:
 				_budgets[slot].text = "%s · %s" % ["Destroyed" if int(health[slot]) <= 0 else "Survived", _budgets[slot].text]
 			_budgets[slot].tooltip_text = ""
 		else:
-			_budgets[slot].text = "%s · %s · Tiles %d / %d" % [readiness, legality, layout.used_tiles(), layout.budget]
+			_budgets[slot].text = "%s · %s · %d / %d tiles" % [readiness, legality, layout.used_tiles(), layout.budget]
 			_budgets[slot].tooltip_text = "Shortest route: %d steps" % (layout.route.size() - 1) if not layout.route.is_empty() else "No route to base"
 		_budgets[slot].modulate = Color("b5e2b7") if in_wave or planning.ready_flags[slot] else Color("e0bc77")
 	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
@@ -392,6 +403,7 @@ func _refresh() -> void:
 	_refresh_targeting()
 	if not planning.active:
 		cancel_strokes()
+	world.set_active(planning.active and is_visible_in_tree())
 
 
 func _show_feedback(message: String) -> void:

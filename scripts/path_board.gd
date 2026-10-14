@@ -60,6 +60,9 @@ var _shot_traces: Array[Dictionary] = []
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 var _tower_textures: Dictionary[String, Texture2D] = {}
+var _endpoint_textures_loaded: bool = false
+var _portal_texture: Texture2D
+var _crystal_texture: Texture2D
 
 
 func _ready() -> void:
@@ -332,6 +335,17 @@ func _draw_combat() -> void:
 
 func _draw_endpoint(cell: Vector2i, color: Color, letter: String) -> void:
 	var center: Vector2 = cell_center(cell)
+	if command_mode:
+		if not _endpoint_textures_loaded:
+			_portal_texture = load("res://assets/world/enemy_portal.png") as Texture2D
+			_crystal_texture = load("res://assets/world/health_crystal.png") as Texture2D
+			_endpoint_textures_loaded = true
+		var texture: Texture2D = _portal_texture if cell == layout.entrance else _crystal_texture
+		if texture != null:
+			var texture_size: Vector2 = texture.get_size()
+			var icon_size: Vector2 = texture_size * (_cell_size() * 0.94 / maxf(texture_size.x, texture_size.y))
+			draw_texture_rect(texture, Rect2(center - icon_size * 0.5, icon_size), false)
+		return
 	var extent: float = _cell_size() * 0.29
 	draw_rect(Rect2(center - Vector2.ONE * extent, Vector2.ONE * extent * 2), color)
 	var font: Font = ThemeDB.fallback_font

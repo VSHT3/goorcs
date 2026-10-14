@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Match Coins, paid towers, kill/wave rewards, upgrades, and selling are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Sends, loadouts, permanent stat growth, and final art are not implemented. The full first playable milestone below is not complete.
+The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Matches now place both boards in one continuous world with smooth local A/D camera scouting and a fixed HUD. Match Coins, paid towers, kill/wave rewards, upgrades, and selling are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Sends, loadouts, permanent stat growth, map expansion, and final art are not implemented. The full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -17,7 +17,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - **Private play:** for the creators and a small group of friends, not a public-service game.
 - **Desktop first:** downloadable game; exact desktop operating systems are still open.
 - **1v1:** both players defend against regular waves and opponent-sent enemies while trying to defeat each other.
-- **Two boards:** players can observe both sides and move the camera to inspect the opponent. Camera movement does not imply a playable character walking across the map.
+- **Two boards, one continuous world:** players start with their own side filling the gameplay view and hold A/D to move smoothly across to inspect the opponent. The camera is local, clamps at the outer map edges, and moves the world independently of the fixed HUD. Camera movement does not imply a playable character walking across the map or permission to edit the opponent's board.
 - **Player-authored routes:** each player lays out a connected path from the entrance to the base using an equal budget of path tiles on a square grid. Towers are not the mechanism that defines the route.
 - **Longer runs:** favor substantial build development over a quick duel. Exact duration is open.
 - **Persistent progression:** unlock more options and some lasting stat changes. Equal starting power is not a requirement.
@@ -29,7 +29,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 
 - A **run** is the complete 1v1 contest. Enemies reaching a base damage it; a destroyed base ends the entire run.
 - Base health carries between rounds. Losing a base is not merely losing one round or spending a run life.
-- A crystal is the current suggested representation of the base and its health; its exact appearance is not finalized.
+- A crystal represents the base and its health. The current match sprite is a blue faceted crystal on a stone pedestal; final art is not settled.
 - A **wave** is a group of regular enemies. Opponent-sent enemies join the current wave until a delivery cutoff. Later orders wait for the next wave. The cutoff allows both boards to clear before the planning break; its timing is still open.
 - The desired format combines a standalone competitive match with development across multiple encounters.
 - **Confirmed simultaneous defeat:** if both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the run winner. The result is shared and terminal; clients do not roll independently.
@@ -58,9 +58,11 @@ This is the conceptual sequence, not a fixed wave schedule or finalized reward c
 
 Players lay walkable path tiles on a square grid. Both players start with the same path-tile budget, and the tiles must connect the entrance to the base. **30 tiles was an example, not a chosen balance value.** Whether the full budget must be used is still open.
 
-The implemented presentation places the host board on the left and the guest board on the right, with both enemy streams entering from the middle toward outer bases. The left board mirrors rendering and input, not authoritative route coordinates. Regular waves and future opponent-sent enemies join each board's own stream. This visual arrangement does not require identical player-built paths, map mechanics, or commanders.
+The implemented presentation places the host board on the left and the guest board on the right in one continuous world, with both enemy streams entering from the middle toward outer bases. The left board mirrors rendering and input, not authoritative route coordinates. Each player initially views their own board; holding A/D pans continuously across the map, rather than switching between two screen-visible panels. A separate world viewport keeps the HUD fixed, including when tower management or notices appear. Camera scouting is available in multiplayer and mirrored Singleplayer, but input remains restricted to the owned board. Regular waves and future opponent-sent enemies join each board's own stream. This visual arrangement does not require identical player-built paths, map mechanics, or commanders.
 
-The entrance and crystal stay in place as the board expands. New territory becomes available around the existing board, and extra path tiles let players route enemies through it. The crystal's visual design and the initial endpoint positions still need map sketches.
+Current matches retain the fixed grid dimensions and equal path-tile budget; camera travel exposes the opposing board, not new buildable territory. Match bases use a blue crystal and entrances use a red stone-ring portal, both locally authored transparent PNGs without external generation costs. Workshop endpoint letters and its editing presentation remain unchanged.
+
+In the intended expansion system, the entrance and crystal stay in place as the board expands. New territory becomes available around the existing board, and extra path tiles let players route enemies through it. That growth is not implemented by the camera cutover. Final crystal art and initial endpoint positions still need map sketches.
 
 Enemies take the shortest route across connected path tiles. They do not follow the order in which the player placed the tiles. Adjacent path sections can therefore create shortcuts. This replaces the earlier tower-blocked-maze assumption: towers and walls do not define the enemy route by blocking otherwise walkable ground.
 
@@ -89,7 +91,7 @@ There are no waves in the workshop. Free editing here does not decide combat rou
 - Final route-preview presentation; equal-length route selection currently uses the workshop's deterministic convention.
 - Whether paths can be redrawn freely between waves and whether unused tiles are retained.
 - Placement relative to path tiles, initial board dimensions, terrain, and the placement of the fixed entrance and crystal.
-- How much of the opposing board is visible at once.
+- How much of each board is visible at future zoom levels or after map growth; the current view starts on the owned side and supports smooth A/D scouting.
 - Sale refunds, purchase/roll costs, and restrictions needed to prevent unlimited trait rerolls through sale/rebuy.
 
 ### Commanders and board identity
@@ -195,20 +197,20 @@ The run should start small and become increasingly extreme: larger towers, stron
 - Required engine release and run commands: [development setup](development.md#setup).
 - Editing and state-ownership conventions: [AGENTS.md](../AGENTS.md).
 - Godot's Compatibility renderer, text-authored scenes/resources, and nearest-neighbor texture filtering are the current starting configuration.
-- One authoritative host validates both players' commands and simulates captured routes, regular enemies, Arrow attacks, base damage, and results. Clients display detached accepted snapshots; selection, tool choice, target defaults for future placement, and visual effects stay local.
+- One authoritative host validates both players' commands and simulates captured routes, regular enemies, Arrow attacks, base damage, and results. Clients display detached accepted snapshots; camera position, selection, tool choice, target defaults for future placement, and visual effects stay local.
 - **Implemented connection setup:** Play offers Host and Join using Godot ENet. The creator chose no game-hosted online infrastructure. A shared invite contains a numeric host address, UDP port, and fresh random room credential; it admits only one guest. LAN, a private VPN/network, or a reachable public address with UDP forwarding/firewall access is required. The invite is not a short-code lookup service and cannot bypass NAT.
 - **Local testing:** Play also offers Singleplayer, with no network connection. A mirror opponent repeats accepted path/tower commands and readiness through the same authoritative rules; no independent AI or progression bypass is added.
 - MCP/editor bridges are optional development tools, not something players must run.
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.
 
-Admission opens two visible boards. The host validates ownership, cells, paths, funds, upgrades, and sales. Accepted planning edits and tower transactions clear readiness; both-ready captures routes and starts a wave. Path edits remain locked during combat, while construction and management remain available.
+Admission opens shared planning with the local camera focused on the owned side of the continuous world. The host validates ownership, cells, paths, funds, upgrades, and sales; scouting never grants opponent-side commands. Accepted planning edits and tower transactions clear readiness; both-ready captures routes and starts a wave. Path edits remain locked during combat, while construction and management remain available.
 
 **Implemented defense slice:** Arrow, Ballista, and Rune use resource-defined prices and stats. Coins pay for towers and one damage plus one speed upgrade per tower, with distinct gains/costs. Kills belong to the final attacking tower and pay its board once. Clearing both boards grants wave income once; selling refunds 60% of actual purchase/upgrade investment. All three targeting policies remain available. Range uses tile neighborhoods; Rune range one covers the center and eight neighbors, damages all enemies inside, and displays a circular pulse. Range itself uses tile highlights.
 
 All tower types remain visible in a normal palette, with locked/unaffordable entries disabled. Placement supports both click-then-place and native drag/drop. Clicking an owned tower opens kills, effective stats, targeting, upgrade prices/status, and Sell. Close dismisses selection; right-click/Escape cancels placement. Without placement selected, breaks enable path editing and combat permits inspection only.
 
-One enemy type scales health, speed, and count with each wave. Resources own provisional values. Match state persists across waves but resets on disconnect/rejoin; collection saves and workshop drafts remain separate. Sends, relocation, expanding footprints, loadouts, scouting, host migration, and relay fallback remain unimplemented. Internet reachability is still unverified on separate networks.
+One enemy type scales health, speed, and count with each wave. Resources own provisional values. Match state persists across waves but resets on disconnect/rejoin; collection saves and workshop drafts remain separate. Camera movement is local and ordinary snapshots do not reset its position. Sends, relocation, expanding footprints, loadouts, map growth, host migration, and relay fallback remain unimplemented. Internet reachability is still unverified on separate networks.
 
 ## First playable proof of the core rules
 
@@ -222,7 +224,7 @@ The first implementation milestone remains deliberately smaller than the full di
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. Same-tick destruction of both bases is resolved by one host-owned random coin flip.
 
-The current slice proves authoritative planning, paid construction, tower management, upgrades/sales, kill and wave income, escalating regular waves, route locks, and results. It does not implement enemy sends, randomized purchases, relocation, expanding footprints, loadouts, or camera scouting.
+The current slice implements authoritative planning, paid construction, tower management, upgrades/sales, kill and wave income, escalating regular waves, route locks, results, and local camera scouting across a continuous world behind a fixed HUD. It does not implement enemy sends, randomized purchases, relocation, expanding footprints, loadouts, or map growth.
 
 ## Decisions still needed before their implementation
 

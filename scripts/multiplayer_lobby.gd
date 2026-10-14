@@ -32,15 +32,17 @@ var _planning_was_active: bool = false
 @onready var _players: Label = %Players
 @onready var _error: RichTextLabel = %Error
 @onready var _scroll: ScrollContainer = %Scroll
-@onready var _content: VBoxContainer = $Margin/Content
+@onready var _margin: MarginContainer = $Margin
+@onready var _background: ColorRect = $Background
 
 
 func _ready() -> void:
 	planning_screen = preload("res://scenes/planning_screen.tscn").instantiate()
 	planning_screen.planning = planning
 	planning_screen.hide()
-	_content.add_child(planning_screen)
-	_content.move_child(planning_screen, _scroll.get_index() + 1)
+	add_child(planning_screen)
+	planning_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	planning_screen.leave_requested.connect(_request_back)
 	if planning != null:
 		planning.changed.connect(_planning_changed)
 	host_button.pressed.connect(_show_host)
@@ -181,6 +183,8 @@ func _planning_changed() -> void:
 
 func _refresh() -> void:
 	var planning_active: bool = planning != null and planning.active
+	_margin.visible = not planning_active
+	_background.visible = not planning_active
 	_scroll.visible = not planning_active
 	planning_screen.visible = planning_active
 	var available: bool = _can_start()
@@ -206,7 +210,7 @@ func _refresh() -> void:
 		copy_button.text = "Copy code"
 	_error.text = session.error_message if session != null else "No session was supplied. Return to the menu and reopen Play."
 	_error.visible = not _error.text.is_empty()
-	back_button.text = "Leave / Esc" if active or planning_active else "Back / Esc"
+	back_button.text = "Leave / Esc" if active else "Back / Esc"
 	_players.text = ""
 	_players.hide()
 	_status.visible = session == null or session.state != MultiplayerSession.State.IDLE
@@ -238,7 +242,7 @@ func _focus_action() -> void:
 	if session == null:
 		back_button.grab_focus()
 	elif planning != null and planning.active:
-		back_button.grab_focus()
+		planning_screen.leave_button.grab_focus()
 	elif session.state in [MultiplayerSession.State.HOSTING, MultiplayerSession.State.CONNECTED]:
 		if _invitation.visible:
 			copy_button.grab_focus()

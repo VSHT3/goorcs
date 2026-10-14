@@ -4,7 +4,7 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**, with a local **Singleplayer** mirror opponent for testing. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, persistent base health, and results are implemented. Enemy sends, loadouts, permanent stat growth, and final art are not implemented.
+Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**, with a local **Singleplayer** mirror opponent for testing. Matches use one continuous camera-scrolled world behind a fixed HUD; each player starts looking at their own side and holds **A / D** to scout across it. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, persistent base health, and results are implemented. Enemy sends, loadouts, permanent stat growth, map expansion, and final art are not implemented.
 
 ## Run
 
@@ -15,6 +15,7 @@ For command-line launch and verification, see the [development commands](docs/de
 ## Test solo
 
 - Choose **Play → Singleplayer** to start immediately without a connection, port, or invite.
+- The initial view shows your own side of the continuous world. Hold **A / D** to inspect the mirrored opponent; the HUD stays fixed and opponent-side input remains read-only.
 - The opponent mirrors accepted path edits, tower purchases, targeting, upgrades, sales, and readiness. Pressing **Ready** starts both boards.
 - Collection locks, prices, combat, wave breaks, and results use the same rules as multiplayer. Identical defenses can end in the existing simultaneous-defeat coin flip; this is a testing opponent, not AI.
 - **Leave / Esc** ends the local run. Opening Singleplayer again starts fresh without changing workshop layouts or collection progress.
@@ -23,12 +24,14 @@ For command-line launch and verification, see the [development commands](docs/de
 
 - Choose **Play → Host**, enter an IP address your friend can reach and a UDP port, then **Create room**.
 - Use **Copy invite code** and share the complete code privately. Your friend chooses **Play → Join**, pastes it, and presses **Connect** or Enter.
-- Admission automatically opens shared planning: both boards are visible, but only your own accepts edits. Match paths are separate from the local workshop and are not saved.
+- Admission automatically opens shared planning in one continuous world: host on the left, guest on the right, with your own side filling the initial gameplay view. Hold **A / D** to pan smoothly left/right and inspect the opponent; movement stops at the outer edges. Only your own board accepts edits, wherever the camera is looking. Match paths are separate from the local workshop and are not saved.
+- Wave/Coins, health/readiness, Leave, and tower controls stay in a fixed HUD over a separate world viewport. Tower management and notices overlay the world rather than moving or resizing it. Camera movement stays local and does not change match state; text fields and targeting popups take priority over A/D.
 - The visible tower palette shows all types, prices, and collection locks. Click a tower then empty non-path ground, or drag it onto your board. Right-click or Escape cancels placement. Clicking an owned tower opens its kills, stats, targeting, damage/speed upgrades, and Sell menu.
 - During planning breaks, no tower selected automatically enables path editing: left-drag places tiles, right-drag removes them. Existing towers remain inspectable. During waves, no tower selected only inspects; paths stay locked. Only your own board accepts commands; building and target changes remain available during combat.
 - **Ready for wave N** requires a legal path. Accepted path edits, purchases, upgrades, sales, and target changes clear planning readiness. Both players ready captures routes and starts the wave; paths remain locked until both boards clear.
 - Arrow and Ballista hit one target. Rune damages every enemy in its surrounding 3×3 tile neighborhood and displays a circular pulse. Selected range is highlighted tiles, not a circle. All types support Furthest, Closest, and Strongest targeting.
 - Enemy visuals move smoothly between host snapshots along the captured route, including corners. Adjacent path tiles form continuous pavement through straights, bends, and branches, without a route-line overlay.
+- Each match entrance is a red stone-ring portal and each base is a blue crystal on a stone pedestal. These transparent PNG sprites were authored locally, without external generation services or costs. Camera scouting does not expand either grid or increase its path-tile budget.
 - A destroyed base ends the run. If both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the winner and both players see that result. The finished run cannot restart; leave/rejoin begins fresh.
 - Coins fund towers and two one-time upgrades per tower; kills and cleared waves earn Coins. Selling refunds part of the actual investment. Wave health, speed, and count increase. Provisional values live in `resources/combat/prototype.tres` and `resources/combat/towers/`.
 - The code contains the host's address and a random room credential. There is no online room lookup or NAT traversal service. Use the same LAN, a private network/VPN, or a public host address with UDP forwarding and firewall access.
@@ -76,9 +79,9 @@ scenes/            Main navigation, connection lobby, shared defense, local path
 scripts/           Rule owners, networking, persistence, input, and presentation
 resources/collection/  Tower reward definitions
 resources/combat/  Provisional defense-loop configuration
-assets/            Imported chest and tower-trio sprites
+assets/            Imported chest/tower sprites and locally authored match crystal/portal PNGs
 archive_assets/    Archived pixel-art variants and sources, with per-image catalog and tags
-tests/             Path, navigation, collection, chest, real peer-session, planning, combat rules and peer combat
+tests/             Path, navigation, collection, chest, real peer-session, planning, match-world, combat rules and peer combat
 docs/              Project documentation
 ```
 

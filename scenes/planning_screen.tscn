@@ -1,19 +1,19 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/planning_screen.gd" id="1_planning"]
-[ext_resource type="Script" path="res://scripts/path_board.gd" id="2_board"]
+[ext_resource type="PackedScene" path="res://scenes/match_world.tscn" id="2_world"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBox_management"]
-bg_color = Color(0.133, 0.173, 0.169, 1)
+[sub_resource type="StyleBoxFlat" id="StyleBox_hud"]
+bg_color = Color(0.10, 0.145, 0.13, 0.96)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.40, 0.46, 0.40, 1)
 content_margin_left = 12.0
-content_margin_top = 8.0
+content_margin_top = 4.0
 content_margin_right = 12.0
-content_margin_bottom = 8.0
+content_margin_bottom = 4.0
 
 [node name="PlanningScreen" type="Control"]
 layout_mode = 3
@@ -22,216 +22,301 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
+mouse_filter = 2
 script = ExtResource("1_planning")
 
-[node name="Content" type="VBoxContainer" parent="."]
+[node name="World" parent="." instance=ExtResource("2_world")]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 6
 
-[node name="Header" type="HBoxContainer" parent="Content"]
+[node name="HUD" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Header" type="PanelContainer" parent="HUD"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 14.0
+offset_top = 6.0
+offset_right = -14.0
+offset_bottom = 72.0
+grow_horizontal = 2
+mouse_filter = 0
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="Content" type="VBoxContainer" parent="HUD/Header"]
 layout_mode = 2
-theme_override_constants/separation = 16
+mouse_filter = 2
+theme_override_constants/separation = 4
 
-[node name="Status" type="Label" parent="Content/Header"]
+[node name="Summary" type="HBoxContainer" parent="HUD/Header/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 18
+
+[node name="Status" type="Label" parent="HUD/Header/Content/Summary"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 20
 text = "Planning · Wave 1"
-autowrap_mode = 2
 
-[node name="Coins" type="Label" parent="Content/Header"]
+[node name="Coins" type="Label" parent="HUD/Header/Content/Summary"]
 unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 20
 text = "Coins 0"
 
-[node name="TowerPalette" type="HBoxContainer" parent="Content"]
+[node name="PanHint" type="Label" parent="HUD/Header/Content/Summary"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
+text = "A / D · Pan"
+
+[node name="Leave" type="Button" parent="HUD/Header/Content/Summary"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(110, 34)
+layout_mode = 2
+text = "Leave / Esc"
+
+[node name="Players" type="HBoxContainer" parent="HUD/Header/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+
+[node name="Host" type="HBoxContainer" parent="HUD/Header/Content/Players"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="HBoxContainer" parent="HUD/Header/Content/Players/Host"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="HUD/Header/Content/Players/Host/Heading"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 14
+text = "You"
+
+[node name="State" type="Label" parent="HUD/Header/Content/Players/Host/Heading"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 14
+text = "HP 10 / 10"
+
+[node name="Budget" type="Label" parent="HUD/Header/Content/Players/Host"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Not ready · Route missing · 0 / 30 tiles"
+
+[node name="Guest" type="HBoxContainer" parent="HUD/Header/Content/Players"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="HBoxContainer" parent="HUD/Header/Content/Players/Guest"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="HUD/Header/Content/Players/Guest/Heading"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 14
+text = "Opponent"
+
+[node name="State" type="Label" parent="HUD/Header/Content/Players/Guest/Heading"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 14
+text = "HP 10 / 10"
+
+[node name="Budget" type="Label" parent="HUD/Header/Content/Players/Guest"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 12
+text = "Not ready · Route missing · 0 / 30 tiles"
+
+[node name="Bottom" type="PanelContainer" parent="HUD"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = -100.0
+offset_right = -14.0
+offset_bottom = 0.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 0
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="Content" type="VBoxContainer" parent="HUD/Bottom"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="TowerPalette" type="HBoxContainer" parent="HUD/Bottom/Content"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
 theme_override_constants/separation = 8
 
-[node name="Placement" type="HBoxContainer" parent="Content"]
+[node name="Actions" type="HBoxContainer" parent="HUD/Bottom/Content"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 8
 
-[node name="PlacementStatus" type="Label" parent="Content/Placement"]
+[node name="Clear" type="Button" parent="HUD/Bottom/Content/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(156, 34)
+layout_mode = 2
+tooltip_text = "Remove your path tiles. Clears your ready state."
+text = "Clear my tiles"
+
+[node name="Ready" type="Button" parent="HUD/Bottom/Content/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(176, 34)
+layout_mode = 2
+tooltip_text = "Both players ready starts the wave. Edits clear your ready state."
+text = "Ready for wave 1"
+
+[node name="PlacementStatus" type="Label" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
 theme_override_font_sizes/font_size = 14
 text = ""
 autowrap_mode = 2
 
-[node name="CancelPlacement" type="Button" parent="Content/Placement"]
+[node name="CancelPlacement" type="Button" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true
 visible = false
+custom_minimum_size = Vector2(116, 34)
 layout_mode = 2
 text = "Cancel / Esc"
 
-[node name="Boards" type="HBoxContainer" parent="Content"]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 16
-
-[node name="Host" type="VBoxContainer" parent="Content/Boards"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 4
-
-[node name="Title" type="Label" parent="Content/Boards/Host"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "You"
-
-[node name="State" type="Label" parent="Content/Boards/Host"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "HP 10 / 10"
-autowrap_mode = 2
-
-[node name="Budget" type="Label" parent="Content/Boards/Host"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "Not ready · No route to base · Tiles 0 / 30"
-autowrap_mode = 2
-
-[node name="Board" type="Control" parent="Content/Boards/Host"]
-custom_minimum_size = Vector2(0, 200)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-clip_contents = true
-mouse_default_cursor_shape = 2
-script = ExtResource("2_board")
-command_mode = true
-input_enabled = false
-
-[node name="Guest" type="VBoxContainer" parent="Content/Boards"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 4
-
-[node name="Title" type="Label" parent="Content/Boards/Guest"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 18
-text = "Opponent"
-
-[node name="State" type="Label" parent="Content/Boards/Guest"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "HP 10 / 10"
-autowrap_mode = 2
-
-[node name="Budget" type="Label" parent="Content/Boards/Guest"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 14
-text = "Not ready · No route to base · Tiles 0 / 30"
-autowrap_mode = 2
-
-[node name="Board" type="Control" parent="Content/Boards/Guest"]
-custom_minimum_size = Vector2(0, 200)
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-clip_contents = true
-script = ExtResource("2_board")
-command_mode = true
-input_enabled = false
-
-[node name="TowerManagement" type="PanelContainer" parent="Content"]
+[node name="TowerManagement" type="PanelContainer" parent="HUD"]
 unique_name_in_owner = true
 visible = false
-layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBox_management")
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -382.0
+offset_top = 84.0
+offset_right = -14.0
+offset_bottom = 312.0
+grow_horizontal = 0
+mouse_filter = 0
+theme_override_styles/panel = SubResource("StyleBox_hud")
 
-[node name="Content" type="VBoxContainer" parent="Content/TowerManagement"]
+[node name="Content" type="VBoxContainer" parent="HUD/TowerManagement"]
 layout_mode = 2
-theme_override_constants/separation = 6
+mouse_filter = 2
+theme_override_constants/separation = 8
 
-[node name="TowerTitle" type="Label" parent="Content/TowerManagement/Content"]
+[node name="TowerTitle" type="Label" parent="HUD/TowerManagement/Content"]
 unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
 theme_override_font_sizes/font_size = 18
 text = "Selected tower"
 
-[node name="TowerStats" type="Label" parent="Content/TowerManagement/Content"]
+[node name="TowerStats" type="Label" parent="HUD/TowerManagement/Content"]
 unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
 theme_override_font_sizes/font_size = 14
 autowrap_mode = 2
 
-[node name="Controls" type="HBoxContainer" parent="Content/TowerManagement/Content"]
+[node name="TargetRow" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 8
 
-[node name="TargetLabel" type="Label" parent="Content/TowerManagement/Content/Controls"]
+[node name="TargetLabel" type="Label" parent="HUD/TowerManagement/Content/TargetRow"]
 layout_mode = 2
+mouse_filter = 2
 text = "Target"
 
-[node name="Targeting" type="OptionButton" parent="Content/TowerManagement/Content/Controls"]
+[node name="Targeting" type="OptionButton" parent="HUD/TowerManagement/Content/TargetRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(118, 38)
+custom_minimum_size = Vector2(118, 34)
 layout_mode = 2
+size_flags_horizontal = 3
 
-[node name="DamageUpgrade" type="Button" parent="Content/TowerManagement/Content/Controls"]
+[node name="Upgrades" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="DamageUpgrade" type="Button" parent="HUD/TowerManagement/Content/Upgrades"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(140, 38)
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="SpeedUpgrade" type="Button" parent="Content/TowerManagement/Content/Controls"]
+[node name="SpeedUpgrade" type="Button" parent="HUD/TowerManagement/Content/Upgrades"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(140, 38)
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="SellTower" type="Button" parent="Content/TowerManagement/Content/Controls"]
+[node name="Actions" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="SellTower" type="Button" parent="HUD/TowerManagement/Content/Actions"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 38)
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="CloseTower" type="Button" parent="Content/TowerManagement/Content/Controls"]
+[node name="CloseTower" type="Button" parent="HUD/TowerManagement/Content/Actions"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(72, 38)
 layout_mode = 2
 text = "Close"
 
-[node name="Actions" type="HBoxContainer" parent="Content"]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="Clear" type="Button" parent="Content/Actions"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(156, 38)
-layout_mode = 2
-tooltip_text = "Remove your path tiles. Clears your ready state."
-text = "Clear my tiles"
-
-[node name="Ready" type="Button" parent="Content/Actions"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(156, 38)
-layout_mode = 2
-tooltip_text = "Both players ready starts the wave. Edits clear your ready state."
-text = "Ready for wave 1"
-
-[node name="Feedback" type="Label" parent="Content"]
+[node name="Feedback" type="Label" parent="HUD"]
 unique_name_in_owner = true
 visible = false
-layout_mode = 2
-theme_override_colors/font_color = Color(0.80, 0.77, 0.67, 1)
+layout_mode = 1
+offset_left = 14.0
+offset_top = 84.0
+offset_right = 540.0
+offset_bottom = 138.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.95, 0.85, 0.61, 1)
+theme_override_colors/font_shadow_color = Color(0.04, 0.06, 0.05, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 14
 autowrap_mode = 2
 

@@ -32,6 +32,9 @@ godot --headless --path . --script tests/path_layout_test.gd
 # Run navigation and drawing-state regressions.
 godot --headless --path . --script tests/navigation_test.gd
 
+# Run continuous match-world camera, input, and fixed-HUD regressions.
+godot --headless --path . --script tests/match_world_test.gd
+
 # Run collection grant and save-failure regressions.
 godot --headless --path . --script tests/collection_store_test.gd
 
@@ -49,6 +52,9 @@ godot --headless --path . --script tests/match_planning_test.gd
 
 # Run offline mirrored-opponent regressions.
 godot --headless --path . --script tests/singleplayer_test.gd
+
+# Run actual GUI tower-drag/drop regressions in an isolated viewport.
+godot --headless --path . --script tests/match_drag_test.gd
 
 # Run deterministic combat-rule regressions.
 godot --headless --path . --script tests/match_combat_test.gd
@@ -88,9 +94,25 @@ Match path strokes on the fixed entrance/base or outside the board are silent no
 
 Cleanup verification exercised menu/workshop/collection/lobby and two real gameplay peers in rendered 1280×720 and 1000×720 subviewports, including live targeting, ordinary/coin-flip results, rejoin, visible errors, and idle notice expiry. The unchanged reset warning was visually inspected; reset/cancellation behavior remains covered by the passing chest-flow regression. Linux save-directory preservation and corrected `GORCS1` peer admission also passed. PDF/brief files were intentionally unchanged.
 
+### Continuous match world and verification
+
+Matches use `MatchWorld`, a separate world `SubViewport` with a local `Camera2D`, behind the fixed planning HUD. The host board is on the left and the guest board on the right; both retain fixed authoritative grid dimensions and the existing equal tile budget. Each player starts focused on their owned board, with that side filling the gameplay view. Hold A/D for smooth horizontal traversal, clamped at the outer map extents. This is camera scouting, not map expansion or a snap between board panels; future milestone-based growth remains unimplemented. The workshop keeps its current board, controls, and endpoint letters.
+
+Wave/Coins, health/readiness, Leave, palette, and actions remain anchored to the screen. Tower management and transient notices overlay the world rather than reflowing it. HUD panels consume their own input; uncovered world space remains interactive. Camera movement is local presentation, never accepted match state, and ordinary snapshots do not reset it. Fresh activation focuses the owned side; hiding/leaving the match or losing focus cancels held movement and path strokes. A/D yields to text input and targeting popups, and panning cancels an active stroke so moving the world cannot paint tiles.
+
+Owned cell input must follow the camera's translated/scaled canvas, including after window resize. Native tower drag/drop travels from the root HUD viewport into the world viewport and reuses the owned board's placement legality. Scouting the opponent grants no editing, placement, or management commands. Multiplayer host authority, mirrored Singleplayer behavior, collection gating, combat interpolation, and workshop state ownership are unchanged.
+
+Camera keys are handled by a separate root-viewport input node because `SubViewportContainer` changes its own native input registration with GUI focus. Visibility notifications cancel motion but never undo activation reentrantly during parent visibility propagation. Native HUD drags stay in the root viewport, with the container acting as the drop target and translating into the owned board's canvas. Input verification must exercise actual engine drag initiation/release, not only call drop validators directly.
+
+`match_world_test.gd` checks host/guest own-side initial focus, continuous intermediate positions in both pan directions, edge clamping, snapshot stability, unchanged accepted match state, coordinate roundtrips and actual owned clicks after pan/resize, denied opponent input, stable HUD rectangles when management/notices appear, hidden/focus-lost cancellation, and Leave/reopen resets. `match_drag_test.gd` drives real GUI press/motion/release in an isolated non-native viewport, checking paid purchases after pan/zoom and unchanged state for occupied, path, out-of-bounds, and opponent drops. These are behavior invariants, not assertions about wording or scene wiring.
+
+For graphical verification, exercise Play/Singleplayer and separate ENet host/guest processes. Hold and release physical A/D keys, inspect the intermediate view and both outer stops, open targeting while panning, lose/recover window focus, and leave/reopen. Draw paths, click/place/select towers, and perform native HUD-to-world drag/drop after panning and resizing. Check that notices and management never move the world or Ready button, opponent input is denied, endpoints remain readable, and accepted paths/Coins/health are unaffected by camera movement.
+
+Resource import, main-scene startup, and all headless regressions in Setup passed, including continuous-world input/camera coverage and real separate-process admission, planning, and combat. Rendered board and tower-icon regressions passed. Graphical Singleplayer and two separate ENet host/guest processes exercised owned mouse-built routes, click purchases, upgrades, actual native HUD-to-world drag/drop, held physical A/D with intermediate views and both endpoints, read-only opponent clicks, and live waves. Singleplayer also exercised Leave/Escape, fresh reopen, and a compact 1000×720 logical viewport. Initial, intermediate, opponent, management, wave, compact, and both-peer screenshots were inspected. Isolated collection saves preserved real progress. The graphical runtime used Intel OpenGL after NVIDIA initialization warnings; internet reachability remains unverified.
+
 ## Local singleplayer testing
 
-**Play → Singleplayer** starts the normal two-board match locally, with no ENet peer, listening port, or invite. `MatchPlanning` owns the mode and authoritative simulation; `MultiplayerSession` remains idle. Accepted player commands are replayed for the second board through the same validators. Tower management resolves the counterpart by cell because tower IDs are distinct. The UI still permits editing only the player's board.
+**Play → Singleplayer** starts the normal continuous-world match locally, with no ENet peer, listening port, or invite. The initial view focuses the player's side, and local hold-A/D scouting uses the same fixed HUD and world viewport as multiplayer. `MatchPlanning` owns the mode and authoritative simulation; `MultiplayerSession` remains idle. Accepted player commands are replayed for the second board through the same validators. Tower management resolves the counterpart by cell because tower IDs are distinct. The UI still permits editing only the player's board.
 
 The opponent mirrors path edits/clear, purchases, targeting, upgrades, sales, and Ready. One Ready therefore starts both sides; planning breaks, collection gating, prices, rewards, and terminal coin-flip results are unchanged. Leaving clears the local mode and match, so reopening starts fresh and Host/Join remain available.
 
@@ -117,9 +139,9 @@ The regression command above launches three real Godot processes and covers admi
 
 Graphical verification exercised Play/Host/Join, full-code clipboard copy, invalid-code correction with Enter, two-player admission, guest leave/rejoin, and host disconnection. Main/host and compact guest/error surfaces were inspected at 1280×720 and 1000×720. Navigation regressions also verify that Esc exits Play while a text field is editing, without affecting local workshop progress.
 
-For a two-instance manual check, launch the project twice with the run command in Setup. Host in one using `127.0.0.1`, copy its invite into Join in the other, and check that both open planning with two boards. Leave as guest, rejoin, then leave as host and inspect the guest's disconnect error. For internet verification, repeat on two separate machines and networks with the actual forwarding/private-network setup. Localhost success does not establish internet reachability; that check remains outstanding.
+For a two-instance manual check, launch the project twice with the run command in Setup. Host in one using `127.0.0.1`, copy its invite into Join in the other, and check that each opens planning focused on its own side of the same continuous world. Hold A/D to inspect the other side without gaining editing access. Leave as guest, rejoin, then leave as host and inspect the guest's disconnect error. For internet verification, repeat on two separate machines and networks with the actual forwarding/private-network setup. Localhost success does not establish internet reachability; that check remains outstanding.
 
-Admission opens shared planning. The visible resource-driven palette shows all tower identities, prices, and disabled collection locks. Click a type then legal ground, or drag it onto the owned board. Right-click/Escape cancels placement. With no placement selected, breaks allow path strokes; clicking a tower opens its management panel. The panel shows kills, effective stats, targeting, two one-time upgrades, and the host-computed sale refund. Close/Escape dismisses selection without selling or disconnecting.
+Admission opens shared planning behind a fixed HUD, initially viewing the owned board. Hold A/D to traverse the separate world viewport locally. The visible resource-driven palette shows all tower identities, prices, and disabled collection locks. Click a type then legal ground, or drag it onto the owned board, including after camera movement. Right-click/Escape cancels placement. With no placement selected, breaks allow path strokes; clicking a tower opens its management overlay without resizing the world. The panel shows kills, effective stats, targeting, two one-time upgrades, and the host-computed sale refund. Close/Escape dismisses selection without selling or disconnecting.
 
 Both-ready requires legal routes and captures them for the wave. Accepted path edits, purchases, target changes, upgrades, and sales clear planning readiness. During waves paths remain locked, while tower management remains available. Towers, upgrades, kills, Coins, paths, and health persist between waves. Finished runs reject mutations; leaving/rejoining starts fresh. Same-tick base destruction uses one host-owned coin flip.
 
@@ -239,13 +261,19 @@ Every tower uses a shared maximum 52×52 logical-pixel visual frame in both the 
 
 The graphical `tower_icon_test.gd` regression renders all catalog icons into transparent viewports and compares their actual visible pixel bounds. It checks equal size across identities, containment, centering, compact areas, and unchanged artwork size when a card expands. Run it without `--headless`; a dummy renderer cannot prove pixel output. The rendered regression and the standard/compact collection and reward smoke passed after correcting the oversized obelisk.
 
+### Locally authored match endpoint sprites
+
+`assets/world/health_crystal.png` and `assets/world/enemy_portal.png` are locally authored transparent 96×96 RGBA pixel-art PNGs, drawn with hand-authored integer-coordinate polygons and lines using Pillow. The base is a blue faceted magical crystal on a squat stone pedestal; the entrance is a red opening in an angular rough stone ring. Their three-quarter/top-down presentation follows the existing tower-art references, with hard alpha and nearest filtering. No external generation service, credentials, network access, external downloads, or paid credits were used for these endpoint assets.
+
+In matches, `PathBoard` fits the sprites inside their fixed endpoint tiles, above terrain and below enemies/tower effects, replacing E/B glyphs without changing route coordinates, endpoint protection, or budget. The workshop retains E/B. These ordinary shipped images introduce no runtime service dependency and do not claim to be PixelLab outputs or finalized world art.
+
 ### Next board-art trial
 
 Choose a shared camera angle, outline style, palette, and pixel scale before generating a small sample:
 
 1. One tower and an evolved version, checking that identity survives the change in size and function.
 2. One enemy with a directional walk cycle, checking frame alignment and consistent appearance.
-3. A crystal that remains readable against the terrain.
+3. Refined crystal and portal art that remains readable against the terrain, using the current locally authored endpoints as a comparison.
 4. Ground and connecting path tiles, checking bends and adjacent sections. Defer paid map tooling until the initial asset results justify it.
 
 Judge these together at the intended game zoom, including a crowded arrangement. Inspect silhouettes, animation timing, transparency, palette consistency, and manual cleanup required. Avoid generating the full roster or buying several subscriptions before this trial.
