@@ -8,10 +8,15 @@ func _new_session() -> void:
 	planning = MatchPlanning.new()
 	planning.name = "Planning"
 	planning.session = _session
+	planning.combat_rules = _planning_rules()
 	# Different guest defaults prove that the host supplies match settings.
 	if _lane == "guest":
 		planning.configure(Vector2i(8, 5), 8, Vector2i(0, 2), Vector2i(7, 2))
 	_main.add_child(planning)
+
+
+func _planning_rules() -> CombatRules:
+	return preload("res://resources/combat/prototype.tres")
 
 
 func _execute_command(command: Dictionary) -> void:
@@ -22,6 +27,10 @@ func _execute_command(command: Dictionary) -> void:
 			planning.request_clear(int(command["slot"]))
 		"ready":
 			planning.submit_ready(bool(command["value"]))
+		"build":
+			planning.build_tower(int(command["slot"]), Vector2i(int(command["x"]), int(command["y"])), int(command["mode"]))
+		"target":
+			planning.set_targeting(int(command["slot"]), int(command["tower_id"]), int(command["mode"]))
 		_:
 			super._execute_command(command)
 
@@ -43,7 +52,7 @@ func _publish() -> void:
 	for route: Array in planning.locked_routes:
 		routes.append(_cells(route))
 	var file := FileAccess.open(_path("planning") + ".tmp", FileAccess.WRITE)
-	file.store_string(JSON.stringify({"active": planning.active, "locked": planning.locked, "flags": planning.ready_flags, "boards": boards, "routes": routes}))
+	file.store_string(JSON.stringify({"active": planning.active, "locked": planning.locked, "flags": planning.ready_flags, "boards": boards, "routes": routes, "combat": planning.combat}))
 	file.close()
 	DirAccess.rename_absolute(_path("planning") + ".tmp", _path("planning"))
 

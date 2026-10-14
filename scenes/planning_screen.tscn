@@ -21,29 +21,62 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
 [node name="Status" type="Label" parent="Content"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
 theme_override_font_sizes/font_size = 18
-text = "Connected · Shared planning\nBuild a legal path, then ready."
+text = "Connected · Planning wave 1\nBuild a legal path and free Arrow towers. Both players ready starts every wave."
+autowrap_mode = 2
+
+[node name="Tools" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ToolLabel" type="Label" parent="Content/Tools"]
+layout_mode = 2
+text = "Tool"
+
+[node name="Tool" type="OptionButton" parent="Content/Tools"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(112, 38)
+layout_mode = 2
+tooltip_text = "Path: drag tiles during planning. Tower: build or select Arrow. Inspect: select your Arrow only."
+
+[node name="TargetLabel" type="Label" parent="Content/Tools"]
+layout_mode = 2
+text = "Target"
+
+[node name="Targeting" type="OptionButton" parent="Content/Tools"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(128, 38)
+layout_mode = 2
+tooltip_text = "Change the selected tower's target priority, or the default for new Arrow towers."
+
+[node name="TargetHelp" type="Label" parent="Content/Tools"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
+theme_override_font_sizes/font_size = 14
+text = "New Arrow towers · Furthest: greatest progress along the route. Ties: lowest enemy ID."
 autowrap_mode = 2
 
 [node name="Boards" type="HBoxContainer" parent="Content"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 20
+theme_override_constants/separation = 16
 
 [node name="Host" type="VBoxContainer" parent="Content/Boards"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
 [node name="Title" type="Label" parent="Content/Boards/Host"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 20
 text = "Host board"
 
 [node name="State" type="Label" parent="Content/Boards/Host"]
@@ -57,10 +90,11 @@ text = "0 / 30 tiles · 30 remaining"
 autowrap_mode = 2
 
 [node name="Board" type="Control" parent="Content/Boards/Host"]
-custom_minimum_size = Vector2(0, 220)
+custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+clip_contents = true
 mouse_default_cursor_shape = 2
 script = ExtResource("2_board")
 command_mode = true
@@ -75,11 +109,11 @@ autowrap_mode = 2
 [node name="Guest" type="VBoxContainer" parent="Content/Boards"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
 [node name="Title" type="Label" parent="Content/Boards/Guest"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 20
 text = "Guest board"
 
 [node name="State" type="Label" parent="Content/Boards/Guest"]
@@ -93,10 +127,11 @@ text = "0 / 30 tiles · 30 remaining"
 autowrap_mode = 2
 
 [node name="Board" type="Control" parent="Content/Boards/Guest"]
-custom_minimum_size = Vector2(0, 220)
+custom_minimum_size = Vector2(0, 200)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+clip_contents = true
 script = ExtResource("2_board")
 command_mode = true
 input_enabled = false
@@ -113,17 +148,18 @@ theme_override_constants/separation = 12
 
 [node name="Clear" type="Button" parent="Content/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 42)
+custom_minimum_size = Vector2(156, 38)
 layout_mode = 2
 text = "Clear my tiles"
 
 [node name="Ready" type="Button" parent="Content/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 42)
+custom_minimum_size = Vector2(156, 38)
 layout_mode = 2
-text = "Ready"
+text = "Ready for wave 1"
 
 [node name="Controls" type="Label" parent="Content/Actions"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
@@ -137,5 +173,5 @@ custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.80, 0.77, 0.67, 1)
 theme_override_font_sizes/font_size = 14
-text = "Edges connect; corners do not. Every placed tile must reach the entrance.\nUnused budget is allowed. Editing clears your ready state."
+text = "Edges connect; corners do not. Every tile must reach the entrance. Edits clear your ready state.\nFree Arrow placement · No economy · All combat numbers are provisional playtest settings."
 autowrap_mode = 2

@@ -4,6 +4,7 @@ extends Control
 signal edited
 signal feedback(message: String)
 signal edit_requested(cell: Vector2i, place: bool)
+signal cell_clicked(cell: Vector2i, button: MouseButton)
 
 const GROUND := Color("222c2b")
 const TILE := Color("6e7465")
@@ -11,9 +12,27 @@ const ROUTE_TILE := Color("426957")
 const ROUTE_LINE := Color("b5e2b7")
 const ENTRY_COLOR := Color("e0bc77")
 const BASE_COLOR := Color("96c8dc")
+const ARROW_REWARD: TowerReward = preload("res://resources/collection/arrow_tower.tres")
+const SHOT_DURATION: float = 0.18
 
 var layout: PathLayout
 var command_mode: bool = false
+var cell_click_mode: bool = false:
+	set(value):
+		if cell_click_mode != value:
+			cancel_stroke()
+		cell_click_mode = value
+var combat_towers: Array = []:
+	set(value):
+		combat_towers = value
+		_capture_shots()
+		queue_redraw()
+var combat_enemies: Array = []:
+	set(value):
+		combat_enemies = value
+		queue_redraw()
+var selected_tower_id: int = -1
+var tower_range: float = 3.0
 var input_enabled: bool = true:
 	set(value):
 		input_enabled = value
@@ -23,11 +42,43 @@ var input_enabled: bool = true:
 var _hover := Vector2i(-1, -1)
 var _paint_button: MouseButton = MOUSE_BUTTON_NONE
 var _last_painted := Vector2i(-1, -1)
+var _seen_shots: Dictionary = {}
+var _shot_traces: Array[Dictionary] = []
 
 
 func _ready() -> void:
 	mouse_exited.connect(_on_mouse_exited)
 	resized.connect(queue_redraw)
+	set_process(not _shot_traces.is_empty())
+
+
+func _process(delta: float) -> void:
+	for index: int in range(_shot_traces.size() - 1, -1, -1):
+		_shot_traces[index]["life"] -= delta
+		if float(_shot_traces[index]["life"]) <= 0.0:
+			_shot_traces.remove_at(index)
+	queue_redraw()
+	if _shot_traces.is_empty():
+		set_process(false)
+
+
+func _capture_shots() -> void:
+	if combat_towers.is_empty():
+		_seen_shots.clear()
+		_shot_traces.clear()
+		set_process(false)
+		return
+	for tower: Dictionary in combat_towers:
+		var tower_id: int = int(tower["id"])
+		var shot: int = int(tower["shot"])
+		if shot > int(_seen_shots.get(tower_id, 0)):
+			_shot_traces.append({
+				"cell": tower["cell"],
+				"aim": tower["aim"],
+				"life": SHOT_DURATION,
+			})
+			set_process(true)
+		_seen_shots[tower_id] = shot
 
 
 func cell_center(cell: Vector2i) -> Vector2:
@@ -52,6 +103,13 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var click := event as InputEventMouseButton
 		if click.button_index != MOUSE_BUTTON_LEFT and click.button_index != MOUSE_BUTTON_RIGHT:
+			return
+		if cell_click_mode:
+			if click.pressed:
+				var cell: Vector2i = _cell_at(click.position)
+				if layout.contains(cell):
+					cell_clicked.emit(cell, click.button_index)
+			accept_event()
 			return
 		if click.pressed:
 			_paint_button = click.button_index
@@ -126,6 +184,43 @@ func _draw() -> void:
 		draw_line(cell_center(layout.route[i - 1]), cell_center(layout.route[i]), ROUTE_LINE, 4.0, true)
 	_draw_endpoint(layout.entrance, ENTRY_COLOR, "E")
 	_draw_endpoint(layout.base, BASE_COLOR, "B")
+	_draw_combat()
+
+
+func _draw_combat() -> void:
+	var cell_size: float = _cell_size()
+	var texture_size: Vector2 = ARROW_REWARD.icon_texture.get_size()
+	var icon_size: Vector2 = texture_size * (cell_size * 0.86 / maxf(texture_size.x, texture_size.y))
+	for tower: Dictionary in combat_towers:
+		if int(tower["id"]) == selected_tower_id:
+			var center: Vector2 = cell_center(tower["cell"])
+			draw_circle(center, tower_range * cell_size, Color(0.71, 0.89, 0.72, 0.06))
+			draw_arc(center, tower_range * cell_size, 0.0, TAU, 96, ROUTE_LINE, 1.5, true)
+	for tower: Dictionary in combat_towers:
+		var center: Vector2 = cell_center(tower["cell"])
+		var selected: bool = int(tower["id"]) == selected_tower_id
+		var extent: float = cell_size * 0.45
+		draw_rect(Rect2(center - Vector2.ONE * extent, Vector2.ONE * extent * 2.0),
+			Color("e0bc77") if selected else Color("526353"), false, 2.0)
+		draw_texture_rect(ARROW_REWARD.icon_texture, Rect2(center - icon_size * 0.5, icon_size), false)
+	for enemy: Dictionary in combat_enemies:
+		var position: Vector2 = enemy["pos"]
+		var center: Vector2 = _board_origin() + (position + Vector2(0.5, 0.5)) * cell_size
+		var radius: float = maxf(4.0, cell_size * 0.20)
+		draw_circle(center, radius + 1.5, Color("172120"))
+		draw_circle(center, radius, Color("d99578"))
+		var bar_size: Vector2 = Vector2(cell_size * 0.62, maxf(3.0, cell_size * 0.09))
+		var bar_position: Vector2 = center - Vector2(bar_size.x * 0.5, radius + bar_size.y + 3.0)
+		draw_rect(Rect2(bar_position, bar_size), Color("172120"))
+		var fraction: float = clampf(float(enemy["hp"]) / maxf(1.0, float(enemy["max_hp"])), 0.0, 1.0)
+		draw_rect(Rect2(bar_position, Vector2(bar_size.x * fraction, bar_size.y)), ROUTE_LINE)
+	for trace: Dictionary in _shot_traces:
+		var aim: Vector2 = trace["aim"]
+		var end: Vector2 = _board_origin() + (aim + Vector2(0.5, 0.5)) * cell_size
+		var color := Color("f6df99")
+		color.a = clampf(float(trace["life"]) / SHOT_DURATION, 0.0, 1.0)
+		draw_line(cell_center(trace["cell"]), end, color, 2.0, true)
+		draw_circle(end, cell_size * 0.13, color, false, 1.5, true)
 
 
 func _draw_endpoint(cell: Vector2i, color: Color, letter: String) -> void:

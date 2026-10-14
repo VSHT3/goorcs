@@ -25,9 +25,9 @@ Read all three for the first task in a session. Add area-specific guidance only 
 - Commit source resources and Godot UID sidecars; keep generated caches, builds, and credentials out of Git.
 - Keep changes small and playable. Do not build extensive progression before proving the two-player core loop.
 
-## State ownership when gameplay is introduced
+## Match state ownership
 
-There is no match simulation yet. These constraints apply if the proposed host-authoritative design is adopted; changing that design requires an explicit decision first.
+Match planning and combat use host-authoritative state. These ownership constraints also apply to future currency and reward systems; changing that design requires an explicit decision first.
 
 - The host owns currency, enemy state, damage, and gameplay reward rolls. Independent client calculations must not decide authoritative outcomes.
 - Players submit commands; the host validates and applies them. Host-player actions use the same rules as remote-player actions.

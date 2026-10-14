@@ -5,12 +5,14 @@ signal changed
 signal feedback(message: String)
 
 var session: MultiplayerSession
+var combat_rules: CombatRules = preload("res://resources/combat/prototype.tres")
 # Presentation copies only. Commands never read these mutable UI-facing values.
 var layouts: Array[PathLayout] = [PathLayout.new(), PathLayout.new()]
 var ready_flags: Array[bool] = [false, false]
 var locked_routes: Array[Array] = [[], []]
 var locked: bool = false
 var active: bool = false
+var combat: Dictionary = {}
 
 var _dimensions: Vector2i = Vector2i(14, 9)
 var _budget: int = 30
@@ -23,6 +25,25 @@ var _host_locked: bool = false
 var _active_peer_id: int = 0
 var _synced_guest_id: int = 0
 var _pending_snapshot_peer: int = 0
+var _host_combat: MatchCombat
+var _combat_publish_elapsed: float = 0.0
+
+
+func _physics_process(delta: float) -> void:
+	if not session.is_host or not active or _host_combat.phase != MatchCombat.Phase.WAVE:
+		return
+	var previous_phase: MatchCombat.Phase = _host_combat.phase
+	if not _host_combat.advance(delta):
+		return
+	_combat_publish_elapsed += delta
+	if _host_combat.phase != previous_phase:
+		_host_locked = _host_combat.phase != MatchCombat.Phase.PLANNING
+		_host_ready = [false, false]
+		set_physics_process(false)
+		_publish_snapshot()
+	elif _combat_publish_elapsed >= 0.1:
+		_combat_publish_elapsed = 0.0
+		_publish_combat()
 
 
 func configure(dimensions: Vector2i, budget: int, entrance: Vector2i, base: Vector2i) -> void:
@@ -56,6 +77,24 @@ func request_clear(slot: int) -> void:
 
 func submit_ready(value: bool) -> void:
 	_request_command("ready", local_slot(), Vector2i.ZERO, value)
+
+
+func build_tower(slot: int, cell: Vector2i, mode: int) -> void:
+	_request_tower_command("build", slot, cell, -1, mode)
+
+
+func set_targeting(slot: int, tower_id: int, mode: int) -> void:
+	_request_tower_command("target", slot, Vector2i.ZERO, tower_id, mode)
+
+
+func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int) -> void:
+	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
+		feedback.emit("Wait for both players to connect and synchronize their boards.")
+		return
+	if session.is_host:
+		_apply_tower_command(1, command, slot, cell, tower_id, mode)
+	else:
+		_receive_tower_command.rpc_id(1, command, slot, cell, tower_id, mode)
 
 
 func _request_command(command: String, slot: int, cell: Vector2i, value: bool) -> void:
@@ -114,6 +153,10 @@ func _reset_match() -> void:
 	_active_peer_id = 0
 	_synced_guest_id = 0
 	_pending_snapshot_peer = 0
+	_host_combat = MatchCombat.new(combat_rules)
+	combat = _host_combat.snapshot()
+	_combat_publish_elapsed = 0.0
+	set_physics_process(false)
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -142,6 +185,40 @@ func _receive_command(command: String, slot: int, cell: Vector2i, value: bool) -
 	_apply_command(multiplayer.get_remote_sender_id(), command, slot, cell, value)
 
 
+@rpc("any_peer", "call_remote", "reliable")
+func _receive_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int) -> void:
+	_apply_tower_command(multiplayer.get_remote_sender_id(), command, slot, cell, tower_id, mode)
+
+
+func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2i, tower_id: int, mode: int) -> void:
+	if not _can_accept(sender):
+		return
+	var permitted_slot: int = 0 if sender == 1 else 1
+	if slot != permitted_slot:
+		_reject(sender, "Only your own towers can be changed.")
+		return
+	if _host_combat.phase == MatchCombat.Phase.FINISHED:
+		_reject(sender, "The run has ended. Leave to start another room.")
+		return
+	if command == "build":
+		var layout: PathLayout = _host_layouts[slot]
+		if not layout.contains(cell) or layout.has_path(cell):
+			_reject(sender, "Build Arrow towers on empty ground, never on a path or endpoint.")
+			return
+		if not _host_combat.build(slot, cell, mode):
+			_reject(sender, "This cell already has a tower or the targeting mode is invalid.")
+			return
+	elif command == "target":
+		if not _host_combat.set_targeting(slot, tower_id, mode):
+			return
+	else:
+		_reject(sender, "Unknown tower command.")
+		return
+	if _host_combat.phase == MatchCombat.Phase.PLANNING:
+		_host_ready[slot] = false
+	_publish_snapshot()
+
+
 func _can_accept(sender: int) -> bool:
 	if not session.is_host or session.state != MultiplayerSession.State.CONNECTED:
 		return false
@@ -157,13 +234,16 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 		_reject(sender, "Only your own board can be changed.")
 		return
 	if _host_locked:
-		_reject(sender, "Both routes are locked. Combat is not implemented.")
+		_reject(sender, "Paths and readiness are locked during a wave or after the run ends.")
 		return
 	var layout: PathLayout = _host_layouts[permitted_slot]
 	match command:
 		"edit":
 			if not layout.contains(cell) or layout.is_endpoint(cell):
 				_reject(sender, "The entrance, base, and cells outside the board cannot be edited.")
+				return
+			if value and _host_combat.has_tower(permitted_slot, cell):
+				_reject(sender, "A path cannot overlap an existing tower.")
 				return
 			if layout.has_path(cell) == value:
 				return
@@ -190,6 +270,9 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 				# Capture independent copies before publishing the single locked state.
 				_host_routes = [_host_layouts[0].route.duplicate(), _host_layouts[1].route.duplicate()]
 				_host_locked = true
+				_host_combat.start_wave(_host_routes)
+				_combat_publish_elapsed = 0.0
+				set_physics_process(true)
 		_:
 			_reject(sender, "Unknown planning command.")
 			return
@@ -227,6 +310,7 @@ func _snapshot() -> Dictionary:
 		"ready": _host_ready.duplicate(),
 		"locked": _host_locked,
 		"routes": [_host_routes[0].duplicate(), _host_routes[1].duplicate()],
+		"combat": _host_combat.snapshot(),
 	}
 
 
@@ -237,6 +321,21 @@ func _publish_snapshot() -> void:
 	if _synced_guest_id != 0 and _can_accept(_synced_guest_id):
 		_receive_snapshot.rpc_id(_synced_guest_id, snapshot)
 
+
+
+func _publish_combat() -> void:
+	combat = _host_combat.snapshot()
+	changed.emit()
+	if _synced_guest_id != 0 and _can_accept(_synced_guest_id):
+		_receive_combat.rpc_id(_synced_guest_id, combat)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _receive_combat(snapshot: Dictionary) -> void:
+	if session.is_host or session.state != MultiplayerSession.State.CONNECTED or multiplayer.get_remote_sender_id() != 1:
+		return
+	combat = snapshot
+	changed.emit()
 
 @rpc("authority", "call_remote", "reliable")
 func _receive_snapshot(snapshot: Dictionary) -> void:
@@ -259,3 +358,4 @@ func _mirror_snapshot(snapshot: Dictionary) -> void:
 	ready_flags = [snapshot["ready"][0], snapshot["ready"][1]]
 	locked = snapshot["locked"]
 	locked_routes = [snapshot["routes"][0].duplicate(), snapshot["routes"][1].duplicate()]
+	combat = snapshot["combat"]

@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, a persistent collection chest flow, and direct two-player connection with host-authoritative shared maze planning. Combat, loadouts, permanent stat growth, and final art are not implemented. These are narrow implemented features; the full first playable milestone below is not complete.
+The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player Arrow-defense loop: shared maze planning, regular waves, live placement and targeting, persistent base health, and synchronized results. Match economy, sends, upgrades, selling, loadouts, permanent stat growth, and final art are not implemented. The full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -32,12 +32,13 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - A crystal is the current suggested representation of the base and its health; its exact appearance is not finalized.
 - A **wave** is a group of regular enemies. Opponent-sent enemies join the current wave until a delivery cutoff. Later orders wait for the next wave. The cutoff allows both boards to clear before the planning break; its timing is still open.
 - The desired format combines a standalone competitive match with development across multiple encounters.
+- **Confirmed simultaneous defeat:** if both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the run winner. The result is shared and terminal; clients do not roll independently.
 
 ### Working preference
 
 Keep and expand the same maze, towers, and upgrades throughout the run. A **round** would be a stage introducing threats, rewards, or modifiers, rather than a fresh scored match. The creator is leaning toward this continuity but has not finalized it.
 
-The number of waves per round, round boundaries, boss cadence, and what else carries over are open. Construction is not limited to breaks. For planning breaks, the creator is considering a fixed timer, a player-ready action that starts a short countdown for the opponent, or a combination. **30 seconds was an example, not a chosen duration.** Neither the trigger nor the final timing is locked.
+The number of waves per round, round boundaries, and boss cadence remain open. Construction is not limited to breaks. **Confirmed wave-start rule:** both players must ready before every wave; editing a path, building, or changing a tower during planning clears that player's readiness. There is no automatic planning timer or opponent countdown in the current loop. **30 seconds was an earlier example, not a chosen duration.**
 
 ## Core player loop
 
@@ -137,7 +138,7 @@ Choose a limited loadout before a run. That loadout determines the known unit ty
 - **Approved prototype rules:** free chest openings on the collection screen; unlock only missing tower types, without duplicates. Openings stop when the catalog is exhausted.
 - **Prototype reset:** the collection screen's confirmed Reset progress action clears saved tower unlocks and the previous reveal, enabling fresh chest openings. Cancel leaves progress unchanged; reset does not affect workshop paths. Reset is unavailable during an active reveal or a save error.
 - **Provisional payout odds:** roll one reward 80% of the time, three 15%, and five 5%; cap to the number of types still locked. The initial three-entry catalog means a five-roll can grant at most three actual rewards.
-- **Initial identities:** Arrow tower, Orc ballista, Rune obelisk. All three use accepted PixelLab sprites with unchanged source PNGs; atlas regions exclude transparent canvas padding. Arrow tower uses the creator-selected green-bannered tower with a visible stone base and a pink-haired archer holding a bow. All three use a consistent visual-size limit in the collection and chest cards without stretching. These are collection identities with no combat stats or behavior.
+- **Initial identities:** Arrow tower, Orc ballista, Rune obelisk. All three use accepted PixelLab sprites with unchanged source PNGs; atlas regions exclude transparent canvas padding. Arrow tower uses the creator-selected green-bannered tower with a visible stone base and a pink-haired archer holding a bow. All three use a consistent visual-size limit in the collection and chest cards without stretching. These resources own collection identities/art, not combat stats; the separate match simulation currently implements only Arrow.
 - **Ownership:** `CollectionStore` selects the rewards and atomically saves the complete unlocked set before granting it in memory. Invalid saves or write failures disable openings and grant nothing; existing saved data is not silently replaced.
 - **Presentation:** `ChestReveal` only displays a supplied reward list. User-supplied PixelLab chest sprites provide closed/open poses; the fixed body stays unchanged while the lid/interior crossfades. Shake, light, decorative coins, and simultaneous reward cards remain separate. This borrows the chest-reveal idea, not assets or a roulette reel. Skipping or navigation cannot reroll or grant rewards.
 - **Persistence:** a local `user://collection.json` save belongs to one running game instance. There is no cloud sync, account, concurrent-writer coordination, or host-authoritative match reward integration.
@@ -194,15 +195,17 @@ The run should start small and become increasingly extreme: larger towers, stron
 - Required engine release and run commands: [development setup](development.md#setup).
 - Editing and state-ownership conventions: [AGENTS.md](../AGENTS.md).
 - Godot's Compatibility renderer, text-authored scenes/resources, and nearest-neighbor texture filtering are the current starting configuration.
-- The implemented shared-planning model has one authoritative host validate both players' path commands and publish accepted boards, readiness, and captured routes. Combat will reuse that owner model; camera state stays local.
+- One authoritative host validates both players' commands and simulates captured routes, regular enemies, Arrow attacks, base damage, and results. Clients display detached accepted snapshots; selection, tool choice, target defaults for future placement, and visual effects stay local.
 - **Implemented connection setup:** Play offers Host and Join using Godot ENet. The creator chose no game-hosted online infrastructure. A shared invite contains a numeric host address, UDP port, and fresh random room credential; it admits only one guest. LAN, a private VPN/network, or a reachable public address with UDP forwarding/firewall access is required. The invite is not a short-code lookup service and cannot bypass NAT.
 - MCP/editor bridges are optional development tools, not something players must run.
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.
 
-The connection lobby authenticates admission and reports waiting/connected/disconnected states. Admission opens two visible planning boards. The host validates ownership, immutable endpoints, bounds, and the equal path budget through `PathLayout`; disconnected drafts are allowed, but readiness requires every placed tile and the base to reach the entrance. Accepted edits clear that player's readiness. Both-ready captures independent shortest-route copies and locks editing, clearing, and readiness. Both peers display the accepted state; local presentation copies cannot decide authoritative outcomes.
+The connection lobby authenticates admission and reports waiting/connected/disconnected states. Admission opens two visible boards. The host validates ownership, immutable endpoints, bounds, equal path budgets, and non-overlapping tower placement through the existing rule owners. Disconnected path drafts are allowed, but readiness requires every placed tile and the base to reach the entrance. Accepted planning edits, tower construction, and target changes clear that player's readiness. Both-ready captures independent shortest-route copies and starts a regular wave; path edits and readiness are locked during combat.
 
-Planning uses the host's exported workshop configuration but owns separate fresh paths. Guest departure resets planning and returns the host to waiting; rejoining starts fresh. Workshop layouts and collection saves remain local. There is no combat simulation, match economy, camera scouting, host migration, or relay fallback. Separate-machine internet connectivity remains unverified. See [connection setup and checks](development.md#direct-connection-lobby).
+**Implemented defense slice:** Arrow towers use fixed provisional stats and free placement on empty non-path cells during planning or combat, independent of collection unlocks. Each tower can target **Furthest** (greatest route progress), **Closest** (shortest distance to the tower), or **Strongest** (highest current HP). Only enemies in inclusive circular range are eligible; equal scores use the lowest enemy ID. Arrows hit instantly; shot traces are cosmetic. One regular enemy type follows the captured route. Killed enemies never leak; surviving arrivals damage the base. Both boards must finish all scheduled spawns and clear before planning resumes. Maze drafts, towers, and base health persist, and both players must ready for every next wave. A destroyed base ends the run; same-tick destruction of both invokes the single host coin flip.
+
+The host's exported board configuration and `resources/combat/prototype.tres` supply provisional playtest settings, not settled balance. Planning paths are separate from workshop drafts. Guest departure resets the match and returns the host to waiting; rejoining starts fresh. Workshop layouts and collection saves remain local. Match economy, sends, upgrades, selling, relocation, loadout gating, camera scouting, host migration, and relay fallback are not implemented. Separate-machine internet connectivity remains unverified. See [connection setup and checks](development.md#direct-connection-lobby).
 
 ## First playable proof of the core rules
 
@@ -214,15 +217,15 @@ The first implementation milestone remains deliberately smaller than the full di
 4. Construction, individual upgrades, and selling work during combat without obstructing the route. Direct relocation is free only during breaks; expanding upgrades require a legal enlarged footprint.
 5. Regular waves threaten both bases. Sending enemies costs currency and increases the sender's future income. Sends enter the current wave until a delivery cutoff; later orders wait for the next wave.
 6. Both players observe consistent currency, income, enemy state, health, and match results.
-7. A base reaching zero health ends the run. A simultaneous defeat rule must be chosen before completion.
+7. A base reaching zero health ends the run. Same-tick destruction of both bases is resolved by one host-owned random coin flip.
 
-This milestone is not the finished game and does not discard the requested abilities, other buildings, map interactions, gambling, traits, collection, or escalation. Those systems need concrete rules and later playable milestones. The path workshop proves local editing and routing; shared planning now proves authoritative two-board editing, readiness, and captured-route locking, not combat or the complete multiplayer milestone.
+This milestone is not the finished game and does not discard the requested abilities, other buildings, map interactions, gambling, traits, collection, or escalation. The current defense slice proves authoritative two-board planning, live fixed-stat Arrow building and targeting, regular waves, captured-route locking, base damage, both-ready breaks, and results. Free placement does not prove the proposed economy; sends, purchases, upgrades, selling, relocation, expanding footprints, loadouts, and camera scouting still need implementation.
 
 ## Decisions still needed before their implementation
 
 - **Board interaction:** final path-budget and map-expansion rules, placement relative to the path, final entrance/crystal positions, and sale/refund rules.
-- **Run pacing:** confirm board continuity; define round boundaries, wave scheduling, the fixed/ready-up planning timer, send cutoff timing, endgame pressure, and simultaneous defeat.
-- **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules and the initial structure/enemy archetypes, targeting, attacks, defenses, and counters.
+- **Run pacing:** confirm continuity across rounds; define round boundaries, wave scheduling beyond the current regular-wave prototype, send cutoff timing, and endgame pressure. Both-ready wave starts and host coin-flip simultaneous defeat are now confirmed.
+- **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules, additional structure/enemy archetypes, defenses, and counters. Arrow now supports Furthest/Closest/Strongest targeting; fixed stats and the single regular enemy remain provisional.
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.
 - **Randomness and progression:** trait reveal/reroll rules, run reward choices, loadout limits, starter collection, permanent stat growth, and post-run payouts.
 - **Balance and readability:** intended duration, economic scaling, late-run density, visual hierarchy, and performance targets.

@@ -1,5 +1,7 @@
 extends "res://tests/multiplayer_session_test.gd"
 
+var planning_worker_path: String = "res://tests/match_planning_worker.gd"
+
 
 func _run() -> void:
 	success_message = "PASS: two-peer distinct paths, ownership/bounds/endpoints/budget, readiness invalidation/withdrawal, route capture/lock, disconnect and fresh rejoin"
@@ -78,7 +80,7 @@ func _run() -> void:
 func _start_workers() -> bool:
 	for lane: String in ["host", "guest"]:
 		_command_ids[lane] = 0
-		var arguments := PackedStringArray(["--headless", "--path", ProjectSettings.globalize_path("res://"), "--log-file", _directory.path_join(lane + ".log"), "--script", "res://tests/match_planning_worker.gd", "--", _directory, lane])
+		var arguments := PackedStringArray(["--headless", "--path", ProjectSettings.globalize_path("res://"), "--log-file", _directory.path_join(lane + ".log"), "--script", planning_worker_path, "--", _directory, lane])
 		var pid: int = OS.create_process(OS.get_executable_path(), arguments)
 		_check(pid > 0, "Start real planning peer: " + lane)
 		if pid <= 0:

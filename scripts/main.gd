@@ -5,6 +5,7 @@ extends Control
 @export var tile_budget: int = 30
 @export var entrance_cell := Vector2i(0, 4)
 @export var base_cell := Vector2i(13, 4)
+@export var combat_rules: CombatRules = preload("res://resources/combat/prototype.tres")
 
 var layout: PathLayout
 var _workshop_opened: bool = false
@@ -43,6 +44,7 @@ func _ready() -> void:
 	planning = MatchPlanning.new()
 	planning.name = "Planning"
 	planning.session = session
+	planning.combat_rules = combat_rules
 	planning.configure(board_dimensions, tile_budget, entrance_cell, base_cell)
 	add_child(planning)
 	play_screen = preload("res://scenes/multiplayer_lobby.tscn").instantiate()

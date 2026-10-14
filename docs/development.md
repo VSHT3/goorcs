@@ -47,6 +47,12 @@ godot --headless --path . --script tests/multiplayer_session_test.gd
 # Run real two-process shared-planning regressions.
 godot --headless --path . --script tests/match_planning_test.gd
 
+# Run deterministic combat-rule regressions.
+godot --headless --path . --script tests/match_combat_test.gd
+
+# Run real two-process combat/result regressions.
+godot --headless --path . --script tests/match_multiplayer_test.gd
+
 # Run rendered tower-size regressions (requires a graphical renderer).
 godot --path . --script tests/tower_icon_test.gd
 ```
@@ -84,17 +90,29 @@ The regression command above launches three real Godot processes and covers admi
 
 Graphical verification exercised Play/Host/Join, full-code clipboard copy, invalid-code correction with Enter, two-player admission, guest leave/rejoin, and host disconnection. Main/host and compact guest/error surfaces were inspected at 1280×720 and 1000×720. Navigation regressions also verify that Esc exits Play while a text field is editing, without affecting local workshop progress.
 
-For a two-instance manual check, launch the project twice with the run command in Setup. Host in one using `127.0.0.1`, copy its invite into Join in the other, and check that both open **Connected · Shared planning** with two boards. Leave as guest, rejoin, then leave as host and inspect the guest's disconnect error. For internet verification, repeat on two separate machines and networks with the actual forwarding/private-network setup. Localhost success does not establish internet reachability; that check remains outstanding.
+For a two-instance manual check, launch the project twice with the run command in Setup. Host in one using `127.0.0.1`, copy its invite into Join in the other, and check that both open planning with two boards. Leave as guest, rejoin, then leave as host and inspect the guest's disconnect error. For internet verification, repeat on two separate machines and networks with the actual forwarding/private-network setup. Localhost success does not establish internet reachability; that check remains outstanding.
 
-Admission automatically opens shared planning. Both boards remain visible; only your own accepts left-drag placement or right-drag removal. **Clear my tiles** clears your board. **Ready** requires a legal connected path, and an accepted edit clears readiness. **Unready** works until both players confirm. Both-ready atomically captures the shortest routes and locks all path/readiness actions. Combat is not implemented; Leave/Esc ends this slice.
+Admission automatically opens shared planning. **Path** edits only your own board by left-drag placement or right-drag removal; **Clear my tiles** clears your paths. **Tower** left-click builds a free prototype Arrow on empty non-path ground or selects an existing own tower; **Inspect** only selects. Select a tower and use **Target** to choose Furthest, Closest, or Strongest. Tower placement and target changes work during planning and combat. Path edits cannot overlap towers.
 
-`MatchPlanning` reuses `MultiplayerSession`'s authenticated API; it never installs a second peer. The host owns authoritative `PathLayout` instances and validates host-player and remote commands through the same rules. Remote sender identity determines board ownership. Clients receive reliable full snapshots with the host's configuration; UI layouts are detached presentation copies, not alternate match state. A post-admission snapshot request avoids exposing guest editing before synchronization. Planning paths are separate from workshop drafts and collection saves.
+**Ready for wave N** requires a legal connected path. Accepted path edits, tower placement, or actual targeting changes during planning clear that player's readiness. **Unready** withdraws it before both confirm. Both-ready captures the shortest routes and starts a regular wave; path edits, clear, and readiness are locked until both boards finish every scheduled spawn and clear. Towers, paths, and base health persist across planning breaks. Every next wave again requires both-ready. A base reaching zero ends the run; if both reach zero in the same host tick, one host RNG coin flip selects the winner. Finished outcomes cannot be rerolled or restarted. Leave/Esc closes the session.
 
-The planning regression launches separate host/guest Godot processes with deliberately different local configurations. It verifies distinct legal mazes and shortest routes agree, ownership/bounds/endpoints/budget rejections preserve state, illegal paths cannot ready, edits invalidate readiness, unready works before lock, captured routes agree and reject subsequent edits/clear/unready, and disconnect/rejoin yields fresh boards. Workers use isolated temporary files and never touch collection saves.
+`MatchPlanning` reuses `MultiplayerSession`'s authenticated API; it never installs a second peer. It owns authoritative `PathLayout` instances and a host-only `MatchCombat`, and validates host-player and remote commands through the same rules. Remote sender identity determines board/tower ownership. Clients receive reliable accepted snapshots; UI layouts and combat dictionaries are detached mirrors. A post-admission snapshot request avoids exposing guest commands before synchronization. Static commands/phase transitions publish full snapshots; in-wave combat snapshots publish every 0.1 seconds without rebuilding path mirrors. Planning paths and match towers are separate from workshop drafts and collection saves.
 
-Graphical two-process verification exercised actual Play/Host/Join controls, distinct mouse-built paths, read-only opponent input, Ready and its waiting state, edit-driven readiness invalidation, right-click removal, both-ready locking, guest Esc, host return to waiting, and host Leave. Standard desktop captures rendered at 1215×683 under the window manager. Compact verification used a visible 1000×720 Godot subviewport because the compositor ignored requested window sizes; both planning and locked surfaces were inspected without clipping. The graphical runtime used Intel OpenGL after NVIDIA driver warnings. Isolated collection paths kept real player progress unchanged.
+The planning regression launches separate host/guest Godot processes with deliberately different local configurations. It verifies distinct legal mazes and shortest routes agree, ownership/bounds/endpoints/budget rejections preserve state, illegal paths cannot ready, edits invalidate readiness, unready works before a wave, captured routes reject combat-time edits/clear/unready, and disconnect/rejoin yields fresh boards. Workers use isolated temporary files and never touch collection saves.
 
-For a manual check, connect two instances, draw different paths, inspect them from both peers, and try editing the opponent board. Ready one side, edit it to clear readiness, then ready both. Check both captured routes remain frozen. Leave as guest and rejoin using the same invite: both boards should be empty. Internet verification still requires separate machines and networks.
+Initial planning-only graphical verification exercised Play/Host/Join, distinct mouse-built paths, read-only opponent input, Ready, readiness invalidation, removal, route locking, Esc, waiting, and Leave. The defense-loop verification below supersedes its old terminal locked-route screen.
+
+### Combat simulation and verification
+
+`CombatRules` and `resources/combat/prototype.tres` hold provisional playtest stats, referenced by the main scene's exported `combat_rules`. This slice implements one regular enemy and fixed-stat Arrow towers with free placement independent of collection unlocks. There is no currency, sending, purchase RNG, upgrading, selling, relocation, loadout gating, or post-run reward grant.
+
+The host advances `MatchCombat` with fixed physics deltas. Enemy positions interpolate along captured grid routes. Scheduled spawns are equal on both boards; later waves apply configured enemy HP growth. Arrow attacks are instant-hit; targets must be in inclusive circular range. Furthest compares route progress, Closest compares squared distance to the tower, and Strongest compares current HP. All equal scores use lowest enemy ID. Attacks resolve before leak bookkeeping, so a killed enemy cannot damage a base. Leaks on both boards are batched before resolving defeat; only same-tick destruction of both consumes one host RNG draw. Selection, range outlines, and shot traces are cosmetic.
+
+Combat-rule regressions verify policy-specific damage distributions, current-HP targeting, range boundaries/ties, immutable captured routes, killed enemies never leaking, pending-spawn gaps and both-board clearance, persistent health/towers, next-wave health growth, ordinary wins without randomness, and one frozen simultaneous-defeat roll. Real separate-process combat regressions verify owned live tower commands and all modes, rejected path/bounds/overlap/mode/ownership commands, readiness invalidation, combat path locks, both-ready wave transitions, host configuration replication, persistent damage, ordinary results, simultaneous coin-flip agreement, terminal command rejection, and fresh rejoin.
+
+Graphical separate host/guest processes exercised actual Path/Tower controls, mouse-built paths, live Arrow placement/selection, native popup selection of all target modes, enemies and health bars, range outlines and shot traces, both-ready starts and breaks, ordinary win/loss, host-owned coin-flip results agreed by both peers, rejoin, Esc, and Leave. Visible Godot subviewports rendered at 1280×720 and 1000×720 because the compositor controls desktop window dimensions. Standard/compact gameplay, planning breaks, and results were inspected without clipping. The runtime used Intel OpenGL after NVIDIA driver warnings; isolated saves preserved real collection progress.
+
+For a manual check, connect two instances and draw different legal paths. Build Arrow towers on one side, select them, and switch all target modes. Ready just one player and verify no wave starts; ready both and inspect movement, hits, kills, and leaks on both boards. Try changing the path during combat: it must be rejected, while construction and targeting remain available. After both boards clear, verify damage and towers persist and both must ready again. An ordinary destroyed base must produce opposite Won/Lost screens. For a quick simultaneous-defeat check, use matching routes and no towers; both bases should fall together and display the same coin-flip winner. Leave/rejoin resets paths, towers, health, and wave state. Internet verification still requires separate machines and networks.
 
 ## Optional Godot bridges
 
@@ -163,7 +181,7 @@ The generation description was:
 
 The existing `arrow_tower` reward retains its ID and resource UID. Its ordinary `AtlasTexture` uses `Rect2(28, 24, 70, 86)`, excluding only transparent padding; the source pixels are neither resized nor retouched. Lossless import, no mipmaps, nearest filtering, and the shared 52×52 visual frame match the other towers. The old procedural Arrow drawing and its unused pixel helper were removed.
 
-Import, main-scene smoke, collection/persistence, reveal-layout, chest-flow, and rendered icon-size regressions pass. Graphical verification exercised actual Collection/Open controls, locked and unlocked catalog entries, an actual three-reward reveal, a remaining-only Arrow reveal, 1280×720 and 1000×720 rendered collection surfaces, and reloading the same saved Arrow ID. Verification used isolated saves and did not change real progress. This is collection artwork, not an implemented combat unit.
+Import, main-scene smoke, collection/persistence, reveal-layout, chest-flow, and rendered icon-size regressions pass. Graphical verification exercised actual Collection/Open controls, locked and unlocked catalog entries, an actual three-reward reveal, a remaining-only Arrow reveal, 1280×720 and 1000×720 rendered collection surfaces, and reloading the same saved Arrow ID. Verification used isolated saves and did not change real progress. The same accepted sprite now supplies the prototype Arrow's board artwork; combat rules belong to `MatchCombat` and `CombatRules`, not the collection resource.
 
 ### Consistent tower icon sizing
 
@@ -205,7 +223,7 @@ For manual verification, connect E to B, create a longer branch and a shortcut, 
 
 Also open the workshop by keyboard, draw while holding the mouse and press Esc, release outside the board, and resume. Hovering must not draw or emit mouse-button errors. Return through the Menu button and resume again; budget and route must remain unchanged.
 
-Desktop exports and combat are not implemented or verified. Direct connection and shared planning are implemented and locally verified; separate-machine internet connectivity is not verified.
+Desktop exports are not implemented or verified. Direct connection, shared planning, and the Arrow-defense loop are implemented and locally verified; separate-machine internet connectivity is not verified.
 
 ## Collection and chest verification
 

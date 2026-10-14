@@ -43,7 +43,7 @@ func _ready() -> void:
 	_content.move_child(planning_screen, _scroll.get_index() + 1)
 	if planning != null:
 		planning.changed.connect(_planning_changed)
-	_scope.text = "Private room · Combat is not available. Workshop and collection remain local."
+	_scope.text = "Private defense room · Free prototype towers, provisional stats. Workshop and collection remain local."
 	host_button.pressed.connect(_show_host)
 	join_button.pressed.connect(_show_join)
 	host_create_button.pressed.connect(_create_host)

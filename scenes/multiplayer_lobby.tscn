@@ -322,5 +322,5 @@ autowrap_mode = 2
 layout_mode = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
 theme_override_font_sizes/font_size = 14
-text = "Connection lobby only · Combat is not available. Workshop and collection remain local."
+text = "Private duel · Free prototype Arrow defense. Workshop and collection remain local."
 autowrap_mode = 2
