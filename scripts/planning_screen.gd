@@ -15,6 +15,7 @@ var selected_tower_id: int = -1
 var _default_targeting: int = 0
 var _pending_tower_cell := Vector2i(-1, -1)
 var _placement_id: StringName = &""
+var _selected_enemy_type: StringName = &"grunt"
 var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 
 @onready var world: MatchWorld = $World
@@ -23,6 +24,7 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
 @onready var send_button: Button = %SendEnemy
+@onready var enemy_selector: OptionButton = %EnemyType
 @onready var _palette: HBoxContainer = %TowerPalette
 @onready var _coins: Label = %Coins
 @onready var _income: Label = %Income
@@ -69,6 +71,7 @@ func _ready() -> void:
 	clear_button.pressed.connect(_clear)
 	ready_button.pressed.connect(_toggle_ready)
 	send_button.pressed.connect(_send_enemy)
+	enemy_selector.item_selected.connect(_enemy_type_selected)
 	leave_button.pressed.connect(leave_requested.emit)
 	visibility_changed.connect(_visibility_changed)
 	_feedback_timer.timeout.connect(_clear_feedback)
@@ -247,33 +250,97 @@ func _own_coins() -> int:
 func _refresh_sends() -> void:
 	var state: Dictionary = planning.combat if planning != null else {}
 	var rules: Dictionary = state.get("rules", {})
+	var types: Dictionary = state.get("enemy_types", {})
+	_refresh_enemy_selector(types)
 	var own_slot: int = planning.local_slot() if planning != null else 0
 	var income: Array = state.get("income", [0, 0])
 	var queued: Array = state.get("queued_sends", [0, 0])
+	var queues: Array = state.get("send_queues", [[], []])
 	var phase: int = int(state.get("phase", MatchCombat.Phase.PLANNING))
-	var configured: bool = rules.has("send_cost") and rules.has("send_income") and rules.has("send_cutoff_seconds")
-	var cost: int = int(rules.get("send_cost", 0))
-	var gain: int = int(rules.get("send_income", 0))
-	var available: bool = planning != null and planning.active and phase != MatchCombat.Phase.FINISHED and configured
+	var finished: bool = phase == MatchCombat.Phase.FINISHED
+	var stats: Dictionary = types.get(String(_selected_enemy_type), {})
+	var configured: bool = not stats.is_empty() and rules.has("send_cutoff_seconds")
+	var cost: int = int(stats.get("send_cost", 0))
+	var gain: int = int(stats.get("send_income", 0))
+	var available: bool = planning != null and planning.active and not finished and configured
 	var delivers_now: bool = phase == MatchCombat.Phase.WAVE and bool(state.get("sends_open", false))
+	enemy_selector.disabled = planning == null or not planning.active or finished or types.is_empty()
 	send_button.disabled = not available or _own_coins() < cost
 	send_button.text = "%s · %d/+%d" % ["Send now" if delivers_now else "Send next", cost, gain] if configured else "Send unavailable"
+	if finished:
+		send_button.text = "Match finished"
 	_income.text = "Income +%d/clear · Q%d/%d" % [int(income[own_slot]), int(queued[own_slot]), int(queued[1 - own_slot])]
-	_income.tooltip_text = "Your recurring bonus: %d Coins at every both-board wave clear, on top of the regular reward. No immediate or terminal payout.\nQueued for next wave: %d incoming to you / %d outgoing to your opponent." % [int(income[own_slot]), int(queued[own_slot]), int(queued[1 - own_slot])]
+	var queue_feedback: String = "Next-wave queues:\nIncoming to you: %d (%s).\nOutgoing to opponent: %d (%s)." % [int(queued[own_slot]), _queue_composition(queues[own_slot], types), int(queued[1 - own_slot]), _queue_composition(queues[1 - own_slot], types)]
+	if finished:
+		queue_feedback += "\nMatch finished; no further delivery or income payouts."
+	_income.tooltip_text = "Your recurring bonus: %d Coins at every both-board wave clear, on top of the regular reward. No immediate or terminal payout.\n%s" % [int(income[own_slot]), queue_feedback]
 	if not configured:
-		send_button.tooltip_text = "Waiting for host send rules."
+		send_button.tooltip_text = "Waiting for host enemy types and send rules.\n" + queue_feedback
+		enemy_selector.tooltip_text = send_button.tooltip_text
 		return
-	var delivery: String = "Delivered to the opponent now." if delivers_now else "Queued for the opponent's next wave."
+	var delivery: String = "Delivered to the opponent now, in wave %d." % int(state.get("wave", 0)) if delivers_now else "Queued for the opponent's next wave (%d)." % (int(state.get("wave", 0)) + 1)
 	if not available:
-		delivery = "Match finished." if planning != null and planning.active else "Waiting for match."
+		delivery = "Match finished." if finished else "Waiting for match."
 	elif _own_coins() < cost:
 		delivery += "\nNeed %d more Coins." % (cost - _own_coins())
-	send_button.tooltip_text = "Send one wave-scaled enemy for %d Coins; add +%d recurring Coins per both-board clear.\n%s\nCurrent-wave delivery closes %.1fs after wave start; breaks and later sends queue for the next wave." % [cost, gain, delivery, float(rules.get("send_cutoff_seconds", 0.0))]
+	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
+	send_button.tooltip_text = "%s\n%s\nHost stats for wave %d: %d HP · %.2f cells/s.\n%s\nCurrent-wave delivery closes %.1fs after wave start; breaks and later sends queue for the next wave." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules.get("send_cutoff_seconds", 0.0))]
+	if phase == MatchCombat.Phase.WAVE and not delivers_now and not finished:
+		send_button.tooltip_text += "\nQueued enemies use next-wave health and speed when delivered."
+	enemy_selector.tooltip_text = send_button.tooltip_text
+	for index: int in range(enemy_selector.item_count):
+		var type_stats: Dictionary = types[String(enemy_selector.get_item_metadata(index))]
+		enemy_selector.set_item_tooltip(index, "%s\nHost stats for wave %d: %d HP · %.2f cells/s." % [_enemy_send_description(type_stats), stats_wave, int(type_stats.get("health", 0)), float(type_stats.get("speed", 0.0))])
+
+
+func _refresh_enemy_selector(types: Dictionary) -> void:
+	var ids: Array[String] = []
+	for id: String in types:
+		ids.append(id)
+	var rebuild: bool = enemy_selector.item_count != ids.size()
+	if not rebuild:
+		for index: int in range(ids.size()):
+			if String(enemy_selector.get_item_metadata(index)) != ids[index]:
+				rebuild = true
+				break
+	if rebuild:
+		enemy_selector.clear()
+		for id: String in ids:
+			enemy_selector.add_item(String(types[id].get("title", id)))
+			enemy_selector.set_item_metadata(enemy_selector.item_count - 1, id)
+	if ids.is_empty():
+		return
+	if not ids.has(String(_selected_enemy_type)):
+		_selected_enemy_type = &"grunt" if ids.has("grunt") else StringName(ids[0])
+	for index: int in range(ids.size()):
+		enemy_selector.set_item_text(index, String(types[ids[index]].get("title", ids[index])))
+		if ids[index] == String(_selected_enemy_type) and enemy_selector.selected != index:
+			enemy_selector.select(index)
+
+
+func _enemy_send_description(stats: Dictionary) -> String:
+	return "%s: %d Coins; +%d recurring Coins per both-board clear." % [String(stats.get("title", _selected_enemy_type)), int(stats.get("send_cost", 0)), int(stats.get("send_income", 0))]
+
+
+func _queue_composition(queue: Array, types: Dictionary) -> String:
+	var counts: Dictionary[String, int] = {}
+	for id: String in queue:
+		counts[id] = counts.get(id, 0) + 1
+	var parts: PackedStringArray = []
+	for id: String in counts:
+		var stats: Dictionary = types.get(id, {})
+		parts.append("%s ×%d" % [String(stats.get("title", id)), counts[id]])
+	return ", ".join(parts) if not parts.is_empty() else "none"
+
+
+func _enemy_type_selected(index: int) -> void:
+	_selected_enemy_type = StringName(enemy_selector.get_item_metadata(index))
+	_refresh_sends()
 
 
 func _send_enemy() -> void:
 	if planning != null and not send_button.disabled:
-		planning.send_enemy(planning.local_slot())
+		planning.send_enemy(planning.local_slot(), _selected_enemy_type)
 
 
 func _target_selected(index: int) -> void:

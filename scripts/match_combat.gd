@@ -10,7 +10,9 @@ var base_health: Array[int] = []
 var coins: Array[int] = []
 # Recurring bonus on each surviving wave clear; queues belong to the target board.
 var income: Array[int] = [0, 0]
-var queued_sends: Array[int] = [0, 0]
+var queued_sends: Array[int]:
+	get:
+		return [_send_queues[0].size(), _send_queues[1].size()]
 var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
@@ -19,6 +21,8 @@ var enemies: Array[Array] = [[], []]
 var _rules: CombatRules
 # Captured once from resources so commands, attacks, and snapshots share host-owned stats.
 var _tower_types: Dictionary = {}
+var _enemy_types: Dictionary = {}
+var _send_queues: Array[Array] = [[], []]
 var _random: RandomNumberGenerator
 var _routes: Array[Array] = [[], []]
 var _spawned: Array[int] = [0, 0]
@@ -35,6 +39,22 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null) -> void:
 		_random.randomize()
 	base_health = [rules.base_health, rules.base_health]
 	coins = [rules.starting_coins, rules.starting_coins]
+	for definition: EnemyDefinition in rules.enemy_definitions:
+		if definition == null:
+			push_error("Combat enemy_definitions contains a null entry")
+			continue
+		var type_id: String = String(definition.id)
+		if type_id.is_empty() or definition.title.is_empty() or not is_finite(definition.health_multiplier) or definition.health_multiplier <= 0.0 or not is_finite(definition.speed_multiplier) or definition.speed_multiplier <= 0.0 or definition.send_cost <= 0 or definition.send_income < 0:
+			push_error("Invalid combat enemy definition '%s': positive multipliers/price and nonnegative income are required" % type_id)
+			continue
+		if _enemy_types.has(type_id):
+			push_error("Duplicate combat enemy definition '%s': keeping the first valid definition" % type_id)
+			continue
+		_enemy_types[type_id] = {
+			"title": definition.title, "health_multiplier": definition.health_multiplier,
+			"speed_multiplier": definition.speed_multiplier,
+			"send_cost": definition.send_cost, "send_income": definition.send_income,
+		}
 	for definition: TowerDefinition in rules.tower_definitions:
 		if definition == null:
 			push_error("Combat tower_definitions contains a null entry")
@@ -146,18 +166,22 @@ func has_tower(slot: int, cell: Vector2i) -> bool:
 	return false
 
 
-func send_enemy(slot: int) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or coins[slot] < _rules.send_cost:
+func send_enemy(slot: int, type_id: StringName) -> bool:
+	if phase == Phase.FINISHED or not _valid_slot(slot) or not _enemy_types.has(String(type_id)):
+		return false
+	var definition: Dictionary = _enemy_types[String(type_id)]
+	var cost: int = definition["send_cost"]
+	if coins[slot] < cost:
 		return false
 	var target: int = 1 - slot
-	# No state changes before every precondition passes. Late/planning orders reserve
-	# delivery instead of requiring an editable or even currently legal route.
-	coins[slot] -= _rules.send_cost
-	income[slot] += _rules.send_income
+	# Acceptance purchases either immediate delivery or a typed next-wave order.
+	# Neither editable routes nor client-provided stats enter this transaction.
+	coins[slot] -= cost
+	income[slot] += int(definition["send_income"])
 	if _sends_open():
-		_spawn_enemy(target, 0.0)
+		_spawn_enemy(target, String(type_id), 0.0)
 	else:
-		queued_sends[target] += 1
+		_send_queues[target].append(String(type_id))
 	return true
 
 
@@ -174,9 +198,9 @@ func start_wave(routes: Array[Array]) -> bool:
 	wave += 1
 	phase = Phase.WAVE
 	for slot: int in range(2):
-		for sent: int in range(queued_sends[slot]):
-			_spawn_enemy(slot, 0.0)
-		queued_sends[slot] = 0
+		for type_id: String in _send_queues[slot]:
+			_spawn_enemy(slot, type_id, 0.0)
+		_send_queues[slot].clear()
 	return true
 
 
@@ -209,28 +233,48 @@ func snapshot() -> Dictionary:
 		"phase": phase, "wave": wave, "health": base_health.duplicate(),
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
-		"income": income.duplicate(), "queued_sends": queued_sends.duplicate(),
+		"income": income.duplicate(), "queued_sends": queued_sends,
+		"send_queues": _send_queues.duplicate(true),
+		"enemy_types": _enemy_types_snapshot(),
 		"sends_open": _sends_open(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"spawned": _spawned.duplicate(), "total": _wave_count(),
 		"tower_types": _tower_types.duplicate(true),
 		"rules": {
-			"enemy_speed": _wave_speed(), "enemy_health": _wave_health(),
+			"enemy_speed": _wave_speed(wave), "enemy_health": _wave_health(wave),
 			"starting_coins": _rules.starting_coins, "kill_bounty": _rules.kill_bounty,
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
-			"send_cost": _rules.send_cost, "send_income": _rules.send_income,
 			"send_cutoff_seconds": _rules.send_cutoff_seconds,
 		},
 	}
 
 
-func _wave_health() -> int:
-	return _rules.enemy_health + maxi(0, wave - 1) * _rules.health_growth
+func _enemy_types_snapshot() -> Dictionary:
+	var result: Dictionary = _enemy_types.duplicate(true)
+	var preview_wave: int = wave + 1 if phase == Phase.PLANNING else wave
+	for type_id: String in result:
+		result[type_id]["health"] = _enemy_health(type_id, preview_wave)
+		result[type_id]["speed"] = _enemy_speed(type_id, preview_wave)
+	return result
 
 
-func _wave_speed() -> float:
-	return _rules.enemy_speed + maxi(0, wave - 1) * _rules.speed_growth
+func _enemy_health(type_id: String, wave_number: int) -> int:
+	var baseline: int = _wave_health(wave_number)
+	return maxi(1, ceili(float(baseline) * float(_enemy_types[type_id]["health_multiplier"])))
+
+
+func _enemy_speed(type_id: String, wave_number: int) -> float:
+	var baseline: float = _wave_speed(wave_number)
+	return baseline * float(_enemy_types[type_id]["speed_multiplier"])
+
+
+func _wave_health(wave_number: int) -> int:
+	return _rules.enemy_health + maxi(0, wave_number - 1) * _rules.health_growth
+
+
+func _wave_speed(wave_number: int) -> float:
+	return _rules.enemy_speed + maxi(0, wave_number - 1) * _rules.speed_growth
 
 
 func _wave_count() -> int:
@@ -246,29 +290,29 @@ func _valid_mode(mode: int) -> bool:
 
 
 func _move_enemies(slot: int, delta: float) -> void:
-	var speed: float = _wave_speed()
 	for enemy: Dictionary in enemies[slot]:
-		enemy["progress"] += speed * delta
+		enemy["progress"] += float(enemy["speed"]) * delta
 		enemy["pos"] = _position(slot, enemy["progress"])
 
 
 func _spawn_enemies(slot: int) -> void:
 	var total: int = _wave_count()
-	var speed: float = _wave_speed()
+	var speed: float = _enemy_speed("grunt", wave)
 	while _spawned[slot] < total:
 		var spawn_time: float = _spawned[slot] * _rules.spawn_interval
 		if spawn_time > _elapsed:
 			break
 		# Account for the fraction of this tick after the scheduled spawn time.
 		var progress: float = (_elapsed - spawn_time) * speed
-		_spawn_enemy(slot, progress)
+		_spawn_enemy(slot, "grunt", progress)
 		_spawned[slot] += 1
 
 
-func _spawn_enemy(slot: int, progress: float) -> void:
-	var hp: int = _wave_health()
+func _spawn_enemy(slot: int, type_id: String, progress: float) -> void:
+	var hp: int = _enemy_health(type_id, wave)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
+		"type_id": type_id, "speed": _enemy_speed(type_id, wave),
 		"progress": progress, "pos": _position(slot, progress),
 	})
 	_next_enemy_id += 1

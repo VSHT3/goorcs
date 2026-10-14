@@ -60,9 +60,10 @@ func _run() -> void:
 		_check(image.get_pixelv(Vector2i(empty)).is_equal_approx(PathBoard.GROUND), "Connections do not fill empty ground, mirrored=%s" % mirrored)
 	_check_drop_input(board)
 	await _check_ranges_and_attacks(board, viewport)
+	await _check_typed_enemies(board, viewport)
 	viewport.queue_free()
 	if failures == 0:
-		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, square tile ranges, circular area pulses and ordinary shot traces")
+		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, tile ranges, attacks and mixed mirrored enemy sprites")
 	quit(1 if failures else 0)
 
 
@@ -196,6 +197,92 @@ func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		board.combat_towers = []
 
 
+func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
+	board.combat_towers = []
+	board.selected_tower_id = -1
+	board.command_mode = false
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	board.enemy_route = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2), Vector2i(3, 2), Vector2i(4, 2)]
+	for cell: Vector2i in [Vector2i(1, 2), Vector2i(2, 2), Vector2i(3, 2)]:
+		board.layout.place(cell)
+	var enemies: Array[Dictionary] = [
+		_enemy(101, 1.0, Vector2(1, 2)),
+		_enemy(102, 2.0, Vector2(2, 2)),
+		_enemy(103, 3.0, Vector2(3, 2)),
+	]
+	enemies[1]["type_id"] = "runner"
+	enemies[2]["type_id"] = "brute"
+	for enemy: Dictionary in enemies:
+		enemy["hp"] = 4
+	var normal_geometry: Array[Dictionary] = []
+	var normal_centers: Array[Vector2i] = []
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_enemies = []
+		var baseline: Image = await _board_image(board, viewport)
+		board.combat_enemies = enemies
+		var image: Image = await _board_image(board, viewport)
+		var geometry: Array[Dictionary] = []
+		for enemy: Dictionary in enemies:
+			var center := Vector2i(board.cell_center(Vector2i(enemy["pos"])))
+			# Exclude the bars, but include the complete opaque body and cell margins.
+			var body_top: int = -24 if enemy["type_id"] == "brute" else -20
+			var region := Rect2i(center + Vector2i(-40, body_top), Vector2i(80, 40 - body_top))
+			var body: Dictionary = _changed_geometry(baseline, image, region)
+			geometry.append(body)
+			var bounds: Rect2i = body["bounds"]
+			_check(int(body["pixels"]) > 100 and bounds.size.x < 80 and bounds.size.y < 80,
+				"Each typed body renders nonempty geometry smaller than one cell, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
+			if not mirrored:
+				normal_centers.append(center)
+			else:
+				var original_center: Vector2i = normal_centers[geometry.size() - 1]
+				var original: Dictionary = normal_geometry[geometry.size() - 1]
+				var original_bounds: Rect2i = original["bounds"]
+				var mirrored_offset: Vector2 = Vector2(bounds.get_center() - center)
+				var original_offset: Vector2 = Vector2(original_bounds.get_center() - original_center)
+				_check(absi(int(body["pixels"]) - int(original["pixels"])) <= maxi(4, ceili(float(original["pixels"]) / 30.0))
+					and absi(bounds.size.x - original_bounds.size.x) <= 1 and absi(bounds.size.y - original_bounds.size.y) <= 1
+					and absf(mirrored_offset.x + original_offset.x) <= 2.0 and absf(mirrored_offset.y - original_offset.y) <= 1.0,
+					"Mirroring preserves each typed silhouette's footprint and centered alignment, type=%s" % enemy["type_id"])
+			var scale: float = 0.84 if enemy["type_id"] == "brute" else 0.70
+			var visual_top: float = center.y - 16.0 if enemy["type_id"] == "grunt" else center.y + (0.10 - scale * 0.5) * 80.0
+			var bar_y: int = floori(visual_top - 3.0 - 7.2 * 0.5)
+			_check(image.get_pixel(center.x - 12, bar_y).is_equal_approx(PathBoard.ROUTE_LINE)
+				and image.get_pixel(center.x + 12, bar_y).is_equal_approx(Color("172120")),
+				"Half-health bars remain clear and unflipped above every typed body, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
+		_check(int(geometry[2]["pixels"]) > int(geometry[1]["pixels"]) * 1.4,
+			"Brute's bulky armored silhouette is visibly larger than Runner, mirrored=%s" % mirrored)
+		var runner_bounds: Rect2i = geometry[1]["bounds"]
+		var grunt_bounds: Rect2i = geometry[0]["bounds"]
+		_check(runner_bounds.size.y > grunt_bounds.size.y,
+			"Runner renders a full lean limb silhouette rather than the baseline circle")
+		if not mirrored:
+			normal_geometry = geometry
+	board.combat_enemies = []
+	board.enemy_route = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 1), Vector2i(0, 1)]
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		_check(board._enemy_faces_left(0.5) == mirrored and board._enemy_faces_left(1.5) == mirrored,
+			"Facing follows the displayed horizontal leg and remains stable along vertical turns")
+		_check(board._enemy_faces_left(2.5) != mirrored,
+			"Facing reverses on leftward route segments in either board orientation")
+
+
+func _changed_geometry(before: Image, after: Image, region: Rect2i) -> Dictionary:
+	var minimum: Vector2i = region.end
+	var maximum: Vector2i = region.position - Vector2i.ONE
+	var pixels: int = 0
+	for y: int in range(region.position.y, region.end.y):
+		for x: int in range(region.position.x, region.end.x):
+			if before.get_pixel(x, y).is_equal_approx(after.get_pixel(x, y)):
+				continue
+			pixels += 1
+			minimum = Vector2i(mini(minimum.x, x), mini(minimum.y, y))
+			maximum = Vector2i(maxi(maximum.x, x), maxi(maximum.y, y))
+	return {"pixels": pixels, "bounds": Rect2i(minimum, maximum - minimum + Vector2i.ONE)}
+
+
 func _board_image(board: PathBoard, viewport: SubViewport) -> Image:
 	board.set_process(false)
 	board.queue_redraw()
@@ -218,7 +305,7 @@ func _tower(id: int, cell: Vector2i, type_id: String) -> Dictionary:
 
 
 func _enemy(id: int, progress: float, position: Vector2) -> Dictionary:
-	return {"id": id, "progress": progress, "pos": position, "hp": 8, "max_hp": 8}
+	return {"id": id, "type_id": "grunt", "speed": 2.0, "progress": progress, "pos": position, "hp": 8, "max_hp": 8}
 
 
 func _check(condition: bool, description: String) -> void:

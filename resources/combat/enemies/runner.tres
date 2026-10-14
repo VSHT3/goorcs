@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/runner.png" id="2_sprite"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"runner"
+title = "Runner"
+health_multiplier = 0.6
+speed_multiplier = 1.7
+send_cost = 25
+send_income = 2
+texture = ExtResource("2_sprite")

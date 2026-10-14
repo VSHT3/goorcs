@@ -16,6 +16,8 @@ func _init() -> void:
 	_test_builtin_upgrade_values()
 	_test_wave_scaling_and_rewards()
 	_test_enemy_sends()
+	_test_typed_enemy_sends()
+	_test_typed_enemy_defense()
 	_test_simultaneous_and_ordinary_outcomes()
 	if failures == 0:
 		print("PASS: authoritative purchases/upgrades/sales, currency and reward atomicity, per-tower kills, tile range/AoE, scaling, resource stats, targeting, captured routes and frozen outcomes")
@@ -461,13 +463,11 @@ func _test_enemy_sends() -> void:
 	rules.starting_coins = 40
 	rules.enemies_per_wave = 1
 	rules.count_growth = 0
-	rules.send_cost = 20
-	rules.send_income = 2
 	rules.send_cutoff_seconds = 1.0
 	var combat := MatchCombat.new(rules)
 	var frozen: Dictionary = combat.snapshot()
-	_check(not combat.send_enemy(-1) and not combat.send_enemy(2) and combat.snapshot() == frozen, "Invalid send payer changes no Coins, income, queues or enemies")
-	_check(combat.send_enemy(0) and combat.coins == [20, 40] and combat.income == [2, 0] and combat.queued_sends == [0, 1] and combat.enemies == [[], []], "Planning sends pay now and reserve exactly one enemy on the opponent, without route access")
+	_check(not combat.send_enemy(-1, &"grunt") and not combat.send_enemy(2, &"grunt") and combat.snapshot() == frozen, "Invalid send payer changes no Coins, income, queues or enemies")
+	_check(combat.send_enemy(0, &"grunt") and combat.coins == [20, 40] and combat.income == [2, 0] and combat.queued_sends == [0, 1] and combat.enemies == [[], []], "Planning sends pay now and reserve exactly one enemy on the opponent, without route access")
 	var copy: Dictionary = combat.snapshot()
 	copy["income"][0] = 999
 	copy["queued_sends"][1] = 999
@@ -477,12 +477,12 @@ func _test_enemy_sends() -> void:
 	_check(not combat.start_wave(invalid_routes) and combat.snapshot() == frozen, "Invalid wave start preserves paid queued delivery")
 	combat.start_wave(_routes(4, 4))
 	_check(combat.queued_sends == [0, 0] and combat.enemies[0].is_empty() and combat.enemies[1].size() == 1 and combat.enemies[1][0]["pos"] == Vector2.ZERO and combat.enemies[1][0]["hp"] == 8, "Starting a legal wave delivers the paid enemy at the opponent entrance with existing wave stats")
-	_check(combat.send_enemy(0) and combat.coins == [0, 40] and combat.income == [4, 0] and combat.enemies[1].size() == 2, "Exact funds send immediately during the delivery window and grow only sender income")
+	_check(combat.send_enemy(0, &"grunt") and combat.coins == [0, 40] and combat.income == [4, 0] and combat.enemies[1].size() == 2, "Exact funds send immediately during the delivery window and grow only sender income")
 	frozen = combat.snapshot()
-	_check(not combat.send_enemy(0) and combat.snapshot() == frozen, "Unaffordable send cannot create a free enemy or income, nor consume IDs")
+	_check(not combat.send_enemy(0, &"grunt") and combat.snapshot() == frozen, "Unaffordable send cannot create a free enemy or income, nor consume IDs")
 	combat.advance(1.0)
 	_check(not combat.snapshot()["sends_open"] and combat.enemies[0].size() == 1 and combat.enemies[1].size() == 3, "Cutoff closes at its exact boundary; sent enemies coexist with regular spawns")
-	_check(combat.send_enemy(1) and combat.coins == [0, 20] and combat.income == [4, 2] and combat.queued_sends == [1, 0] and combat.enemies[0].size() == 1, "A cutoff order pays once and waits for the next wave, never extending current delivery")
+	_check(combat.send_enemy(1, &"grunt") and combat.coins == [0, 20] and combat.income == [4, 2] and combat.queued_sends == [1, 0] and combat.enemies[0].size() == 1, "A cutoff order pays once and waits for the next wave, never extending current delivery")
 	_run_wave(combat)
 	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.base_health == [9, 7], "Both boards clear including sent enemies; each sent enemy causes the usual base damage")
 	_check(combat.coins == [39, 57] and combat.queued_sends == [1, 0], "Clear pays shared reward plus each sender's recurring bonus once and preserves late orders")
@@ -497,16 +497,99 @@ func _test_enemy_sends() -> void:
 	rules.tower_definitions[0].damage = 100
 	rules.tower_definitions[0].interval = 0.01
 	combat = MatchCombat.new(rules)
-	combat.send_enemy(0)
+	combat.send_enemy(0, &"grunt")
 	combat.build(1, Vector2i(0, 1), &"arrow_tower", 0)
 	combat.start_wave(_routes(4, 4))
 	_run_wave(combat)
 	_check(combat.base_health == [9, 10] and combat.towers[1][0]["kills"] == 2 and combat.coins == [217, 196], "Defenses kill sent and regular enemies through the same bounty and wave-clear rules")
 	rules.base_health = 1
 	combat = MatchCombat.new(rules)
-	combat.send_enemy(0)
+	combat.send_enemy(0, &"grunt")
 	combat.start_wave(_routes(4, 4))
 	_run_wave(combat)
 	_check(combat.phase == MatchCombat.Phase.FINISHED and combat.coins == [180, 200], "Terminal defeat pays no wave income even when a send earned a bonus")
 	frozen = combat.snapshot()
-	_check(not combat.send_enemy(0) and not combat.send_enemy(1) and not combat.advance(10.0) and combat.snapshot() == frozen, "Finished matches reject sends without charging, spawning, rerolling or paying income")
+	_check(not combat.send_enemy(0, &"grunt") and not combat.send_enemy(1, &"grunt") and not combat.advance(10.0) and combat.snapshot() == frozen, "Finished matches reject sends without charging, spawning, rerolling or paying income")
+
+
+func _test_typed_enemy_sends() -> void:
+	var rules := _rules()
+	rules.enemies_per_wave = 1
+	rules.spawn_interval = 0.0
+	rules.speed_growth = 0.15
+	rules.send_cutoff_seconds = 1.0
+	var combat := MatchCombat.new(rules)
+	var frozen: Dictionary = combat.snapshot()
+	_check(not combat.send_enemy(0, &"unknown") and not combat.send_enemy(0, &"") and combat.snapshot() == frozen, "Unknown/empty enemy IDs cannot spend Coins, grow income or create orders")
+	_check(combat.send_enemy(0, &"runner") and combat.send_enemy(0, &"brute") and combat.coins == [135, 200] and combat.income == [6, 0], "Runner and Brute spend their own prices and add their own recurring income")
+	var copy: Dictionary = combat.snapshot()
+	copy["enemy_types"]["runner"]["health_multiplier"] = 99.0
+	copy["enemy_types"]["brute"]["send_cost"] = 1
+	copy["send_queues"][1][0] = "grunt"
+	_check(combat.snapshot()["send_queues"] == [[], ["runner", "brute"]], "Mixed queues retain identity/order despite consumer snapshot mutation")
+	combat.start_wave(_routes(4, 4))
+	var runner: Dictionary = combat.enemies[1][0]
+	var brute: Dictionary = combat.enemies[1][1]
+	_check(runner["type_id"] == "runner" and runner["hp"] == 5 and is_equal_approx(runner["speed"], 1.7) and brute["type_id"] == "brute" and brute["hp"] == 20 and is_equal_approx(brute["speed"], 0.65), "Queued types spawn with rounded Runner health and durable Brute health plus independent wave-scaled speeds")
+	combat.advance(1.0)
+	_check(is_equal_approx(runner["progress"], 1.7) and is_equal_approx(brute["progress"], 0.65) and is_equal_approx(combat.enemies[1][2]["progress"], 1.0) and combat.enemies[1][2]["type_id"] == "grunt", "Mixed enemies advance by their own host-captured speeds; regular waves stay Grunts")
+	combat.advance(1.4)
+	_check(combat.base_health == [10, 9] and combat.enemies[1].size() == 2 and combat.enemies[1][0]["type_id"] == "brute", "Runner reaches the base first while slower Brute and regular Grunt remain in combat")
+	_run_wave(combat)
+	_check(combat.base_health == [9, 7] and combat.coins == [176, 235], "Every typed leak damages once and clear pays only sender's purchased income bonus")
+	var preview: Dictionary = combat.snapshot()["enemy_types"]
+	_check(preview["runner"]["health"] == 6 and preview["brute"]["health"] == 25 and is_equal_approx(preview["runner"]["speed"], 1.15 * 1.7), "Planning previews the next wave's effective typed stats, not the cleared wave")
+	combat.start_wave(_routes(4, 4))
+	combat.advance(1.0)
+	combat.send_enemy(1, &"brute")
+	combat.send_enemy(1, &"runner")
+	_check(combat.snapshot()["send_queues"] == [["brute", "runner"], []] and combat.queued_sends == [2, 0] and combat.enemies[0].size() == 1, "Mixed orders at the exact cutoff preserve next-wave type order and spawn nothing now")
+	_run_wave(combat)
+	combat.start_wave(_routes(4, 4))
+	_check(combat.enemies[0].size() == 2 and combat.enemies[0][0]["type_id"] == "brute" and combat.enemies[0][1]["type_id"] == "runner" and combat.enemies[0][0]["hp"] == 30 and combat.enemies[0][1]["hp"] == 8 and combat.queued_sends == [0, 0], "Deferred mixed orders deliver exactly once using wave-three stats, not purchase-time stats")
+	# Resource edits after admission cannot rewrite captured type rules.
+	var detached: EnemyDefinition = rules.enemy_definitions[1].duplicate()
+	rules.enemy_definitions = rules.enemy_definitions.duplicate()
+	rules.enemy_definitions[1] = detached
+	combat = MatchCombat.new(rules)
+	detached.send_cost = 1
+	detached.send_income = 99
+	detached.speed_multiplier = 99.0
+	combat.start_wave(_routes())
+	combat.send_enemy(0, &"runner")
+	_check(combat.coins == [175, 200] and combat.income == [2, 0] and is_equal_approx(combat.enemies[1][0]["speed"], 1.7), "Accepted match captures type prices, income and movement independently of later resource edits")
+	var exact_rules := _rules()
+	exact_rules.starting_coins = 40
+	combat = MatchCombat.new(exact_rules)
+	_check(combat.send_enemy(0, &"brute") and combat.coins[0] == 0 and combat.snapshot()["send_queues"][1] == ["brute"], "Exact funds buy a Brute without granting a free extra order")
+	frozen = combat.snapshot()
+	_check(not combat.send_enemy(0, &"runner") and not combat.send_enemy(0, &"brute") and combat.snapshot() == frozen, "Poor typed sends cannot grow income or queues")
+
+
+func _test_typed_enemy_defense() -> void:
+	var rules := _rules()
+	rules.enemies_per_wave = 1
+	rules.spawn_interval = 0.0
+	rules.enemy_speed = 0.0
+	rules.tower_definitions[0].damage = 5
+	rules.tower_definitions[0].interval = 0.1
+	var combat := MatchCombat.new(rules)
+	combat.send_enemy(0, &"runner")
+	combat.send_enemy(0, &"brute")
+	combat.start_wave(_routes())
+	combat.build(1, Vector2i(0, 1), &"arrow_tower", MatchCombat.TargetMode.STRONGEST)
+	combat.advance(0.01)
+	_check(combat.enemies[1][0]["hp"] == 5 and combat.enemies[1][1]["hp"] == 15 and combat.towers[1][0]["target_id"] == combat.enemies[1][1]["id"], "Strongest targets the durable Brute in a mixed stream instead of the Runner")
+	combat.set_targeting(1, combat.towers[1][0]["id"], MatchCombat.TargetMode.FURTHEST)
+	combat.advance(0.1)
+	_check(combat.enemies[1].size() == 2 and combat.towers[1][0]["kills"] == 1 and combat.coins[1] == 158, "A killed Runner pays the normal bounty once and is removed before leaks")
+	var area := _definition(&"test_area", 5, 1.0, 0.1)
+	area.area_attack = true
+	rules.tower_definitions = [area]
+	combat = MatchCombat.new(rules)
+	combat.send_enemy(0, &"runner")
+	combat.send_enemy(0, &"brute")
+	combat.start_wave(_routes())
+	combat.build(1, Vector2i(0, 1), &"test_area", 0)
+	combat.advance(0.01)
+	_check(combat.enemies[1].size() == 2 and combat.enemies[1][0]["type_id"] == "brute" and combat.enemies[1][0]["hp"] == 15 and combat.towers[1][0]["kills"] == 1, "Area attacks hit the whole mixed footprint, killing the fragile Runner while Brute survives")

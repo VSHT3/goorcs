@@ -26,6 +26,16 @@ func _planning_rules() -> CombatRules:
 		definition.area_attack = source.area_attack
 		definitions.append(definition)
 	rules.tower_definitions = definitions
+	var enemy_definitions: Array[EnemyDefinition] = []
+	for source: EnemyDefinition in rules.enemy_definitions:
+		var definition := source.duplicate() as EnemyDefinition
+		if _lane == "guest":
+			definition.health_multiplier = 9.0
+			definition.speed_multiplier = 0.1
+			definition.send_cost = 1
+			definition.send_income = 99
+		enemy_definitions.append(definition)
+	rules.enemy_definitions = enemy_definitions
 	if _lane == "guest":
 		rules.base_health = 7
 		rules.starting_coins = 999
@@ -36,14 +46,14 @@ func _planning_rules() -> CombatRules:
 
 
 func _execute_command(command: Dictionary) -> void:
-	if String(command.get("action", "")) == "send_scenario":
+	var action: String = String(command.get("action", ""))
+	if action in ["send_scenario", "typed_send_scenario"]:
 		var rules: CombatRules = _planning_rules()
-		rules.base_health = 6 if _lane == "host" else 99
-		rules.starting_coins = 45 if _lane == "host" else 999
+		var typed: bool = action == "typed_send_scenario"
+		rules.base_health = (7 if typed else 6) if _lane == "host" else 99
+		rules.starting_coins = (200 if typed else 45) if _lane == "host" else 999
 		rules.health_growth = 2
-		rules.send_cost = 20 if _lane == "host" else 1
-		rules.send_income = 2 if _lane == "host" else 99
-		rules.send_cutoff_seconds = 0.5 if _lane == "host" else 99.0
+		rules.send_cutoff_seconds = (0.8 if typed else 0.5) if _lane == "host" else 99.0
 		planning.combat_rules = rules
 	else:
 		super._execute_command(command)

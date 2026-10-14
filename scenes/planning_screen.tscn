@@ -85,14 +85,27 @@ theme_override_fonts/font = ExtResource("3_numbers")
 theme_override_font_sizes/font_size = 16
 text = "Coins 0"
 
-[node name="Income" type="Label" parent="HUD/Header/Content/Summary"]
-unique_name_in_owner = true
+[node name="SendControls" type="HBoxContainer" parent="HUD/Header/Content/Summary"]
 layout_mode = 2
-mouse_filter = 1
-theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="EnemyType" type="OptionButton" parent="HUD/Header/Content/Summary/SendControls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(112, 34)
+layout_mode = 2
+disabled = true
+tooltip_text = "Choose a send type when the host catalog arrives."
+
+[node name="SendEnemy" type="Button" parent="HUD/Header/Content/Summary/SendControls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(176, 34)
+layout_mode = 2
+disabled = true
+tooltip_text = "Waiting for host enemy types and send rules."
 theme_override_fonts/font = ExtResource("3_numbers")
 theme_override_font_sizes/font_size = 16
-text = "Income +0/clear · Q0/0"
+text = "Send unavailable"
 
 [node name="PanHint" type="Label" parent="HUD/Header/Content/Summary"]
 layout_mode = 2
@@ -235,15 +248,14 @@ theme_override_fonts/font = ExtResource("3_numbers")
 theme_override_font_sizes/font_size = 16
 text = "Ready for wave 1"
 
-[node name="SendEnemy" type="Button" parent="HUD/Bottom/Content/Actions"]
+[node name="Income" type="Label" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(176, 34)
 layout_mode = 2
-disabled = true
-tooltip_text = "Waiting for host send rules."
+mouse_filter = 1
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
 theme_override_fonts/font = ExtResource("3_numbers")
 theme_override_font_sizes/font_size = 16
-text = "Send unavailable"
+text = "Income +0/clear · Q0/0"
 
 [node name="PlacementStatus" type="Label" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true

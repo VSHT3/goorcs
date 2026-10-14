@@ -196,13 +196,14 @@ func _check_owned_drop() -> void:
 
 func _check_popup_and_text_focus() -> void:
 	var position: Vector2 = world.camera.position
-	screen.targeting_button.show_popup()
-	await process_frame
-	await _key(KEY_D, true)
-	world._process(0.1)
-	_check(world.camera.position.is_equal_approx(position), "Open targeting popup blocks camera movement")
-	await _key(KEY_D, false)
-	screen.targeting_button.get_popup().hide()
+	for selector: OptionButton in [screen.targeting_button, screen.enemy_selector]:
+		selector.show_popup()
+		await process_frame
+		await _key(KEY_D, true)
+		world._process(0.1)
+		_check(world.camera.position.is_equal_approx(position), "An open gameplay selector blocks camera movement")
+		await _key(KEY_D, false)
+		selector.get_popup().hide()
 	var editor := LineEdit.new()
 	screen.add_child(editor)
 	editor.grab_focus()
@@ -302,7 +303,7 @@ func _check_leave_and_reopen() -> void:
 
 
 func _hud_rects() -> Array[Rect2]:
-	var rectangles: Array[Rect2] = [screen.ready_button.get_global_rect(), screen.clear_button.get_global_rect(), screen.leave_button.get_global_rect(), screen.get_node("%Coins").get_global_rect()]
+	var rectangles: Array[Rect2] = [screen.ready_button.get_global_rect(), screen.clear_button.get_global_rect(), screen.leave_button.get_global_rect(), screen.get_node("%Coins").get_global_rect(), screen.send_button.get_global_rect(), screen.enemy_selector.get_global_rect()]
 	for button: TowerShopButton in screen.shop_buttons.values():
 		rectangles.append(button.get_global_rect())
 	return rectangles

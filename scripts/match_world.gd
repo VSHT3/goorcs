@@ -25,7 +25,7 @@ var _own_slot: int = 0
 var _active: bool = false
 var _left_held: bool = false
 var _right_held: bool = false
-var _targeting_popup: PopupMenu
+var _hud_popups: Array[PopupMenu] = []
 var _camera_input: CameraInput
 
 @onready var boards: Array[PathBoard] = [$Viewport/Map/Host, $Viewport/Map/Guest]
@@ -37,9 +37,10 @@ var _camera_input: CameraInput
 func _ready() -> void:
 	_world_viewport.world_2d = World2D.new()
 	resized.connect(_fit_camera)
-	var targeting := get_parent().get_node_or_null("%Targeting") as OptionButton
-	if targeting != null:
-		_targeting_popup = targeting.get_popup()
+	for path: String in ["%Targeting", "%EnemyType"]:
+		var selector := get_parent().get_node_or_null(path) as OptionButton
+		if selector != null:
+			_hud_popups.append(selector.get_popup())
 	_world_viewport.gui_disable_input = true
 	# Container focus notifications change its native input registration.
 	# Keep physical camera keys in the root viewport independently of HUD focus.
@@ -148,7 +149,12 @@ func _notification(what: int) -> void:
 func _movement_blocked() -> bool:
 	var root_focus: Control = get_viewport().gui_get_focus_owner()
 	var world_focus: Control = _world_viewport.gui_get_focus_owner()
-	return root_focus is LineEdit or root_focus is TextEdit or world_focus is LineEdit or world_focus is TextEdit or (_targeting_popup != null and _targeting_popup.visible)
+	if root_focus is LineEdit or root_focus is TextEdit or world_focus is LineEdit or world_focus is TextEdit:
+		return true
+	for popup: PopupMenu in _hud_popups:
+		if popup.visible:
+			return true
+	return false
 
 
 func _propagate_input_event(event: InputEvent) -> bool:

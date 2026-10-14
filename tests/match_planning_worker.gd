@@ -36,7 +36,7 @@ func _execute_command(command: Dictionary) -> void:
 		"sell":
 			planning.sell_tower(int(command["slot"]), int(command["tower_id"]))
 		"send":
-			planning.send_enemy(int(command["slot"]))
+			planning.send_enemy(int(command["slot"]), StringName(command["type_id"]))
 		_:
 			super._execute_command(command)
 

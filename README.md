@@ -4,7 +4,7 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**, with a local **Singleplayer** mirror opponent for testing. Matches use one continuous camera-scrolled world behind a fixed HUD; each player starts looking at their own side and holds **A / D** to scout across it. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, enemy sends with recurring income, persistent base health, and results are implemented. Loadouts, permanent stat growth, map expansion, and final art are not implemented.
+Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**, with a local **Singleplayer** mirror opponent for testing. Matches use one continuous camera-scrolled world behind a fixed HUD; each player starts looking at their own side and holds **A / D** to scout across it. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, typed Grunt/Runner/Brute sends with recurring income, persistent base health, and results are implemented. Loadouts, permanent stat growth, map expansion, and final art are not implemented.
 
 The UI pairs bundled **Pixelify Sans** labels with crisper **Silkscreen** pixel numerals for prices, health, stats, and counts. Small interface text stays at least 16px. Both fonts work offline and include their [Pixelify](assets/fonts/OFL.txt) and [Silkscreen](assets/fonts/silkscreen/OFL.txt) licenses.
 
@@ -36,7 +36,8 @@ For command-line launch and verification, see the [development commands](docs/de
 - Each match entrance is a red stone-ring portal and each base is a blue crystal on a stone pedestal. These transparent PNG sprites were authored locally, without external generation services or costs. Camera scouting does not expand either grid or increase its path-tile budget.
 - A destroyed base ends the run. If both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the winner and both players see that result. The finished run cannot restart; leave/rejoin begins fresh.
 - Coins fund towers and two one-time upgrades per tower; kills and cleared waves earn Coins. Selling refunds part of the actual investment. Wave health, speed, and count increase. Provisional values live in `resources/combat/prototype.tres` and `resources/combat/towers/`.
-- One **Send now / Send next** button spends 20 Coins to put one existing wave-scaled enemy on the opponent's route and adds +2 recurring Coins at each future both-board wave clear. Orders during the first 3 seconds of combat deliver immediately; planning and later orders queue for the next wave. The host accepts payment, delivery, and income together; rejected sends change nothing. `Income +N/clear` shows your recurring bonus; `Qincoming/outgoing` shows next-wave queues. These values are provisional and live in the same combat resource.
+- Choose **Grunt**, **Runner**, or **Brute**, then use the one **Send now / Send next** button. Each type has its own Coin price and recurring wave-clear income gain. Orders during the first 3 seconds of combat deliver immediately; planning and later orders preserve their chosen types in the next-wave queue. The host accepts type, payment, delivery, and income together; rejected sends change nothing. `Income +N/clear` shows your recurring bonus; `Qincoming/outgoing` shows next-wave totals, with composition in tooltips. Provisional type values live in `resources/combat/enemies/`; wave values and cutoff remain in `resources/combat/prototype.tres`.
+- Regular waves remain Grunts. Runner sends are fast and fragile; Brutes are slow and durable. Health and speed scale with the delivery wave. Both use original locally authored pixel sprites, distinct silhouettes, directional facing, and health bars; the Grunt retains its baseline circle. Every type uses the same tower targeting, damage, bounty, and one-point base-leak rules. See [enemy roster values and verification](docs/development.md#enemy-roster).
 - The code contains the host's address and a random room credential. There is no online room lookup or NAT traversal service. Use the same LAN, a private network/VPN, or a public host address with UDP forwarding and firewall access.
 - **Leave / Esc** closes your connection and clears shared planning. If the guest leaves, the host waits for another guest with the same code; rejoining starts with fresh boards. If the host leaves, the room closes and its code expires.
 - For network setup, security limits, and two-instance verification, see [direct connection development](docs/development.md#direct-connection-lobby).
@@ -83,7 +84,7 @@ scenes/            Main navigation, connection lobby, shared defense, local path
 scripts/           Rule owners, networking, persistence, input, and presentation
 resources/collection/  Tower reward definitions
 resources/combat/  Provisional defense-loop configuration
-assets/            Imported chest/tower sprites and locally authored match crystal/portal PNGs
+assets/            Imported chest/tower sprites and locally authored enemy/crystal/portal PNGs
 archive_assets/    Archived pixel-art variants and sources, with per-image catalog and tags
 tests/             Path, navigation, collection, chest, real peer-session, planning, match-world, combat rules and peer combat
 docs/              Project documentation

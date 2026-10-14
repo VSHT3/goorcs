@@ -115,8 +115,8 @@ func sell_tower(slot: int, tower_id: int) -> void:
 	_request_tower_command("sell", slot, Vector2i.ZERO, tower_id, -1, "")
 
 
-func send_enemy(slot: int) -> void:
-	_request_tower_command("send", slot, Vector2i.ZERO, -1, -1, "")
+func send_enemy(slot: int, type_id: StringName) -> void:
+	_request_tower_command("send", slot, Vector2i.ZERO, -1, -1, String(type_id))
 
 
 func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
@@ -250,8 +250,8 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 						break
 				break
 	if command == "send":
-		if not _host_combat.send_enemy(slot):
-			_reject(sender, "Not enough Coins to send an enemy.")
+		if not _host_combat.send_enemy(slot, StringName(argument)):
+			_reject(sender, "Not enough Coins or this enemy type is unavailable.")
 			return
 	elif command == "build":
 		var layout: PathLayout = _host_layouts[slot]

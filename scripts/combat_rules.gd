@@ -1,12 +1,19 @@
 class_name CombatRules
 extends Resource
 
+const DEFAULT_ENEMIES: Array[EnemyDefinition] = [
+	preload("res://resources/combat/enemies/grunt.tres"),
+	preload("res://resources/combat/enemies/runner.tres"),
+	preload("res://resources/combat/enemies/brute.tres"),
+]
+
 # Provisional match-only playtest values, independent of collection progression.
 @export var base_health: int = 10
 @export var enemy_health: int = 8
 @export var enemy_speed: float = 2.0
 @export var enemies_per_wave: int = 6
 @export var spawn_interval: float = 0.75
+@export var enemy_definitions: Array[EnemyDefinition] = DEFAULT_ENEMIES
 @export var tower_definitions: Array[TowerDefinition] = [
 	preload("res://resources/combat/towers/arrow_tower.tres"),
 	preload("res://resources/combat/towers/orc_ballista.tres"),
@@ -19,6 +26,4 @@ extends Resource
 @export var kill_bounty: int = 3
 @export var wave_reward: int = 30
 @export var wave_reward_growth: int = 5
-@export var send_cost: int = 20
-@export var send_income: int = 2
 @export var send_cutoff_seconds: float = 3.0

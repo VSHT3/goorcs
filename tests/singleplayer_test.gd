@@ -83,8 +83,8 @@ func _run() -> void:
 	var final_state: Dictionary = planning.combat.duplicate(true)
 	planning.build_tower(0, Vector2i(4, 3), &"arrow_tower", 0)
 	planning.submit_ready(true)
-	planning.send_enemy(0)
-	planning.send_enemy(1)
+	planning.send_enemy(0, &"grunt")
+	planning.send_enemy(1, &"grunt")
 	_check(planning.combat == final_state, "Finished solo runs reject mutations")
 	planning.stop_singleplayer()
 	_check(not planning.active and not planning.singleplayer and not planning.is_physics_processing(), "Leaving clears solo mode and stops simulation")
@@ -92,6 +92,7 @@ func _run() -> void:
 	_check(planning.layouts[0].used_tiles() == 0 and planning.combat["wave"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["coins"] == initial_coins and planning.combat["income"] == [0, 0] and planning.combat["queued_sends"] == [0, 0] and not planning.combat["sends_open"], "Reopening starts a fresh match")
 	planning.stop_singleplayer()
 	_solo_sends(planning)
+	_solo_typed_sends(planning)
 	planning.queue_free()
 	session.queue_free()
 	await process_frame
@@ -112,21 +113,23 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	rules.enemy_speed = 10.0
 	rules.speed_growth = 0.0
 	rules.spawn_interval = 0.05
-	rules.send_cost = 20
-	rules.send_income = 2
+	var grunt := preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
+	grunt.send_cost = 20
+	grunt.send_income = 2
+	rules.enemy_definitions = [grunt]
 	rules.send_cutoff_seconds = 0.25
 	planning.combat_rules = rules
 	planning.start_singleplayer()
 	var before: Dictionary = planning.combat.duplicate(true)
 	for slot: int in [1, -1, 2]:
-		planning.send_enemy(slot)
+		planning.send_enemy(slot, &"grunt")
 	_check(planning.combat == before, "Solo sends cannot pay from the read-only opponent or an invalid slot")
-	planning.send_enemy(0)
+	planning.send_enemy(0, &"grunt")
 	_check(planning.combat["coins"] == [25, 25] and planning.combat["income"] == [2, 2] and planning.combat["queued_sends"] == [1, 1] and planning.combat["enemies"] == [[], []], "Accepted planning send mirrors exactly one paid order and income gain per payer without requiring legal routes")
-	planning.send_enemy(0)
+	planning.send_enemy(0, &"grunt")
 	_check(planning.combat["coins"] == [5, 5] and planning.combat["income"] == [4, 4] and planning.combat["queued_sends"] == [2, 2], "Mirrored sends spend Coins now but only accumulate future income")
 	before = planning.combat.duplicate(true)
-	planning.send_enemy(0)
+	planning.send_enemy(0, &"grunt")
 	_check(planning.combat == before, "Unaffordable solo send cannot charge, grow income or mirror a free order")
 	for x: int in range(1, 13):
 		planning.request_edit(0, Vector2i(x, 4), true)
@@ -137,7 +140,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	_advance_send_wave(planning)
 	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [4, 4] and planning.combat["coins"] == [44, 44] and planning.combat["income"] == [4, 4], "Mirrored sent enemies leak on both targets and first clear pays accumulated income exactly once")
 	planning.submit_ready(true)
-	planning.send_enemy(0)
+	planning.send_enemy(0, &"grunt")
 	_check(planning.combat["coins"] == [24, 24] and planning.combat["income"] == [6, 6] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"][0].size() == 1 and planning.combat["enemies"][1].size() == 1, "Early live send mirrors immediate delivery rather than queueing")
 	for slot: int in range(2):
 		var enemy: Dictionary = planning.combat["enemies"][slot][0]
@@ -145,7 +148,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	planning._physics_process(0.3)
 	_check(planning.combat["phase"] == MatchCombat.Phase.WAVE and not planning.combat["sends_open"], "The host clock closes solo delivery at its cutoff")
 	var counts: Array[int] = [planning.combat["enemies"][0].size(), planning.combat["enemies"][1].size()]
-	planning.send_enemy(0)
+	planning.send_enemy(0, &"grunt")
 	_check(planning.combat["coins"] == [4, 4] and planning.combat["income"] == [8, 8] and planning.combat["queued_sends"] == [1, 1] and [planning.combat["enemies"][0].size(), planning.combat["enemies"][1].size()] == counts, "Late solo send mirrors paid next-wave queues without adding current enemies")
 	_advance_send_wave(planning)
 	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [2, 2] and planning.combat["coins"] == [52, 52] and planning.combat["income"] == [8, 8] and planning.combat["queued_sends"] == [1, 1], "Second solo clear pays recurring income again and preserves late delivery")
@@ -154,8 +157,8 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	_advance_send_wave(planning)
 	_check(planning.combat["phase"] == MatchCombat.Phase.FINISHED and planning.combat["health"] == [0, 0] and planning.combat["coins"] == [52, 52] and planning.combat["income"] == [8, 8] and planning.combat["coin_flip"], "Mirrored send pressure reaches the normal terminal coin flip with no terminal income payout")
 	before = planning.combat.duplicate(true)
-	planning.send_enemy(0)
-	planning.send_enemy(1)
+	planning.send_enemy(0, &"grunt")
+	planning.send_enemy(1, &"grunt")
 	planning.submit_ready(true)
 	_check(planning.combat == before, "Finished solo sends cannot spend remaining affordable Coins, gain income, create enemies or reroll")
 	planning.stop_singleplayer()
@@ -169,3 +172,106 @@ func _advance_send_wave(planning: MatchPlanning) -> void:
 		planning._physics_process(1.0 / 60.0)
 		if planning.combat["phase"] != MatchCombat.Phase.WAVE:
 			break
+
+
+func _solo_typed_sends(planning: MatchPlanning) -> void:
+	var rules := CombatRules.new()
+	rules.base_health = 7
+	rules.starting_coins = 200
+	rules.enemies_per_wave = 1
+	rules.count_growth = 0
+	rules.enemy_health = 4
+	rules.health_growth = 2
+	rules.enemy_speed = 10.0
+	rules.speed_growth = 0.0
+	rules.spawn_interval = 0.05
+	rules.send_cutoff_seconds = 0.25
+	var definitions: Array[EnemyDefinition] = []
+	for source: EnemyDefinition in rules.enemy_definitions:
+		definitions.append(source.duplicate() as EnemyDefinition)
+	rules.enemy_definitions = definitions
+	planning.combat_rules = rules
+	planning.start_singleplayer()
+	var before: Dictionary = planning.combat.duplicate(true)
+	for type_id: StringName in [&"runner", &"brute"]:
+		for slot: int in [1, -1, 2]:
+			planning.send_enemy(slot, type_id)
+	planning.send_enemy(0, &"missing_enemy")
+	_check(planning.combat == before, "Typed solo ownership and unknown IDs cannot spend, gain income, queue or mirror an enemy")
+	planning.send_enemy(0, &"runner")
+	_check(planning.combat["coins"] == [175, 175] and planning.combat["income"] == [2, 2] and planning.combat["send_queues"] == [["runner"], ["runner"]], "Runner acceptance mirrors the same type and independently pays both validators")
+	planning.send_enemy(0, &"brute")
+	_check(planning.combat["coins"] == [135, 135] and planning.combat["income"] == [6, 6] and planning.combat["send_queues"] == [["runner", "brute"], ["runner", "brute"]], "Brute acceptance adds its distinct cost/income and preserves each mixed target queue")
+	for x: int in range(1, 13):
+		planning.request_edit(0, Vector2i(x, 4), true)
+	planning.submit_ready(true)
+	_check_solo_enemy_types(planning, ["runner", "brute"], 4, "Planning sends deliver identical types, not Grunt mirror defaults")
+	_check(planning.combat["queued_sends"] == [0, 0] and planning.combat["send_queues"] == [[], []], "Both mixed solo queues drain once")
+	planning._physics_process(0.1)
+	_check_solo_enemy_types(planning, ["runner", "brute", "grunt"], 4, "Regular spawn remains baseline Grunt")
+	for slot: int in range(2):
+		var enemies: Array = planning.combat["enemies"][slot]
+		_check(is_equal_approx(float(enemies[0]["progress"]), 1.7) and is_equal_approx(float(enemies[1]["progress"]), 0.65) and is_equal_approx(float(enemies[2]["progress"]), 1.0), "Actual mirrored movement advances Runner, Brute and Grunt independently")
+	_advance_solo_health(planning, [6, 6])
+	_check_solo_enemy_types(planning, ["brute", "grunt"], 4, "Runner actually leaks before the others")
+	_advance_solo_health(planning, [5, 5])
+	_check_solo_enemy_types(planning, ["brute"], 4, "Baseline Grunt leaks while Brute still travels")
+	_advance_send_wave(planning)
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [4, 4] and planning.combat["coins"] == [176, 176], "Both Brutes finally leak and typed recurring income pays with one clear")
+	planning.submit_ready(true)
+	planning.send_enemy(0, &"runner")
+	planning.send_enemy(0, &"brute")
+	_check_solo_enemy_types(planning, ["runner", "brute"], 6, "Early live typed sends use current-wave scaled HP")
+	_check(planning.combat["coins"] == [111, 111] and planning.combat["income"] == [12, 12] and planning.combat["send_queues"] == [[], []], "Both live mirrored types pay exactly once without queueing")
+	planning._physics_process(0.3)
+	_check(not planning.combat["sends_open"], "Normal solo host clock closes typed immediate delivery")
+	var counts: Array[int] = [planning.combat["enemies"][0].size(), planning.combat["enemies"][1].size()]
+	planning.send_enemy(0, &"brute")
+	planning.send_enemy(0, &"runner")
+	_check(planning.combat["coins"] == [46, 46] and planning.combat["income"] == [18, 18] and planning.combat["send_queues"] == [["brute", "runner"], ["brute", "runner"]] and [planning.combat["enemies"][0].size(), planning.combat["enemies"][1].size()] == counts, "Cutoff preserves mixed typed next-wave order without adding live enemies")
+	_advance_send_wave(planning)
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["health"] == [1, 1] and planning.combat["coins"] == [104, 104] and planning.combat["send_queues"] == [["brute", "runner"], ["brute", "runner"]], "Second clear repeats accumulated income and retains both deferred typed orders")
+	planning.submit_ready(true)
+	_check_solo_enemy_types(planning, ["brute", "runner"], 8, "Deferred mixed sends retain type/order and use next-wave scaled HP")
+	_check(planning.combat["send_queues"] == [[], []] and planning.combat["queued_sends"] == [0, 0], "Next-wave delivery drains mixed queues and HUD totals together")
+	_advance_send_wave(planning)
+	_check(planning.combat["phase"] == MatchCombat.Phase.FINISHED and planning.combat["health"] == [0, 0] and planning.combat["coin_flip"] and planning.combat["coins"] == [104, 104], "Typed mirrored pressure reaches the normal terminal result without clear income")
+	before = planning.combat.duplicate(true)
+	for type_id: StringName in [&"runner", &"brute", &"missing_enemy"]:
+		planning.send_enemy(0, type_id)
+		planning.send_enemy(1, type_id)
+	_check(planning.combat == before, "Terminal typed sends cannot spend affordable Coins, create enemies, grow income or mirror")
+	planning.stop_singleplayer()
+	planning.start_singleplayer()
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 0 and planning.combat["health"] == [7, 7] and planning.combat["coins"] == [200, 200] and planning.combat["income"] == [0, 0] and planning.combat["send_queues"] == [[], []] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []] and not planning.combat["sends_open"], "Solo restart clears both typed queues, income, enemies, health and cutoff")
+	for type_id: StringName in [&"brute", &"brute", &"brute", &"brute", &"runner"]:
+		planning.send_enemy(0, type_id)
+	_check(planning.combat["coins"] == [15, 15] and planning.combat["income"] == [18, 18], "Typed affordability setup independently pays each mirror")
+	before = planning.combat.duplicate(true)
+	for type_id: StringName in [&"runner", &"brute"]:
+		planning.send_enemy(0, type_id)
+	_check(planning.combat == before, "Neither unaffordable type can spend, gain income, queue or create a free mirrored order")
+	planning.stop_singleplayer()
+
+
+func _advance_solo_health(planning: MatchPlanning, expected: Array) -> void:
+	for tick: int in range(600):
+		if planning.combat["health"] == expected or planning.combat["phase"] != MatchCombat.Phase.WAVE:
+			break
+		planning._physics_process(1.0 / 60.0)
+	_check(planning.combat["health"] == expected, "Independent typed leaks reach health %s rather than moving every type at baseline speed" % [expected])
+
+
+func _check_solo_enemy_types(planning: MatchPlanning, expected: Array, wave_health: int, description: String) -> void:
+	var ids: Array[int] = []
+	for slot: int in range(2):
+		var identities: Array[String] = []
+		for enemy: Dictionary in planning.combat["enemies"][slot]:
+			var type_id: String = enemy.get("type_id", "")
+			identities.append(type_id)
+			var hp_multiplier: float = 0.6 if type_id == "runner" else (2.5 if type_id == "brute" else 1.0)
+			var speed_multiplier: float = 1.7 if type_id == "runner" else (0.65 if type_id == "brute" else 1.0)
+			_check(enemy["hp"] == ceili(wave_health * hp_multiplier) and enemy["max_hp"] == ceili(wave_health * hp_multiplier) and is_equal_approx(float(enemy.get("speed", 0.0)), 10.0 * speed_multiplier), "%s: %s has typed HP and speed on mirror %d" % [description, type_id, slot])
+			_check(not int(enemy["id"]) in ids, "Mirrored typed enemies retain independent authoritative IDs")
+			ids.append(int(enemy["id"]))
+		_check(identities == expected, "%s: mirror %d has ordered types %s" % [description, slot, identities])

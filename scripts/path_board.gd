@@ -60,6 +60,7 @@ var _shot_traces: Array[Dictionary] = []
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 var _tower_textures: Dictionary[String, Texture2D] = {}
+var _enemy_textures: Dictionary[String, Texture2D] = {}
 var _endpoint_textures_loaded: bool = false
 var _portal_texture: Texture2D
 var _crystal_texture: Texture2D
@@ -67,6 +68,8 @@ var _crystal_texture: Texture2D
 
 func _ready() -> void:
 	tower_catalog = tower_catalog
+	for definition: EnemyDefinition in CombatRules.DEFAULT_ENEMIES:
+		_enemy_textures[String(definition.id)] = definition.texture
 	mouse_exited.connect(_on_mouse_exited)
 	resized.connect(queue_redraw)
 	set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
@@ -123,10 +126,33 @@ func _blend_enemies() -> void:
 func _enemy_position(enemy: Dictionary) -> Vector2:
 	if enemy_route.size() < 2:
 		return enemy["pos"]
+	return _route_position(_enemy_route_progress(enemy))
+
+
+func _enemy_route_progress(enemy: Dictionary) -> float:
 	var blend: Vector2 = _enemy_progress.get(int(enemy["id"]), Vector2(enemy["progress"], enemy["progress"]))
-	var progress: float = clampf(lerpf(blend.x, blend.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), 0.0, enemy_route.size() - 1)
+	return clampf(lerpf(blend.x, blend.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), 0.0, enemy_route.size() - 1)
+
+
+func _route_position(progress: float) -> Vector2:
 	var index: int = mini(floori(progress), enemy_route.size() - 2)
 	return Vector2(enemy_route[index]).lerp(Vector2(enemy_route[index + 1]), progress - index)
+
+
+func _enemy_faces_left(progress: float) -> bool:
+	if enemy_route.size() < 2:
+		return mirror_horizontal
+	# Keep upright sprites facing the last horizontal leg through vertical turns.
+	var index: int = mini(floori(progress), enemy_route.size() - 2)
+	for segment: int in range(index, -1, -1):
+		var direction: Vector2i = enemy_route[segment + 1] - enemy_route[segment]
+		if direction.x != 0:
+			return (direction.x < 0) != mirror_horizontal
+	for segment: int in range(index + 1, enemy_route.size() - 1):
+		var direction: Vector2i = enemy_route[segment + 1] - enemy_route[segment]
+		if direction.x != 0:
+			return (direction.x < 0) != mirror_horizontal
+	return mirror_horizontal
 
 
 func cell_center(cell: Vector2i) -> Vector2:
@@ -309,13 +335,28 @@ func _draw_combat() -> void:
 			var icon_size: Vector2 = texture_size * (cell_size * 0.86 / maxf(texture_size.x, texture_size.y))
 			draw_texture_rect(texture, Rect2(center - icon_size * 0.5, icon_size), false)
 	for enemy: Dictionary in combat_enemies:
-		var position: Vector2 = _enemy_position(enemy)
+		var progress: float = _enemy_route_progress(enemy) if enemy_route.size() >= 2 else 0.0
+		var position: Vector2 = _route_position(progress) if enemy_route.size() >= 2 else enemy["pos"]
 		var center: Vector2 = _position_center(position)
-		var radius: float = maxf(4.0, cell_size * 0.20)
-		draw_circle(center, radius + 1.5, Color("172120"))
-		draw_circle(center, radius, Color("d99578"))
+		var texture: Texture2D = _enemy_textures[enemy["type_id"]]
+		var visual_top: float
+		if texture != null:
+			var texture_size: Vector2 = texture.get_size()
+			var scale: float = 0.84 if enemy["type_id"] == "brute" else 0.70
+			var icon_size: Vector2 = texture_size * (cell_size * scale / maxf(texture_size.x, texture_size.y))
+			var sprite_center: Vector2 = center + Vector2(0.0, cell_size * 0.10)
+			var rect := Rect2(sprite_center - icon_size * 0.5, icon_size)
+			if _enemy_faces_left(progress):
+				rect.size.x = -rect.size.x
+			draw_texture_rect(texture, rect, false)
+			visual_top = sprite_center.y - icon_size.y * 0.5
+		else:
+			var radius: float = maxf(4.0, cell_size * 0.20)
+			draw_circle(center, radius + 1.5, Color("172120"))
+			draw_circle(center, radius, Color("d99578"))
+			visual_top = center.y - radius
 		var bar_size: Vector2 = Vector2(cell_size * 0.62, maxf(3.0, cell_size * 0.09))
-		var bar_position: Vector2 = center - Vector2(bar_size.x * 0.5, radius + bar_size.y + 3.0)
+		var bar_position: Vector2 = Vector2(center.x - bar_size.x * 0.5, visual_top - bar_size.y - 3.0)
 		draw_rect(Rect2(bar_position, bar_size), Color("172120"))
 		var fraction: float = clampf(float(enemy["hp"]) / maxf(1.0, float(enemy["max_hp"])), 0.0, 1.0)
 		draw_rect(Rect2(bar_position, Vector2(bar_size.x * fraction, bar_size.y)), ROUTE_LINE)
