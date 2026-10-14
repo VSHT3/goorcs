@@ -17,6 +17,7 @@ const SHOT_DURATION: float = 0.18
 
 var layout: PathLayout
 var command_mode: bool = false
+var mirror_horizontal: bool = false
 var cell_click_mode: bool = false:
 	set(value):
 		if cell_click_mode != value:
@@ -82,7 +83,13 @@ func _capture_shots() -> void:
 
 
 func cell_center(cell: Vector2i) -> Vector2:
-	return _board_origin() + (Vector2(cell) + Vector2(0.5, 0.5)) * _cell_size()
+	return _position_center(Vector2(cell))
+
+
+func _position_center(position: Vector2) -> Vector2:
+	if mirror_horizontal:
+		position.x = layout.dimensions.x - 1 - position.x
+	return _board_origin() + (position + Vector2(0.5, 0.5)) * _cell_size()
 
 
 func _cell_size() -> float:
@@ -94,7 +101,10 @@ func _board_origin() -> Vector2:
 
 
 func _cell_at(position: Vector2) -> Vector2i:
-	return Vector2i(((position - _board_origin()) / _cell_size()).floor())
+	var cell := Vector2i(((position - _board_origin()) / _cell_size()).floor())
+	if mirror_horizontal:
+		cell.x = layout.dimensions.x - 1 - cell.x
+	return cell
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -141,6 +151,11 @@ func _paint(cell: Vector2i) -> void:
 		return
 	_last_painted = cell
 	if command_mode:
+		for tower: Dictionary in combat_towers:
+			if tower["cell"] == cell:
+				if _paint_button == MOUSE_BUTTON_LEFT:
+					cell_clicked.emit(cell, _paint_button)
+				return
 		edit_requested.emit(cell, _paint_button == MOUSE_BUTTON_LEFT)
 		return
 	if layout.is_endpoint(cell):
@@ -173,7 +188,8 @@ func _draw() -> void:
 	for y: int in range(layout.dimensions.y):
 		for x: int in range(layout.dimensions.x):
 			var cell := Vector2i(x, y)
-			var rect := Rect2(origin + Vector2(cell) * cell_size + Vector2.ONE, Vector2.ONE * (cell_size - 2))
+			var display_x: int = layout.dimensions.x - 1 - x if mirror_horizontal else x
+			var rect := Rect2(origin + Vector2(display_x, y) * cell_size + Vector2.ONE, Vector2.ONE * (cell_size - 2))
 			var color: Color = GROUND
 			if layout.has_path(cell):
 				color = ROUTE_TILE if layout.route.has(cell) else TILE
@@ -205,7 +221,7 @@ func _draw_combat() -> void:
 		draw_texture_rect(ARROW_REWARD.icon_texture, Rect2(center - icon_size * 0.5, icon_size), false)
 	for enemy: Dictionary in combat_enemies:
 		var position: Vector2 = enemy["pos"]
-		var center: Vector2 = _board_origin() + (position + Vector2(0.5, 0.5)) * cell_size
+		var center: Vector2 = _position_center(position)
 		var radius: float = maxf(4.0, cell_size * 0.20)
 		draw_circle(center, radius + 1.5, Color("172120"))
 		draw_circle(center, radius, Color("d99578"))
@@ -216,7 +232,7 @@ func _draw_combat() -> void:
 		draw_rect(Rect2(bar_position, Vector2(bar_size.x * fraction, bar_size.y)), ROUTE_LINE)
 	for trace: Dictionary in _shot_traces:
 		var aim: Vector2 = trace["aim"]
-		var end: Vector2 = _board_origin() + (aim + Vector2(0.5, 0.5)) * cell_size
+		var end: Vector2 = _position_center(aim)
 		var color := Color("f6df99")
 		color.a = clampf(float(trace["life"]) / SHOT_DURATION, 0.0, 1.0)
 		draw_line(cell_center(trace["cell"]), end, color, 2.0, true)

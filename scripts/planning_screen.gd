@@ -1,7 +1,6 @@
 class_name MatchPlanningScreen
 extends Control
 
-enum Tool { PATH, TOWER, INSPECT }
 
 const TARGET_HELP: Array[String] = [
 	"Furthest along the route.",
@@ -17,7 +16,7 @@ var _pending_tower_cell := Vector2i(-1, -1)
 @onready var boards: Array[PathBoard] = [$Content/Boards/Host/Board, $Content/Boards/Guest/Board]
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
-@onready var tool_button: OptionButton = %Tool
+@onready var tower_menu: OptionButton = %TowerMenu
 @onready var targeting_button: OptionButton = %Targeting
 @onready var _arrow_stats: Label = %ArrowStats
 @onready var _target_label: Label = $Content/Tools/TargetLabel
@@ -34,18 +33,17 @@ func _ready() -> void:
 		boards[slot].edit_requested.connect(_request_edit.bind(slot))
 		boards[slot].cell_clicked.connect(_cell_clicked.bind(slot))
 		boards[slot].command_mode = true
-	tool_button.add_item("Path", Tool.PATH)
-	tool_button.add_item("Tower", Tool.TOWER)
-	tool_button.add_item("Inspect", Tool.INSPECT)
-	tool_button.set_item_tooltip(Tool.PATH, "Left drag: place · Right drag: erase.\nConnect E (entrance) to B (base) through edges; all tiles must reach E. Edits unready you.")
-	tool_button.set_item_tooltip(Tool.TOWER, "Left click: build on empty ground or select your Arrow. Edits unready you.")
-	tool_button.set_item_tooltip(Tool.INSPECT, "Left click: select your Arrow and show its range.")
+	boards[0].mirror_horizontal = true
+	tower_menu.add_item("None", 0)
+	tower_menu.add_item("Arrow tower", 1)
+	tower_menu.set_item_tooltip(0, "Inspect towers. During breaks, left drag places paths and right drag erases them.")
+	tower_menu.set_item_tooltip(1, "Left click: place an Arrow on empty ground. Right click: cancel placement.")
 	targeting_button.add_item("Furthest", 0)
 	targeting_button.add_item("Closest", 1)
 	targeting_button.add_item("Strongest", 2)
 	for index: int in range(TARGET_HELP.size()):
 		targeting_button.set_item_tooltip(index, TARGET_HELP[index])
-	tool_button.item_selected.connect(_tool_selected)
+	tower_menu.item_selected.connect(_tower_selected)
 	targeting_button.item_selected.connect(_target_selected)
 	clear_button.pressed.connect(_clear)
 	ready_button.pressed.connect(_toggle_ready)
@@ -71,12 +69,18 @@ func _visibility_changed() -> void:
 
 
 func _request_edit(cell: Vector2i, place: bool, slot: int) -> void:
-	if planning != null and planning.active and not planning.locked and slot == planning.local_slot() and tool_button.selected == Tool.PATH:
+	if planning != null and planning.active and not planning.locked and slot == planning.local_slot() and tower_menu.selected == 0:
 		planning.request_edit(slot, cell, place)
 
 
 func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
-	if planning == null or not planning.active or slot != planning.local_slot() or button != MOUSE_BUTTON_LEFT:
+	if planning == null or not planning.active or slot != planning.local_slot():
+		return
+	if button == MOUSE_BUTTON_RIGHT and tower_menu.selected != 0:
+		tower_menu.select(0)
+		_tower_selected(0)
+		return
+	if button != MOUSE_BUTTON_LEFT:
 		return
 	if int(planning.combat.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.FINISHED:
 		return
@@ -87,15 +91,16 @@ func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
 			_refresh()
 			return
 	selected_tower_id = -1
-	if tool_button.selected == Tool.TOWER:
+	if tower_menu.selected == 1:
 		_pending_tower_cell = cell
 		planning.build_tower(slot, cell, _default_targeting)
 	_refresh()
 
 
-func _tool_selected(_index: int) -> void:
+func _tower_selected(_index: int) -> void:
 	cancel_strokes()
 	_pending_tower_cell = Vector2i(-1, -1)
+	selected_tower_id = -1
 	_refresh()
 
 
@@ -123,7 +128,7 @@ func _refresh_targeting() -> void:
 	var tower: Dictionary = _selected_tower()
 	var mode: int = int(tower["mode"]) if not tower.is_empty() else _default_targeting
 	targeting_button.select(mode)
-	var has_controls: bool = tool_button.selected == Tool.TOWER or (tool_button.selected == Tool.INSPECT and not tower.is_empty())
+	var has_controls: bool = tower_menu.selected != 0 or not tower.is_empty()
 	targeting_button.visible = has_controls
 	_target_label.visible = has_controls
 	_arrow_stats.visible = has_controls
@@ -151,7 +156,7 @@ func _refresh() -> void:
 		_clear_feedback()
 		clear_button.disabled = true
 		ready_button.disabled = true
-		tool_button.disabled = true
+		tower_menu.disabled = true
 		targeting_button.disabled = true
 		_status.text = "Planning unavailable"
 		return
@@ -170,11 +175,7 @@ func _refresh() -> void:
 	var health: Array = state.get("health", [10, 10])
 	var spawned: Array = state.get("spawned", [0, 0])
 	var rules: Dictionary = state.get("rules", {})
-	tool_button.disabled = not planning.active or finished
-	tool_button.set_item_disabled(Tool.PATH, planning.locked)
-	if planning.locked and tool_button.selected == Tool.PATH:
-		cancel_strokes()
-		tool_button.select(Tool.INSPECT)
+	tower_menu.disabled = not planning.active or finished
 	targeting_button.disabled = not planning.active or finished
 	if _pending_tower_cell != Vector2i(-1, -1):
 		for tower: Dictionary in all_towers[own_slot]:
@@ -188,7 +189,7 @@ func _refresh() -> void:
 		var layout: PathLayout = planning.layouts[slot]
 		var board: PathBoard = boards[slot]
 		board.layout = layout
-		board.cell_click_mode = tool_button.selected != Tool.PATH
+		board.cell_click_mode = tower_menu.selected != 0 or not editable
 		board.input_enabled = planning.active and not finished and slot == own_slot and (editable or board.cell_click_mode)
 		board.selected_tower_id = selected_tower_id if slot == own_slot else -1
 		board.tower_range = float(rules.get("range", 3.0))
@@ -233,7 +234,7 @@ func _refresh() -> void:
 	else:
 		_status.text = "Planning · Wave %d" % (int(state.get("wave", 0)) + 1)
 		_status.tooltip_text = ""
-	tool_button.tooltip_text = tool_button.get_item_tooltip(tool_button.selected)
+	tower_menu.tooltip_text = tower_menu.get_item_tooltip(tower_menu.selected)
 	_refresh_targeting()
 	if not planning.active:
 		cancel_strokes()

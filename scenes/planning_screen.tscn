@@ -35,15 +35,15 @@ autowrap_mode = 2
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="ToolLabel" type="Label" parent="Content/Tools"]
+[node name="TowerLabel" type="Label" parent="Content/Tools"]
 layout_mode = 2
-text = "Tool"
+text = "Place tower"
 
-[node name="Tool" type="OptionButton" parent="Content/Tools"]
+[node name="TowerMenu" type="OptionButton" parent="Content/Tools"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(112, 38)
+custom_minimum_size = Vector2(150, 38)
 layout_mode = 2
-tooltip_text = "Left drag: place · Right drag: erase. Connect E (entrance) to B (base) through edges."
+tooltip_text = "Select a tower to place, or None to inspect and edit paths during breaks."
 
 [node name="TargetLabel" type="Label" parent="Content/Tools"]
 layout_mode = 2
