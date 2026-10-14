@@ -1,7 +1,19 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/planning_screen.gd" id="1_planning"]
 [ext_resource type="Script" path="res://scripts/path_board.gd" id="2_board"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_management"]
+bg_color = Color(0.133, 0.173, 0.169, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.40, 0.46, 0.40, 1)
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
 
 [node name="PlanningScreen" type="Control"]
 layout_mode = 3
@@ -23,49 +35,49 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 6
 
-[node name="Status" type="Label" parent="Content"]
+[node name="Header" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Status" type="Label" parent="Content/Header"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
 theme_override_font_sizes/font_size = 24
 text = "Planning · Wave 1"
 autowrap_mode = 2
 
-[node name="Tools" type="HBoxContainer" parent="Content"]
+[node name="Coins" type="Label" parent="Content/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+theme_override_font_sizes/font_size = 24
+text = "Coins 0"
+
+[node name="TowerPalette" type="HBoxContainer" parent="Content"]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="TowerLabel" type="Label" parent="Content/Tools"]
+[node name="Placement" type="HBoxContainer" parent="Content"]
 layout_mode = 2
-text = "Place tower"
+theme_override_constants/separation = 8
 
-[node name="TowerMenu" type="OptionButton" parent="Content/Tools"]
+[node name="PlacementStatus" type="Label" parent="Content/Placement"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 38)
-layout_mode = 2
-tooltip_text = "Select a tower to place, or None to inspect and edit paths during breaks."
-
-[node name="TargetLabel" type="Label" parent="Content/Tools"]
-layout_mode = 2
-visible = false
-text = "Target"
-
-[node name="Targeting" type="OptionButton" parent="Content/Tools"]
-unique_name_in_owner = true
-visible = false
-custom_minimum_size = Vector2(128, 38)
-layout_mode = 2
-tooltip_text = "New tower priority"
-
-[node name="TowerStats" type="Label" parent="Content/Tools"]
-unique_name_in_owner = true
-visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
 theme_override_font_sizes/font_size = 14
 text = ""
 autowrap_mode = 2
+
+[node name="CancelPlacement" type="Button" parent="Content/Placement"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Cancel / Esc"
 
 [node name="Boards" type="HBoxContainer" parent="Content"]
 layout_mode = 2
@@ -136,6 +148,66 @@ clip_contents = true
 script = ExtResource("2_board")
 command_mode = true
 input_enabled = false
+
+[node name="TowerManagement" type="PanelContainer" parent="Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_management")
+
+[node name="Content" type="VBoxContainer" parent="Content/TowerManagement"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="TowerTitle" type="Label" parent="Content/TowerManagement/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+theme_override_font_sizes/font_size = 18
+text = "Selected tower"
+
+[node name="TowerStats" type="Label" parent="Content/TowerManagement/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+autowrap_mode = 2
+
+[node name="Controls" type="HBoxContainer" parent="Content/TowerManagement/Content"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TargetLabel" type="Label" parent="Content/TowerManagement/Content/Controls"]
+layout_mode = 2
+text = "Target"
+
+[node name="Targeting" type="OptionButton" parent="Content/TowerManagement/Content/Controls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(118, 38)
+layout_mode = 2
+
+[node name="DamageUpgrade" type="Button" parent="Content/TowerManagement/Content/Controls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SpeedUpgrade" type="Button" parent="Content/TowerManagement/Content/Controls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SellTower" type="Button" parent="Content/TowerManagement/Content/Controls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 38)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CloseTower" type="Button" parent="Content/TowerManagement/Content/Controls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(72, 38)
+layout_mode = 2
+text = "Close"
 
 [node name="Actions" type="HBoxContainer" parent="Content"]
 layout_mode = 2

@@ -17,66 +17,70 @@ func _run() -> void:
 	main.collection_store = CollectionStore.new(save_path)
 	root.add_child(main)
 	await process_frame
-	var screen: MatchPlanningScreen = main.play_screen.planning_screen
-	_check(_ids(screen) == ["", "orc_ballista"], "Saved Ballista is selectable while locked Arrow and Rune stay absent")
-	screen.tower_menu.select(1)
-	screen.tower_menu.item_selected.emit(1)
+	main.session.is_host = true
+	main.planning.active = true
 	main.planning.changed.emit()
-	_check(screen._placement_type() == &"orc_ballista", "Combat refresh preserves selection by stable resource identity")
+	var screen: MatchPlanningScreen = main.play_screen.planning_screen
+	_check(screen.shop_buttons.size() == 3, "All three collection towers remain visible")
+	_check(screen.shop_buttons[&"arrow_tower"].disabled and screen.shop_buttons[&"rune_obelisk"].disabled, "Locked towers are visible but cannot be purchased")
+	_check(not screen.shop_buttons[&"orc_ballista"].disabled, "Saved unlocked tower is affordable and selectable")
+	screen.shop_buttons[&"orc_ballista"].pressed.emit()
+	main.planning.changed.emit()
+	_check(screen._placement_type() == &"orc_ballista" and screen.boards[0].cell_click_mode, "Click selection survives host snapshots and disables path strokes")
+	_check(not screen.boards[1].input_enabled, "Opponent board cannot accept placement or drag commands")
+	_check(screen.cancel_interaction() and screen._placement_type() == &"" and not screen.boards[0].cell_click_mode, "Cancel returns to path editing without leaving the match")
 	var opened: ChestResult = main.collection_store.open_chest()
 	_check(opened.error_message.is_empty(), "Real chest grant succeeds in isolated save")
 	main.planning.changed.emit()
-	_check(_ids(screen).has(String(opened.rewards[0].id)) and screen._placement_type() == &"orc_ballista", "Newly granted tower enters the menu without changing the existing selection")
+	_check(not screen.shop_buttons[opened.rewards[0].id].disabled, "Chest grant enables its previously visible locked tower")
+	screen.shop_buttons[&"orc_ballista"].pressed.emit()
 	main.collection_store.reset_progress()
 	main.planning.changed.emit()
-	_check(_ids(screen) == [""] and screen._placement_type() == &"", "Reset removes placement options and cancels selection; no free locked Arrow remains")
-	main.queue_free()
-	await process_frame
-	# A fourth resource proves the menu has no three-tower identity switch.
-	var custom: TowerReward = CollectionStore.DEFAULT_CATALOG[0].duplicate()
-	custom.id = &"test_watchtower"
-	custom.title = "Test watchtower"
-	var definition := TowerDefinition.new()
-	definition.reward = custom
-	definition.damage = 3
-	definition.range_cells = 2.0
-	definition.interval = 0.5
-	var rules := CombatRules.new()
-	rules.tower_definitions = [definition]
-	FileAccess.open(save_path, FileAccess.WRITE).store_string(JSON.stringify({"version": 1, "unlocked": ["test_watchtower"]}))
-	main = preload("res://scenes/main.tscn").instantiate()
-	main.collection_store = CollectionStore.new(save_path, [custom])
-	main.combat_rules = rules
-	root.add_child(main)
-	await process_frame
-	screen = main.play_screen.planning_screen
-	_check(_ids(screen) == ["", "test_watchtower"], "Custom catalog and combat resources automatically expose a fourth tower")
-	screen.tower_menu.select(1)
-	screen.tower_menu.item_selected.emit(1)
-	_check(screen._placement_type() == custom.id, "Custom tower selection carries the resource ID rather than a menu index")
-	main.queue_free()
-	await process_frame
-	rules.tower_definitions = []
-	main = preload("res://scenes/main.tscn").instantiate()
-	main.collection_store = CollectionStore.new(save_path, [custom])
-	main.combat_rules = rules
-	root.add_child(main)
-	await process_frame
-	_check(_ids(main.play_screen.planning_screen) == [""], "Unlocked types without a host combat definition cannot be selected")
+	_check(screen.shop_buttons.size() == 3 and screen._placement_type() == &"", "Reset cancels placement without hiding the catalog")
+	for button: TowerShopButton in screen.shop_buttons.values():
+		_check(button.disabled, "Reset disables every locked purchase")
+
+	# Real model snapshots exercise owned selection, effective upgrades and stale sales.
+	var model := MatchCombat.new(main.combat_rules)
+	model.coins[0] = 1000
+	_check(model.build(0, Vector2i(3, 3), &"orc_ballista", MatchCombat.TargetMode.CLOSEST), "Model creates tower for management consumer")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+	var id: int = int(model.towers[0][0]["id"])
+	_check(screen.selected_tower_id == id and screen.get_node("%TowerManagement").visible, "Owned inspection opens management")
+	_check(screen.targeting_button.selected == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
+	_check(screen.boards[0].selected_tower_id == id and screen.boards[1].selected_tower_id == -1, "Range selection stays local to owned board")
+	var definition: Dictionary = main.planning.combat["tower_types"]["orc_ballista"]
+	_check(model.upgrade_tower(0, id, "damage") and model.upgrade_tower(0, id, "speed"), "Both real one-time model upgrades succeed")
+	model.towers[0][0]["kills"] = 7
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(screen.damage_upgrade.disabled and screen.speed_upgrade.disabled, "Purchased upgrades cannot be bought twice in management")
+	screen.close_button.pressed.emit()
+	_check(screen.selected_tower_id == -1 and model.towers[0].size() == 1, "Close clears selection without selling")
+	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+	_check(model.sell_tower(0, id), "Model sale succeeds")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(screen.selected_tower_id == -1 and not screen.get_node("%TowerManagement").visible, "Sold selection disappears on accepted snapshot")
+	FileAccess.open(save_path, FileAccess.WRITE).store_string(JSON.stringify({"version": 1, "unlocked": ["orc_ballista"]}))
+	main.planning.collection_store = CollectionStore.new(save_path)
+	model.coins[0] = int(definition["cost"])
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	screen.shop_buttons[&"orc_ballista"].pressed.emit()
+	model.coins[0] = int(definition["cost"]) - 1
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(screen.shop_buttons[&"orc_ballista"].disabled and screen._placement_type() == &"", "Insufficient host funds disable purchase and cancel stale placement")
 	main.queue_free()
 	await process_frame
 	DirAccess.remove_absolute(save_path)
 	DirAccess.remove_absolute(directory)
 	if failures == 0:
-		print("PASS: saved unlocks gate tower menu, chest grants refresh roster, selection survives snapshots, reset cancels placement, and a fourth resource needs no UI branch")
+		print("PASS: visible locked palette, click/cancel ownership, unlock/reset, effective owned stats, upgrades, close, sale and affordability snapshots")
 	quit(1 if failures else 0)
-
-
-func _ids(screen: MatchPlanningScreen) -> Array[String]:
-	var ids: Array[String] = []
-	for index: int in range(screen.tower_menu.item_count):
-		ids.append(String(screen.tower_menu.get_item_metadata(index)))
-	return ids
 
 
 func _check(condition: bool, description: String) -> void:

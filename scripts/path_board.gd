@@ -5,6 +5,7 @@ signal edited
 signal feedback(message: String)
 signal edit_requested(cell: Vector2i, place: bool)
 signal cell_clicked(cell: Vector2i, button: MouseButton)
+signal tower_dropped(cell: Vector2i, type_id: StringName)
 
 const GROUND := Color("222c2b")
 const TILE := Color("6e7465")
@@ -13,6 +14,7 @@ const ROUTE_LINE := Color("b5e2b7")
 const ENTRY_COLOR := Color("e0bc77")
 const BASE_COLOR := Color("96c8dc")
 const SHOT_DURATION: float = 0.18
+const PULSE_DURATION: float = 0.45
 
 var layout: PathLayout
 var command_mode: bool = false
@@ -88,10 +90,16 @@ func _capture_shots() -> void:
 		var tower_id: int = int(tower["id"])
 		var shot: int = int(tower["shot"])
 		if shot > int(_seen_shots.get(tower_id, 0)):
+			var definition: Dictionary = tower_types[tower["type_id"]]
+			var area_attack: bool = bool(definition["area_attack"])
+			var duration: float = PULSE_DURATION if area_attack else SHOT_DURATION
 			_shot_traces.append({
 				"cell": tower["cell"],
 				"aim": tower["aim"],
-				"life": SHOT_DURATION,
+				"life": duration,
+				"duration": duration,
+				"area_attack": area_attack,
+				"range": float(definition["range"]),
 			})
 			set_process(true)
 		_seen_shots[tower_id] = shot
@@ -141,6 +149,30 @@ func _cell_at(position: Vector2) -> Vector2i:
 	if mirror_horizontal:
 		cell.x = layout.dimensions.x - 1 - cell.x
 	return cell
+
+
+func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
+	if not input_enabled or layout == null or _cell_size() <= 0.0:
+		return false
+	if not data is Dictionary or not data.get("tower_type") is String:
+		return false
+	var type_id: String = data["tower_type"]
+	if not tower_types.has(type_id):
+		return false
+	var cell: Vector2i = _cell_at(at_position)
+	if not layout.contains(cell) or layout.has_path(cell):
+		return false
+	for tower: Dictionary in combat_towers:
+		if tower["cell"] == cell:
+			return false
+	return true
+
+
+func _drop_data(at_position: Vector2, data: Variant) -> void:
+	if not _can_drop_data(at_position, data):
+		return
+	cancel_stroke()
+	tower_dropped.emit(_cell_at(at_position), StringName(data["tower_type"]))
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -251,10 +283,17 @@ func _draw_combat() -> void:
 	var cell_size: float = _cell_size()
 	for tower: Dictionary in combat_towers:
 		if int(tower["id"]) == selected_tower_id:
-			var center: Vector2 = cell_center(tower["cell"])
+			var tower_cell: Vector2i = tower["cell"]
 			var tower_range: float = float(tower_types[tower["type_id"]]["range"])
-			draw_circle(center, tower_range * cell_size, Color(0.71, 0.89, 0.72, 0.06))
-			draw_arc(center, tower_range * cell_size, 0.0, TAU, 96, ROUTE_LINE, 1.5, true)
+			for y: int in range(layout.dimensions.y):
+				for x: int in range(layout.dimensions.x):
+					var cell := Vector2i(x, y)
+					if not MatchCombat.cell_in_range(tower_cell, cell, tower_range):
+						continue
+					var rect := Rect2(cell_center(cell) - Vector2.ONE * cell_size * 0.5 + Vector2.ONE * 2.0,
+						Vector2.ONE * (cell_size - 4.0))
+					draw_rect(rect, Color(0.71, 0.89, 0.72, 0.12))
+					draw_rect(rect, ROUTE_LINE, false, 1.5)
 	for tower: Dictionary in combat_towers:
 		var center: Vector2 = cell_center(tower["cell"])
 		var selected: bool = int(tower["id"]) == selected_tower_id
@@ -278,12 +317,17 @@ func _draw_combat() -> void:
 		var fraction: float = clampf(float(enemy["hp"]) / maxf(1.0, float(enemy["max_hp"])), 0.0, 1.0)
 		draw_rect(Rect2(bar_position, Vector2(bar_size.x * fraction, bar_size.y)), ROUTE_LINE)
 	for trace: Dictionary in _shot_traces:
-		var aim: Vector2 = trace["aim"]
-		var end: Vector2 = _position_center(aim)
 		var color := Color("f6df99")
-		color.a = clampf(float(trace["life"]) / SHOT_DURATION, 0.0, 1.0)
-		draw_line(cell_center(trace["cell"]), end, color, 2.0, true)
-		draw_circle(end, cell_size * 0.13, color, false, 1.5, true)
+		var remaining: float = clampf(float(trace["life"]) / float(trace["duration"]), 0.0, 1.0)
+		color.a = remaining
+		if bool(trace["area_attack"]):
+			var radius: float = (float(trace["range"]) + 0.5) * cell_size * (1.0 - remaining)
+			draw_circle(cell_center(trace["cell"]), radius, color, false, 2.5, true)
+		else:
+			var aim: Vector2 = trace["aim"]
+			var end: Vector2 = _position_center(aim)
+			draw_line(cell_center(trace["cell"]), end, color, 2.0, true)
+			draw_circle(end, cell_size * 0.13, color, false, 1.5, true)
 
 
 func _draw_endpoint(cell: Vector2i, color: Color, letter: String) -> void:

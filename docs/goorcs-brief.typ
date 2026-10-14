@@ -180,8 +180,8 @@ Planning could use a fixed timer, a ready button that starts a short countdown f
 )
 
 #v(4mm)
-#note([Where the project stands], [We are building this with AI assistance in Godot, using GDScript. The local workshop supports maze editing and route previews. Free animated chests unlock three tower identities in a saved collection. Play connects two players by invite over LAN, private VPN or forwarded UDP. The host synchronizes both planning boards; both players ready to lock their routes. Combat is not implemented.])
+#note([Where the project stands], [The Godot prototype connects two players by invite and synchronizes their boards. Both-ready locks routes for escalating waves. Coins pay for three tower types, damage/speed upgrades and partial-refund selling. Tower menus show kills and targeting; Rune uses a short-range area pulse. Enemy sends, loadouts and the full progression systems remain planned. Local workshop and collection chests are also playable.])
 #v(3mm)
 #text(size: 9.5pt)[*First playable:* connect two boards with one tower type and one enemy type. Prove the path rules, live building and upgrades, selling, income from sends, and base defeat before adding the collection and larger content roster.]
 #v(2mm)
-#small[Source: docs/game-direction.md. The full match remains planned; local paths, collection chests and shared two-player maze planning are implemented.]
+#small[Source: docs/game-direction.md. The competitive prototype includes shared mazes, combat, Coins and tower management; the full match design remains planned.]

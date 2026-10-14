@@ -171,7 +171,7 @@ The choice of multiple activities does not yet lock in all three candidates or t
 
 Sending enemies spends match currency now and increases future income. This creates a tradeoff between immediate defensive investment, economic growth, and pressure on the opponent.
 
-Do not assign balance numbers yet. Baseline income, kill rewards if any, payout intervals, send costs, income increments and caps, tower costs, sale refunds, and gambling payouts remain open.
+The creator authorized provisional playtest Coins and balance values: host-owned paid towers, kill and wave-clear income, two one-time damage/speed upgrades, and a partial invested-cost sale refund. These do not settle the future send-to-grow-income economy, gambling, purchase randomness, or long-run progression.
 
 Important design risks to address:
 
@@ -201,13 +201,13 @@ The run should start small and become increasingly extreme: larger towers, stron
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.
 
-The connection lobby authenticates admission and reports waiting/connected/disconnected states. Admission opens two visible boards. The host validates ownership, immutable endpoints, bounds, equal path budgets, and non-overlapping tower placement through the existing rule owners. Disconnected path drafts are allowed, but readiness requires every placed tile and the base to reach the entrance. Accepted planning edits, tower construction, and target changes clear that player's readiness. Both-ready captures independent shortest-route copies and starts a regular wave; path edits and readiness are locked during combat.
+Admission opens two visible boards. The host validates ownership, cells, paths, funds, upgrades, and sales. Accepted planning edits and tower transactions clear readiness; both-ready captures routes and starts a wave. Path edits remain locked during combat, while construction and management remain available.
 
-**Implemented defense slice:** Arrow, Ballista, and Rune use resource-owned provisional stats and free placement on empty non-path cells during planning or combat. The placement menu exposes locally unlocked types supported by the host's definitions. Each tower can target **Furthest** (greatest route progress), **Closest** (shortest distance to the tower), or **Strongest** (highest current HP). Only enemies in inclusive circular range are eligible; equal scores use the lowest enemy ID. All current towers deal instant-hit single-target damage; shot traces are cosmetic. Ballista and Rune differ in damage, range, and firing interval, not special abilities. One regular enemy type follows the captured route. Killed enemies never leak; surviving arrivals damage the base. Both boards must finish all scheduled spawns and clear before planning resumes. Maze drafts, towers, and base health persist, and both players must ready for every next wave. A destroyed base ends the run; same-tick destruction of both invokes the single host coin flip.
+**Implemented defense slice:** Arrow, Ballista, and Rune use resource-defined prices and stats. Coins pay for towers and one damage plus one speed upgrade per tower, with distinct gains/costs. Kills belong to the final attacking tower and pay its board once. Clearing both boards grants wave income once; selling refunds 60% of actual purchase/upgrade investment. All three targeting policies remain available. Range uses tile neighborhoods; Rune range one covers the center and eight neighbors, damages all enemies inside, and displays a circular pulse. Range itself uses tile highlights.
 
-Match input uses a resource-driven tower-placement menu showing unlocked supported towers and their art. With no tower selected, breaks automatically enable path drawing/removal while existing towers remain inspectable. During waves, no selection means inspection only; path edits stay locked. Selecting a tower enables placement during either phase. Right-click or choosing None cancels placement. This replaces the former explicit Path/Tower/Inspect tool modes.
+All tower types remain visible in a normal palette, with locked/unaffordable entries disabled. Placement supports both click-then-place and native drag/drop. Clicking an owned tower opens kills, effective stats, targeting, upgrade prices/status, and Sell. Close dismisses selection; right-click/Escape cancels placement. Without placement selected, breaks enable path editing and combat permits inspection only.
 
-The host's exported board configuration and `resources/combat/prototype.tres` supply provisional playtest settings, not settled balance. Planning paths are separate from workshop drafts. Guest departure resets the match and returns the host to waiting; rejoining starts fresh. Workshop layouts and collection saves remain local. Match economy, sends, upgrades, selling, relocation, loadout gating, camera scouting, host migration, and relay fallback are not implemented. Separate-machine internet connectivity remains unverified. See [connection setup and checks](development.md#direct-connection-lobby).
+One enemy type scales health, speed, and count with each wave. Resources own provisional values. Match state persists across waves but resets on disconnect/rejoin; collection saves and workshop drafts remain separate. Sends, relocation, expanding footprints, loadouts, scouting, host migration, and relay fallback remain unimplemented. Internet reachability is still unverified on separate networks.
 
 ## First playable proof of the core rules
 
@@ -221,7 +221,7 @@ The first implementation milestone remains deliberately smaller than the full di
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. Same-tick destruction of both bases is resolved by one host-owned random coin flip.
 
-This milestone is not the finished game and does not discard the requested abilities, other buildings, map interactions, gambling, traits, collection, or escalation. The current defense slice proves authoritative two-board planning, live resource-defined tower building and targeting, local collection-driven selection, regular waves, captured-route locking, base damage, both-ready breaks, and results. Free placement does not prove the proposed economy; sends, purchases, upgrades, selling, relocation, expanding footprints, loadouts, and camera scouting still need implementation.
+The current slice proves authoritative planning, paid construction, tower management, upgrades/sales, kill and wave income, escalating regular waves, route locks, and results. It does not implement enemy sends, randomized purchases, relocation, expanding footprints, loadouts, or camera scouting.
 
 ## Decisions still needed before their implementation
 

@@ -7,5 +7,11 @@
 script = ExtResource("1_definition")
 reward = ExtResource("2_reward")
 damage = 1
-range_cells = 2.5
+range_cells = 1.0
 interval = 0.3
+cost = 70
+damage_upgrade_cost = 45
+damage_upgrade_bonus = 1
+speed_upgrade_cost = 45
+speed_upgrade_multiplier = 0.85
+area_attack = true

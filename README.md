@@ -4,7 +4,7 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path workshop, persistent tower collection and animated reward chests, plus a host-authoritative two-player defense loop reached through **Play**. Shared mazes, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and final results are implemented. Match economy, enemy sends, upgrades, selling, loadouts, permanent stat growth, and final art are not implemented. No MCP plugin is installed.
+Playable local path workshop, persistent collection/chests, and host-authoritative two-player defense through **Play**. Match Coins, paid towers, kills, damage/speed upgrades, selling, tile ranges, Rune area attacks, scaling waves, persistent base health, and results are implemented. Enemy sends, loadouts, permanent stat growth, and final art are not implemented.
 
 ## Run
 
@@ -17,13 +17,13 @@ For command-line launch and verification, see the [development commands](docs/de
 - Choose **Play → Host**, enter an IP address your friend can reach and a UDP port, then **Create room**.
 - Use **Copy invite code** and share the complete code privately. Your friend chooses **Play → Join**, pastes it, and presses **Connect** or Enter.
 - Admission automatically opens shared planning: both boards are visible, but only your own accepts edits. Match paths are separate from the local workshop and are not saved.
-- Both enemy streams enter from the middle, with bases on the outer edges. **Place tower** lists your unlocked towers supported by the host's combat rules, with their artwork. Select a tower, then click empty non-path ground to build. Choose **None** or right-click to cancel placement. With no tower selected, click an existing own tower to inspect it and choose **Furthest**, **Closest**, or **Strongest** targeting. A fresh collection has no placement options until you open a chest.
+- The visible tower palette shows all types, prices, and collection locks. Click a tower then empty non-path ground, or drag it onto your board. Right-click or Escape cancels placement. Clicking an owned tower opens its kills, stats, targeting, damage/speed upgrades, and Sell menu.
 - During planning breaks, no tower selected automatically enables path editing: left-drag places tiles, right-drag removes them. Existing towers remain inspectable. During waves, no tower selected only inspects; paths stay locked. Only your own board accepts commands; building and target changes remain available during combat.
-- **Ready for wave N** requires a legal path. Editing paths, building, or changing targeting during planning clears your readiness; **Unready** withdraws it. Both players ready starts each regular wave and captures its routes. Paths cannot change until all scheduled enemies and both boards clear.
-- All three tower types currently deal direct instant-hit, single-target damage in circular range, with different provisional damage, range, and firing intervals. Enemies follow the captured shortest routes; a leak deals one base damage. Paths, towers, and base health persist between waves. Both players must ready again.
+- **Ready for wave N** requires a legal path. Accepted path edits, purchases, upgrades, sales, and target changes clear planning readiness. Both players ready captures routes and starts the wave; paths remain locked until both boards clear.
+- Arrow and Ballista hit one target. Rune damages every enemy in its surrounding 3×3 tile neighborhood and displays a circular pulse. Selected range is highlighted tiles, not a circle. All types support Furthest, Closest, and Strongest targeting.
 - Enemy visuals move smoothly between host snapshots along the captured route, including corners. Adjacent path tiles form continuous pavement through straights, bends, and branches, without a route-line overlay.
 - A destroyed base ends the run. If both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the winner and both players see that result. The finished run cannot restart; leave/rejoin begins fresh.
-- Enemy/wave settings live in `resources/combat/prototype.tres`; tower stats live in `resources/combat/towers/`. The host owns combat stats. Placement is free, so this proves defense, not the unimplemented match economy. See [adding a tower](docs/development.md#adding-a-tower) for the resource-driven extension steps.
+- Coins fund towers and two one-time upgrades per tower; kills and cleared waves earn Coins. Selling refunds part of the actual investment. Wave health, speed, and count increase. Provisional values live in `resources/combat/prototype.tres` and `resources/combat/towers/`.
 - The code contains the host's address and a random room credential. There is no online room lookup or NAT traversal service. Use the same LAN, a private network/VPN, or a public host address with UDP forwarding and firewall access.
 - **Leave / Esc** closes your connection and clears shared planning. If the guest leaves, the host waits for another guest with the same code; rejoining starts with fresh boards. If the host leaves, the room closes and its code expires.
 - For network setup, security limits, and two-instance verification, see [direct connection development](docs/development.md#direct-connection-lobby).

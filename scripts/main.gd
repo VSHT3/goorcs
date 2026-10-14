@@ -128,7 +128,9 @@ func _input(event: InputEvent) -> void:
 	if play_screen.visible and event is InputEventKey:
 		var key := event as InputEventKey
 		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
-			_show_menu()
+			var screen: MatchPlanningScreen = play_screen.planning_screen
+			if screen == null or not screen.is_visible_in_tree() or not screen.cancel_interaction():
+				_show_menu()
 			get_viewport().set_input_as_handled()
 
 

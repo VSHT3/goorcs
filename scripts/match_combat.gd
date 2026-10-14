@@ -7,6 +7,7 @@ enum TargetMode { FURTHEST, CLOSEST, STRONGEST }
 var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
+var coins: Array[int] = []
 var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
@@ -30,6 +31,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null) -> void:
 		_random = RandomNumberGenerator.new()
 		_random.randomize()
 	base_health = [rules.base_health, rules.base_health]
+	coins = [rules.starting_coins, rules.starting_coins]
 	for definition: TowerDefinition in rules.tower_definitions:
 		if definition == null:
 			push_error("Combat tower_definitions contains a null entry")
@@ -38,8 +40,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null) -> void:
 			push_error("Combat tower definition '%s' has no reward" % definition.resource_path)
 			continue
 		var type_id: String = String(definition.reward.id)
-		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0:
-			push_error("Invalid combat tower definition '%s' (%s): ID and positive finite stats are required" % [type_id, definition.resource_path])
+		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0 or definition.cost <= 0 or definition.damage_upgrade_cost <= 0 or definition.damage_upgrade_bonus <= 0 or definition.speed_upgrade_cost <= 0 or not is_finite(definition.speed_upgrade_multiplier) or definition.speed_upgrade_multiplier <= 0.0 or definition.speed_upgrade_multiplier >= 1.0:
+			push_error("Invalid combat tower definition '%s' (%s): positive stats/prices and speed multiplier between zero and one are required" % [type_id, definition.resource_path])
 			continue
 		if _tower_types.has(type_id):
 			push_error("Duplicate combat tower definition '%s': keeping the first valid definition" % type_id)
@@ -47,16 +49,29 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null) -> void:
 		_tower_types[type_id] = {
 			"title": definition.reward.title, "damage": definition.damage,
 			"range": definition.range_cells, "interval": definition.interval,
+			"cost": definition.cost, "damage_upgrade_cost": definition.damage_upgrade_cost,
+			"damage_upgrade_bonus": definition.damage_upgrade_bonus,
+			"speed_upgrade_cost": definition.speed_upgrade_cost,
+			"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
+			"area_attack": definition.area_attack,
 		}
 
 
 func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 	if phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode) or not _tower_types.has(String(type_id)) or has_tower(slot, cell):
 		return false
+	var definition: Dictionary = _tower_types[String(type_id)]
+	var cost: int = definition["cost"]
+	if coins[slot] < cost:
+		return false
 	towers[slot].append({
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
+		"kills": 0, "damage_upgraded": false, "speed_upgraded": false,
+		"damage": definition["damage"], "interval": definition["interval"],
+		"invested": cost, "sell_value": _sell_value(cost),
 	})
+	coins[slot] -= cost
 	_next_tower_id += 1
 	return true
 
@@ -71,6 +86,52 @@ func set_targeting(slot: int, tower_id: int, mode: int) -> bool:
 			tower["mode"] = mode
 			return true
 	return false
+
+
+func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
+	if phase == Phase.FINISHED or not _valid_slot(slot) or (upgrade != "damage" and upgrade != "speed"):
+		return false
+	for tower: Dictionary in towers[slot]:
+		if tower["id"] != tower_id:
+			continue
+		var flag: String = upgrade + "_upgraded"
+		var definition: Dictionary = _tower_types[tower["type_id"]]
+		var cost: int = definition[upgrade + "_upgrade_cost"]
+		if tower[flag] or coins[slot] < cost:
+			return false
+		coins[slot] -= cost
+		tower[flag] = true
+		tower["invested"] += cost
+		tower["sell_value"] = _sell_value(tower["invested"])
+		if upgrade == "damage":
+			tower["damage"] += definition["damage_upgrade_bonus"]
+		else:
+			tower["interval"] *= definition["speed_upgrade_multiplier"]
+			# Accelerate the current reload, but never grant an immediate extra shot.
+			tower["cooldown"] *= definition["speed_upgrade_multiplier"]
+		return true
+	return false
+
+
+func sell_tower(slot: int, tower_id: int) -> bool:
+	if phase == Phase.FINISHED or not _valid_slot(slot):
+		return false
+	for index: int in range(towers[slot].size()):
+		var tower: Dictionary = towers[slot][index]
+		if tower["id"] != tower_id:
+			continue
+		coins[slot] += _sell_value(tower["invested"])
+		towers[slot].remove_at(index)
+		return true
+	return false
+
+
+static func _sell_value(invested: int) -> int:
+	return floori(float(invested) * 0.6)
+
+
+static func cell_in_range(origin: Vector2i, cell: Vector2i, range_cells: float) -> bool:
+	return maxi(absi(cell.x - origin.x), absi(cell.y - origin.y)) <= range_cells
 
 
 func has_tower(slot: int, cell: Vector2i) -> bool:
@@ -109,7 +170,10 @@ func advance(delta: float) -> bool:
 		phase = Phase.FINISHED
 		coin_flip = base_health[0] == 0 and base_health[1] == 0
 		winner = _random.randi_range(0, 1) if coin_flip else (1 if base_health[0] == 0 else 0)
-	elif _spawned[0] == _rules.enemies_per_wave and _spawned[1] == _rules.enemies_per_wave and enemies[0].is_empty() and enemies[1].is_empty():
+	elif _spawned[0] == _wave_count() and _spawned[1] == _wave_count() and enemies[0].is_empty() and enemies[1].is_empty():
+		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
+		coins[0] += reward
+		coins[1] += reward
 		phase = Phase.PLANNING
 	return true
 
@@ -118,15 +182,29 @@ func snapshot() -> Dictionary:
 	return {
 		"phase": phase, "wave": wave, "health": base_health.duplicate(),
 		"winner": winner, "coin_flip": coin_flip,
+		"coins": coins.duplicate(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
-		"spawned": _spawned.duplicate(), "total": _rules.enemies_per_wave,
+		"spawned": _spawned.duplicate(), "total": _wave_count(),
 		"tower_types": _tower_types.duplicate(true),
 		"rules": {
-			"enemy_speed": _rules.enemy_speed,
-			"enemy_health": _rules.enemy_health + maxi(0, wave - 1) * _rules.health_growth,
+			"enemy_speed": _wave_speed(), "enemy_health": _wave_health(),
+			"starting_coins": _rules.starting_coins, "kill_bounty": _rules.kill_bounty,
+			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
 		},
 	}
+
+
+func _wave_health() -> int:
+	return _rules.enemy_health + maxi(0, wave - 1) * _rules.health_growth
+
+
+func _wave_speed() -> float:
+	return _rules.enemy_speed + maxi(0, wave - 1) * _rules.speed_growth
+
+
+func _wave_count() -> int:
+	return _rules.enemies_per_wave + maxi(0, wave - 1) * _rules.count_growth
 
 
 func _valid_slot(slot: int) -> bool:
@@ -138,19 +216,22 @@ func _valid_mode(mode: int) -> bool:
 
 
 func _move_enemies(slot: int, delta: float) -> void:
+	var speed: float = _wave_speed()
 	for enemy: Dictionary in enemies[slot]:
-		enemy["progress"] += _rules.enemy_speed * delta
+		enemy["progress"] += speed * delta
 		enemy["pos"] = _position(slot, enemy["progress"])
 
 
 func _spawn_enemies(slot: int) -> void:
-	while _spawned[slot] < _rules.enemies_per_wave:
+	var total: int = _wave_count()
+	var speed: float = _wave_speed()
+	var hp: int = _wave_health()
+	while _spawned[slot] < total:
 		var spawn_time: float = _spawned[slot] * _rules.spawn_interval
 		if spawn_time > _elapsed:
 			break
 		# Account for the fraction of this tick after the scheduled spawn time.
-		var progress: float = (_elapsed - spawn_time) * _rules.enemy_speed
-		var hp: int = _rules.enemy_health + (wave - 1) * _rules.health_growth
+		var progress: float = (_elapsed - spawn_time) * speed
 		enemies[slot].append({
 			"id": _next_enemy_id, "hp": hp, "max_hp": hp,
 			"progress": progress, "pos": _position(slot, progress),
@@ -180,10 +261,23 @@ func _attack(slot: int, delta: float) -> void:
 		tower["target_id"] = enemy["id"]
 		tower["aim"] = enemy["pos"]
 		tower["shot"] += 1
-		tower["cooldown"] = definition["interval"]
-		enemy["hp"] -= definition["damage"]
-		if enemy["hp"] <= 0:
-			enemies[slot].remove_at(target_index)
+		tower["cooldown"] = tower["interval"]
+		if definition["area_attack"]:
+			# Reverse traversal permits removal in place without missing a victim.
+			for index: int in range(enemies[slot].size() - 1, -1, -1):
+				if cell_in_range(tower["cell"], Vector2i(enemies[slot][index]["pos"].round()), definition["range"]):
+					_hit(slot, tower, index)
+		else:
+			_hit(slot, tower, target_index)
+
+
+func _hit(slot: int, tower: Dictionary, enemy_index: int) -> void:
+	var enemy: Dictionary = enemies[slot][enemy_index]
+	enemy["hp"] -= tower["damage"]
+	if enemy["hp"] <= 0:
+		tower["kills"] += 1
+		coins[slot] += _rules.kill_bounty
+		enemies[slot].remove_at(enemy_index)
 
 
 # Scan in place rather than allocating or sorting candidates for each tower.
@@ -192,12 +286,11 @@ func _target(slot: int, tower: Dictionary, range_cells: float) -> int:
 	var best_score: float = -INF
 	var best_id: int = 0
 	var center: Vector2 = Vector2(tower["cell"])
-	var range_squared: float = range_cells * range_cells
 	for index: int in range(enemies[slot].size()):
 		var enemy: Dictionary = enemies[slot][index]
-		var distance_squared: float = center.distance_squared_to(enemy["pos"])
-		if distance_squared > range_squared:
+		if not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), range_cells):
 			continue
+		var distance_squared: float = center.distance_squared_to(enemy["pos"])
 		var score: float
 		match tower["mode"]:
 			TargetMode.CLOSEST:

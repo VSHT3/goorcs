@@ -81,6 +81,9 @@ func submit_ready(value: bool) -> void:
 
 
 func build_tower(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> void:
+	if collection_store != null and not collection_store.is_unlocked(type_id):
+		feedback.emit("Unlock this tower in your collection before buying it.")
+		return
 	_request_tower_command("build", slot, cell, -1, mode, String(type_id))
 
 
@@ -88,14 +91,22 @@ func set_targeting(slot: int, tower_id: int, mode: int) -> void:
 	_request_tower_command("target", slot, Vector2i.ZERO, tower_id, mode, "")
 
 
-func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, type_id: String) -> void:
+func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> void:
+	_request_tower_command("upgrade", slot, Vector2i.ZERO, tower_id, -1, upgrade)
+
+
+func sell_tower(slot: int, tower_id: int) -> void:
+	_request_tower_command("sell", slot, Vector2i.ZERO, tower_id, -1, "")
+
+
+func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
 	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
 		feedback.emit("Wait for both players to connect and synchronize their boards.")
 		return
 	if session.is_host:
-		_apply_tower_command(1, command, slot, cell, tower_id, mode, type_id)
+		_apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
 	else:
-		_receive_tower_command.rpc_id(1, command, slot, cell, tower_id, mode, type_id)
+		_receive_tower_command.rpc_id(1, command, slot, cell, tower_id, mode, argument)
 
 
 func _request_command(command: String, slot: int, cell: Vector2i, value: bool) -> void:
@@ -187,11 +198,11 @@ func _receive_command(command: String, slot: int, cell: Vector2i, value: bool) -
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _receive_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, type_id: String) -> void:
-	_apply_tower_command(multiplayer.get_remote_sender_id(), command, slot, cell, tower_id, mode, type_id)
+func _receive_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
+	_apply_tower_command(multiplayer.get_remote_sender_id(), command, slot, cell, tower_id, mode, argument)
 
 
-func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, type_id: String) -> void:
+func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
 	if not _can_accept(sender):
 		return
 	var permitted_slot: int = 0 if sender == 1 else 1
@@ -206,11 +217,20 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 		if not layout.contains(cell) or layout.has_path(cell):
 			_reject(sender, "Build towers on empty ground, never on a path or endpoint.")
 			return
-		if not _host_combat.build(slot, cell, StringName(type_id), mode):
-			_reject(sender, "This cell already has a tower, the tower type is unavailable, or the targeting mode is invalid.")
+		if not _host_combat.build(slot, cell, StringName(argument), mode):
+			_reject(sender, "Not enough Coins, this cell is occupied, the tower type is unavailable, or the targeting mode is invalid.")
 			return
 	elif command == "target":
 		if not _host_combat.set_targeting(slot, tower_id, mode):
+			_reject(sender, "Choose an existing own tower and a different valid targeting mode.")
+			return
+	elif command == "upgrade":
+		if not _host_combat.upgrade_tower(slot, tower_id, argument):
+			_reject(sender, "Not enough Coins, this upgrade was already bought, or the tower/upgrade is invalid.")
+			return
+	elif command == "sell":
+		if not _host_combat.sell_tower(slot, tower_id):
+			_reject(sender, "Only an existing own tower can be sold.")
 			return
 	else:
 		_reject(sender, "Unknown tower command.")
