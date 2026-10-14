@@ -4,13 +4,22 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path workshop plus a persistent tower collection and animated reward chests, reached through the main menu. Combat, multiplayer, loadouts, permanent stat growth, and final art are not implemented. No MCP plugin is installed.
+Playable local path workshop, persistent tower collection and animated reward chests, plus a direct two-player connection lobby reached through **Play**. Combat, synchronized boards, loadouts, permanent stat growth, and final art are not implemented. No MCP plugin is installed.
 
 ## Run
 
 Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.
 
 For command-line launch and verification, see the [development commands](docs/development.md#setup).
+
+## Play with a friend
+
+- Choose **Play → Host**, enter an IP address your friend can reach and a UDP port, then **Create room**.
+- Use **Copy invite code** and share the complete code privately. Your friend chooses **Play → Join**, pastes it, and presses **Connect** or Enter.
+- Both peers show **Connected · 2 of 2 players** after admission. This is a connection lobby, not a playable match; the workshop and collection remain local.
+- The code contains the host's address and a random room credential. There is no online room lookup or NAT traversal service. Use the same LAN, a private network/VPN, or a public host address with UDP forwarding and firewall access.
+- **Leave / Esc** closes your connection. If the guest leaves, the host waits for another guest with the same code. If the host leaves, the room closes and its code expires.
+- For network setup, security limits, and two-instance verification, see [direct connection development](docs/development.md#direct-connection-lobby).
 
 ## Collection and chests
 
@@ -48,11 +57,11 @@ This workshop does not simulate waves, enemies, or combat-time route locking.
 ```text
 project.godot       Engine settings and main scene
 AGENTS.md          Repository editing instructions
-scenes/            Main navigation, path workshop, collection, and reusable chest reveal
-scripts/           Rule owners, persistence, input, and presentation
+scenes/            Main navigation, connection lobby, path workshop, collection, chest reveal
+scripts/           Rule owners, networking, persistence, input, and presentation
 resources/collection/  Tower reward definitions
 assets/            Imported chest and base ballista sprites
-tests/             Path, navigation, collection, and chest regressions
+tests/             Path, navigation, collection, chest, and real peer-session regressions
 docs/              Project documentation
 ```
 

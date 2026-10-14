@@ -1,0 +1,326 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/multiplayer_lobby.gd" id="1_lobby"]
+
+[sub_resource type="StyleBoxFlat" id="StyleButton"]
+bg_color = Color(0.24, 0.34, 0.27, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.47, 0.56, 0.42, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleHover"]
+bg_color = Color(0.32, 0.43, 0.32, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878, 0.737, 0.467, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleDisabled"]
+bg_color = Color(0.16, 0.20, 0.17, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleFocus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.878, 0.737, 0.467, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleInput"]
+bg_color = Color(0.11, 0.16, 0.13, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.47, 0.56, 0.42, 1)
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 10.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="StyleInputReadOnly"]
+bg_color = Color(0.11, 0.16, 0.13, 1)
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 10.0
+content_margin_bottom = 10.0
+
+[sub_resource type="Theme" id="ThemeLobby"]
+default_font_size = 16
+Label/colors/font_color = Color(0.90, 0.88, 0.81, 1)
+Button/colors/font_color = Color(0.95, 0.94, 0.85, 1)
+Button/colors/font_hover_color = Color(1, 0.95, 0.79, 1)
+Button/colors/font_pressed_color = Color(1, 0.95, 0.79, 1)
+Button/colors/font_disabled_color = Color(0.57, 0.63, 0.57, 1)
+Button/styles/normal = SubResource("StyleButton")
+Button/styles/hover = SubResource("StyleHover")
+Button/styles/pressed = SubResource("StyleButton")
+Button/styles/disabled = SubResource("StyleDisabled")
+Button/styles/focus = SubResource("StyleFocus")
+LineEdit/colors/font_color = Color(0.95, 0.94, 0.85, 1)
+LineEdit/colors/font_placeholder_color = Color(0.69, 0.75, 0.69, 1)
+LineEdit/colors/caret_color = Color(0.878, 0.737, 0.467, 1)
+LineEdit/styles/normal = SubResource("StyleInput")
+LineEdit/styles/read_only = SubResource("StyleInputReadOnly")
+LineEdit/styles/focus = SubResource("StyleFocus")
+TextEdit/colors/font_readonly_color = Color(0.95, 0.94, 0.85, 1)
+TextEdit/styles/normal = SubResource("StyleInput")
+TextEdit/styles/read_only = SubResource("StyleInputReadOnly")
+TextEdit/styles/focus = SubResource("StyleFocus")
+RichTextLabel/colors/default_color = Color(0.88, 0.64, 0.59, 1)
+
+[node name="MultiplayerLobby" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("ThemeLobby")
+script = ExtResource("1_lobby")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.067, 0.10, 0.086, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 20
+
+[node name="Content" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Header" type="HBoxContainer" parent="Margin/Content"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Title" type="Label" parent="Margin/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 30
+text = "GOORCS / Play"
+
+[node name="Back" type="Button" parent="Margin/Content/Header"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 42)
+layout_mode = 2
+text = "Back / Esc"
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+follow_focus = true
+
+[node name="Body" type="VBoxContainer" parent="Margin/Content/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 16
+
+[node name="Status" type="Label" parent="Margin/Content/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+theme_override_font_sizes/font_size = 26
+text = "Play with a friend"
+autowrap_mode = 2
+
+[node name="Players" type="Label" parent="Margin/Content/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+autowrap_mode = 2
+
+[node name="Choices" type="HBoxContainer" parent="Margin/Content/Scroll/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Host" type="Button" parent="Margin/Content/Scroll/Body/Choices"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 46)
+layout_mode = 2
+text = "Host"
+tooltip_text = "Create a private room on this computer."
+
+[node name="Join" type="Button" parent="Margin/Content/Scroll/Body/Choices"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 46)
+layout_mode = 2
+text = "Join"
+tooltip_text = "Connect using your friend's complete invite code."
+
+[node name="HostForm" type="VBoxContainer" parent="Margin/Content/Scroll/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Margin/Content/Scroll/Body/HostForm"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Create a private room"
+
+[node name="AddressLabel" type="Label" parent="Margin/Content/Scroll/Body/HostForm"]
+layout_mode = 2
+text = "Host address your friend can reach (numeric IP)"
+
+[node name="Address" type="LineEdit" parent="Margin/Content/Scroll/Body/HostForm"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+placeholder_text = "192.168.1.20"
+max_length = 45
+keep_editing_on_text_submit = true
+
+[node name="Hint" type="Label" parent="Margin/Content/Scroll/Body/HostForm"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
+theme_override_font_sizes/font_size = 14
+text = "Use a LAN, public, or private VPN / Tailscale IP. 127.0.0.1 works only on this computer."
+autowrap_mode = 2
+
+[node name="PortRow" type="HBoxContainer" parent="Margin/Content/Scroll/Body/HostForm"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PortLabel" type="Label" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
+layout_mode = 2
+text = "UDP port"
+
+[node name="Port" type="SpinBox" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(140, 42)
+layout_mode = 2
+min_value = 1.0
+max_value = 65535.0
+value = 7000.0
+
+[node name="Create" type="Button" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 42)
+layout_mode = 2
+text = "Create room"
+
+[node name="JoinForm" type="VBoxContainer" parent="Margin/Content/Scroll/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Margin/Content/Scroll/Body/JoinForm"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Join your friend's room"
+
+[node name="CodeLabel" type="Label" parent="Margin/Content/Scroll/Body/JoinForm"]
+layout_mode = 2
+text = "Paste the complete invite code"
+
+[node name="JoinCode" type="LineEdit" parent="Margin/Content/Scroll/Body/JoinForm"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+placeholder_text = "GOORCS1/host IP/port/room credential"
+keep_editing_on_text_submit = true
+
+[node name="Connect" type="Button" parent="Margin/Content/Scroll/Body/JoinForm"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 42)
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Connect"
+
+[node name="Invitation" type="VBoxContainer" parent="Margin/Content/Scroll/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="Margin/Content/Scroll/Body/Invitation"]
+layout_mode = 2
+text = "Your invite code · share privately with one friend"
+
+[node name="Code" type="TextEdit" parent="Margin/Content/Scroll/Body/Invitation"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 100)
+layout_mode = 2
+editable = false
+wrap_mode = 1
+scroll_fit_content_height = true
+scroll_horizontal_enabled = false
+
+[node name="Copy" type="Button" parent="Margin/Content/Scroll/Body/Invitation"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 42)
+layout_mode = 2
+size_flags_horizontal = 0
+text = "Copy invite code"
+
+[node name="Validity" type="Label" parent="Margin/Content/Scroll/Body/Invitation"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
+theme_override_font_sizes/font_size = 14
+text = "This code is valid only while you host. Leaving closes the room and invalidates the code."
+autowrap_mode = 2
+
+[node name="Error" type="RichTextLabel" parent="Margin/Content/Scroll/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+fit_content = true
+scroll_active = false
+selection_enabled = true
+focus_mode = 2
+
+[node name="Divider" type="HSeparator" parent="Margin/Content/Scroll/Body"]
+layout_mode = 2
+
+[node name="ConnectionHeading" type="Label" parent="Margin/Content/Scroll/Body"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Direct connection · no online broker"
+
+[node name="ConnectionHelp" type="Label" parent="Margin/Content/Scroll/Body"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.74, 0.79, 0.73, 1)
+text = "The code contains the host's address and a private room credential, not a server lookup. Use the same LAN or a private VPN. For internet play, the host needs a routable address and UDP port forwarding / firewall access. The code cannot bypass NAT. The host must remain online."
+autowrap_mode = 2
+
+[node name="Scope" type="Label" parent="Margin/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+theme_override_font_sizes/font_size = 14
+text = "Connection lobby only · Combat is not available. Workshop and collection remain local."
+autowrap_mode = 2

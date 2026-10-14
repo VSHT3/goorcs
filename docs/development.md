@@ -40,6 +40,9 @@ godot --headless --path . --script tests/chest_reveal_test.gd
 
 # Run collection-screen navigation and grant regressions.
 godot --headless --path . --script tests/chest_flow_test.gd
+
+# Run real multi-process connection/authentication regressions.
+godot --headless --path . --script tests/multiplayer_session_test.gd
 ```
 
 A headless pass verifies that the project loads and runs, not that the visuals or interactions are correct. Inspect runtime errors as well as the exit status.
@@ -55,6 +58,29 @@ For a gameplay change, run the game and exercise the changed action. Use screens
 For networking changes, launch separate host and client processes and verify the resulting authoritative state. Before declaring internet support, play a match between separate machines and networks; localhost is not proof of NAT traversal or acceptable latency.
 
 The first multiplayer milestone should be completed before building extensive progression and content systems.
+
+## Direct connection lobby
+
+**Play → Host / Join** uses built-in ENet; there is no game-hosted signaling, room-code lookup, or relay service, and no additional runtime package is required. One host admits one guest using native `SceneMultiplayer` authentication. `MultiplayerSession` exclusively owns the tree's default multiplayer API while active; future match networking must reuse that owner rather than install a competing peer.
+
+Host with a numeric IP address your friend can reach:
+
+- Same LAN: use the host's LAN address and allow the selected UDP port through its firewall.
+- Private VPN/network: both players must already belong to that network; advertise the host's VPN address. Tailscale is an optional example, not installed or configured by this game.
+- Public internet: advertise the public/routable address. Forward the chosen UDP port to the host computer if required and allow it through the firewall. Carrier-grade NAT may prevent forwarding; this game does not solve it.
+- Two processes on this computer: use `127.0.0.1`. That address cannot connect a friend on another machine.
+
+The host copies the full `GOORCS1/address/port/credential` invite; the guest pastes it into Join. The default hosting port is UDP 7000, and both sides use the port encoded in the invite. The credential is regenerated for each new hosting attempt. Never publish a live code: it exposes the address and permits room admission. ENet traffic and its authentication exchange are not encrypted; use trusted networks or an encrypted private VPN if confidentiality is needed.
+
+Wrong credentials, incompatible invite/authentication versions, malformed endpoints, occupied ports, full rooms, and unreachable hosts fail visibly without admitting another player. Connecting has a bounded deadline and can be cancelled. The guest can leave and rejoin the same waiting host; leaving as host closes the room and invalidates its code. Returning to the menu or closing the lobby releases the connection and listening port. No host migration or automatic reconnect is implemented.
+
+The regression command above launches three real Godot processes and covers admission, wrong/version/full rejection, an unfinished authentication deadline, cancellation, leave/rejoin, fresh credentials, host loss, node exit, and cross-process port reuse. Worker commands, results, and logs use isolated temporary files and do not touch the real collection save.
+
+Graphical verification exercised Play/Host/Join, full-code clipboard copy, invalid-code correction with Enter, two-player admission, guest leave/rejoin, and host disconnection. Main/host and compact guest/error surfaces were inspected at 1280×720 and 1000×720. Navigation regressions also verify that Esc exits Play while a text field is editing, without affecting local workshop progress.
+
+For a two-instance manual check, launch the project twice with the run command in Setup. Host in one using `127.0.0.1`, copy its invite into Join in the other, and check **Connected · 2 of 2 players** on both. Leave as guest, rejoin, then leave as host and inspect the guest's disconnect error. For internet verification, repeat on two separate machines and networks with the actual forwarding/private-network setup. Localhost success does not establish internet reachability; that check remains outstanding.
+
+This implements the connection lobby only. Boards, combat, economy, and collection progress are not synchronized; there is no match to start yet.
 
 ## Optional Godot bridges
 
@@ -135,7 +161,7 @@ For manual verification, connect E to B, create a longer branch and a shortcut, 
 
 Also open the workshop by keyboard, draw while holding the mouse and press Esc, release outside the board, and resume. Hovering must not draw or emit mouse-button errors. Return through the Menu button and resume again; budget and route must remain unchanged.
 
-Desktop exports, combat, and internet multiplayer are not verified or implemented.
+Desktop exports and combat are not implemented or verified. The direct connection lobby is implemented and locally verified; separate-machine internet connectivity is not verified.
 
 ## Collection and chest verification
 

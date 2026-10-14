@@ -22,6 +22,23 @@ func _run() -> void:
 	await process_frame
 	_check(main.menu.visible and not main.workshop.visible, "Startup shows only the menu")
 	await _key(KEY_ENTER)
+	_check(main.play_screen.visible and not main.menu.visible and not main.workshop.visible, "Keyboard activation opens Play without exposing the workshop")
+	await process_frame
+	await process_frame
+	await _click(_control_center(main.play_screen.join_button))
+	main.play_screen.join_code_input.text = "invalid invite"
+	await _key(KEY_ENTER)
+	_check(main.session.state == MultiplayerSession.State.ERROR, "An invalid invite fails without leaving Play")
+	var unreachable := PacketPeerUDP.new()
+	_check(unreachable.bind(0, "127.0.0.1") == OK, "Reserve an isolated endpoint without an ENet host")
+	main.play_screen.join_code_input.text = "GOORCS1/127.0.0.1/%d/0123456789abcdef0123456789abcdef" % unreachable.get_local_port()
+	await _key(KEY_ENTER)
+	_check(main.play_screen.visible and main.session.state == MultiplayerSession.State.CONNECTING, "Correcting an invalid invite and pressing Enter starts a connection without another click")
+	await _key(KEY_ESCAPE)
+	_check(main.menu.visible and main.session.state == MultiplayerSession.State.IDLE, "Leaving Play returns to the menu without an active session")
+	unreachable.close()
+	main.open_button.grab_focus()
+	await _key(KEY_ENTER)
 	_check(main.workshop.visible and not main.menu.visible, "Keyboard activation opens the workshop")
 	await _motion(_cell_point(Vector2i(1, 4)))
 	await _motion(_cell_point(Vector2i(2, 4)))

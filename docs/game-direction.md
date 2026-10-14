@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop and a persistent collection chest flow. Combat, multiplayer, loadouts, permanent stat growth, and final art are not implemented. These were approved as narrow prototypes; the full first playable milestone below is not complete.
+The project contains a playable local path workshop, a persistent collection chest flow, and a direct two-player connection lobby. Combat, synchronized boards, loadouts, permanent stat growth, and final art are not implemented. These are narrow implemented features; the full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -195,10 +195,12 @@ The run should start small and become increasingly extreme: larger towers, stron
 - Editing and state-ownership conventions: [AGENTS.md](../AGENTS.md).
 - Godot's Compatibility renderer, text-authored scenes/resources, and nearest-neighbor texture filtering are the current starting configuration.
 - The proposed networking model has one authoritative host simulate both boards, validate actions, and distribute results. Camera state stays local.
-- Either player hosting with some setup or a small hosted service is acceptable. ENet with a private network tool such as Tailscale is a recommendation, not a final service choice or an implemented feature.
+- **Implemented connection setup:** Play offers Host and Join using Godot ENet. The creator chose no game-hosted online infrastructure. A shared invite contains a numeric host address, UDP port, and fresh random room credential; it admits only one guest. LAN, a private VPN/network, or a reachable public address with UDP forwarding/firewall access is required. The invite is not a short-code lookup service and cannot bypass NAT.
 - MCP/editor bridges are optional development tools, not something players must run.
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.
+
+The connection lobby authenticates admission and reports waiting/connected/disconnected states. Workshop layouts and collection saves are not synchronized. There is no match simulation, remote-board view, host migration, or relay fallback. Separate-process and graphical lobby checks pass; separate-machine internet connectivity remains unverified. See [connection setup and checks](development.md#direct-connection-lobby).
 
 ## First playable proof of the core rules
 
@@ -222,4 +224,4 @@ This milestone is not the finished game and does not discard the requested abili
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.
 - **Randomness and progression:** trait reveal/reroll rules, run reward choices, loadout limits, starter collection, permanent stat growth, and post-run payouts.
 - **Balance and readability:** intended duration, economic scaling, late-run density, visual hierarchy, and performance targets.
-- **Delivery:** desktop operating systems, future save ownership beyond the current local collection, and connection setup.
+- **Delivery:** desktop operating systems, future save ownership beyond the current local collection, and separate-machine/network connection verification.

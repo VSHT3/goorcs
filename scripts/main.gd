@@ -10,6 +10,8 @@ var layout: PathLayout
 var _workshop_opened: bool = false
 var collection_store: CollectionStore
 var collection_screen: CollectionScreen
+var session: MultiplayerSession
+var play_screen: MultiplayerLobby
 var _last_activity: Control
 
 @onready var board: PathBoard = $Margin/Content/Workspace/Board
@@ -20,6 +22,7 @@ var _last_activity: Control
 @onready var menu: Control = $Menu
 @onready var workshop: Control = $Margin
 @onready var open_button: Button = $Menu/Center/Panel/Open
+@onready var play_button: Button = $Menu/Center/Panel/Play
 
 
 func _ready() -> void:
@@ -32,6 +35,15 @@ func _ready() -> void:
 	$Menu/Center/Panel/Quit.pressed.connect(_quit)
 	$Margin/Content/Header/Menu.pressed.connect(_show_menu)
 	$Menu/Center/Panel/Collection.pressed.connect(_open_collection)
+	play_button.pressed.connect(_open_play)
+	session = MultiplayerSession.new()
+	session.name = "Session"
+	add_child(session)
+	play_screen = preload("res://scenes/multiplayer_lobby.tscn").instantiate()
+	play_screen.session = session
+	play_screen.hide()
+	add_child(play_screen)
+	play_screen.back_requested.connect(_show_menu)
 	if collection_store == null:
 		collection_store = CollectionStore.new()
 	collection_screen = preload("res://scenes/collection_screen.tscn").instantiate()
@@ -47,6 +59,8 @@ func _ready() -> void:
 func _open_workshop() -> void:
 	_workshop_opened = true
 	_last_activity = workshop
+	play_screen.prepare_to_leave()
+	play_screen.hide()
 	collection_screen.prepare_to_leave()
 	collection_screen.hide()
 	menu.hide()
@@ -57,9 +71,22 @@ func _open_workshop() -> void:
 func _open_collection() -> void:
 	board.cancel_stroke()
 	_last_activity = collection_screen
+	play_screen.prepare_to_leave()
+	play_screen.hide()
 	menu.hide()
 	workshop.hide()
 	collection_screen.show()
+
+
+func _open_play() -> void:
+	board.cancel_stroke()
+	_last_activity = play_screen
+	collection_screen.prepare_to_leave()
+	collection_screen.hide()
+	workshop.hide()
+	menu.hide()
+	play_screen.show()
+	play_screen.open()
 
 
 func _show_menu() -> void:
@@ -67,13 +94,28 @@ func _show_menu() -> void:
 	workshop.hide()
 	collection_screen.prepare_to_leave()
 	collection_screen.hide()
+	play_screen.prepare_to_leave()
+	play_screen.hide()
 	menu.show()
 	open_button.text = "Resume workshop" if _workshop_opened else "Open workshop"
-	open_button.grab_focus()
+	if _last_activity == workshop:
+		open_button.grab_focus()
+	else:
+		play_button.grab_focus()
 
 
 func _quit() -> void:
+	session.leave()
 	get_tree().quit()
+
+
+func _input(event: InputEvent) -> void:
+	# LineEdit consumes Escape while editing; Play's advertised exit works there too.
+	if play_screen.visible and event is InputEventKey:
+		var key := event as InputEventKey
+		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
+			_show_menu()
+			get_viewport().set_input_as_handled()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -86,6 +128,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_open_workshop()
 			elif _last_activity == collection_screen:
 				_open_collection()
+			elif _last_activity == play_screen:
+				_open_play()
 			get_viewport().set_input_as_handled()
 
 

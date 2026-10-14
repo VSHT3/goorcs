@@ -47,7 +47,7 @@ text = "Menu / Esc"
 [node name="Subtitle" type="Label" parent="Margin/Content"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-text = "Draw the maze. Inspect the shortcuts.   •   Local prototype — no combat or multiplayer"
+text = "Draw the maze. Inspect the shortcuts.   •   Local workshop — no combat"
 
 [node name="Workspace" type="HBoxContainer" parent="Margin/Content"]
 layout_mode = 2
@@ -137,7 +137,7 @@ theme_override_constants/separation = 20
 [node name="Eyebrow" type="Label" parent="Menu/Center/Panel"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-text = "PRIVATE TOWER DEFENSE / LOCAL PROTOTYPE"
+text = "PRIVATE TOWER DEFENSE / IN DEVELOPMENT"
 
 [node name="Title" type="Label" parent="Menu/Center/Panel"]
 layout_mode = 2
@@ -153,7 +153,13 @@ text = "Build your collection. Shape the battlefield."
 [node name="Scope" type="Label" parent="Menu/Center/Panel"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.65, 0.70, 0.65, 1)
-text = "Open reward chests or explore the path workshop.\nCombat and multiplayer are not available yet."
+text = "Host or join a private room, open chests,\nor explore the workshop. Combat is not available yet."
+
+[node name="Play" type="Button" parent="Menu/Center/Panel"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Play"
 
 [node name="Open" type="Button" parent="Menu/Center/Panel"]
 custom_minimum_size = Vector2(0, 52)
