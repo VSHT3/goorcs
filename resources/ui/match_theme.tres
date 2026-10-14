@@ -1,0 +1,83 @@
+[gd_resource type="Theme" load_steps=7 format=3]
+
+[sub_resource type="StyleBoxFlat" id="StyleButton"]
+bg_color = Color(0.24, 0.34, 0.27, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.47, 0.56, 0.42, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleHover"]
+bg_color = Color(0.32, 0.43, 0.32, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.878, 0.737, 0.467, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleDisabled"]
+bg_color = Color(0.16, 0.20, 0.17, 1)
+content_margin_left = 18.0
+content_margin_right = 18.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="StyleFocus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.878, 0.737, 0.467, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleInput"]
+bg_color = Color(0.11, 0.16, 0.13, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.47, 0.56, 0.42, 1)
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 10.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StyleBoxFlat" id="StyleInputReadOnly"]
+bg_color = Color(0.11, 0.16, 0.13, 1)
+content_margin_left = 12.0
+content_margin_right = 12.0
+content_margin_top = 10.0
+content_margin_bottom = 10.0
+
+[resource]
+default_font_size = 16
+Label/colors/font_color = Color(0.90, 0.88, 0.81, 1)
+Button/colors/font_color = Color(0.95, 0.94, 0.85, 1)
+Button/colors/font_hover_color = Color(1, 0.95, 0.79, 1)
+Button/colors/font_pressed_color = Color(1, 0.95, 0.79, 1)
+Button/colors/font_disabled_color = Color(0.57, 0.63, 0.57, 1)
+Button/styles/normal = SubResource("StyleButton")
+Button/styles/hover = SubResource("StyleHover")
+Button/styles/pressed = SubResource("StyleButton")
+Button/styles/disabled = SubResource("StyleDisabled")
+Button/styles/focus = SubResource("StyleFocus")
+LineEdit/colors/font_color = Color(0.95, 0.94, 0.85, 1)
+LineEdit/colors/font_placeholder_color = Color(0.69, 0.75, 0.69, 1)
+LineEdit/colors/caret_color = Color(0.878, 0.737, 0.467, 1)
+LineEdit/styles/normal = SubResource("StyleInput")
+LineEdit/styles/read_only = SubResource("StyleInputReadOnly")
+LineEdit/styles/focus = SubResource("StyleFocus")
+TextEdit/colors/font_readonly_color = Color(0.95, 0.94, 0.85, 1)
+TextEdit/styles/normal = SubResource("StyleInput")
+TextEdit/styles/read_only = SubResource("StyleInputReadOnly")
+TextEdit/styles/focus = SubResource("StyleFocus")
+RichTextLabel/colors/default_color = Color(0.88, 0.64, 0.59, 1)

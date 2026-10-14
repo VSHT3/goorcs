@@ -18,6 +18,8 @@ For command-line launch and verification, see the [development commands](docs/de
 
 The centered main-menu wordmark uses a larger green pixel-orc O with pointed ears, heavy brows, a broad jaw, and upward tusks, retaining its raised alignment. On first load, the logo assembles in crisp pixel blocks, then the orc braces, squeezes its eyes shut, and opens its jaw for a short animated roar. The tusks descend with the jaw; the face recovers before the finishing light sweep. This is a silent animation, not a new sound effect. Buttons work throughout, and the entrance never replays on menu return; occasional blinking/tiny idle lift remain afterward. Hover/focus marks stay inside fixed button bounds.
 
+**Play** uses a centered menu with a primary Singleplayer action, paired Host/Join choices, and the same button styling/hover effects as the title screen. Connection forms, waiting rooms, real errors, and Cancel/Leave stay in the compact column rather than spanning the screen.
+
 ## Test solo
 
 - Choose **Play → Singleplayer** to start immediately without a connection, port, or invite.

@@ -1,149 +1,9 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/menu_wordmark.gd" id="1_title"]
 [ext_resource type="Script" path="res://scripts/menu_button.gd" id="2_button"]
-[ext_resource type="FontFile" path="res://assets/fonts/PixelifySans.ttf" id="3_font"]
+[ext_resource type="Theme" path="res://resources/ui/menu_theme.tres" id="3_theme"]
 
-[sub_resource type="StyleBoxFlat" id="Style_normal"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.10, 0.145, 0.13, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.26, 0.34, 0.27, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_hover"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.16, 0.22, 0.17, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.61, 0.70, 0.44, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_pressed"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.075, 0.12, 0.09, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878, 0.737, 0.467, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_disabled"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.09, 0.12, 0.10, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.19, 0.25, 0.20, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_focus"]
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.878, 0.737, 0.467, 1)
-expand_margin_left = 3.0
-expand_margin_top = 3.0
-expand_margin_right = 3.0
-expand_margin_bottom = 3.0
-
-[sub_resource type="StyleBoxFlat" id="Style_primary"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.23, 0.34, 0.20, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.48, 0.60, 0.34, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_primary_hover"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.29, 0.40, 0.23, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.72, 0.78, 0.47, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_primary_pressed"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.18, 0.28, 0.16, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878, 0.737, 0.467, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_quiet"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0, 0, 0, 0)
-
-[sub_resource type="StyleBoxFlat" id="Style_quiet_hover"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.10, 0.145, 0.13, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.35, 0.42, 0.32, 1)
-
-[sub_resource type="StyleBoxFlat" id="Style_quiet_pressed"]
-content_margin_left = 36.0
-content_margin_top = 8.0
-content_margin_right = 36.0
-content_margin_bottom = 8.0
-bg_color = Color(0.075, 0.12, 0.09, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878, 0.737, 0.467, 1)
-
-[sub_resource type="Theme" id="Theme_menu"]
-default_font = ExtResource("3_font")
-default_font_size = 20
-Button/colors/font_color = Color(0.90, 0.88, 0.81, 1)
-Button/colors/font_hover_color = Color(0.98, 0.96, 0.88, 1)
-Button/colors/font_focus_color = Color(0.98, 0.96, 0.88, 1)
-Button/colors/font_pressed_color = Color(0.90, 0.88, 0.81, 1)
-Button/colors/font_disabled_color = Color(0.52, 0.58, 0.50, 1)
-Button/styles/normal = SubResource("Style_normal")
-Button/styles/hover = SubResource("Style_hover")
-Button/styles/pressed = SubResource("Style_pressed")
-Button/styles/disabled = SubResource("Style_disabled")
-Button/styles/focus = SubResource("Style_focus")
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -152,7 +12,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme = SubResource("Theme_menu")
+theme = ExtResource("3_theme")
 
 [node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
@@ -183,9 +43,7 @@ focus_neighbor_top = NodePath("../Quit")
 focus_neighbor_bottom = NodePath("../Open")
 focus_next = NodePath("../Open")
 focus_previous = NodePath("../Quit")
-theme_override_styles/normal = SubResource("Style_primary")
-theme_override_styles/hover = SubResource("Style_primary_hover")
-theme_override_styles/pressed = SubResource("Style_primary_pressed")
+theme_type_variation = &"PrimaryButton"
 text = "Play"
 tooltip_text = "Host or join a two-player match."
 script = ExtResource("2_button")
@@ -222,10 +80,6 @@ focus_neighbor_top = NodePath("../Collection")
 focus_neighbor_bottom = NodePath("../Play")
 focus_next = NodePath("../Play")
 focus_previous = NodePath("../Collection")
-theme_override_colors/font_color = Color(0.69, 0.73, 0.64, 1)
-theme_override_font_sizes/font_size = 18
-theme_override_styles/normal = SubResource("Style_quiet")
-theme_override_styles/hover = SubResource("Style_quiet_hover")
-theme_override_styles/pressed = SubResource("Style_quiet_pressed")
+theme_type_variation = &"QuietButton"
 text = "Quit"
 script = ExtResource("2_button")

@@ -178,6 +178,12 @@ The singleplayer regression covers silent endpoint/out-of-bounds no-ops, ownersh
 
 **Play → Host / Join** uses built-in ENet; there is no game-hosted signaling, room-code lookup, or relay service, and no additional runtime package is required. One host admits one guest using native `SceneMultiplayer` authentication. `MultiplayerSession` exclusively owns the tree's default multiplayer API while active; future match networking must reuse that owner rather than install a competing peer.
 
+Play presentation uses a centered, scrollable 500px column at standard/compact widths. Singleplayer is the initial primary/focused action; Host/Join stay directly available above their forms, with the chosen mode pressed. Address/port and invite inputs align with full-width Create/Connect actions. Waiting rooms show the real code, Copy, and Leave; connecting shows its actual status and Cancel. Rejections retain the real readable/selectable error and editable retry fields without an additional generic failure heading. Enter submits the focused action/field and Escape still cancels/leaves through the existing session owner.
+
+`resources/ui/menu_theme.tres` owns the title/Play menu palette, native control styles, and PrimaryButton/QuietButton variants. Both menus reuse `menu_button.gd` for short inner hover/focus marks with fixed hit bounds. The original lobby-inherited match styles were moved unchanged to `resources/ui/match_theme.tres`; the new menu theme applies only to the connection Margin subtree so it cannot enlarge or recolor the live match HUD. No networking, authentication, gameplay, or invite-format change was made.
+
+Polish verification exercised actual Play/Host/Join, invalid-invite correction with Enter, unreachable-host connecting/cancellation, keyboard solo, full clipboard-copy roundtrip, and separate graphical host/client admission and guest leave. Chooser, forms, error, connecting, waiting/rejoin, and live peer/solo HUD captures were inspected at 1280×720 and 1000×720. Navigation, workshop layout, chest flow, camera/input, native tower drag/drop, tower selection, rendered enemy inspection, import, and startup checks passed. Temporary scripts/private invite files were removed, clipboard restored, and collection saves isolated. This is localhost proof, not separate-network reachability.
+
 Host with a numeric IP address your friend can reach:
 
 - Same LAN: use the host's LAN address and allow the selected UDP port through its firewall.

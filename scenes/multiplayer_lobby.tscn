@@ -1,89 +1,10 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/multiplayer_lobby.gd" id="1_lobby"]
 [ext_resource type="FontFile" path="res://assets/fonts/silkscreen/Silkscreen-Regular.ttf" id="2_digits"]
-
-[sub_resource type="StyleBoxFlat" id="StyleButton"]
-bg_color = Color(0.24, 0.34, 0.27, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.47, 0.56, 0.42, 1)
-content_margin_left = 18.0
-content_margin_right = 18.0
-content_margin_top = 8.0
-content_margin_bottom = 8.0
-
-[sub_resource type="StyleBoxFlat" id="StyleHover"]
-bg_color = Color(0.32, 0.43, 0.32, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.878, 0.737, 0.467, 1)
-content_margin_left = 18.0
-content_margin_right = 18.0
-content_margin_top = 8.0
-content_margin_bottom = 8.0
-
-[sub_resource type="StyleBoxFlat" id="StyleDisabled"]
-bg_color = Color(0.16, 0.20, 0.17, 1)
-content_margin_left = 18.0
-content_margin_right = 18.0
-content_margin_top = 8.0
-content_margin_bottom = 8.0
-
-[sub_resource type="StyleBoxFlat" id="StyleFocus"]
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.878, 0.737, 0.467, 1)
-
-[sub_resource type="StyleBoxFlat" id="StyleInput"]
-bg_color = Color(0.11, 0.16, 0.13, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.47, 0.56, 0.42, 1)
-content_margin_left = 12.0
-content_margin_right = 12.0
-content_margin_top = 10.0
-content_margin_bottom = 10.0
-
-[sub_resource type="StyleBoxFlat" id="StyleInputReadOnly"]
-bg_color = Color(0.11, 0.16, 0.13, 1)
-content_margin_left = 12.0
-content_margin_right = 12.0
-content_margin_top = 10.0
-content_margin_bottom = 10.0
-
-[sub_resource type="Theme" id="ThemeLobby"]
-default_font_size = 16
-Label/colors/font_color = Color(0.90, 0.88, 0.81, 1)
-Button/colors/font_color = Color(0.95, 0.94, 0.85, 1)
-Button/colors/font_hover_color = Color(1, 0.95, 0.79, 1)
-Button/colors/font_pressed_color = Color(1, 0.95, 0.79, 1)
-Button/colors/font_disabled_color = Color(0.57, 0.63, 0.57, 1)
-Button/styles/normal = SubResource("StyleButton")
-Button/styles/hover = SubResource("StyleHover")
-Button/styles/pressed = SubResource("StyleButton")
-Button/styles/disabled = SubResource("StyleDisabled")
-Button/styles/focus = SubResource("StyleFocus")
-LineEdit/colors/font_color = Color(0.95, 0.94, 0.85, 1)
-LineEdit/colors/font_placeholder_color = Color(0.69, 0.75, 0.69, 1)
-LineEdit/colors/caret_color = Color(0.878, 0.737, 0.467, 1)
-LineEdit/styles/normal = SubResource("StyleInput")
-LineEdit/styles/read_only = SubResource("StyleInputReadOnly")
-LineEdit/styles/focus = SubResource("StyleFocus")
-TextEdit/colors/font_readonly_color = Color(0.95, 0.94, 0.85, 1)
-TextEdit/styles/normal = SubResource("StyleInput")
-TextEdit/styles/read_only = SubResource("StyleInputReadOnly")
-TextEdit/styles/focus = SubResource("StyleFocus")
-RichTextLabel/colors/default_color = Color(0.88, 0.64, 0.59, 1)
+[ext_resource type="Theme" path="res://resources/ui/menu_theme.tres" id="3_theme"]
+[ext_resource type="Script" path="res://scripts/menu_button.gd" id="4_button"]
+[ext_resource type="Theme" path="res://resources/ui/match_theme.tres" id="5_match_theme"]
 
 [node name="MultiplayerLobby" type="Control"]
 layout_mode = 3
@@ -93,7 +14,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-theme = SubResource("ThemeLobby")
+theme = ExtResource("5_match_theme")
 script = ExtResource("1_lobby")
 
 [node name="Background" type="ColorRect" parent="."]
@@ -104,9 +25,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(0.067, 0.10, 0.086, 1)
+color = Color(0.055, 0.07, 0.09, 1)
 
 [node name="Margin" type="MarginContainer" parent="."]
+theme = ExtResource("3_theme")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -114,94 +36,119 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 20
+theme_override_constants/margin_top = 24
 theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 20
+theme_override_constants/margin_bottom = 24
 
-[node name="Content" type="VBoxContainer" parent="Margin"]
-layout_mode = 2
-theme_override_constants/separation = 18
-
-[node name="Header" type="HBoxContainer" parent="Margin/Content"]
-layout_mode = 2
-theme_override_constants/separation = 20
-
-[node name="Title" type="Label" parent="Margin/Content/Header"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 30
-text = "Play"
-
-[node name="Back" type="Button" parent="Margin/Content/Header"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 42)
-layout_mode = 2
-text = "Back / Esc"
-
-[node name="Scroll" type="ScrollContainer" parent="Margin/Content"]
+[node name="Scroll" type="ScrollContainer" parent="Margin"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 3
 horizontal_scroll_mode = 0
 follow_focus = true
 
-[node name="Body" type="VBoxContainer" parent="Margin/Content/Scroll"]
+[node name="Center" type="CenterContainer" parent="Margin/Scroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 16
+size_flags_vertical = 3
+mouse_filter = 2
 
-[node name="Status" type="Label" parent="Margin/Content/Scroll/Body"]
+[node name="Content" type="VBoxContainer" parent="Margin/Scroll/Center"]
+custom_minimum_size = Vector2(500, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 24
+
+[node name="Title" type="Label" parent="Margin/Scroll/Center/Content"]
 unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.90, 0.88, 0.81, 1)
+theme_override_font_sizes/font_size = 32
+text = "Play"
+horizontal_alignment = 1
+
+[node name="Body" type="VBoxContainer" parent="Margin/Scroll/Center/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 20
+
+[node name="Status" type="Label" parent="Margin/Scroll/Center/Content/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
 theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
-theme_override_font_sizes/font_size = 26
+theme_override_font_sizes/font_size = 30
+horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="Players" type="Label" parent="Margin/Content/Scroll/Body"]
+[node name="Players" type="Label" parent="Margin/Scroll/Center/Content/Body"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_font_sizes/font_size = 18
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.69, 0.73, 0.64, 1)
+theme_override_fonts/font = ExtResource("2_digits")
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="Choices" type="HBoxContainer" parent="Margin/Content/Scroll/Body"]
+[node name="Choices" type="VBoxContainer" parent="Margin/Scroll/Center/Content/Body"]
 unique_name_in_owner = true
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 12
 
-[node name="Host" type="Button" parent="Margin/Content/Scroll/Body/Choices"]
+[node name="Singleplayer" type="Button" parent="Margin/Scroll/Center/Content/Body/Choices"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 46)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
-text = "Host"
-tooltip_text = "Create a private room on this computer."
-
-[node name="Join" type="Button" parent="Margin/Content/Scroll/Body/Choices"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 46)
-layout_mode = 2
-text = "Join"
-tooltip_text = "Connect using your friend's complete invite code."
-
-[node name="Singleplayer" type="Button" parent="Margin/Content/Scroll/Body/Choices"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 46)
-layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_type_variation = &"PrimaryButton"
 text = "Singleplayer"
 tooltip_text = "Local testing: the opponent mirrors your paths, towers, and readiness. No connection required."
+script = ExtResource("4_button")
 
-[node name="HostForm" type="VBoxContainer" parent="Margin/Content/Scroll/Body"]
+[node name="Multiplayer" type="HBoxContainer" parent="Margin/Scroll/Center/Content/Body/Choices"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 12
+
+[node name="Host" type="Button" parent="Margin/Scroll/Center/Content/Body/Choices/Multiplayer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+toggle_mode = true
+text = "Host"
+tooltip_text = "Create a private room on this computer."
+script = ExtResource("4_button")
+
+[node name="Join" type="Button" parent="Margin/Scroll/Center/Content/Body/Choices/Multiplayer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+toggle_mode = true
+text = "Join"
+tooltip_text = "Connect using your friend's complete invite code."
+script = ExtResource("4_button")
+
+[node name="HostForm" type="VBoxContainer" parent="Margin/Scroll/Center/Content/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_constants/separation = 8
+mouse_filter = 2
+theme_override_constants/separation = 10
 
-[node name="AddressLabel" type="Label" parent="Margin/Content/Scroll/Body/HostForm"]
+[node name="AddressLabel" type="Label" parent="Margin/Scroll/Center/Content/Body/HostForm"]
 layout_mode = 2
+mouse_filter = 2
 text = "Host IP"
 
-[node name="Address" type="LineEdit" parent="Margin/Content/Scroll/Body/HostForm"]
+[node name="Address" type="LineEdit" parent="Margin/Scroll/Center/Content/Body/HostForm"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 42)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_digits")
 tooltip_text = "Use an IP your friend can reach over the same LAN or a private VPN / Tailscale. 127.0.0.1 works only on this computer."
@@ -209,67 +156,79 @@ placeholder_text = "192.168.1.20"
 max_length = 45
 keep_editing_on_text_submit = true
 
-[node name="PortRow" type="HBoxContainer" parent="Margin/Content/Scroll/Body/HostForm"]
+[node name="PortRow" type="HBoxContainer" parent="Margin/Scroll/Center/Content/Body/HostForm"]
 layout_mode = 2
+mouse_filter = 2
 theme_override_constants/separation = 12
 
-[node name="PortLabel" type="Label" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
+[node name="PortLabel" type="Label" parent="Margin/Scroll/Center/Content/Body/HostForm/PortRow"]
 layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
 text = "Port"
 
-[node name="Port" type="SpinBox" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
+[node name="Port" type="SpinBox" parent="Margin/Scroll/Center/Content/Body/HostForm/PortRow"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(140, 42)
+custom_minimum_size = Vector2(160, 46)
 layout_mode = 2
 tooltip_text = "Allow this UDP port through the host firewall. Internet connections also need a reachable IP and UDP port forwarding."
 min_value = 1.0
 max_value = 65535.0
 value = 7000.0
 
-[node name="Create" type="Button" parent="Margin/Content/Scroll/Body/HostForm/PortRow"]
+[node name="Create" type="Button" parent="Margin/Scroll/Center/Content/Body/HostForm"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 42)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_type_variation = &"PrimaryButton"
 text = "Create room"
+script = ExtResource("4_button")
 
-[node name="JoinForm" type="VBoxContainer" parent="Margin/Content/Scroll/Body"]
+[node name="JoinForm" type="VBoxContainer" parent="Margin/Scroll/Center/Content/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_constants/separation = 8
+mouse_filter = 2
+theme_override_constants/separation = 10
 
-[node name="CodeLabel" type="Label" parent="Margin/Content/Scroll/Body/JoinForm"]
+[node name="CodeLabel" type="Label" parent="Margin/Scroll/Center/Content/Body/JoinForm"]
 layout_mode = 2
+mouse_filter = 2
 text = "Invite code"
 
-[node name="JoinCode" type="LineEdit" parent="Margin/Content/Scroll/Body/JoinForm"]
+[node name="JoinCode" type="LineEdit" parent="Margin/Scroll/Center/Content/Body/JoinForm"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 tooltip_text = "Paste the complete invite code. It includes the host IP and a private room credential; share it only with your friend."
 placeholder_text = "Paste invite code"
 keep_editing_on_text_submit = true
 
-[node name="Connect" type="Button" parent="Margin/Content/Scroll/Body/JoinForm"]
+[node name="Connect" type="Button" parent="Margin/Scroll/Center/Content/Body/JoinForm"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 42)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
-size_flags_horizontal = 0
+mouse_default_cursor_shape = 2
+theme_type_variation = &"PrimaryButton"
 text = "Connect"
+script = ExtResource("4_button")
 
-[node name="Invitation" type="VBoxContainer" parent="Margin/Content/Scroll/Body"]
+[node name="Invitation" type="VBoxContainer" parent="Margin/Scroll/Center/Content/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-theme_override_constants/separation = 8
+mouse_filter = 2
+theme_override_constants/separation = 10
 
-[node name="Label" type="Label" parent="Margin/Content/Scroll/Body/Invitation"]
+[node name="Label" type="Label" parent="Margin/Scroll/Center/Content/Body/Invitation"]
 layout_mode = 2
+mouse_filter = 2
 text = "Invite code"
 
-[node name="Code" type="TextEdit" parent="Margin/Content/Scroll/Body/Invitation"]
+[node name="Code" type="TextEdit" parent="Margin/Scroll/Center/Content/Body/Invitation"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 100)
+custom_minimum_size = Vector2(0, 92)
 layout_mode = 2
 tooltip_text = "Share this code privately with one friend. It contains your IP and room credential and expires when you leave."
 editable = false
@@ -277,14 +236,16 @@ wrap_mode = 1
 scroll_fit_content_height = true
 scroll_horizontal_enabled = false
 
-[node name="Copy" type="Button" parent="Margin/Content/Scroll/Body/Invitation"]
+[node name="Copy" type="Button" parent="Margin/Scroll/Center/Content/Body/Invitation"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(180, 42)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
-size_flags_horizontal = 0
+mouse_default_cursor_shape = 2
+theme_type_variation = &"PrimaryButton"
 text = "Copy code"
+script = ExtResource("4_button")
 
-[node name="Error" type="RichTextLabel" parent="Margin/Content/Scroll/Body"]
+[node name="Error" type="RichTextLabel" parent="Margin/Scroll/Center/Content/Body"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -293,3 +254,11 @@ scroll_active = false
 selection_enabled = true
 focus_mode = 2
 
+[node name="Back" type="Button" parent="Margin/Scroll/Center/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_type_variation = &"QuietButton"
+text = "Back / Esc"
+script = ExtResource("4_button")

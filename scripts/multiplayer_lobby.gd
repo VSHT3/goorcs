@@ -24,11 +24,12 @@ var _planning_was_active: bool = false
 @onready var code_output: TextEdit = %Code
 @onready var copy_button: Button = %Copy
 @onready var back_button: Button = %Back
-@onready var _choices: HBoxContainer = %Choices
+@onready var _choices: VBoxContainer = %Choices
 @onready var _host_form: VBoxContainer = %HostForm
 @onready var _join_form: VBoxContainer = %JoinForm
 @onready var _invitation: VBoxContainer = %Invitation
 @onready var _status: Label = %Status
+@onready var _title: Label = %Title
 @onready var _players: Label = %Players
 @onready var _error: RichTextLabel = %Error
 @onready var _scroll: ScrollContainer = %Scroll
@@ -193,6 +194,10 @@ func _refresh() -> void:
 	var editable: bool = session != null and not active
 	var has_code: bool = active and not planning_active and session.is_host and not session.invite_code.is_empty()
 	_choices.visible = not active
+	host_button.set_pressed_no_signal(_form == Form.HOST)
+	join_button.set_pressed_no_signal(_form == Form.JOIN)
+	singleplayer_button.theme_type_variation = &"PrimaryButton" if _form == Form.CHOOSE else &""
+	_title.visible = not active
 	host_button.disabled = not available
 	join_button.disabled = not available
 	singleplayer_button.disabled = not available
@@ -214,22 +219,19 @@ func _refresh() -> void:
 	back_button.text = "Leave / Esc" if active else "Back / Esc"
 	_players.text = ""
 	_players.hide()
-	_status.visible = session == null or session.state != MultiplayerSession.State.IDLE
+	_status.visible = session == null or session.state not in [MultiplayerSession.State.IDLE, MultiplayerSession.State.ERROR]
 	if session == null:
 		_status.text = "Connection unavailable"
 		return
 	_last_state = session.state
 	match session.state:
-		MultiplayerSession.State.IDLE:
+		MultiplayerSession.State.IDLE, MultiplayerSession.State.ERROR:
 			_status.text = ""
-		MultiplayerSession.State.ERROR:
-			_status.text = "Connection unsuccessful"
 		MultiplayerSession.State.HOSTING:
 			_status.text = "Waiting for friend"
 			_players.text = "Host · %d / 2 players" % session.player_count()
 		MultiplayerSession.State.CONNECTING:
 			_status.text = "Connecting to host…"
-			_players.text = "Guest · Awaiting admission"
 			back_button.text = "Cancel / Esc"
 		MultiplayerSession.State.CONNECTED:
 			_status.text = "Connected"
@@ -256,7 +258,7 @@ func _focus_action() -> void:
 	elif _form == Form.JOIN:
 		join_code_input.grab_focus()
 	else:
-		host_button.grab_focus()
+		singleplayer_button.grab_focus()
 
 
 func _default_address() -> String:
