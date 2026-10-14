@@ -6,9 +6,12 @@ signal back_requested
 enum Form { CHOOSE, HOST, JOIN }
 
 var session: MultiplayerSession
+var planning: MatchPlanning
+var planning_screen: MatchPlanningScreen
 var _form: Form = Form.CHOOSE
 var _submitting: bool = false
 var _last_state: int = -1
+var _planning_was_active: bool = false
 
 @onready var host_button: Button = %Host
 @onready var join_button: Button = %Join
@@ -28,9 +31,19 @@ var _last_state: int = -1
 @onready var _players: Label = %Players
 @onready var _error: RichTextLabel = %Error
 @onready var _scroll: ScrollContainer = %Scroll
+@onready var _content: VBoxContainer = $Margin/Content
+@onready var _scope: Label = $Margin/Content/Scope
 
 
 func _ready() -> void:
+	planning_screen = preload("res://scenes/planning_screen.tscn").instantiate()
+	planning_screen.planning = planning
+	planning_screen.hide()
+	_content.add_child(planning_screen)
+	_content.move_child(planning_screen, _scroll.get_index() + 1)
+	if planning != null:
+		planning.changed.connect(_planning_changed)
+	_scope.text = "Private room · Combat is not available. Workshop and collection remain local."
 	host_button.pressed.connect(_show_host)
 	join_button.pressed.connect(_show_join)
 	host_create_button.pressed.connect(_create_host)
@@ -59,6 +72,8 @@ func open() -> void:
 
 
 func prepare_to_leave() -> void:
+	if is_instance_valid(planning_screen):
+		planning_screen.cancel_strokes()
 	if is_instance_valid(session):
 		session.leave()
 	_form = Form.CHOOSE
@@ -146,11 +161,26 @@ func _session_changed() -> void:
 		_focus_action.call_deferred()
 
 
+func _planning_changed() -> void:
+	if not is_node_ready():
+		return
+	var planning_active: bool = planning != null and planning.active
+	var activity_changed: bool = planning_active != _planning_was_active
+	_planning_was_active = planning_active
+	_refresh()
+	if activity_changed and is_visible_in_tree():
+		_focus_action.call_deferred()
+
+
 func _refresh() -> void:
+	var planning_active: bool = planning != null and planning.active
+	_scroll.visible = not planning_active
+	_scope.visible = not planning_active
+	planning_screen.visible = planning_active
 	var available: bool = _can_start()
 	var active: bool = session != null and session.state in [MultiplayerSession.State.HOSTING, MultiplayerSession.State.CONNECTING, MultiplayerSession.State.CONNECTED]
 	var editable: bool = session != null and not active
-	var has_code: bool = active and session.is_host and not session.invite_code.is_empty()
+	var has_code: bool = active and not planning_active and session.is_host and not session.invite_code.is_empty()
 	_choices.visible = not active
 	host_button.disabled = not available
 	join_button.disabled = not available

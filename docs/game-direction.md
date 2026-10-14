@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, a persistent collection chest flow, and a direct two-player connection lobby. Combat, synchronized boards, loadouts, permanent stat growth, and final art are not implemented. These are narrow implemented features; the full first playable milestone below is not complete.
+The project contains a playable local path workshop, a persistent collection chest flow, and direct two-player connection with host-authoritative shared maze planning. Combat, loadouts, permanent stat growth, and final art are not implemented. These are narrow implemented features; the full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -194,13 +194,15 @@ The run should start small and become increasingly extreme: larger towers, stron
 - Required engine release and run commands: [development setup](development.md#setup).
 - Editing and state-ownership conventions: [AGENTS.md](../AGENTS.md).
 - Godot's Compatibility renderer, text-authored scenes/resources, and nearest-neighbor texture filtering are the current starting configuration.
-- The proposed networking model has one authoritative host simulate both boards, validate actions, and distribute results. Camera state stays local.
+- The implemented shared-planning model has one authoritative host validate both players' path commands and publish accepted boards, readiness, and captured routes. Combat will reuse that owner model; camera state stays local.
 - **Implemented connection setup:** Play offers Host and Join using Godot ENet. The creator chose no game-hosted online infrastructure. A shared invite contains a numeric host address, UDP port, and fresh random room credential; it admits only one guest. LAN, a private VPN/network, or a reachable public address with UDP forwarding/firewall access is required. The invite is not a short-code lookup service and cannot bypass NAT.
 - MCP/editor bridges are optional development tools, not something players must run.
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.
 
-The connection lobby authenticates admission and reports waiting/connected/disconnected states. Workshop layouts and collection saves are not synchronized. There is no match simulation, remote-board view, host migration, or relay fallback. Separate-process and graphical lobby checks pass; separate-machine internet connectivity remains unverified. See [connection setup and checks](development.md#direct-connection-lobby).
+The connection lobby authenticates admission and reports waiting/connected/disconnected states. Admission opens two visible planning boards. The host validates ownership, immutable endpoints, bounds, and the equal path budget through `PathLayout`; disconnected drafts are allowed, but readiness requires every placed tile and the base to reach the entrance. Accepted edits clear that player's readiness. Both-ready captures independent shortest-route copies and locks editing, clearing, and readiness. Both peers display the accepted state; local presentation copies cannot decide authoritative outcomes.
+
+Planning uses the host's exported workshop configuration but owns separate fresh paths. Guest departure resets planning and returns the host to waiting; rejoining starts fresh. Workshop layouts and collection saves remain local. There is no combat simulation, match economy, camera scouting, host migration, or relay fallback. Separate-machine internet connectivity remains unverified. See [connection setup and checks](development.md#direct-connection-lobby).
 
 ## First playable proof of the core rules
 
@@ -214,7 +216,7 @@ The first implementation milestone remains deliberately smaller than the full di
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. A simultaneous defeat rule must be chosen before completion.
 
-This milestone is not the finished game and does not discard the requested abilities, other buildings, map interactions, gambling, traits, collection, or escalation. Those systems need concrete rules and later playable milestones. The approved path workshop proves only local editing and routing, not the multiplayer/combat milestone.
+This milestone is not the finished game and does not discard the requested abilities, other buildings, map interactions, gambling, traits, collection, or escalation. Those systems need concrete rules and later playable milestones. The path workshop proves local editing and routing; shared planning now proves authoritative two-board editing, readiness, and captured-route locking, not combat or the complete multiplayer milestone.
 
 ## Decisions still needed before their implementation
 

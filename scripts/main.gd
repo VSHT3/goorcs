@@ -11,6 +11,7 @@ var _workshop_opened: bool = false
 var collection_store: CollectionStore
 var collection_screen: CollectionScreen
 var session: MultiplayerSession
+var planning: MatchPlanning
 var play_screen: MultiplayerLobby
 var _last_activity: Control
 
@@ -39,8 +40,14 @@ func _ready() -> void:
 	session = MultiplayerSession.new()
 	session.name = "Session"
 	add_child(session)
+	planning = MatchPlanning.new()
+	planning.name = "Planning"
+	planning.session = session
+	planning.configure(board_dimensions, tile_budget, entrance_cell, base_cell)
+	add_child(planning)
 	play_screen = preload("res://scenes/multiplayer_lobby.tscn").instantiate()
 	play_screen.session = session
+	play_screen.planning = planning
 	play_screen.hide()
 	add_child(play_screen)
 	play_screen.back_requested.connect(_show_menu)

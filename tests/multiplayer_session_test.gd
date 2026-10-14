@@ -9,6 +9,7 @@ var _directory: String = ""
 var _processes: Dictionary[String, int] = {}
 var _command_ids: Dictionary[String, int] = {}
 var _suite_deadline_msec: int = 0
+var success_message: String = "PASS: real ENet admission, invalid/wrong/version/full rejection, authentication deadline, cancellation, leave/rejoin, host loss, fresh credentials, node exit and port reuse"
 
 
 func _initialize() -> void:
@@ -297,7 +298,7 @@ func _finish() -> void:
 			var log_text: String = FileAccess.get_file_as_string(log_path)
 			_check(not log_text.contains("ERROR:"), "Worker produces no Godot runtime/script errors: " + lane)
 	if failures == 0:
-		print("PASS: real ENet admission, invalid/wrong/version/full rejection, authentication deadline, cancellation, leave/rejoin, host loss, fresh credentials, node exit and port reuse")
+		print(success_message)
 	else:
 		for lane: String in _processes:
 			var log_path: String = _directory.path_join(lane + ".log")

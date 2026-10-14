@@ -4,7 +4,7 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 ## Current state
 
-Playable local path workshop, persistent tower collection and animated reward chests, plus a direct two-player connection lobby reached through **Play**. Combat, synchronized boards, loadouts, permanent stat growth, and final art are not implemented. No MCP plugin is installed.
+Playable local path workshop, persistent tower collection and animated reward chests, plus direct two-player connection and host-authoritative shared maze planning reached through **Play**. Combat, loadouts, permanent stat growth, and final art are not implemented. No MCP plugin is installed.
 
 ## Run
 
@@ -16,9 +16,10 @@ For command-line launch and verification, see the [development commands](docs/de
 
 - Choose **Play → Host**, enter an IP address your friend can reach and a UDP port, then **Create room**.
 - Use **Copy invite code** and share the complete code privately. Your friend chooses **Play → Join**, pastes it, and presses **Connect** or Enter.
-- Both peers show **Connected · 2 of 2 players** after admission. This is a connection lobby, not a playable match; the workshop and collection remain local.
+- Admission automatically opens shared planning: both boards are visible, but only your own accepts edits. Match paths are separate from the local workshop and are not saved.
+- Draw a legal route, then press **Ready**. Editing clears your readiness; **Unready** withdraws it before both players confirm. Once both are ready, the host captures and locks both shortest routes. Combat is not implemented; this is the end of the current planning slice.
 - The code contains the host's address and a random room credential. There is no online room lookup or NAT traversal service. Use the same LAN, a private network/VPN, or a public host address with UDP forwarding and firewall access.
-- **Leave / Esc** closes your connection. If the guest leaves, the host waits for another guest with the same code. If the host leaves, the room closes and its code expires.
+- **Leave / Esc** closes your connection and clears shared planning. If the guest leaves, the host waits for another guest with the same code; rejoining starts with fresh boards. If the host leaves, the room closes and its code expires.
 - For network setup, security limits, and two-instance verification, see [direct connection development](docs/development.md#direct-connection-lobby).
 
 ## Collection and chests
@@ -57,11 +58,11 @@ This workshop does not simulate waves, enemies, or combat-time route locking.
 ```text
 project.godot       Engine settings and main scene
 AGENTS.md          Repository editing instructions
-scenes/            Main navigation, connection lobby, path workshop, collection, chest reveal
+scenes/            Main navigation, connection lobby, shared planning, path workshop, collection, chest reveal
 scripts/           Rule owners, networking, persistence, input, and presentation
 resources/collection/  Tower reward definitions
 assets/            Imported chest and base ballista sprites
-tests/             Path, navigation, collection, chest, and real peer-session regressions
+tests/             Path, navigation, collection, chest, real peer-session and shared-planning regressions
 docs/              Project documentation
 ```
 

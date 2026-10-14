@@ -1,0 +1,141 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/planning_screen.gd" id="1_planning"]
+[ext_resource type="Script" path="res://scripts/path_board.gd" id="2_board"]
+
+[node name="PlanningScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("1_planning")
+
+[node name="Content" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+
+[node name="Status" type="Label" parent="Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.737, 0.467, 1)
+theme_override_font_sizes/font_size = 18
+text = "Connected · Shared planning\nBuild a legal path, then ready."
+autowrap_mode = 2
+
+[node name="Boards" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="Host" type="VBoxContainer" parent="Content/Boards"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Content/Boards/Host"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Host board"
+
+[node name="State" type="Label" parent="Content/Boards/Host"]
+layout_mode = 2
+text = "Not ready · No route to base"
+autowrap_mode = 2
+
+[node name="Budget" type="Label" parent="Content/Boards/Host"]
+layout_mode = 2
+text = "0 / 30 tiles · 30 remaining"
+autowrap_mode = 2
+
+[node name="Board" type="Control" parent="Content/Boards/Host"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+mouse_default_cursor_shape = 2
+script = ExtResource("2_board")
+command_mode = true
+input_enabled = false
+
+[node name="Route" type="Label" parent="Content/Boards/Host"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "E entrance · B base · Green line: shortest route"
+autowrap_mode = 2
+
+[node name="Guest" type="VBoxContainer" parent="Content/Boards"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Content/Boards/Guest"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Guest board"
+
+[node name="State" type="Label" parent="Content/Boards/Guest"]
+layout_mode = 2
+text = "Not ready · No route to base"
+autowrap_mode = 2
+
+[node name="Budget" type="Label" parent="Content/Boards/Guest"]
+layout_mode = 2
+text = "0 / 30 tiles · 30 remaining"
+autowrap_mode = 2
+
+[node name="Board" type="Control" parent="Content/Boards/Guest"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("2_board")
+command_mode = true
+input_enabled = false
+
+[node name="Route" type="Label" parent="Content/Boards/Guest"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "E entrance · B base · Green line: shortest route"
+autowrap_mode = 2
+
+[node name="Actions" type="HBoxContainer" parent="Content"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Clear" type="Button" parent="Content/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 42)
+layout_mode = 2
+text = "Clear my tiles"
+
+[node name="Ready" type="Button" parent="Content/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(180, 42)
+layout_mode = 2
+text = "Ready"
+
+[node name="Controls" type="Label" parent="Content/Actions"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
+theme_override_font_sizes/font_size = 14
+text = "Left drag: place · Right drag: erase\nOnly your board is editable."
+autowrap_mode = 2
+
+[node name="Feedback" type="Label" parent="Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 38)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.80, 0.77, 0.67, 1)
+theme_override_font_sizes/font_size = 14
+text = "Edges connect; corners do not. Every placed tile must reach the entrance.\nUnused budget is allowed. Editing clears your ready state."
+autowrap_mode = 2

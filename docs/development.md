@@ -44,6 +44,9 @@ godot --headless --path . --script tests/chest_flow_test.gd
 # Run real multi-process connection/authentication regressions.
 godot --headless --path . --script tests/multiplayer_session_test.gd
 
+# Run real two-process shared-planning regressions.
+godot --headless --path . --script tests/match_planning_test.gd
+
 # Run rendered tower-size regressions (requires a graphical renderer).
 godot --path . --script tests/tower_icon_test.gd
 ```
@@ -81,9 +84,17 @@ The regression command above launches three real Godot processes and covers admi
 
 Graphical verification exercised Play/Host/Join, full-code clipboard copy, invalid-code correction with Enter, two-player admission, guest leave/rejoin, and host disconnection. Main/host and compact guest/error surfaces were inspected at 1280×720 and 1000×720. Navigation regressions also verify that Esc exits Play while a text field is editing, without affecting local workshop progress.
 
-For a two-instance manual check, launch the project twice with the run command in Setup. Host in one using `127.0.0.1`, copy its invite into Join in the other, and check **Connected · 2 of 2 players** on both. Leave as guest, rejoin, then leave as host and inspect the guest's disconnect error. For internet verification, repeat on two separate machines and networks with the actual forwarding/private-network setup. Localhost success does not establish internet reachability; that check remains outstanding.
+For a two-instance manual check, launch the project twice with the run command in Setup. Host in one using `127.0.0.1`, copy its invite into Join in the other, and check that both open **Connected · Shared planning** with two boards. Leave as guest, rejoin, then leave as host and inspect the guest's disconnect error. For internet verification, repeat on two separate machines and networks with the actual forwarding/private-network setup. Localhost success does not establish internet reachability; that check remains outstanding.
 
-This implements the connection lobby only. Boards, combat, economy, and collection progress are not synchronized; there is no match to start yet.
+Admission automatically opens shared planning. Both boards remain visible; only your own accepts left-drag placement or right-drag removal. **Clear my tiles** clears your board. **Ready** requires a legal connected path, and an accepted edit clears readiness. **Unready** works until both players confirm. Both-ready atomically captures the shortest routes and locks all path/readiness actions. Combat is not implemented; Leave/Esc ends this slice.
+
+`MatchPlanning` reuses `MultiplayerSession`'s authenticated API; it never installs a second peer. The host owns authoritative `PathLayout` instances and validates host-player and remote commands through the same rules. Remote sender identity determines board ownership. Clients receive reliable full snapshots with the host's configuration; UI layouts are detached presentation copies, not alternate match state. A post-admission snapshot request avoids exposing guest editing before synchronization. Planning paths are separate from workshop drafts and collection saves.
+
+The planning regression launches separate host/guest Godot processes with deliberately different local configurations. It verifies distinct legal mazes and shortest routes agree, ownership/bounds/endpoints/budget rejections preserve state, illegal paths cannot ready, edits invalidate readiness, unready works before lock, captured routes agree and reject subsequent edits/clear/unready, and disconnect/rejoin yields fresh boards. Workers use isolated temporary files and never touch collection saves.
+
+Graphical two-process verification exercised actual Play/Host/Join controls, distinct mouse-built paths, read-only opponent input, Ready and its waiting state, edit-driven readiness invalidation, right-click removal, both-ready locking, guest Esc, host return to waiting, and host Leave. Standard desktop captures rendered at 1215×683 under the window manager. Compact verification used a visible 1000×720 Godot subviewport because the compositor ignored requested window sizes; both planning and locked surfaces were inspected without clipping. The graphical runtime used Intel OpenGL after NVIDIA driver warnings. Isolated collection paths kept real player progress unchanged.
+
+For a manual check, connect two instances, draw different paths, inspect them from both peers, and try editing the opponent board. Ready one side, edit it to clear readiness, then ready both. Check both captured routes remain frozen. Leave as guest and rejoin using the same invite: both boards should be empty. Internet verification still requires separate machines and networks.
 
 ## Optional Godot bridges
 
@@ -180,7 +191,7 @@ For manual verification, connect E to B, create a longer branch and a shortcut, 
 
 Also open the workshop by keyboard, draw while holding the mouse and press Esc, release outside the board, and resume. Hovering must not draw or emit mouse-button errors. Return through the Menu button and resume again; budget and route must remain unchanged.
 
-Desktop exports and combat are not implemented or verified. The direct connection lobby is implemented and locally verified; separate-machine internet connectivity is not verified.
+Desktop exports and combat are not implemented or verified. Direct connection and shared planning are implemented and locally verified; separate-machine internet connectivity is not verified.
 
 ## Collection and chest verification
 

@@ -3,6 +3,7 @@ extends Control
 
 signal edited
 signal feedback(message: String)
+signal edit_requested(cell: Vector2i, place: bool)
 
 const GROUND := Color("222c2b")
 const TILE := Color("6e7465")
@@ -12,6 +13,13 @@ const ENTRY_COLOR := Color("e0bc77")
 const BASE_COLOR := Color("96c8dc")
 
 var layout: PathLayout
+var command_mode: bool = false
+var input_enabled: bool = true:
+	set(value):
+		input_enabled = value
+		mouse_filter = Control.MOUSE_FILTER_STOP if value else Control.MOUSE_FILTER_IGNORE
+		if not value:
+			cancel_stroke()
 var _hover := Vector2i(-1, -1)
 var _paint_button: MouseButton = MOUSE_BUTTON_NONE
 var _last_painted := Vector2i(-1, -1)
@@ -39,7 +47,7 @@ func _cell_at(position: Vector2) -> Vector2i:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if layout == null:
+	if layout == null or not input_enabled:
 		return
 	if event is InputEventMouseButton:
 		var click := event as InputEventMouseButton
@@ -74,6 +82,9 @@ func _paint(cell: Vector2i) -> void:
 	if cell == _last_painted or not layout.contains(cell):
 		return
 	_last_painted = cell
+	if command_mode:
+		edit_requested.emit(cell, _paint_button == MOUSE_BUTTON_LEFT)
+		return
 	if layout.is_endpoint(cell):
 		feedback.emit("Entrance and base are fixed; they use no budget.")
 		return
@@ -109,7 +120,7 @@ func _draw() -> void:
 			if layout.has_path(cell):
 				color = ROUTE_TILE if layout.route.has(cell) else TILE
 			draw_rect(rect, color)
-			if cell == _hover:
+			if input_enabled and cell == _hover:
 				draw_rect(rect.grow(-2), Color("e6e0cf"), false, 2.0)
 	for i: int in range(1, layout.route.size()):
 		draw_line(cell_center(layout.route[i - 1]), cell_center(layout.route[i]), ROUTE_LINE, 4.0, true)
