@@ -11,21 +11,23 @@ const GREEN_LIGHT: Color = Color(0.61, 0.76, 0.43, 1.0)
 const GREEN_DARK: Color = Color(0.29, 0.44, 0.24, 1.0)
 const INK: Color = Color(0.085, 0.15, 0.105, 1.0)
 const FACE_ROWS: Array[String] = [
-	"....LLLLLL....",
-	"..LLGGGGGGLL..",
-	".LGGGGGGGGGGL.",
-	"LGGGGGGGGGGGGL",
-	"LGGGGGGGGGGGGL",
-	"LGIIIGGGGIIIGL",
-	"LGGEIGGGGIEGGL",
-	"LGGEEGGGGEEGGL",
-	"LGGGGGDDGGGGGL",
-	"LGGGGDDDDGGGGL",
-	"LGGTIIIIIITGGL",
-	"LGGTTIIIITTGGL",
-	".LGTTGGGGTTGL.",
-	"..LGGGGGGGGL..",
-	"....LLLLLL....",
+	"......LLLLLL......",
+	"....LLGGGGGGLL....",
+	"...LGGGGGGGGGGL...",
+	"..LGGGGGGGGGGGGL..",
+	"L.LGIIIGGGGIIIGL.L",
+	"LDLGGIIIGGIIIGGLDL",
+	".DLGEIGGGGGGIEGLD.",
+	"..LGEEGGDDGGEEGL..",
+	"..LGGGGDDDDGGGGL..",
+	"..LGGGGDIIDGGGGL..",
+	"..LGGTGGGGGGTGGL..",
+	"..LGGTIIIIIITGGL..",
+	"..LGTTIIIIIITTGL..",
+	"..LDTTGGGGGGTTDL..",
+	"...LDGGGGGGGGDL...",
+	"....LDDDDDDDDL....",
+	".....LLLLLLLL.....",
 ]
 const BLINK_START: float = 4.3
 const BLINK_END: float = 4.46
@@ -83,7 +85,7 @@ func _process(delta: float) -> void:
 
 
 func _draw() -> void:
-	var face_width: float = 14.0 * PIXEL
+	var face_width: float = FACE_ROWS[0].length() * PIXEL
 	var gap: float = 4.0
 	var word_width: float = _g_width + face_width + gap * 2.0 + _suffix_width
 	var origin_x: float = floorf((size.x - word_width) * 0.5)
@@ -108,7 +110,7 @@ func _draw() -> void:
 		draw_string(TITLE_FONT, position, letter, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, IVORY)
 		advance += _letter_advances[index]
 	draw_set_transform(Vector2.ZERO)
-	var face_origin: Vector2 = Vector2(floorf(origin_x + _g_width + gap), baseline - 60.0 - FACE_LIFT)
+	var face_origin: Vector2 = Vector2(floorf(origin_x + _g_width + gap), baseline - FACE_ROWS.size() * PIXEL - FACE_LIFT)
 	_draw_face(face_origin + Vector2(2, 3), true)
 	_draw_face(face_origin, false)
 
@@ -126,8 +128,8 @@ func _draw_face(origin: Vector2, shadow: bool) -> void:
 				"D": color = GREEN_DARK
 				"I": color = INK
 				"E", "T": color = IVORY
-			if _eyes_closed and row_index >= 6 and row_index <= 7 and (column == 3 or column == 4 or column == 9 or column == 10):
-				color = INK if row_index == 7 else GREEN
+			if _eyes_closed and pixel == "E":
+				color = INK
 			if shadow:
 				color = SHADOW
 			draw_rect(Rect2(origin + Vector2(column * PIXEL, row_index * PIXEL), Vector2(PIXEL, PIXEL)), color)
