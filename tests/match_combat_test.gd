@@ -20,6 +20,7 @@ func _init() -> void:
 	_test_typed_enemy_defense()
 	_test_weighted_wave_constraints_and_streams()
 	_test_weighted_wave_randomness_and_extension()
+	_test_growing_count_caps()
 	_test_resource_damage_and_roster_clearance()
 	_test_simultaneous_and_ordinary_outcomes()
 	if failures == 0:
@@ -620,7 +621,10 @@ func _check_roster_constraints(state: Dictionary, wave_number: int) -> void:
 	for type_id: String in counts:
 		var definition: Dictionary = state["enemy_types"][type_id]
 		var count: int = counts[type_id]
-		_check(int(definition["max_per_wave"]) == 0 or count <= int(definition["max_per_wave"]), "Regular type respects its hard count cap")
+		var base_cap: int = definition["max_per_wave"]
+		var growth_steps: int = floori(float(maxi(0, wave_number - int(definition["first_wave"]))) / int(definition["count_cap_growth_interval"]))
+		var cap: int = base_cap + growth_steps * int(definition["count_cap_growth"])
+		_check(base_cap == 0 or count <= cap, "Regular type respects its wave-scaled hard count cap")
 		_check(count * int(definition["spawn_weight"]) <= floori(budget * float(definition["max_weight_share"])), "Regular type respects floored total-weight share")
 	_check(weight == budget and state["total"] == state["wave_roster"].size(), "Regular roster fills exact integer budget and reports actual count")
 
@@ -665,6 +669,50 @@ func _test_weighted_wave_constraints_and_streams() -> void:
 			_check(combat.phase == MatchCombat.Phase.PLANNING, "Both actual roster streams clear into the next break")
 			_check(tie_random.state == frozen_tie_state, "Regular wave choices never consume terminal coin-flip randomness")
 	_check(saw_runner and saw_brute, "Unlocked weighted waves actually include both heavier shipped types")
+
+
+func _test_growing_count_caps() -> void:
+	# Large budgets isolate count growth; a separate share-limited case proves precedence.
+	var rules := CombatRules.new()
+	rules.wave_weight = 100
+	rules.wave_weight_growth = 0
+	rules.enemy_definitions = rules.enemy_definitions.duplicate()
+	var growing := EnemyDefinition.new()
+	growing.id = &"test_growing_enemy"
+	growing.title = "Growing"
+	growing.spawn_weight = 2
+	growing.first_wave = 4
+	growing.max_per_wave = 2
+	growing.count_cap_growth = 2
+	growing.count_cap_growth_interval = 3
+	growing.max_weight_share = 1.0
+	rules.enemy_definitions = [rules.enemy_definitions[0], growing]
+	for example: Vector2i in [Vector2i(3, 0), Vector2i(4, 2), Vector2i(6, 2), Vector2i(7, 4), Vector2i(9, 4), Vector2i(10, 6)]:
+		var combat := MatchCombat.new(rules, null, _wave_rng(17))
+		combat.wave = example.x - 1
+		combat.start_wave(_routes(1000, 1000))
+		_check(combat.wave_roster.count(String(growing.id)) == example.y, "Real roster honors unlock-relative cap growth at wave %d" % example.x)
+		_check_roster_constraints(combat.snapshot(), example.x)
+	growing.max_weight_share = 0.05
+	var shared := MatchCombat.new(rules, null, _wave_rng(17))
+	shared.wave = 99
+	shared.start_wave(_routes(1000, 1000))
+	_check(shared.wave_roster.count(String(growing.id)) == 2, "Weight-share ceiling still limits a much larger grown hard cap")
+	_check_roster_constraints(shared.snapshot(), 100)
+	growing.max_per_wave = 0
+	growing.max_weight_share = 1.0
+	var unlimited := MatchCombat.new(rules, null, _wave_rng(17))
+	unlimited.wave = 3
+	unlimited.start_wave(_routes(1000, 1000))
+	_check(unlimited.wave_roster.count(String(growing.id)) > 2, "Zero base cap remains unlimited rather than becoming a finite grown cap")
+	_check_roster_constraints(unlimited.snapshot(), 4)
+	for type_id: String in ["runner", "brute"]:
+		var late := MatchCombat.new(CombatRules.new(), null, _wave_rng(17))
+		late.wave = 49
+		late.start_wave(_routes(1000, 1000))
+		var original_limit: int = 4 if type_id == "runner" else 2
+		_check(late.wave_roster.count(type_id) > original_limit, "Late shipped waves can exceed the original fixed %s cap" % type_id)
+		_check_roster_constraints(late.snapshot(), 50)
 
 
 func _test_weighted_wave_randomness_and_extension() -> void:

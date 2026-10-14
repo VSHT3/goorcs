@@ -56,8 +56,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			_roster_configuration_valid = false
 			continue
 		var type_id: String = String(definition.id)
-		if type_id.is_empty() or definition.title.is_empty() or not is_finite(definition.health_multiplier) or definition.health_multiplier <= 0.0 or not is_finite(definition.speed_multiplier) or definition.speed_multiplier <= 0.0 or definition.send_cost <= 0 or definition.send_income < 0 or definition.base_damage <= 0 or definition.spawn_weight <= 0 or definition.first_wave < 1 or definition.max_per_wave < 0 or not is_finite(definition.max_weight_share) or definition.max_weight_share < 0.0 or definition.max_weight_share > 1.0:
-			push_error("Invalid combat enemy definition '%s': require positive multipliers/price/damage/weight/unlock, nonnegative income/count cap, and finite share in [0, 1]" % type_id)
+		if type_id.is_empty() or definition.title.is_empty() or not is_finite(definition.health_multiplier) or definition.health_multiplier <= 0.0 or not is_finite(definition.speed_multiplier) or definition.speed_multiplier <= 0.0 or definition.send_cost <= 0 or definition.send_income < 0 or definition.base_damage <= 0 or definition.spawn_weight <= 0 or definition.first_wave < 1 or definition.max_per_wave < 0 or definition.count_cap_growth < 0 or definition.count_cap_growth_interval < 1 or not is_finite(definition.max_weight_share) or definition.max_weight_share < 0.0 or definition.max_weight_share > 1.0:
+			push_error("Invalid combat enemy definition '%s': require positive multipliers/price/damage/weight/unlock/growth interval, nonnegative income/count cap/growth, and finite share in [0, 1]" % type_id)
 			_roster_configuration_valid = false
 			continue
 		if _enemy_types.has(type_id):
@@ -71,6 +71,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"send_cost": definition.send_cost, "send_income": definition.send_income,
 			"base_damage": definition.base_damage, "spawn_weight": definition.spawn_weight,
 			"first_wave": definition.first_wave, "max_per_wave": definition.max_per_wave,
+			"count_cap_growth": definition.count_cap_growth,
+			"count_cap_growth_interval": definition.count_cap_growth_interval,
 			"max_weight_share": definition.max_weight_share,
 		}
 	if not _enemy_types.has("grunt") or int(_enemy_types["grunt"]["spawn_weight"]) != 1 or int(_enemy_types["grunt"]["first_wave"]) != 1 or int(_enemy_types["grunt"]["max_per_wave"]) != 0 or float(_enemy_types["grunt"]["max_weight_share"]) != 1.0:
@@ -307,19 +309,30 @@ func _wave_weight(wave_number: int) -> int:
 	return _rules.wave_weight + maxi(0, wave_number - 1) * _rules.wave_weight_growth
 
 
+func _enemy_count_cap(definition: Dictionary, wave_number: int) -> int:
+	var base_cap: int = definition["max_per_wave"]
+	if base_cap == 0:
+		return 0
+	var steps: int = floori(float(maxi(0, wave_number - int(definition["first_wave"]))) / int(definition["count_cap_growth_interval"]))
+	return base_cap + steps * int(definition["count_cap_growth"])
+
+
 func _generate_wave_roster(wave_number: int) -> Array[String]:
 	var budget: int = _wave_weight(wave_number)
 	var remaining: int = budget
 	var counts: Dictionary = {}
 	var roster: Array[String] = []
 	var eligible: Array[String] = []
+	var count_caps: Dictionary[String, int] = {}
+	for type_id: String in _enemy_types:
+		count_caps[type_id] = _enemy_count_cap(_enemy_types[type_id], wave_number)
 	while remaining > 0:
 		eligible.clear()
 		for type_id: String in _enemy_types:
 			var definition: Dictionary = _enemy_types[type_id]
 			var weight: int = definition["spawn_weight"]
 			var count: int = counts.get(type_id, 0)
-			var count_cap: int = definition["max_per_wave"]
+			var count_cap: int = count_caps[type_id]
 			var share_cap: int = floori(float(budget) * float(definition["max_weight_share"]))
 			if wave_number >= int(definition["first_wave"]) and weight <= remaining and (count_cap == 0 or count < count_cap) and (count + 1) * weight <= share_cap:
 				eligible.append(type_id)

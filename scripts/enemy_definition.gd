@@ -12,6 +12,9 @@ extends Resource
 @export var first_wave: int = 1
 # Zero means unlimited. Share caps this type's total weight, not its head count.
 @export var max_per_wave: int = 0
+# Finite caps gain this amount every interval waves after first_wave.
+@export var count_cap_growth: int = 0
+@export var count_cap_growth_interval: int = 1
 @export_range(0.0, 1.0) var max_weight_share: float = 1.0
 @export var send_cost: int = 20
 @export var send_income: int = 2
