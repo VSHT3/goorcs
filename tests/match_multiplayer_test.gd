@@ -28,6 +28,7 @@ func _run() -> void:
 	await _build("host", 0, -1, 2, 0)
 	await _build("host", 0, 1, 1, 0)
 	await _build("host", 0, 2, 1, 99)
+	await _build("host", 0, 2, 1, 0, "unknown_tower")
 	await _command("guest", {"action": "target", "slot": 0, "tower_id": tower_id, "mode": 2})
 	await _edit("host", 0, 1, 1)
 	await create_timer(0.15).timeout
@@ -71,6 +72,18 @@ func _run() -> void:
 	_check(int(final_state.get("winner", -1)) in [0, 1], "Coin flip produces exactly one player winner")
 	await _wait_combat("guest", {"phase": 2, "health": [0, 0], "coin_flip": true, "winner": final_state.get("winner", -1)}, "Guest receives the host's coin-flip winner")
 	await _assert_terminal(-1)
+	await _command("guest", {"action": "leave"})
+	await _wait_for("host", {"active": false}, "Leave resets typed tower boards")
+	await _connect_guest("guest", "host", code)
+	for type_id: String in ["orc_ballista", "rune_obelisk"]:
+		var cell := Vector2i(2 if type_id == "orc_ballista" else 4, 2)
+		await _build("host", 0, cell.x, cell.y, 0, type_id)
+		var typed_host: Dictionary = await _wait_tower("guest", 0, cell, 0)
+		_check(typed_host.get("type_id") == type_id, "Guest sees the host's chosen tower identity")
+		await _build("guest", 1, cell.x, cell.y, 1, type_id)
+		var typed_guest: Dictionary = await _wait_tower("host", 1, cell, 1)
+		_check(typed_guest.get("type_id") == type_id, "Host accepts the guest's chosen tower identity")
+	_check(_snapshot("host")["combat"]["tower_types"] == _snapshot("guest")["combat"]["tower_types"], "Both peers use detached host-owned per-type stats")
 	await _finish()
 
 
@@ -88,8 +101,8 @@ func _both_ready() -> void:
 	await _command("guest", {"action": "ready", "value": true})
 
 
-func _build(lane: String, slot: int, x: int, y: int, mode: int) -> void:
-	await _command(lane, {"action": "build", "slot": slot, "x": x, "y": y, "mode": mode})
+func _build(lane: String, slot: int, x: int, y: int, mode: int, type_id: String = "arrow_tower") -> void:
+	await _command(lane, {"action": "build", "slot": slot, "x": x, "y": y, "mode": mode, "type_id": type_id})
 
 
 func _wait_combat(lane: String, expected: Dictionary, description: String) -> Dictionary:

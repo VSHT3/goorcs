@@ -13,6 +13,8 @@ var towers: Array[Array] = [[], []]
 var enemies: Array[Array] = [[], []]
 
 var _rules: CombatRules
+# Captured once from resources so commands, attacks, and snapshots share host-owned stats.
+var _tower_types: Dictionary = {}
 var _random: RandomNumberGenerator
 var _routes: Array[Array] = [[], []]
 var _spawned: Array[int] = [0, 0]
@@ -28,13 +30,31 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null) -> void:
 		_random = RandomNumberGenerator.new()
 		_random.randomize()
 	base_health = [rules.base_health, rules.base_health]
+	for definition: TowerDefinition in rules.tower_definitions:
+		if definition == null:
+			push_error("Combat tower_definitions contains a null entry")
+			continue
+		if definition.reward == null:
+			push_error("Combat tower definition '%s' has no reward" % definition.resource_path)
+			continue
+		var type_id: String = String(definition.reward.id)
+		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0:
+			push_error("Invalid combat tower definition '%s' (%s): ID and positive finite stats are required" % [type_id, definition.resource_path])
+			continue
+		if _tower_types.has(type_id):
+			push_error("Duplicate combat tower definition '%s': keeping the first valid definition" % type_id)
+			continue
+		_tower_types[type_id] = {
+			"title": definition.reward.title, "damage": definition.damage,
+			"range": definition.range_cells, "interval": definition.interval,
+		}
 
 
-func build(slot: int, cell: Vector2i, mode: int) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode) or has_tower(slot, cell):
+func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
+	if phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode) or not _tower_types.has(String(type_id)) or has_tower(slot, cell):
 		return false
 	towers[slot].append({
-		"id": _next_tower_id, "cell": cell, "mode": mode, "cooldown": 0.0,
+		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
 	})
 	_next_tower_id += 1
@@ -73,7 +93,7 @@ func start_wave(routes: Array[Array]) -> bool:
 	return true
 
 
-# Only the host calls this, using fixed physics deltas. Arrows hit immediately;
+# Only the host calls this, using fixed physics deltas. All towers hit immediately;
 # the shot counter and aim position are cosmetic events for snapshot consumers.
 func advance(delta: float) -> bool:
 	if phase != Phase.WAVE or delta <= 0.0:
@@ -100,9 +120,9 @@ func snapshot() -> Dictionary:
 		"winner": winner, "coin_flip": coin_flip,
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"spawned": _spawned.duplicate(), "total": _rules.enemies_per_wave,
+		"tower_types": _tower_types.duplicate(true),
 		"rules": {
-			"range": _rules.tower_range, "damage": _rules.tower_damage,
-			"interval": _rules.tower_interval, "enemy_speed": _rules.enemy_speed,
+			"enemy_speed": _rules.enemy_speed,
 			"enemy_health": _rules.enemy_health + maxi(0, wave - 1) * _rules.health_growth,
 			"base_health": _rules.base_health,
 		},
@@ -152,26 +172,27 @@ func _attack(slot: int, delta: float) -> void:
 		tower["cooldown"] = maxf(0.0, tower["cooldown"] - delta)
 		if tower["cooldown"] > 0.0:
 			continue
-		var target_index: int = _target(slot, tower)
+		var definition: Dictionary = _tower_types[tower["type_id"]]
+		var target_index: int = _target(slot, tower, definition["range"])
 		if target_index < 0:
 			continue
 		var enemy: Dictionary = enemies[slot][target_index]
 		tower["target_id"] = enemy["id"]
 		tower["aim"] = enemy["pos"]
 		tower["shot"] += 1
-		tower["cooldown"] = _rules.tower_interval
-		enemy["hp"] -= _rules.tower_damage
+		tower["cooldown"] = definition["interval"]
+		enemy["hp"] -= definition["damage"]
 		if enemy["hp"] <= 0:
 			enemies[slot].remove_at(target_index)
 
 
 # Scan in place rather than allocating or sorting candidates for each tower.
-func _target(slot: int, tower: Dictionary) -> int:
+func _target(slot: int, tower: Dictionary, range_cells: float) -> int:
 	var best: int = -1
 	var best_score: float = -INF
 	var best_id: int = 0
 	var center: Vector2 = Vector2(tower["cell"])
-	var range_squared: float = _rules.tower_range * _rules.tower_range
+	var range_squared: float = range_cells * range_cells
 	for index: int in range(enemies[slot].size()):
 		var enemy: Dictionary = enemies[slot][index]
 		var distance_squared: float = center.distance_squared_to(enemy["pos"])

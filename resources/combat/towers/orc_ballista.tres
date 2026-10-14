@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TowerDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/tower_definition.gd" id="1_definition"]
+[ext_resource type="Resource" path="res://resources/collection/orc_ballista.tres" id="2_reward"]
+
+[resource]
+script = ExtResource("1_definition")
+reward = ExtResource("2_reward")
+damage = 6
+range_cells = 4.0
+interval = 1.5

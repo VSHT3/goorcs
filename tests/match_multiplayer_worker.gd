@@ -9,9 +9,15 @@ func _planning_rules() -> CombatRules:
 	rules.enemies_per_wave = 1
 	rules.enemy_speed = 6.5
 	rules.spawn_interval = 0.05
-	rules.tower_damage = 99
-	rules.tower_range = 1.5
-	rules.tower_interval = 0.05
+	var definitions: Array[TowerDefinition] = []
+	for source: TowerDefinition in rules.tower_definitions:
+		var definition := TowerDefinition.new()
+		definition.reward = source.reward
+		definition.damage = 1 if _lane == "guest" else 99
+		definition.range_cells = 0.5 if _lane == "guest" else 1.5
+		definition.interval = 5.0 if _lane == "guest" else 0.05
+		definitions.append(definition)
+	rules.tower_definitions = definitions
 	if _lane == "guest":
 		rules.base_health = 7
 	return rules

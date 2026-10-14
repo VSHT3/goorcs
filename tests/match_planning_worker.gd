@@ -28,7 +28,7 @@ func _execute_command(command: Dictionary) -> void:
 		"ready":
 			planning.submit_ready(bool(command["value"]))
 		"build":
-			planning.build_tower(int(command["slot"]), Vector2i(int(command["x"]), int(command["y"])), int(command["mode"]))
+			planning.build_tower(int(command["slot"]), Vector2i(int(command["x"]), int(command["y"])), StringName(command["type_id"]), int(command["mode"]))
 		"target":
 			planning.set_targeting(int(command["slot"]), int(command["tower_id"]), int(command["mode"]))
 		_:

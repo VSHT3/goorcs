@@ -12,7 +12,6 @@ const ENEMY_BLEND_DURATION: float = 0.1
 const ROUTE_LINE := Color("b5e2b7")
 const ENTRY_COLOR := Color("e0bc77")
 const BASE_COLOR := Color("96c8dc")
-const ARROW_REWARD: TowerReward = preload("res://resources/collection/arrow_tower.tres")
 const SHOT_DURATION: float = 0.18
 
 var layout: PathLayout
@@ -36,7 +35,14 @@ var combat_enemies: Array = []:
 		set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
 		queue_redraw()
 var selected_tower_id: int = -1
-var tower_range: float = 3.0
+var tower_types: Dictionary = {}
+var tower_catalog: Array[TowerReward] = CollectionStore.DEFAULT_CATALOG:
+	set(value):
+		tower_catalog = value
+		_tower_textures.clear()
+		for reward: TowerReward in value:
+			_tower_textures[String(reward.id)] = reward.icon_texture
+		queue_redraw()
 var enemy_route: Array = []
 var input_enabled: bool = true:
 	set(value):
@@ -51,9 +57,11 @@ var _seen_shots: Dictionary = {}
 var _shot_traces: Array[Dictionary] = []
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
+var _tower_textures: Dictionary[String, Texture2D] = {}
 
 
 func _ready() -> void:
+	tower_catalog = tower_catalog
 	mouse_exited.connect(_on_mouse_exited)
 	resized.connect(queue_redraw)
 	set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
@@ -241,11 +249,10 @@ func _draw() -> void:
 
 func _draw_combat() -> void:
 	var cell_size: float = _cell_size()
-	var texture_size: Vector2 = ARROW_REWARD.icon_texture.get_size()
-	var icon_size: Vector2 = texture_size * (cell_size * 0.86 / maxf(texture_size.x, texture_size.y))
 	for tower: Dictionary in combat_towers:
 		if int(tower["id"]) == selected_tower_id:
 			var center: Vector2 = cell_center(tower["cell"])
+			var tower_range: float = float(tower_types[tower["type_id"]]["range"])
 			draw_circle(center, tower_range * cell_size, Color(0.71, 0.89, 0.72, 0.06))
 			draw_arc(center, tower_range * cell_size, 0.0, TAU, 96, ROUTE_LINE, 1.5, true)
 	for tower: Dictionary in combat_towers:
@@ -254,7 +261,11 @@ func _draw_combat() -> void:
 		var extent: float = cell_size * 0.45
 		draw_rect(Rect2(center - Vector2.ONE * extent, Vector2.ONE * extent * 2.0),
 			Color("e0bc77") if selected else Color("526353"), false, 2.0)
-		draw_texture_rect(ARROW_REWARD.icon_texture, Rect2(center - icon_size * 0.5, icon_size), false)
+		var texture: Texture2D = _tower_textures.get(tower["type_id"])
+		if texture != null:
+			var texture_size: Vector2 = texture.get_size()
+			var icon_size: Vector2 = texture_size * (cell_size * 0.86 / maxf(texture_size.x, texture_size.y))
+			draw_texture_rect(texture, Rect2(center - icon_size * 0.5, icon_size), false)
 	for enemy: Dictionary in combat_enemies:
 		var position: Vector2 = _enemy_position(enemy)
 		var center: Vector2 = _position_center(position)

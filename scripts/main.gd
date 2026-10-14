@@ -40,12 +40,15 @@ func _ready() -> void:
 	$Margin/Content/Header/Menu.pressed.connect(_show_menu)
 	$Menu/Center/Panel/Collection.pressed.connect(_open_collection)
 	play_button.pressed.connect(_open_play)
+	if collection_store == null:
+		collection_store = CollectionStore.new()
 	session = MultiplayerSession.new()
 	session.name = "Session"
 	add_child(session)
 	planning = MatchPlanning.new()
 	planning.name = "Planning"
 	planning.session = session
+	planning.collection_store = collection_store
 	planning.combat_rules = combat_rules
 	planning.configure(board_dimensions, tile_budget, entrance_cell, base_cell)
 	add_child(planning)
@@ -55,8 +58,6 @@ func _ready() -> void:
 	play_screen.hide()
 	add_child(play_screen)
 	play_screen.back_requested.connect(_show_menu)
-	if collection_store == null:
-		collection_store = CollectionStore.new()
 	collection_screen = preload("res://scenes/collection_screen.tscn").instantiate()
 	collection_screen.store = collection_store
 	collection_screen.hide()

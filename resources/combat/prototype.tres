@@ -9,7 +9,4 @@ enemy_health = 8
 enemy_speed = 2.0
 enemies_per_wave = 6
 spawn_interval = 0.75
-tower_damage = 2
-tower_range = 3.0
-tower_interval = 0.75
 health_growth = 2

@@ -55,16 +55,16 @@ unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(128, 38)
 layout_mode = 2
-tooltip_text = "New Arrow priority"
+tooltip_text = "New tower priority"
 
-[node name="ArrowStats" type="Label" parent="Content/Tools"]
+[node name="TowerStats" type="Label" parent="Content/Tools"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.69, 0.75, 0.69, 1)
 theme_override_font_sizes/font_size = 14
-text = "Arrow · 2 dmg · 0.75s · 3.0 cells"
+text = ""
 autowrap_mode = 2
 
 [node name="Boards" type="HBoxContainer" parent="Content"]

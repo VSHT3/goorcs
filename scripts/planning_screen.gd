@@ -12,13 +12,14 @@ var planning: MatchPlanning
 var selected_tower_id: int = -1
 var _default_targeting: int = 0
 var _pending_tower_cell := Vector2i(-1, -1)
+var _menu_ids: Array[StringName] = []
 
 @onready var boards: Array[PathBoard] = [$Content/Boards/Host/Board, $Content/Boards/Guest/Board]
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
 @onready var tower_menu: OptionButton = %TowerMenu
 @onready var targeting_button: OptionButton = %Targeting
-@onready var _arrow_stats: Label = %ArrowStats
+@onready var _tower_stats: Label = %TowerStats
 @onready var _target_label: Label = $Content/Tools/TargetLabel
 @onready var _status: Label = %Status
 @onready var _feedback: Label = %Feedback
@@ -33,11 +34,14 @@ func _ready() -> void:
 		boards[slot].edit_requested.connect(_request_edit.bind(slot))
 		boards[slot].cell_clicked.connect(_cell_clicked.bind(slot))
 		boards[slot].command_mode = true
+		if planning != null and planning.collection_store != null:
+			boards[slot].tower_catalog = planning.collection_store.catalog
 	boards[0].mirror_horizontal = true
+	tower_menu.add_theme_constant_override("icon_max_width", 24)
+	tower_menu.get_popup().add_theme_constant_override("icon_max_width", 24)
 	tower_menu.add_item("None", 0)
-	tower_menu.add_item("Arrow tower", 1)
+	tower_menu.set_item_metadata(0, &"")
 	tower_menu.set_item_tooltip(0, "Inspect towers. During breaks, left drag places paths and right drag erases them.")
-	tower_menu.set_item_tooltip(1, "Left click: place an Arrow on empty ground. Right click: cancel placement.")
 	targeting_button.add_item("Furthest", 0)
 	targeting_button.add_item("Closest", 1)
 	targeting_button.add_item("Strongest", 2)
@@ -66,6 +70,8 @@ func _visibility_changed() -> void:
 	if not is_visible_in_tree():
 		cancel_strokes()
 		_clear_feedback()
+	else:
+		_refresh()
 
 
 func _request_edit(cell: Vector2i, place: bool, slot: int) -> void:
@@ -91,9 +97,10 @@ func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
 			_refresh()
 			return
 	selected_tower_id = -1
-	if tower_menu.selected == 1:
+	var type_id: StringName = _placement_type()
+	if type_id != &"":
 		_pending_tower_cell = cell
-		planning.build_tower(slot, cell, _default_targeting)
+		planning.build_tower(slot, cell, type_id, _default_targeting)
 	_refresh()
 
 
@@ -102,6 +109,38 @@ func _tower_selected(_index: int) -> void:
 	_pending_tower_cell = Vector2i(-1, -1)
 	selected_tower_id = -1
 	_refresh()
+
+
+func _placement_type() -> StringName:
+	return StringName(tower_menu.get_item_metadata(tower_menu.selected))
+
+
+func _refresh_tower_menu() -> void:
+	var ids: Array[StringName] = []
+	var rewards: Array[TowerReward] = []
+	var types: Dictionary = planning.combat.get("tower_types", {})
+	if planning.collection_store != null:
+		for reward: TowerReward in planning.collection_store.catalog:
+			if planning.collection_store.is_unlocked(reward.id) and types.has(String(reward.id)):
+				ids.append(reward.id)
+				rewards.append(reward)
+	if ids == _menu_ids:
+		return
+	var previous: StringName = _placement_type()
+	_menu_ids = ids
+	tower_menu.clear()
+	tower_menu.add_item("None")
+	tower_menu.set_item_metadata(0, &"")
+	tower_menu.set_item_tooltip(0, "Inspect towers. During breaks, left drag places paths and right drag erases them.")
+	for reward: TowerReward in rewards:
+		var id: StringName = reward.id
+		var stats: Dictionary = types[String(id)]
+		tower_menu.add_icon_item(reward.icon_texture, stats["title"])
+		var index: int = tower_menu.item_count - 1
+		tower_menu.set_item_metadata(index, id)
+		tower_menu.set_item_tooltip(index, "Left click: place %s on empty ground. Right click: cancel placement." % stats["title"])
+	tower_menu.select(ids.find(previous) + 1 if ids.has(previous) else 0)
+	cancel_strokes()
 
 
 func _target_selected(index: int) -> void:
@@ -131,11 +170,14 @@ func _refresh_targeting() -> void:
 	var has_controls: bool = tower_menu.selected != 0 or not tower.is_empty()
 	targeting_button.visible = has_controls
 	_target_label.visible = has_controls
-	_arrow_stats.visible = has_controls
-	var rules: Dictionary = planning.combat.get("rules", {}) if planning != null else {}
-	_arrow_stats.text = "Arrow · %d dmg · %.2fs · %.1f cells" % [int(rules.get("damage", 2)), float(rules.get("interval", 0.75)), float(rules.get("range", 3.0))]
-	_arrow_stats.tooltip_text = "Damage · Firing interval · Circular range"
-	targeting_button.tooltip_text = "New Arrow priority" if tower.is_empty() else "Selected Arrow priority"
+	_tower_stats.visible = has_controls
+	var type_id: String = String(tower["type_id"]) if not tower.is_empty() else String(_placement_type())
+	var types: Dictionary = planning.combat.get("tower_types", {}) if planning != null else {}
+	var stats: Dictionary = types.get(type_id, {})
+	if not stats.is_empty():
+		_tower_stats.text = "%s · %d dmg · %.2fs · %.1f cells" % [stats["title"], int(stats["damage"]), float(stats["interval"]), float(stats["range"])]
+	_tower_stats.tooltip_text = "Damage · Firing interval · Circular range"
+	targeting_button.tooltip_text = "New tower priority" if tower.is_empty() else "Selected tower priority"
 
 
 func _clear() -> void:
@@ -160,6 +202,7 @@ func _refresh() -> void:
 		targeting_button.disabled = true
 		_status.text = "Planning unavailable"
 		return
+	_refresh_tower_menu()
 	var own_slot: int = planning.local_slot()
 	if not planning.active:
 		_clear_feedback()
@@ -192,7 +235,7 @@ func _refresh() -> void:
 		board.cell_click_mode = tower_menu.selected != 0 or not editable
 		board.input_enabled = planning.active and not finished and slot == own_slot and (editable or board.cell_click_mode)
 		board.selected_tower_id = selected_tower_id if slot == own_slot else -1
-		board.tower_range = float(rules.get("range", 3.0))
+		board.tower_types = state.get("tower_types", {})
 		board.enemy_route = planning.locked_routes[slot]
 		board.combat_towers = all_towers[slot]
 		board.combat_enemies = all_enemies[slot]
@@ -236,6 +279,8 @@ func _refresh() -> void:
 		_status.text = "Planning · Wave %d" % (int(state.get("wave", 0)) + 1)
 		_status.tooltip_text = ""
 	tower_menu.tooltip_text = tower_menu.get_item_tooltip(tower_menu.selected)
+	if tower_menu.item_count == 1:
+		tower_menu.tooltip_text += "\nNo unlocked combat towers. Open a chest in Collection."
 	_refresh_targeting()
 	if not planning.active:
 		cancel_strokes()
