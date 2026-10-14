@@ -71,6 +71,7 @@ This workshop does not simulate waves, enemies, or combat-time route locking.
 - [Agent instructions](AGENTS.md): required reading, editing rules, state ownership, and completion criteria.
 - [Game direction](docs/game-direction.md): intended experience, technical decisions, and first playable milestone.
 - [Development workflow](docs/development.md): setup, verification, and optional MCP tooling.
+- [AI-to-sprite pipeline](docs/sprite-pipeline.md): local reference editing, agent/API steps, cleanup, provenance, and approval before importing artwork.
 - [Pixel-art archive](archive_assets/README.md): original candidates, prepared sprites, searchable tags, and source provenance; excluded from Godot imports.
 
 ## Layout
