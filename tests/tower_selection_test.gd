@@ -94,7 +94,7 @@ func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:
 	var layout := PathLayout.new()
 	for x: int in range(1, 13):
 		layout.place(Vector2i(x, 4))
-	var routes: Array[Array] = [layout.route, layout.route]
+	var routes: Array[Dictionary] = [layout.capture_routing(), layout.capture_routing()]
 	_check(model.start_wave(routes), "Legal routes deliver the accepted queue")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()

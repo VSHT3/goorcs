@@ -64,11 +64,11 @@ Current matches retain the fixed grid dimensions and equal path-tile budget; cam
 
 In the intended expansion system, the entrance and crystal stay in place as the board expands. New territory becomes available around the existing board, and extra path tiles let players route enemies through it. That growth is not implemented by the camera cutover. Final crystal art and initial endpoint positions still need map sketches.
 
-Enemies take the shortest route across connected path tiles. They do not follow the order in which the player placed the tiles. Adjacent path sections can therefore create shortcuts. This replaces the earlier tower-blocked-maze assumption: towers and walls do not define the enemy route by blocking otherwise walkable ground.
+Enemies take shortest routes across connected path tiles, not placement order. When more than one next branch has the same remaining shortest distance, the host alternates assignments in stable round-robin order at that fork. Regular and sent enemies share a board's rotation, reset each wave; longer alternatives remain unused. Each enemy receives its complete captured route at spawn. Adjacent path sections can still create shortcuts. Towers and walls do not define routes by blocking otherwise walkable ground.
 
 Both the available path tiles and the map's buildable area grow during the run. The whole board expands at milestones rather than the player selecting individual land sections to unlock. Milestone timing, amounts, and whether both players expand at the same time remain open.
 
-The current wave's route is preserved throughout combat. Redesigning the route happens between waves, not as a tactic for repeatedly redirecting moving enemies.
+The current wave's routing graph and each enemy's assigned shortest route are preserved throughout combat. Redesigning paths happens between waves, not as a tactic for repeatedly redirecting moving enemies.
 
 Buildings also use square-grid placement. Building, upgrading, and selling remain available during combat, but must not invalidate the current route. Tower relocation that preserves upgrades and traits is free during breaks only; it is not available during combat.
 
@@ -79,7 +79,7 @@ Some major tower upgrades expand their occupied footprint. An expanding upgrade 
 - **Confirmed rules:** four-direction edge adjacency; the tile budget is a maximum, so unused tiles are allowed.
 - **Prototype configuration:** a 14×9 board, entrance at (0, 4), base at (13, 4), and 30 placeable tiles. Endpoints are fixed, traversable, and free. These map/balance values are provisional and exported on the main scene.
 - **Connectivity:** disconnected tiles are allowed during editing, but readiness requires every placed tile and the base to connect to the entrance. Connected branches are legal.
-- **Routing convention:** breadth-first shortest path, with right/down/left/up neighbor order resolving equal-length alternatives deterministically. Connected pavement is shown without a shortest-route overlay.
+- **Workshop routing convention:** breadth-first shortest path, with right/down/left/up neighbor order selecting one stable representative route. Match combat captures all equally short successors and alternates enemy assignments at forks. Connected pavement is shown without a shortest-route overlay.
 - **Navigation:** the main menu opens/resumes the workshop or quits. Esc and the workshop's Menu button return to navigation without changing the layout. Layouts persist only within the running session, not after quitting.
 - **Check:** build a detour and add a shorter connection; remove a bridge or add an island to invalidate readiness. Headless regressions and graphical checks are described in [development](development.md#path-workshop-verification).
 
@@ -88,7 +88,7 @@ There are no waves in the workshop. Free editing here does not decide combat rou
 ### Open implementation-shaping decisions
 
 - Initial path-budget size and the timing and amounts of milestone-based path-tile and whole-board growth.
-- Final route-preview presentation; equal-length route selection currently uses the workshop's deterministic convention.
+- Final route-preview presentation; the workshop retains a stable representative route, while match enemies alternate among equal shortest branches.
 - Whether paths can be redrawn freely between waves and whether unused tiles are retained.
 - Placement relative to path tiles, initial board dimensions, terrain, and the placement of the fixed entrance and crystal.
 - How much of each board is visible at future zoom levels or after map growth; the current view starts on the owned side and supports smooth A/D scouting.

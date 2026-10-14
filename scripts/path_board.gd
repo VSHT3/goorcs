@@ -71,7 +71,6 @@ var tower_catalog: Array[TowerReward] = CollectionStore.DEFAULT_CATALOG:
 			_tower_art[String(reward.id)] = reward
 			_cache_texture_bounds(reward.icon_texture)
 		queue_redraw()
-var enemy_route: Array = []
 var input_enabled: bool = true:
 	set(value):
 		input_enabled = value
@@ -173,32 +172,35 @@ func _blend_enemies() -> void:
 
 
 func _enemy_position(enemy: Dictionary) -> Vector2:
-	if enemy_route.size() < 2:
+	var route: Array = enemy["route"]
+	if route.is_empty():
 		return enemy["pos"]
-	return _route_position(_enemy_route_progress(enemy))
+	if route.size() == 1:
+		return Vector2(route[0])
+	return _route_position(route, _enemy_route_progress(enemy))
 
 
 func _enemy_route_progress(enemy: Dictionary) -> float:
 	var blend: Vector2 = _enemy_progress.get(int(enemy["id"]), Vector2(enemy["progress"], enemy["progress"]))
-	return clampf(lerpf(blend.x, blend.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), 0.0, enemy_route.size() - 1)
+	return clampf(lerpf(blend.x, blend.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), 0.0, maxf(0.0, enemy["route"].size() - 1))
 
 
-func _route_position(progress: float) -> Vector2:
-	var index: int = mini(floori(progress), enemy_route.size() - 2)
-	return Vector2(enemy_route[index]).lerp(Vector2(enemy_route[index + 1]), progress - index)
+func _route_position(route: Array, progress: float) -> Vector2:
+	var index: int = mini(floori(progress), route.size() - 2)
+	return Vector2(route[index]).lerp(Vector2(route[index + 1]), progress - index)
 
 
-func _enemy_faces_left(progress: float) -> bool:
-	if enemy_route.size() < 2:
+func _enemy_faces_left(route: Array, progress: float) -> bool:
+	if route.size() < 2:
 		return mirror_horizontal
 	# Keep upright sprites facing the last horizontal leg through vertical turns.
-	var index: int = mini(floori(progress), enemy_route.size() - 2)
+	var index: int = mini(floori(progress), route.size() - 2)
 	for segment: int in range(index, -1, -1):
-		var direction: Vector2i = enemy_route[segment + 1] - enemy_route[segment]
+		var direction: Vector2i = route[segment + 1] - route[segment]
 		if direction.x != 0:
 			return (direction.x < 0) != mirror_horizontal
-	for segment: int in range(index + 1, enemy_route.size() - 1):
-		var direction: Vector2i = enemy_route[segment + 1] - enemy_route[segment]
+	for segment: int in range(index + 1, route.size() - 1):
+		var direction: Vector2i = route[segment + 1] - route[segment]
 		if direction.x != 0:
 			return (direction.x < 0) != mirror_horizontal
 	return mirror_horizontal
@@ -276,7 +278,7 @@ func enemy_at(position: Vector2) -> int:
 			continue
 		var enemy: Dictionary = item["data"]
 		var foot: Vector2 = _position_center(_enemy_position(enemy)) + Vector2(0, _cell_size() * 0.28)
-		var progress: float = _enemy_route_progress(enemy) if enemy_route.size() >= 2 else 0.0
+		var progress: float = _enemy_route_progress(enemy)
 		if _enemy_sprite_bounds(enemy, foot, progress).has_point(position):
 			return int(enemy["id"])
 	return -1
@@ -591,9 +593,9 @@ func _draw_combat() -> void:
 				center = cell_center(item["data"]["cell"])
 			2:
 				var enemy: Dictionary = item["data"]
-				var progress: float = _enemy_route_progress(enemy) if enemy_route.size() >= 2 else 0.0
+				var progress: float = _enemy_route_progress(enemy)
 				item["progress"] = progress
-				center = _position_center(_route_position(progress) if enemy_route.size() >= 2 else enemy["pos"])
+				center = _position_center(_enemy_position(enemy))
 		item["foot"] = center + Vector2(0, cell_size * 0.28)
 	_draw_order.sort_custom(_depth_before)
 	# All contact shadows belong to the ground, not in front of foreground units.
@@ -629,7 +631,7 @@ func _draw_combat() -> void:
 func _draw_enemy(item: Dictionary) -> void:
 	var enemy: Dictionary = item["data"]
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
-	var flip: bool = _enemy_faces_left(item["progress"]) != artwork.source_faces_left
+	var flip: bool = _enemy_faces_left(enemy["route"], item["progress"]) != artwork.source_faces_left
 	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, item["foot"], flip)
 	if flip:
 		rect.size.x = -rect.size.x
@@ -638,7 +640,7 @@ func _draw_enemy(item: Dictionary) -> void:
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
-	var flip: bool = _enemy_faces_left(progress) != artwork.source_faces_left
+	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
 	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, foot, flip)
 	var bounds: Rect2 = _texture_bounds[artwork.texture]
 	if flip:

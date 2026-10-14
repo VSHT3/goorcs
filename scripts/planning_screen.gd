@@ -570,7 +570,6 @@ func _refresh() -> void:
 		board.placement_id = _placement_id if slot == own_slot else &""
 		board.selected_tower_id = selected_tower_id if slot == own_slot else -1
 		board.tower_types = state.get("tower_types", {})
-		board.enemy_route = planning.locked_routes[slot]
 		board.combat_towers = all_towers[slot]
 		board.combat_enemies = all_enemies[slot]
 		board.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if board.input_enabled or board.enemy_inspection_enabled else Control.CURSOR_ARROW

@@ -16,7 +16,7 @@ func _run() -> void:
 	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 1), Vector2i(4, 3))
 	for cell: Vector2i in [Vector2i(1, 1), Vector2i(2, 1), Vector2i(2, 2), Vector2i(2, 3), Vector2i(3, 3), Vector2i(1, 2)]:
 		board.layout.place(cell)
-	board.enemy_route = [Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(2, 2), Vector2i(2, 3), Vector2i(3, 3), Vector2i(4, 3)]
+	var route: Array = [Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(2, 2), Vector2i(2, 3), Vector2i(3, 3), Vector2i(4, 3)]
 	var viewport := SubViewport.new()
 	viewport.size = Vector2i(400, 400)
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
@@ -25,9 +25,9 @@ func _run() -> void:
 	board.input_enabled = false
 	viewport.add_child(board)
 	await process_frame
-	board.combat_enemies = [_enemy(1, 1.8, Vector2(1.8, 1))]
+	board.combat_enemies = [_enemy(1, 1.8, Vector2(1.8, 1), route)]
 	board.set_process(false)
-	board.combat_enemies = [_enemy(1, 2.2, Vector2(2, 1.2))]
+	board.combat_enemies = [_enemy(1, 2.2, Vector2(2, 1.2), route)]
 	board.set_process(false)
 	_check(board._enemy_position(board.combat_enemies[0]).is_equal_approx(Vector2(1.8, 1)), "Receiving a snapshot does not jump the existing enemy")
 	board._process(0.025)
@@ -41,7 +41,7 @@ func _run() -> void:
 	_check(board._enemy_position(board.combat_enemies[0]).is_equal_approx(Vector2(2, 1.2)), "Missing snapshots cannot extrapolate enemies beyond the accepted position")
 	board.combat_towers = []
 	_check(board.is_processing(), "Undefended enemies animate even without shot traces")
-	board.combat_enemies = [_enemy(2, 0.1, Vector2(0.1, 1))]
+	board.combat_enemies = [_enemy(2, 0.1, Vector2(0.1, 1), route)]
 	_check(board._enemy_position(board.combat_enemies[0]).is_equal_approx(Vector2(0.1, 1)), "A new enemy never inherits another enemy's interpolation")
 	board.combat_enemies = []
 	_check(not board.is_processing(), "Cleared boards stop animation without retaining removed enemies")
@@ -67,6 +67,7 @@ func _run() -> void:
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
 	await _check_source_facing(board, viewport)
+	await _check_split_routes(board, viewport)
 	await _check_depth_overlap(board, viewport)
 	await _check_contextual_hover(board, viewport)
 	viewport.queue_free()
@@ -261,13 +262,13 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 	board.selected_tower_id = -1
 	board.command_mode = false
 	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
-	board.enemy_route = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2), Vector2i(3, 2), Vector2i(4, 2)]
+	var route: Array = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2), Vector2i(3, 2), Vector2i(4, 2)]
 	for cell: Vector2i in [Vector2i(1, 2), Vector2i(2, 2), Vector2i(3, 2)]:
 		board.layout.place(cell)
 	var enemies: Array[Dictionary] = [
-		_enemy(101, 1.0, Vector2(1, 2)),
-		_enemy(102, 2.0, Vector2(2, 2)),
-		_enemy(103, 3.0, Vector2(3, 2)),
+		_enemy(101, 1.0, Vector2(1, 2), route),
+		_enemy(102, 2.0, Vector2(2, 2), route),
+		_enemy(103, 3.0, Vector2(3, 2), route),
 	]
 	enemies[1]["type_id"] = "runner"
 	enemies[2]["type_id"] = "brute"
@@ -302,12 +303,12 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 				"Damage reveals health information above the opaque body without repainting it, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
 		_check(masses[2] > masses[1], "Brute has more visible mass than Runner on either board")
 	board.combat_enemies = []
-	board.enemy_route = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 1), Vector2i(0, 1)]
+	var turning_route: Array = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 1), Vector2i(0, 1)]
 	for mirrored: bool in [false, true]:
 		board.mirror_horizontal = mirrored
-		_check(board._enemy_faces_left(0.5) == mirrored and board._enemy_faces_left(1.5) == mirrored,
+		_check(board._enemy_faces_left(turning_route, 0.5) == mirrored and board._enemy_faces_left(turning_route, 1.5) == mirrored,
 			"Facing follows the displayed horizontal leg and remains stable along vertical turns")
-		_check(board._enemy_faces_left(2.5) != mirrored,
+		_check(board._enemy_faces_left(turning_route, 2.5) != mirrored,
 			"Facing reverses on leftward route segments in either board orientation")
 
 
@@ -321,12 +322,12 @@ func _check_source_facing(board: PathBoard, viewport: SubViewport) -> void:
 	artwork.source_faces_left = true
 	var original: EnemyDefinition = board._enemy_art["grunt"]
 	board._enemy_art["grunt"] = artwork
-	board.enemy_route = [Vector2i(0, 2), Vector2i(1, 2)]
+	var route: Array = [Vector2i(0, 2), Vector2i(1, 2)]
 	for mirrored: bool in [false, true]:
 		board.mirror_horizontal = mirrored
 		board.combat_enemies = []
 		var baseline: Image = await _board_image(board, viewport)
-		board.combat_enemies = [_enemy(104, 1.0, Vector2(1, 2))]
+		board.combat_enemies = [_enemy(104, 1.0, Vector2(1, 2), route)]
 		var image: Image = await _board_image(board, viewport)
 		var center := Vector2i(board.cell_center(Vector2i(1, 2)))
 		var geometry: Dictionary = _changed_geometry(baseline, image, Rect2i(center + Vector2i(-50, -90), Vector2i(100, 130)))
@@ -335,6 +336,99 @@ func _check_source_facing(board: PathBoard, viewport: SubViewport) -> void:
 		_check(offset < -8 if mirrored else offset > 8, "Left-authored artwork faces along the route on either board, not backward")
 	board._enemy_art["grunt"] = original
 	board.combat_enemies = []
+
+
+func _check_split_routes(board: PathBoard, viewport: SubViewport) -> void:
+	var upper: Array = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1), Vector2i(3, 2), Vector2i(4, 2)]
+	var lower: Array = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 3), Vector2i(2, 3), Vector2i(3, 3), Vector2i(3, 2), Vector2i(4, 2)]
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	for route: Array in [upper, lower]:
+		for index: int in range(1, route.size() - 1):
+			board.layout.place(route[index])
+	board.command_mode = false
+	board.combat_towers = []
+	board.enemy_inspection_enabled = true
+	var clicked: Array[int] = []
+	var on_click: Callable = func(id: int) -> void: clicked.append(id)
+	board.enemy_clicked.connect(on_click)
+	var marker := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	marker.fill(Color.CYAN)
+	marker.fill_rect(Rect2i(0, 0, 2, 8), Color.MAGENTA)
+	var artwork := EnemyDefinition.new()
+	artwork.texture = ImageTexture.create_from_image(marker)
+	artwork.board_height = 0.45
+	artwork.board_anchor = Vector2(0.5, 1.0)
+	artwork.source_faces_left = true
+	var original: EnemyDefinition = board._enemy_art["grunt"]
+	board._enemy_art["grunt"] = artwork
+	board._cache_texture_bounds(artwork.texture)
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.selected_enemy_id = -1
+		board.combat_enemies = []
+		var ground: Image = await _board_image(board, viewport)
+		board.combat_enemies = [
+			_enemy(301, 1.8, Vector2(1, 1.2), upper),
+			_enemy(302, 1.8, Vector2(1, 2.8), lower),
+		]
+		board.set_process(false)
+		board._process(PathBoard.ENEMY_BLEND_DURATION)
+		board.combat_enemies = [
+			_enemy(301, 2.2, Vector2(1.2, 1), upper),
+			_enemy(302, 2.2, Vector2(1.2, 3), lower),
+		]
+		board.set_process(false)
+		var steps: Array = [
+			[Vector2(1, 1.1), Vector2(1, 2.9)],
+			[Vector2(1, 1), Vector2(1, 3)],
+			[Vector2(1.1, 1), Vector2(1.1, 3)],
+		]
+		for expected: Array in steps:
+			board._process(PathBoard.ENEMY_BLEND_DURATION * 0.25)
+			var image: Image = await _board_image(board, viewport)
+			for index: int in range(2):
+				var enemy: Dictionary = board.combat_enemies[index]
+				var center: Vector2 = board._position_center(expected[index])
+				var foot: Vector2 = center + Vector2(0, board._cell_size() * 0.28)
+				var rect := Rect2(foot - Vector2(18, 36), Vector2(36, 36))
+				var region := Rect2i(rect.grow(4))
+				var geometry: Dictionary = _changed_geometry(ground, image, region)
+				var bounds: Rect2i = geometry["bounds"]
+				_check(int(geometry["pixels"]) > 900
+					and absf(bounds.position.x - rect.position.x) < 2.0
+					and absf(bounds.position.y - rect.position.y) < 2.0,
+					"Rendered same-type instance follows its own branch through the corner, mirrored=%s id=%s" % [mirrored, enemy["id"]])
+				_check(board._enemy_position(enemy).is_equal_approx(expected[index]),
+					"Split interpolation turns at the route cell instead of taking a diagonal chord")
+				var marker_point: Vector2 = rect.position + Vector2(4 if mirrored else 32, 12)
+				_check(image.get_pixelv(Vector2i(marker_point)).is_equal_approx(Color.MAGENTA),
+					"Source-facing marker follows each branch's horizontal heading through its vertical corner in both orientations")
+				_check(board.enemy_at(rect.get_center()) == int(enemy["id"]),
+					"Hit bounds follow the displayed split-route instance")
+		var unselected: Image = await _board_image(board, viewport)
+		for index: int in range(2):
+			var enemy: Dictionary = board.combat_enemies[index]
+			var foot: Vector2 = board._position_center(steps[2][index]) + Vector2(0, board._cell_size() * 0.28)
+			var click := InputEventMouseButton.new()
+			click.position = foot - Vector2(0, 18)
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = true
+			board._gui_input(click)
+			_check(not clicked.is_empty() and clicked.back() == int(enemy["id"]),
+				"Click selects only the actual same-type instance on its displayed branch")
+			board.selected_enemy_id = int(enemy["id"])
+			var highlighted: Image = await _board_image(board, viewport)
+			for branch: int in range(2):
+				var branch_foot: Vector2 = board._position_center(steps[2][branch]) + Vector2(0, board._cell_size() * 0.28)
+				var region := Rect2i(Rect2(branch_foot - Vector2(18, 36), Vector2(36, 36)).grow(6))
+				var pixels: int = int(_changed_geometry(unselected, highlighted, region)["pixels"])
+				_check(pixels > 0 if branch == index else pixels == 0,
+					"Rendered highlight follows only the selected split-route ID, mirrored=%s selected=%s branch=%s" % [mirrored, index, branch])
+	board.enemy_clicked.disconnect(on_click)
+	board.enemy_inspection_enabled = false
+	board.selected_enemy_id = -1
+	board.combat_enemies = []
+	board._enemy_art["grunt"] = original
 
 
 func _check_depth_overlap(board: PathBoard, viewport: SubViewport) -> void:
@@ -356,7 +450,6 @@ func _check_depth_overlap(board: PathBoard, viewport: SubViewport) -> void:
 	board._tower_art["arrow_tower"] = tower_art
 	board._enemy_art["grunt"] = enemy_art
 	board.command_mode = true
-	board.enemy_route = []
 	board.selected_tower_id = -1
 	var tower: Dictionary = _tower(201, Vector2i(2, 2), "arrow_tower")
 	for mirrored: bool in [false, true]:
@@ -365,7 +458,7 @@ func _check_depth_overlap(board: PathBoard, viewport: SubViewport) -> void:
 		board.combat_enemies = []
 		board.combat_towers = [tower]
 		var tower_only: Image = await _board_image(board, viewport)
-		var front: Dictionary = _enemy(202, 0.0, Vector2(2, 2.4))
+		var front: Dictionary = _enemy(202, 0.0, Vector2(2, 2.4), [])
 		board.combat_towers = []
 		board.combat_enemies = [front]
 		var enemy_only: Image = await _board_image(board, viewport)
@@ -374,7 +467,7 @@ func _check_depth_overlap(board: PathBoard, viewport: SubViewport) -> void:
 		_check(front_overlap.get_pixelv(sample).is_equal_approx(enemy_only.get_pixelv(sample))
 			and not front_overlap.get_pixelv(sample).is_equal_approx(tower_only.get_pixelv(sample)),
 			"An enemy whose feet are in front occludes the tower rather than inheriting type draw order")
-		board.combat_enemies = [_enemy(202, 0.0, Vector2(2, 1.6))]
+		board.combat_enemies = [_enemy(202, 0.0, Vector2(2, 1.6), [])]
 		var rear_overlap: Image = await _board_image(board, viewport)
 		_check(rear_overlap.get_pixelv(sample).is_equal_approx(tower_only.get_pixelv(sample)),
 			"The same moving enemy passes behind a tower when its feet are farther back")
@@ -473,8 +566,9 @@ func _tower(id: int, cell: Vector2i, type_id: String) -> Dictionary:
 	return {"id": id, "cell": cell, "type_id": type_id, "shot": 0, "aim": Vector2(cell)}
 
 
-func _enemy(id: int, progress: float, position: Vector2) -> Dictionary:
-	return {"id": id, "type_id": "grunt", "speed": 2.0, "progress": progress, "pos": position, "hp": 8, "max_hp": 8}
+func _enemy(id: int, progress: float, position: Vector2, route: Array) -> Dictionary:
+	# Empty routes are explicit position-only fixtures, never a board-wide route.
+	return {"id": id, "type_id": "grunt", "speed": 2.0, "progress": progress, "pos": position, "hp": 8, "max_hp": 8, "route": route}
 
 
 func _check(condition: bool, description: String) -> void:

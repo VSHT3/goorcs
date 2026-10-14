@@ -29,6 +29,8 @@ var _random: RandomNumberGenerator
 var _wave_random: RandomNumberGenerator
 var _roster_configuration_valid: bool = true
 var _routes: Array[Array] = [[], []]
+var _routing_next: Array[Dictionary] = [{}, {}]
+var _fork_cursors: Array[Dictionary] = [{}, {}]
 var _spawned: Array[int] = [0, 0]
 var _elapsed: float = 0.0
 var _next_tower_id: int = 1
@@ -212,14 +214,19 @@ func _sends_open() -> bool:
 	return phase == Phase.WAVE and _elapsed < _rules.send_cutoff_seconds
 
 
-func start_wave(routes: Array[Array]) -> bool:
-	if phase != Phase.PLANNING or not _roster_configuration_valid or routes.size() != 2 or routes[0].size() < 2 or routes[1].size() < 2:
+func start_wave(routing: Array[Dictionary]) -> bool:
+	if phase != Phase.PLANNING or not _roster_configuration_valid or routing.size() != 2:
 		return false
+	for captured: Dictionary in routing:
+		if not _valid_routing(captured):
+			return false
 	var roster: Array[String] = _generate_wave_roster(wave + 1)
 	if roster.is_empty():
 		return false
 	wave_roster = roster
-	_routes = routes.duplicate(true)
+	_routes = [routing[0]["route"].duplicate(), routing[1]["route"].duplicate()]
+	_routing_next = [routing[0]["next"].duplicate(true), routing[1]["next"].duplicate(true)]
+	_fork_cursors = [{}, {}]
 	_spawned = [0, 0]
 	_elapsed = 0.0
 	wave += 1
@@ -229,6 +236,75 @@ func start_wave(routes: Array[Array]) -> bool:
 			_spawn_enemy(slot, type_id, 0.0)
 		_send_queues[slot].clear()
 	return true
+
+
+# Validate the whole graph in linear space, without enumerating complete paths.
+# Reverse distances reject cycles, dead ends, and longer alternatives before any
+# wave state (including queued sends and random roster selection) is changed.
+func _valid_routing(captured: Dictionary) -> bool:
+	if not captured.get("route") is Array or not captured.get("next") is Dictionary:
+		return false
+	var route: Array = captured["route"]
+	var next: Dictionary = captured["next"]
+	if route.size() < 2:
+		return false
+	for cell: Variant in route:
+		if not cell is Vector2i:
+			return false
+	var base: Vector2i = route.back()
+	if not next.has(base) or not next[base] is Array or not next[base].is_empty():
+		return false
+	var previous: Dictionary = {}
+	for cell: Variant in next:
+		if not cell is Vector2i or not next[cell] is Array:
+			return false
+		var choices: Array = next[cell]
+		if cell != base and choices.is_empty():
+			return false
+		var seen: Dictionary = {}
+		for successor: Variant in choices:
+			if not successor is Vector2i or not next.has(successor) or seen.has(successor):
+				return false
+			if absi(cell.x - successor.x) + absi(cell.y - successor.y) != 1:
+				return false
+			seen[successor] = true
+			if not previous.has(successor):
+				previous[successor] = []
+			previous[successor].append(cell)
+	var distance: Dictionary = {base: 0}
+	var pending: Array[Vector2i] = [base]
+	var head: int = 0
+	while head < pending.size():
+		var cell: Vector2i = pending[head]
+		head += 1
+		for predecessor: Vector2i in previous.get(cell, []):
+			if not distance.has(predecessor):
+				distance[predecessor] = int(distance[cell]) + 1
+				pending.append(predecessor)
+	if distance.size() != next.size() or int(distance.get(route[0], -1)) != route.size() - 1:
+		return false
+	for cell: Vector2i in next:
+		for successor: Vector2i in next[cell]:
+			if int(distance[successor]) != int(distance[cell]) - 1:
+				return false
+	for index: int in range(route.size() - 1):
+		if not next.has(route[index]) or not next[route[index]].has(route[index + 1]):
+			return false
+	return true
+
+
+func _assign_route(slot: int) -> Array[Vector2i]:
+	var route: Array[Vector2i] = [_routes[slot][0]]
+	# Validation guarantees every successor reduces base distance by exactly one.
+	for step: int in range(_routes[slot].size() - 1):
+		var cell: Vector2i = route.back()
+		var choices: Array = _routing_next[slot][cell]
+		var choice: int = 0
+		if choices.size() > 1:
+			choice = int(_fork_cursors[slot].get(cell, 0))
+			_fork_cursors[slot][cell] = (choice + 1) % choices.size()
+		route.append(choices[choice])
+	return route
 
 
 # Only the host calls this, using fixed physics deltas. All towers hit immediately;
@@ -358,7 +434,7 @@ func _valid_mode(mode: int) -> bool:
 func _move_enemies(slot: int, delta: float) -> void:
 	for enemy: Dictionary in enemies[slot]:
 		enemy["progress"] += float(enemy["speed"]) * delta
-		enemy["pos"] = _position(slot, enemy["progress"])
+		enemy["pos"] = _position(enemy["route"], enemy["progress"])
 
 
 func _spawn_enemies(slot: int) -> void:
@@ -376,20 +452,21 @@ func _spawn_enemies(slot: int) -> void:
 
 func _spawn_enemy(slot: int, type_id: String, progress: float) -> void:
 	var hp: int = _enemy_health(type_id, wave)
+	var route: Array[Vector2i] = _assign_route(slot)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
 		"type_id": type_id, "speed": _enemy_speed(type_id, wave), "damage": _enemy_types[type_id]["base_damage"],
-		"progress": progress, "pos": _position(slot, progress),
+		"route": route, "progress": progress, "pos": _position(route, progress),
 	})
 	_next_enemy_id += 1
 
 
-func _position(slot: int, progress: float) -> Vector2:
-	var last: int = _routes[slot].size() - 1
+func _position(route: Array, progress: float) -> Vector2:
+	var last: int = route.size() - 1
 	if progress >= last:
-		return Vector2(_routes[slot][last])
+		return Vector2(route[last])
 	var index: int = floori(progress)
-	return Vector2(_routes[slot][index]).lerp(Vector2(_routes[slot][index + 1]), progress - index)
+	return Vector2(route[index]).lerp(Vector2(route[index + 1]), progress - index)
 
 
 func _attack(slot: int, delta: float) -> void:
@@ -453,9 +530,8 @@ func _target(slot: int, tower: Dictionary, range_cells: float) -> int:
 
 func _apply_leaks(slot: int) -> void:
 	var index: int = enemies[slot].size() - 1
-	var last: int = _routes[slot].size() - 1
 	while index >= 0:
-		if enemies[slot][index]["progress"] >= last:
+		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1:
 			base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
 			enemies[slot].remove_at(index)
 		index -= 1

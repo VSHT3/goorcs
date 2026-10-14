@@ -390,7 +390,8 @@ func _try_start_wave() -> bool:
 	if not _host_layouts[0].is_ready() or not _host_layouts[1].is_ready():
 		return false
 	var routes: Array[Array] = [_host_layouts[0].route.duplicate(), _host_layouts[1].route.duplicate()]
-	if not _host_combat.start_wave(routes):
+	var routing: Array[Dictionary] = [_host_layouts[0].capture_routing(), _host_layouts[1].capture_routing()]
+	if not _host_combat.start_wave(routing):
 		return false
 	_host_routes = routes
 	_host_locked = true

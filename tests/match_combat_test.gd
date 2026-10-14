@@ -23,6 +23,9 @@ func _init() -> void:
 	_test_growing_count_caps()
 	_test_resource_damage_and_roster_clearance()
 	_test_simultaneous_and_ordinary_outcomes()
+	_test_shortest_branch_assignment()
+	_test_nested_branch_assignment()
+	_test_routing_validation()
 	if failures == 0:
 		print("PASS: authoritative purchases/upgrades/sales, currency and reward atomicity, per-tower kills, tile range/AoE, scaling, resource stats, targeting, captured routes and frozen outcomes")
 	quit(1 if failures > 0 else 0)
@@ -67,8 +70,15 @@ func _line(length: int) -> Array:
 	return route
 
 
-func _routes(first: int = 10, second: int = 10) -> Array[Array]:
-	return [_line(first), _line(second)]
+func _routes(first: int = 10, second: int = 10) -> Array[Dictionary]:
+	return [_routing(_line(first)), _routing(_line(second))]
+
+
+func _routing(route: Array) -> Dictionary:
+	var next: Dictionary = {}
+	for index: int in range(route.size()):
+		next[route[index]] = [route[index + 1]] if index + 1 < route.size() else []
+	return {"route": route, "next": next}
 
 
 func _run_wave(combat: MatchCombat, ticks: int = 2400) -> void:
@@ -93,7 +103,7 @@ func _test_commands_and_snapshots() -> void:
 	var id: int = combat.towers[0][0]["id"]
 	_check(not combat.set_targeting(1, id, 1) and not combat.set_targeting(0, id, -1) and not combat.set_targeting(0, id, 0), "Wrong board, invalid mode, and no-op targeting leave towers untouched")
 	_check(combat.set_targeting(0, id, MatchCombat.TargetMode.CLOSEST), "Existing own tower changes targeting")
-	var invalid_routes: Array[Array] = [[], _line(10)]
+	var invalid_routes: Array[Dictionary] = [_routing([]), _routing(_line(10))]
 	_check(not combat.start_wave(invalid_routes) and combat.wave == 0, "Missing route cannot start or increment a wave")
 	_check(combat.start_wave(_routes()) and not combat.start_wave(_routes()), "Only planning can start a wave")
 	_check(combat.build(1, Vector2i(2, 1), &"arrow_tower", MatchCombat.TargetMode.STRONGEST), "Paid placement remains available during combat")
@@ -178,10 +188,10 @@ func _test_routes_and_both_board_clear() -> void:
 	var rules := _rules()
 	rules.wave_weight = 1
 	var combat := MatchCombat.new(rules)
-	var routes: Array[Array] = [[Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(2, 1)], _line(5)]
+	var routes: Array[Dictionary] = [_routing([Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(2, 1)]), _routing(_line(5))]
 	combat.start_wave(routes)
-	routes[0][1] = Vector2i(99, 99)
-	routes[1].clear()
+	routes[0]["route"][1] = Vector2i(99, 99)
+	routes[1]["next"].clear()
 	combat.advance(0.5)
 	_check(combat.enemies[0][0]["pos"].is_equal_approx(Vector2(0.5, 0.0)), "Enemy interpolates along an immutable captured route")
 	combat.advance(1.0)
@@ -480,7 +490,7 @@ func _test_enemy_sends() -> void:
 	copy["income"][0] = 999
 	copy["queued_sends"][1] = 999
 	_check(combat.income == [2, 0] and combat.queued_sends == [0, 1], "Client snapshot income/queue mutations cannot affect the host")
-	var invalid_routes: Array[Array] = [[], _line(4)]
+	var invalid_routes: Array[Dictionary] = [_routing([]), _routing(_line(4))]
 	frozen = combat.snapshot()
 	_check(not combat.start_wave(invalid_routes) and combat.snapshot() == frozen, "Invalid wave start preserves paid queued delivery")
 	combat.start_wave(_routes(4, 4))
@@ -790,3 +800,117 @@ func _test_resource_damage_and_roster_clearance() -> void:
 	_check(combat.enemies[0].is_empty() and combat.enemies[1].is_empty() and combat.phase == MatchCombat.Phase.WAVE, "Empty alive gap cannot clear while actual roster entries remain scheduled")
 	combat.advance((total - 1) * rules.spawn_interval + 2.0)
 	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.snapshot()["spawned"] == [total, total], "Clearance uses actual mixed roster length rather than weight budget")
+
+
+func _branch_routing(three_way: bool = false) -> Dictionary:
+	var top: Array = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1), Vector2i(4, 1), Vector2i(5, 1), Vector2i(5, 2)]
+	var bottom: Array = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 3), Vector2i(2, 3), Vector2i(3, 3), Vector2i(4, 3), Vector2i(5, 3), Vector2i(5, 2)]
+	var result: Dictionary = _routing(top)
+	var other: Dictionary = _routing(bottom)
+	for cell: Vector2i in other["next"]:
+		if not result["next"].has(cell):
+			result["next"][cell] = other["next"][cell]
+	result["next"][Vector2i(1, 2)] = [Vector2i(1, 1), Vector2i(1, 3)]
+	if three_way:
+		result["next"][Vector2i(1, 2)].append(Vector2i(2, 2))
+		result["next"][Vector2i(2, 2)] = [Vector2i(2, 1), Vector2i(2, 3)]
+	return result
+
+
+func _test_shortest_branch_assignment() -> void:
+	for choices: int in [2, 3]:
+		var rules := _rules()
+		rules.base_health = 100
+		rules.starting_coins = 1000
+		rules.wave_weight = 4
+		rules.spawn_interval = 0.0
+		var combat := MatchCombat.new(rules)
+		var graph: Dictionary = _branch_routing(choices == 3)
+		var accepted: Dictionary = graph.duplicate(true)
+		var routing: Array[Dictionary] = [graph, graph]
+		_check(combat.send_enemy(1, &"grunt"), "Planning send queues a route assignment for board zero")
+		_check(combat.start_wave(routing), "%d-way shortest graph starts" % choices)
+		# Queued, immediate, then regular enemies all consume the same board cursor.
+		_check(combat.enemies[0][0]["route"][2] == Vector2i(1, 1), "Queued send receives the first fork choice")
+		_check(combat.send_enemy(1, &"grunt") and combat.enemies[0][1]["route"][2] == Vector2i(1, 3), "Immediate send rotates the same fork counter")
+		graph["route"].clear()
+		graph["next"][Vector2i(1, 2)].clear()
+		combat.advance(0.1)
+		var expected: Array = accepted["next"][Vector2i(1, 2)]
+		for index: int in range(combat.enemies[0].size()):
+			var enemy: Dictionary = combat.enemies[0][index]
+			_check(enemy["route"][2] == expected[index % choices], "Board zero assignments rotate all %d choices, index %d" % [choices, index])
+			_check(enemy["route"].size() == accepted["route"].size(), "Every assigned branch has canonical shortest length")
+		for index: int in range(combat.enemies[1].size()):
+			_check(combat.enemies[1][index]["route"][2] == expected[index % choices], "Other board starts its independent fork counter")
+		var snapshot: Dictionary = combat.snapshot()
+		snapshot["enemies"][0][0]["route"].clear()
+		_check(combat.enemies[0][0]["route"].size() == 8 and combat.enemies[0][1]["route"].size() == 8, "Snapshots and other enemies cannot alias a captured instance route")
+		var surviving_route: Array = combat.enemies[0][1]["route"].duplicate()
+		combat.enemies[0].remove_at(0)
+		_check(combat.enemies[0][0]["route"] == surviving_route, "Death before a fork never reassigns an already accepted path")
+		_check(combat.send_enemy(1, &"grunt"), "Further accepted send follows prior assignment history")
+		var last: Dictionary = combat.enemies[0].back()
+		_check(last["route"][2] == expected[6 % choices], "Removing an enemy never rewinds the fork counter")
+		combat.advance(2.4)
+		var top_enemy: Dictionary = combat.enemies[1][0]
+		var bottom_enemy: Dictionary = combat.enemies[1][1]
+		_check(top_enemy["pos"].is_equal_approx(Vector2(1.5, 1)) and bottom_enemy["pos"].is_equal_approx(Vector2(1.5, 3)), "Equal-progress instances actually move on their own branches")
+		var tower: Dictionary = {"cell": Vector2i(2, 1), "mode": MatchCombat.TargetMode.CLOSEST}
+		_check(combat._target(1, tower, 0.5) == 0, "Range and closest targeting use each branch's actual position")
+		_run_wave(combat)
+		_check(combat.base_health == [94, 96] and combat.phase == MatchCombat.Phase.PLANNING, "Every remaining assigned route leaks once at its own endpoint")
+		var reset_routing: Array[Dictionary] = [accepted, accepted]
+		_check(combat.start_wave(reset_routing), "Next wave accepts captured routing again")
+		combat.advance(0.1)
+		_check(combat.enemies[0][0]["route"][2] == expected[0] and combat.enemies[1][0]["route"][2] == expected[0], "Each wave resets both boards' fork cursors")
+
+
+func _test_nested_branch_assignment() -> void:
+	var rules := _rules()
+	rules.wave_weight = 12
+	rules.spawn_interval = 0.0
+	var combat := MatchCombat.new(rules)
+	var graph: Dictionary = _branch_routing(true)
+	var routing: Array[Dictionary] = [graph, graph]
+	_check(combat.start_wave(routing), "Nested forks and rejoins start without enumerating routes")
+	combat.advance(0.1)
+	var nested: Array = []
+	for enemy: Dictionary in combat.enemies[0]:
+		if enemy["route"][2] == Vector2i(2, 2):
+			nested.append(enemy["route"][3])
+		_check(enemy["route"].back() == Vector2i(5, 2) and enemy["route"].size() == 8, "All nested/rejoined paths end at base at equal distance")
+	_check(nested == [Vector2i(2, 1), Vector2i(2, 3), Vector2i(2, 1), Vector2i(2, 3)], "Nested fork rotates only for enemies whose preassigned route visits it")
+	# A real layout has a straight shortest connection and a connected longer loop.
+	var layout := PathLayout.new(Vector2i(6, 5), 30, Vector2i(0, 2), Vector2i(5, 2))
+	for x: int in range(1, 5):
+		layout.place(Vector2i(x, 2))
+	for x: int in range(0, 6):
+		layout.place(Vector2i(x, 1))
+	var shortest: Dictionary = layout.capture_routing()
+	var straight_routing: Array[Dictionary] = [shortest, shortest]
+	combat = MatchCombat.new(rules)
+	_check(combat.start_wave(straight_routing), "Real captured layout includes connected longer pavement")
+	combat.advance(0.1)
+	for enemy: Dictionary in combat.enemies[0]:
+		_check(enemy["route"].size() == 6, "Longer connected alternatives never enter assigned routes")
+		for cell: Vector2i in enemy["route"]:
+			_check(cell.y == 2, "Shortest movement never takes the longer loop")
+
+
+func _test_routing_validation() -> void:
+	var combat := MatchCombat.new(_rules())
+	combat.send_enemy(1, &"grunt")
+	var frozen: Dictionary = combat.snapshot()
+	var valid: Dictionary = _branch_routing()
+	var cyclic: Dictionary = valid.duplicate(true)
+	cyclic["next"][Vector2i(1, 1)].append(Vector2i(1, 2))
+	var dead_end: Dictionary = valid.duplicate(true)
+	dead_end["next"][Vector2i(1, 1)] = []
+	var longer: Dictionary = valid.duplicate(true)
+	longer["next"][Vector2i(2, 1)].append(Vector2i(2, 0))
+	longer["next"][Vector2i(2, 0)] = [Vector2i(3, 0)]
+	longer["next"][Vector2i(3, 0)] = [Vector2i(3, 1)]
+	for invalid: Dictionary in [cyclic, dead_end, longer, {"route": valid["route"], "next": {}}, {"route": [], "next": {}}]:
+		var routing: Array[Dictionary] = [valid, invalid]
+		_check(not combat.start_wave(routing) and combat.snapshot() == frozen, "Invalid second graph rejects atomically without consuming sends or wave state")

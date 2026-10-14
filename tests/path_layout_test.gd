@@ -7,6 +7,7 @@ func _init() -> void:
 	_test_budget_and_endpoints()
 	_test_shortcuts_and_islands()
 	_test_diagonals_and_ties()
+	_test_captured_shortest_successors()
 	if failures == 0:
 		print("PASS: path budget, immutable endpoints, shortcuts, islands, diagonals, and route ties")
 	quit(1 if failures > 0 else 0)
@@ -57,3 +58,22 @@ func _test_diagonals_and_ties() -> void:
 		layout.place(Vector2i(x, 0))
 		layout.place(Vector2i(x, 2))
 	_check(layout.route == [Vector2i(0, 1), Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2), Vector2i(2, 1)], "Equal-length routes follow deterministic right/down/left/up tie order")
+
+
+func _test_captured_shortest_successors() -> void:
+	var layout := PathLayout.new(Vector2i(7, 5), 30, Vector2i(0, 2), Vector2i(6, 2))
+	for cell: Vector2i in [Vector2i(1, 2), Vector2i(2, 2), Vector2i(4, 2), Vector2i(5, 2)]:
+		layout.place(cell)
+	for x: int in range(2, 5):
+		layout.place(Vector2i(x, 1))
+		layout.place(Vector2i(x, 3))
+		layout.place(Vector2i(x, 0))
+	var captured: Dictionary = layout.capture_routing()
+	_check(captured["next"][Vector2i(2, 2)] == [Vector2i(2, 3), Vector2i(2, 1)], "Both equally short fork branches are captured in stable order")
+	_check(captured["next"][Vector2i(2, 1)] == [Vector2i(3, 1)], "A connected but longer detour is not a shortest successor")
+	_check(captured["next"][layout.base].is_empty(), "The base has no outgoing routing edge")
+	layout.erase(Vector2i(4, 3))
+	_check(captured["next"][Vector2i(2, 2)].size() == 2 and layout.capture_routing()["next"][Vector2i(2, 2)] == [Vector2i(2, 1)], "Capturing preserves the wave's fork after later layout edits")
+	captured["next"][layout.entrance].clear()
+	captured["route"].clear()
+	_check(not layout.capture_routing()["next"][layout.entrance].is_empty() and not layout.route.is_empty(), "Captured dictionaries and route arrays cannot mutate the layout")

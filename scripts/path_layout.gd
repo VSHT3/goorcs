@@ -1,7 +1,7 @@
 class_name PathLayout
 extends RefCounted
 
-# Neighbor order also resolves equal-length routes: right, down, left, up.
+# Stable ordering for the workshop's representative route and combat fork choices.
 const DIRECTIONS: Array[Vector2i] = [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT, Vector2i.UP]
 
 var dimensions: Vector2i
@@ -62,6 +62,32 @@ func erase(cell: Vector2i) -> bool:
 func clear() -> void:
 	_tiles.clear()
 	_recalculate()
+
+
+func capture_routing() -> Dictionary:
+	var next_cells: Dictionary[Vector2i, Array] = {}
+	if not is_ready():
+		return {"route": [], "next": next_cells}
+	# Distance to the base makes every successor a strictly shorter remaining path.
+	var distance: Dictionary[Vector2i, int] = {base: 0}
+	var frontier: Array[Vector2i] = [base]
+	var cursor: int = 0
+	while cursor < frontier.size():
+		var current: Vector2i = frontier[cursor]
+		cursor += 1
+		for direction: Vector2i in DIRECTIONS:
+			var neighbor: Vector2i = current + direction
+			if contains(neighbor) and has_path(neighbor) and not distance.has(neighbor):
+				distance[neighbor] = distance[current] + 1
+				frontier.append(neighbor)
+	for cell: Vector2i in frontier:
+		var successors: Array[Vector2i] = []
+		for direction: Vector2i in DIRECTIONS:
+			var neighbor: Vector2i = cell + direction
+			if distance.has(neighbor) and distance[neighbor] == distance[cell] - 1:
+				successors.append(neighbor)
+		next_cells[cell] = successors
+	return {"route": route.duplicate(), "next": next_cells}
 
 
 func _recalculate() -> void:
