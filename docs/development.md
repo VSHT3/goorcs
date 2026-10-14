@@ -32,6 +32,9 @@ godot --headless --path . --script tests/path_layout_test.gd
 # Run navigation and drawing-state regressions.
 godot --headless --path . --script tests/navigation_test.gd
 
+# Run workshop feedback-layout and compact navigation regressions.
+godot --headless --path . --script tests/workshop_ui_test.gd
+
 # Run continuous match-world camera, input, and fixed-HUD regressions.
 godot --headless --path . --script tests/match_world_test.gd
 
@@ -109,7 +112,7 @@ The game bundles [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) by Ste
 
 Numeric readouts use [Silkscreen](https://github.com/googlefonts/silkscreen) by Jason Kottke, bundled unchanged at `assets/fonts/silkscreen/Silkscreen-Regular.ttf` from commit `206ccf3f5234c281461e63ecc59cbc6b0563472b`, with its separate `OFL.txt`. The creator found Pixelify's digits hard to read, so health, Coins, prices, stats, counters, and numeric host fields use this crisper **pixel** face—not a smooth font. Keep both licenses with redistributed builds.
 
-`project.godot` owns the shared Pixelify `gui/theme/custom_font` setting. Scene themes retain colors/styles and inherit this font; workshop endpoint drawing also uses it. Numeric controls override only their font with the shared Silkscreen asset. Tower-shop captions and native drag previews separate Pixelify titles from Silkscreen prices; explanatory tooltips and generic feedback remain Pixelify. Invite-code input/output stays Pixelify so letter case remains distinguishable. Small UI text stays at least 16px, and the original 72px/100px camera-fit bands are retained. Management stats use two lines; compact upgrades show benefit and numeric price/Purchased, with insufficient-Coins explanations only in tooltips.
+`project.godot` owns the shared Pixelify `gui/theme/custom_font` setting. Scene themes retain colors/styles and inherit this font; the custom menu wordmark draws with the bundled Pixelify asset. Numeric controls override only their font with the shared Silkscreen asset. Tower-shop captions and native drag previews separate Pixelify titles from Silkscreen prices; explanatory tooltips and generic feedback remain Pixelify. Invite-code input/output stays Pixelify so letter case remains distinguishable. Small UI text stays at least 16px, and the original 72px/100px camera-fit bands are retained. Management stats use two lines; compact upgrades show benefit and numeric price/Purchased, with insufficient-Coins explanations only in tooltips.
 
 Reward titles wrap rather than ellipsize. Card minimum-size changes coalesce a deferred layout pass: wrapped labels first receive their real width, then nominal card bounds are reapplied. This prevents inflated initial heights from covering neighboring rewards or the chest, without changing grant rules or artwork sizes. Chest geometry regressions cover fresh one/three/five-card presentations, full wrapped titles, reuse, and resize transitions.
 
@@ -117,7 +120,7 @@ Rendered verification exercised menu/workshop, Host/Join and connection errors, 
 
 ### Continuous match world and verification
 
-Matches use `MatchWorld`, a separate world `SubViewport` with a local `Camera2D`, behind the fixed planning HUD. The host board is on the left and the guest board on the right; both retain fixed authoritative grid dimensions and the existing equal tile budget. Each player starts focused on their owned board, with that side filling the gameplay view. Hold A/D for smooth horizontal traversal, clamped at the outer map extents. This is camera scouting, not map expansion or a snap between board panels; future milestone-based growth remains unimplemented. The workshop keeps its current board, controls, and endpoint letters.
+Matches use `MatchWorld`, a separate world `SubViewport` with a local `Camera2D`, behind the fixed planning HUD. The host board is on the left and the guest board on the right; both retain fixed authoritative grid dimensions and the existing equal tile budget. Each player starts focused on their owned board, with that side filling the gameplay view. Hold A/D for smooth horizontal traversal, clamped at the outer map extents. This is scouting, not map expansion; future milestone-based growth remains unimplemented. Workshop painting stays local and camera-free while reusing match terrain/path materials and endpoint artwork.
 
 Wave/Coins, health/readiness, Leave, palette, and actions remain anchored to the screen. Tower management and transient notices overlay the world rather than reflowing it. HUD panels consume their own input; uncovered world space remains interactive. Camera movement is local presentation, never accepted match state, and ordinary snapshots do not reset it. Fresh activation focuses the owned side; hiding/leaving the match or losing focus cancels held movement and path strokes. A/D yields to text input and targeting popups, and panning cancels an active stroke so moving the world cannot paint tiles.
 
@@ -149,7 +152,7 @@ The rendered enemy-inspection regression also passed: same-type ID isolation, ac
 
 `TowerReward` and `EnemyDefinition` own `board_height` (opaque height in cells) and normalized `board_anchor` (base/feet within the displayed texture). Collection/chest icon sizing is unchanged. Shipped tower heights are Arrow 1.42, Ballista 1.40, Rune 1.50; enemies are Grunt 0.84, Runner 0.74, Brute 1.02. The common foot point is the cell center plus 0.28 cells downward. Cached opaque bounds prevent transparent padding from determining size. Foot-y sorting includes towers, enemies, and endpoints; health bars render above bodies only when damaged.
 
-Match grass/soil and connected stone materials are cosmetic, not blocked cells or path rules. The playable field contrasts with a darker, quieter exterior; broad stepped sod variation replaces scattered rectangle noise. An external earth apron/rim marks the existing bounds, and a continuous jagged ravine separates the boards without adding traversable cells. Orderly world-aligned masonry uses quiet stone variation, mortar, and soil/contact edges. Cached ground drawing remains continuous through bends, branches, endpoints, and mirroring. Workshop editing retains its flat treatment. Selected towers get a base marker and quiet tile range; explicit click/native-drag placement shows legal/illegal cells. Idle combat has no hover square or permanent tower rectangles. Arrow/Ballista retain brief directional traces; Rune uses a 0.14-second faint neighborhood shimmer with local hit sparks instead of expanding gold rings.
+Match grass/soil and connected stone materials are cosmetic, not blocked cells or path rules. The playable field contrasts with a darker, quieter exterior; broad stepped sod variation replaces scattered rectangle noise. An external earth apron/rim marks the existing bounds, and a continuous jagged ravine separates the match boards without adding traversable cells. Orderly world-aligned masonry uses quiet stone variation, mortar, and soil/contact edges. Cached ground drawing remains continuous through bends, branches, endpoints, and mirroring. Workshop rendering now reuses the terrain/stone/rim drawing paths; `command_mode` controls edit authority rather than artwork. Selected towers get a base marker and quiet tile range; explicit click/native-drag placement shows legal/illegal cells. Idle combat has no hover square or permanent tower rectangles. Arrow/Ballista retain brief directional traces; Rune uses a 0.14-second faint neighborhood shimmer with local hit sparks instead of expanding gold rings.
 
 Camera fitting retains the fixed HUD bands and horizontal scouting bounds but reserves resource-derived top headroom. Graphical smoke initially reproduced tall top-row towers hidden by the HUD; the corrected fit and a camera regression now check every tower resource on both owned orientations at 1280×720 and 1000×720. This changes framing, not board dimensions, footprints, range, path budget, or authoritative state.
 
@@ -390,7 +393,7 @@ The graphical `tower_icon_test.gd` regression renders all catalog icons into tra
 
 `assets/world/health_crystal.png` and `assets/world/enemy_portal.png` are locally authored transparent 96×96 RGBA pixel-art PNGs, drawn with hand-authored integer-coordinate polygons and lines using Pillow. The base is a blue faceted magical crystal on a squat stone pedestal; the entrance is a red opening in an angular rough stone ring. Their three-quarter/top-down presentation follows the existing tower-art references, with hard alpha and nearest filtering. No external generation service, credentials, network access, external downloads, or paid credits were used for these endpoint assets.
 
-In matches, `PathBoard` fits the sprites inside their fixed endpoint tiles, above terrain and below enemies/tower effects, replacing E/B glyphs without changing route coordinates, endpoint protection, or budget. The workshop retains E/B. These ordinary shipped images introduce no runtime service dependency and do not claim to be PixelLab outputs or finalized world art.
+In matches and the workshop, `PathBoard` fits the portal/crystal sprites inside their fixed endpoint tiles, above terrain and below enemies/tower effects, with contact shadows. The obsolete E/B glyph renderer is removed. Route coordinates, endpoint protection, budget, and match authority are unchanged. These ordinary shipped images introduce no runtime service dependency and do not claim to be PixelLab outputs or finalized world art.
 
 ### Next board-art trial
 
@@ -414,6 +417,13 @@ References: [PixelLab MCP documentation](https://api.pixellab.ai/mcp/docs), [Pix
 
 ## Path workshop verification
 
+The main menu lives in `scenes/main_menu.tscn`; navigation remains owned by `main.gd`. `menu_wordmark.gd` centers ivory G/RCS around a green pixel-orc O with brows, eyes, and two tusks. A brief blink and one-pixel lift use a local idle clock; hidden menus stop that processing. `menu_button.gd` adds a short inner-bracket hover/focus response without moving controls or delaying visibility. The new theme preserves Pixelify labels, visible keyboard focus, a primary Play action, and quiet Quit. No new audio, settings, runtime services, or gameplay rules were added.
+
+Workshop header/sidebar use the match HUD palette. The shared `PathBoard` draws grass/soil, connected stonework, rim, portal, and crystal for both local and command boards. A fixed visual margin keeps the workshop rim clear of controls. Rejection feedback moved out of the content VBox into a screen-anchored footer: warnings remain visible, but their appearance/expiry cannot change board bounds or cell coordinates.
+
+Verification passed import/startup, the new workshop UI regression, navigation, chest flow, camera/input, native tower drag/drop, and rendered board regressions. Actual main-scene clicks exercised both endpoints/buttons, over-budget painting, notice expiry, legal paths, clear/resume and hover at 1280×720 and 1000×720. Menu/rest/hover and workshop empty/notice/path captures were inspected. A separate real-clock graphical smoke observed the logo lift/blink, stable button hit bounds, and hidden-menu processing stop. Isolated collection saves were used and temporary harnesses removed.
+
+
 The resource import, main-scene headless run, and path-rule regression command above pass. Regressions cover budget rejection/refunds, immutable endpoints, out-of-bounds placement, shortcut selection, disconnected islands, edge-only adjacency, and deterministic equal-length routes.
 
 The graphical scene was exercised through mouse input: placement, dragging, bridge removal, endpoint protection, isolated-tile removal, budget rejection, and the clear button. Rendered screenshots were inspected for clipping and route readability. The desktop run used Intel OpenGL after NVIDIA driver warnings.
@@ -422,7 +432,7 @@ Navigation regressions pass both headlessly and graphically: keyboard opening/re
 
 The main menu, session-resume menu, and compact workshop were visually inspected. The actual Quit button terminated the graphical process. Menu navigation preserves the existing layout but does not save it to disk.
 
-For manual verification, connect E to B, create a longer branch and a shortcut, remove a connecting tile, add/remove an isolated tile, exhaust the budget, and clear the board. Check that readiness, budget, and connected pavement follow each edit. Resize the window and check that controls remain visible and mouse coordinates still match tiles.
+For manual verification, connect the portal to the crystal, create a longer branch and a shortcut, remove a connecting tile, add/remove an isolated tile, exhaust the budget, and clear the board. Check readiness, budget, and connected pavement after edits. Click both fixed endpoints and verify that notices stay in the footer without changing the map size. Resize and check that controls remain visible and mouse coordinates still match tiles.
 
 Also open the workshop by keyboard, draw while holding the mouse and press Esc, release outside the board, and resume. Hovering must not draw or emit mouse-button errors. Return through the Menu button and resume again; budget and route must remain unchanged.
 

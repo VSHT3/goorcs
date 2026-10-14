@@ -16,6 +16,8 @@ Use the standard Godot edition and the [required engine release](docs/developmen
 
 For command-line launch and verification, see the [development commands](docs/development.md#setup).
 
+The centered main-menu wordmark uses a green pixel-orc face for the O, with eyes, tusks, an occasional blink, and a tiny idle lift. Hover/focus marks animate inside buttons without moving their clickable bounds.
+
 ## Test solo
 
 - Choose **Play → Singleplayer** to start immediately without a connection, port, or invite.
@@ -66,6 +68,7 @@ For command-line launch and verification, see the [development commands](docs/de
 - Menu navigation preserves the layout only for this session. **Quit** exits; layouts are not saved after quitting.
 - Left click or drag to place tiles; right click or drag to remove them. **Clear tiles** resets the board.
 - Only shared edges connect. Entrance and base are fixed and do not spend budget.
+- Workshop terrain, stone paths, portal entrance, and crystal base share the match artwork. Header/sidebar use the same dark-green HUD palette. Endpoint and budget notices appear in a fixed footer without resizing the map or shifting click coordinates.
 - Unused budget is allowed. A ready layout connects the base and every placed tile to the entrance.
 - Enemies use the shortest route, not placement order. Branches and adjacent sections can create shortcuts; there is no route-line overlay.
 - The 14×9 board, opposite-side endpoints, and 30-tile maximum are provisional. Adjust the main scene's exported settings together in the Inspector.

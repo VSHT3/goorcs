@@ -61,7 +61,7 @@ func _run() -> void:
 	_check(main.layout.is_ready(), "The workshop still builds valid routes")
 	var saved_route: Array[Vector2i] = main.layout.route.duplicate()
 	var saved_used: int = main.layout.used_tiles()
-	await _click(_control_center(main.get_node("Margin/Content/Header/Menu")))
+	await _click(_control_center(main.get_node("Margin/Content/Header/Content/Menu")))
 	await _click(_cell_point(Vector2i(0, 0)))
 	_check(main.menu.visible and main.layout.used_tiles() == saved_used, "Hidden board does not accept edits")
 	await _click(_control_center(main.open_button))

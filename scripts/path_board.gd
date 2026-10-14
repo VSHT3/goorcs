@@ -22,8 +22,6 @@ const STONE := Color("696d57")
 const STONE_LIGHT := Color("6c705a")
 const STONE_DARK := Color("676b55")
 const ENEMY_BLEND_DURATION: float = 0.1
-const ENTRY_COLOR := Color("e0bc77")
-const BASE_COLOR := Color("96c8dc")
 const SHOT_DURATION: float = 0.18
 const PULSE_DURATION: float = 0.14
 
@@ -377,15 +375,12 @@ func _draw() -> void:
 	_draw_ranges()
 	_draw_hover()
 	_draw_attacks()
-	if not command_mode:
-		_draw_endpoint(layout.entrance, ENTRY_COLOR, "E")
-		_draw_endpoint(layout.base, BASE_COLOR, "B")
 	_draw_combat()
 
 
 func _update_ground() -> void:
 	var rect := Rect2(_board_origin(), Vector2(layout.dimensions) * _cell_size())
-	var style: int = int(command_mode) + int(mirror_horizontal) * 2
+	var style: int = int(mirror_horizontal)
 	var dirty: bool = rect != _ground_rect or style != _ground_style or layout.dimensions != _ground_dimensions
 	if layout.dimensions != _ground_dimensions:
 		_ground_mask.resize(layout.dimensions.x * layout.dimensions.y)
@@ -409,34 +404,32 @@ func _draw_ground() -> void:
 	var cell_size: float = _cell_size()
 	var origin: Vector2 = _board_origin()
 	var field := Rect2(origin, Vector2(layout.dimensions) * cell_size)
-	if command_mode:
-		# A subdued earth apron is entirely outside the legal rectangular field.
-		_ground_canvas.draw_rect(field.grow(cell_size * 0.375), APRON)
-		_ground_canvas.draw_rect(field.grow(cell_size * 0.18), EARTH_RIM)
-		_ground_canvas.draw_rect(field.grow(cell_size * 0.055), FIELD_EDGE)
-	_ground_canvas.draw_rect(field, GROUND if command_mode else Color("222c2b"))
-	if command_mode:
-		# Broad stepped sod masses, not a mark repeated inside every grid cell.
-		var patch_size := Vector2(cell_size * 3.4, cell_size * 2.3)
-		for row: int in range(ceili(field.size.y / patch_size.y)):
-			for column: int in range(ceili(field.size.x / patch_size.x)):
-				var pattern: int = absi(column * 47 + row * 83)
-				var point: Vector2 = origin + Vector2(column, row) * patch_size
-				point += Vector2((pattern % 7) * 0.10 - 0.3, (pattern % 5) * 0.08 - 0.2) * cell_size
-				var color: Color = GROUND_PATCH_LIGHT if pattern % 3 else GROUND_PATCH_DARK
-				var patch := Rect2(point, patch_size * Vector2(0.78, 0.66))
-				_ground_canvas.draw_rect(patch.intersection(field), color)
-				patch = Rect2(point + Vector2(cell_size * 0.5, patch_size.y * 0.66),
-					patch_size * Vector2(0.51, 0.20))
-				_ground_canvas.draw_rect(patch.intersection(field), color)
-		for y: int in range(layout.dimensions.y):
-			for x: int in range(layout.dimensions.x):
-				var pattern: int = absi(x * 37 + y * 61)
-				if pattern % 7 != 2:
-					continue
-				var tuft: Vector2 = origin + (Vector2(x, y) + Vector2(0.28 + (pattern % 3) * 0.16, 0.73)) * cell_size
-				_ground_canvas.draw_line(tuft, tuft + Vector2(-2, -3), GRASS, 1.0)
-				_ground_canvas.draw_line(tuft + Vector2(3, 0), tuft + Vector2(2, -2), GRASS, 1.0)
+	# A subdued earth apron is entirely outside the legal rectangular field.
+	_ground_canvas.draw_rect(field.grow(cell_size * 0.375), APRON)
+	_ground_canvas.draw_rect(field.grow(cell_size * 0.18), EARTH_RIM)
+	_ground_canvas.draw_rect(field.grow(cell_size * 0.055), FIELD_EDGE)
+	_ground_canvas.draw_rect(field, GROUND)
+	# Broad stepped sod masses, not a mark repeated inside every grid cell.
+	var patch_size := Vector2(cell_size * 3.4, cell_size * 2.3)
+	for row: int in range(ceili(field.size.y / patch_size.y)):
+		for column: int in range(ceili(field.size.x / patch_size.x)):
+			var pattern: int = absi(column * 47 + row * 83)
+			var point: Vector2 = origin + Vector2(column, row) * patch_size
+			point += Vector2((pattern % 7) * 0.10 - 0.3, (pattern % 5) * 0.08 - 0.2) * cell_size
+			var color: Color = GROUND_PATCH_LIGHT if pattern % 3 else GROUND_PATCH_DARK
+			var patch := Rect2(point, patch_size * Vector2(0.78, 0.66))
+			_ground_canvas.draw_rect(patch.intersection(field), color)
+			patch = Rect2(point + Vector2(cell_size * 0.5, patch_size.y * 0.66),
+				patch_size * Vector2(0.51, 0.20))
+			_ground_canvas.draw_rect(patch.intersection(field), color)
+	for y: int in range(layout.dimensions.y):
+		for x: int in range(layout.dimensions.x):
+			var pattern: int = absi(x * 37 + y * 61)
+			if pattern % 7 != 2:
+				continue
+			var tuft: Vector2 = origin + (Vector2(x, y) + Vector2(0.28 + (pattern % 3) * 0.16, 0.73)) * cell_size
+			_ground_canvas.draw_line(tuft, tuft + Vector2(-2, -3), GRASS, 1.0)
+			_ground_canvas.draw_line(tuft + Vector2(3, 0), tuft + Vector2(2, -2), GRASS, 1.0)
 	# Soil and contact silhouettes precede the stone union, preserving every join.
 	for layer: int in range(3):
 		for y: int in range(layout.dimensions.y):
@@ -446,8 +439,6 @@ func _draw_ground() -> void:
 					continue
 				var center: Vector2 = cell_center(cell)
 				var width: float = cell_size * (0.72 if layer == 2 else (0.84 if layer == 1 else 0.92))
-				if not command_mode:
-					width = cell_size * 0.64
 				_draw_pavement_piece(Rect2(center - Vector2.ONE * width * 0.5, Vector2.ONE * width), layer)
 				for direction: Vector2i in PathLayout.DIRECTIONS:
 					if not layout.contains(cell + direction) or not layout.has_path(cell + direction):
@@ -466,9 +457,6 @@ func _draw_ground() -> void:
 
 
 func _draw_pavement_piece(rect: Rect2, layer: int) -> void:
-	if not command_mode:
-		_ground_canvas.draw_rect(rect, Color("6e7465"))
-		return
 	_ground_canvas.draw_rect(rect, TILE if layer == 2 else (PATH_CONTACT if layer == 1 else PATH_SOIL))
 	if layer != 2:
 		return
@@ -600,8 +588,6 @@ func _draw_combat() -> void:
 	_draw_order.sort_custom(_depth_before)
 	# All contact shadows belong to the ground, not in front of foreground units.
 	for item: Dictionary in _draw_order:
-		if int(item["kind"]) == 0 and not command_mode:
-			continue
 		var width: float = cell_size * (0.22 if int(item["kind"]) == 2 else 0.35)
 		draw_set_transform(item["foot"], 0.0, Vector2(1.0, 0.30))
 		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, 0.35))
@@ -609,9 +595,8 @@ func _draw_combat() -> void:
 	for item: Dictionary in _draw_order:
 		match int(item["kind"]):
 			0:
-				if command_mode:
-					var texture: Texture2D = _portal_texture if item["cell"] == layout.entrance else _crystal_texture
-					draw_texture_rect(texture, _sprite_rect(texture, 1.05, Vector2(0.5, 0.97), item["foot"]), false)
+				var texture: Texture2D = _portal_texture if item["cell"] == layout.entrance else _crystal_texture
+				draw_texture_rect(texture, _sprite_rect(texture, 1.05, Vector2(0.5, 0.97), item["foot"]), false)
 			1:
 				var tower: Dictionary = item["data"]
 				var artwork: TowerReward = _tower_art.get(tower["type_id"])
@@ -697,14 +682,3 @@ func _draw_attacks() -> void:
 			draw_line(cell_center(trace["cell"]) + Vector2(0, -cell_size * 0.30), end,
 				Color(0.84, 0.80, 0.62, remaining * 0.75), 1.5)
 			draw_line(end + Vector2(-3, -3), end + Vector2(3, 3), Color(0.92, 0.87, 0.69, remaining), 1.5)
-
-
-func _draw_endpoint(cell: Vector2i, color: Color, letter: String) -> void:
-	var center: Vector2 = cell_center(cell)
-	var extent: float = _cell_size() * 0.29
-	draw_rect(Rect2(center - Vector2.ONE * extent, Vector2.ONE * extent * 2), color)
-	var font: Font = get_theme_default_font()
-	var font_size: int = 22
-	var text_size: Vector2 = font.get_string_size(letter, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
-	draw_string(font, center + Vector2(-text_size.x * 0.5, font.get_ascent(font_size) * 0.35), letter,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color("1c2625"))

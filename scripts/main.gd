@@ -16,11 +16,11 @@ var planning: MatchPlanning
 var play_screen: MultiplayerLobby
 var _last_activity: Control
 
-@onready var board: PathBoard = $Margin/Content/Workspace/Board
-@onready var status: Label = $Margin/Content/Workspace/Sidebar/Status
-@onready var budget_label: Label = $Margin/Content/Workspace/Sidebar/Budget
-@onready var route_label: Label = $Margin/Content/Workspace/Sidebar/Route
-@onready var feedback_label: Label = $Margin/Content/Feedback
+@onready var board: PathBoard = $Margin/Content/Workspace/BoardArea/Board
+@onready var status: Label = $Margin/Content/Workspace/Sidebar/Content/Status
+@onready var budget_label: Label = $Margin/Content/Workspace/Sidebar/Content/Budget
+@onready var route_label: Label = $Margin/Content/Workspace/Sidebar/Content/Route
+@onready var feedback_label: Label = $WorkshopFeedback
 @onready var _feedback_timer: Timer = $FeedbackTimer
 @onready var menu: Control = $Menu
 @onready var workshop: Control = $Margin
@@ -35,10 +35,10 @@ func _ready() -> void:
 	board.edited.connect(_refresh)
 	board.feedback.connect(_show_feedback)
 	_feedback_timer.timeout.connect(_clear_feedback)
-	$Margin/Content/Workspace/Sidebar/Clear.pressed.connect(_clear)
+	$Margin/Content/Workspace/Sidebar/Content/Clear.pressed.connect(_clear)
 	open_button.pressed.connect(_open_workshop)
 	$Menu/Center/Panel/Quit.pressed.connect(_quit)
-	$Margin/Content/Header/Menu.pressed.connect(_show_menu)
+	$Margin/Content/Header/Content/Menu.pressed.connect(_show_menu)
 	$Menu/Center/Panel/Collection.pressed.connect(_open_collection)
 	play_button.pressed.connect(_open_play)
 	if collection_store == null:
@@ -81,7 +81,7 @@ func _open_workshop() -> void:
 	collection_screen.hide()
 	menu.hide()
 	workshop.show()
-	$Margin/Content/Header/Menu.grab_focus()
+	$Margin/Content/Header/Content/Menu.grab_focus()
 
 
 func _open_collection() -> void:

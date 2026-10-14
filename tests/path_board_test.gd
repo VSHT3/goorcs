@@ -63,6 +63,7 @@ func _run() -> void:
 		_check(int(_changed_geometry(ground, pavement, gap_region)["pixels"]) == 0,
 			"Branch stonework and soil edges leave the whole intervening cell unfilled, mirrored=%s" % mirrored)
 	await _check_ground_materials()
+	await _check_workshop_materials_and_editing()
 	_check_drop_input(board)
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
@@ -130,6 +131,93 @@ func _check_ground_materials() -> void:
 			board.queue_free()
 		viewport.queue_free()
 		await process_frame
+
+
+func _check_workshop_materials_and_editing() -> void:
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(480, 480)
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(viewport)
+	var board := PathBoard.new()
+	board.layout = PathLayout.new(Vector2i(5, 5), 25, Vector2i(0, 2), Vector2i(4, 2))
+	board.position = Vector2(40, 40)
+	board.size = Vector2(400, 400)
+	viewport.add_child(board)
+	var commands: Array[Vector2i] = []
+	var changes: Array[bool] = []
+	var feedback_messages: Array[String] = []
+	board.edit_requested.connect(func(cell: Vector2i, _place: bool) -> void: commands.append(cell))
+	board.edited.connect(func() -> void: changes.append(true))
+	board.feedback.connect(func(message: String) -> void: feedback_messages.append(message))
+	var whole := Rect2i(Vector2i.ZERO, viewport.size)
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.command_mode = false
+		board.cancel_stroke()
+		var workshop: Image = await _board_image(board, viewport)
+		board.command_mode = true
+		var match_image: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(workshop, match_image, whole)["pixels"]) == 0,
+			"Workshop shares match grass patches, external rim, endpoint sprites and shadows, mirrored=%s" % mirrored)
+		board.command_mode = false
+		var portal: Texture2D = board._portal_texture
+		var crystal: Texture2D = board._crystal_texture
+		var transparent := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+		transparent.fill(Color.TRANSPARENT)
+		var empty_texture: ImageTexture = ImageTexture.create_from_image(transparent)
+		board._portal_texture = empty_texture
+		board._crystal_texture = empty_texture
+		var without_art: Image = await _board_image(board, viewport)
+		for endpoint: Vector2i in [board.layout.entrance, board.layout.base]:
+			var center := Vector2i(board.position + board.cell_center(endpoint))
+			var region := Rect2i(center + Vector2i(-40, -65), Vector2i(80, 100))
+			_check(int(_changed_geometry(without_art, workshop, region)["pixels"]) > 100,
+				"Non-command endpoints draw actual portal/crystal texture silhouettes, mirrored=%s endpoint=%s" % [mirrored, endpoint])
+		board._portal_texture = portal
+		board._crystal_texture = crystal
+		var motion := InputEventMouseMotion.new()
+		motion.position = board.cell_center(Vector2i(2, 2))
+		board._gui_input(motion)
+		var hover: Image = await _board_image(board, viewport)
+		_check(_pixels_changed_near(workshop, hover, board.position + motion.position + Vector2(37, 0)),
+			"Workshop path hover remains visible over shared terrain, mirrored=%s" % mirrored)
+		board.cancel_stroke()
+		var click := InputEventMouseButton.new()
+		click.pressed = true
+		click.button_index = MOUSE_BUTTON_LEFT
+		var before_changes: int = changes.size()
+		for y: int in range(5):
+			for x: int in range(5):
+				var cell := Vector2i(x, y)
+				if board.layout.is_endpoint(cell):
+					continue
+				click.position = board.cell_center(cell)
+				board._gui_input(click)
+				_check(board.layout.has_path(cell), "Every non-endpoint workshop cell remains locally paintable")
+		board.cancel_stroke()
+		var paved: Image = await _board_image(board, viewport)
+		board.command_mode = true
+		var match_paved: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(paved, match_paved, whole)["pixels"]) == 0,
+			"Locally painted workshop uses the same stone, soil and connected joins as a match")
+		board.command_mode = false
+		click.button_index = MOUSE_BUTTON_RIGHT
+		for y: int in range(5):
+			for x: int in range(5):
+				var cell := Vector2i(x, y)
+				click.position = board.cell_center(cell)
+				board._gui_input(click)
+				_check(board.layout.has_path(cell) == board.layout.is_endpoint(cell),
+					"Workshop erase removes local pavement but protects endpoint cells")
+		board.cancel_stroke()
+		var erased: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(workshop, erased, whole)["pixels"]) == 0,
+			"Local erasing restores shared grass without damaging endpoint artwork")
+		_check(changes.size() == before_changes + 46 and commands.is_empty(),
+			"Workshop painting and erasing emits local changes, never authoritative match edit requests")
+	_check(feedback_messages.size() == 4, "Protected endpoints provide feedback in both workshop orientations")
+	viewport.queue_free()
+	await process_frame
 
 
 func _region_luminance(image: Image, center: Vector2) -> float:
