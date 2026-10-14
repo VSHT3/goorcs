@@ -13,12 +13,12 @@ The portable reference is copied unchanged from `~/Pictures/Gorcs-PixelArt/board
 
 ## Recommended viewing angle
 
-**Use a shared elevated three-quarter top-down view for buildings and enemies.** This is the working recommendation, to validate with an actual-size asset lineup before another sprite batch.
+**Validate an elevated, front-dominant oblique view for structures:** a broad front face, a narrower visible right side, and enough roof to convey depth. This is the creator's latest working preference from the 2026-10-14 sprite discussion; replacement artwork is not yet approved.
 
 - Keep the existing axis-aligned square grid and 2D gameplay camera. This is a sprite-art direction, not a conversion to a diamond/isometric map or a 3D camera.
-- Show enough of a tower's top and sides to communicate height, while keeping its base readable on the ground.
+- Avoid both equal-sided corner-on foundations and flat front-elevation cutouts. Keep the front foundation edge broadly horizontal; reveal a smaller side face and visible top surfaces.
 - Show an enemy's head/shoulders from above while retaining a readable face, torso, and legs. Avoid a pure side-view platformer pose.
-- Share camera elevation, ground plane, light direction, shadow treatment, outline weight, and apparent pixel density. Matching angle does **not** require identical facing: towers may retain a fixed readable three-quarter pose while enemies face along their route.
+- Share camera elevation, ground plane, light direction, shadow treatment, outline weight, and apparent pixel density. Matching angle does **not** require identical facing: structure bases stay fixed while directional weapons and enemies turn.
 - Small readability cheats are acceptable. Mixing genuinely side-on towers with strict overhead enemies is not the target; they should look as if they occupy the same world.
 - Do not switch to strict bird's-eye sprites unless that alternative is explicitly chosen after comparison. It sacrifices the faces and tall building silhouettes that work in the approved study.
 
@@ -58,7 +58,37 @@ Creator chose **Keep current sprites** for the initial presentation change. Exis
 
 Portable review artifacts: [shared-scene candidate comparison](docs/visual-reference/coherent-candidates.png) and [provenance](docs/visual-reference/coherent-candidates.provenance.json). These are unapproved static proposals, kept outside Godot imports; the updated original-asset lineup uses the corrected terrain palette.
 
-### 3. Verification and acceptance
+### 3. Structure perspective and eight-way ballista — paused, not implemented
+
+The creator preferred the original heavy crossbow over a front-facing masonry base, but rejected that rough composite's quality. The later `swappy-20261014_223240.png` sketch supersedes the completely frontal box in `swappy-20261014_223203.png`: retain a broad front wall, show a narrower right wall, and reveal more roof. The earlier equal-sided corner-facing appearance in `swappy-20261014_215908.png` is not the target. These references are local Desktop screenshots; the geometry description here is the portable direction.
+
+#### Artwork changes
+
+- [ ] Refine the ballista into a convincing, substantial structure in that front-dominant perspective. Preserve the recognizable heavy timber crossbow, pale stone, steel fittings, upper-left light, and readable dark contours. Improve masonry and roof depth; avoid a skinny box, repetitive tiny bricks, or a miniature weapon.
+- [ ] Produce **eight distinct crossbow poses: N, NE, E, SE, S, SW, W, NW**. Generate poses individually against one consistent design/perspective reference; keep the process direct and show useful results promptly instead of repeating a prolonged guide/composite/isolation workflow.
+- [ ] Keep the **base identical in every pose**. Only the crossbow assembly turns around its vertical swivel: stock, bow limbs, string, and bolt move together. One shared base with eight weapon layers or full frames assembled from that same base are acceptable; independently changing masonry is not.
+- [ ] Align all poses to one swivel point, consistent scale, and canvas. Match physical weapon proportions and materials across views; ensure each bolt points in its named direction, strings meet the stock correctly, and nothing floats or detaches. Draw directional perspective rather than rotating the PNG in its image plane.
+- [ ] Apply the same accepted structure perspective to the other towers, crystal pedestal, and portal rim. Preserve crystal facets and portal-opening readability; do not change the square-grid map or gameplay camera to accommodate sprites.
+- [ ] Obtain approval for the finished actual-size set before importing replacements. Preserve original PNGs, generation provenance, and stable collection/save identities.
+
+#### Game additions
+
+- [ ] Add ballista directional-art resources and board rendering using the accepted eight poses and shared base; retain a suitable still icon for collection/chest/UI surfaces.
+- [ ] Make the crossbow visually track the **host-selected enemy**, not a renderer-selected nearest enemy. `MatchCombat` already records `target_id` and `aim` when firing; follow the live target position between shots and handle absent/dead/out-of-range targets explicitly without changing targeting policy, damage, or authority.
+- [ ] Select the correct pose from the displayed direction to that target, including mirrored-board rendering. Keep the base, foot anchor, contact shadow, depth sorting, selection, and camera behavior stable while aiming.
+- [ ] Exercise all eight directions and target/idle transitions in the running game, on both board orientations and with separate host/client processes. Inspect adjacent towers, roof attachment, overlaps, and HUD clipping at 1280×720 and 1000×720; run the applicable development checks before marking this implemented.
+
+#### Experiment handoff
+
+Work stopped at the creator's request; **no replacement sprites were imported and no tracking behavior was implemented**. Eight individual full-pose generations and isolated weapon candidates exist, but the set is not approved or fully cleaned/aligned. The south full-pose generation was oversized; a smaller isolated alternative exists. Other observed issues include inconsistent bow/stock/string geometry, mount alignment gaps, and a detached fragment in the west extraction. The draft assembly is not acceptance evidence.
+
+- Initial rough front-facing studies: `~/Pictures/Gorcs-PixelArt/ballista-facing-experiment/`.
+- Later generations, direction references, requests/history, and draft assemblies: `~/Pictures/Gorcs-PixelArt/ballista-eight-directions-v2/`.
+- `generated-full-poses-review.png` shows the eight generated full poses; `eight-pose-assembly-review.png` shows the unfinished shared-base assembly.
+- `base-oblique-01-native_00001_.png` is the unapproved sketch-led base candidate with a narrower visible right side. Later weapon refinement outputs still need review; do not treat a completed generation as approved artwork.
+
+
+### 4. Verification and acceptance
 
 - [x] Exercise the actual game at 1280×720 and 1000×720, on both board orientations and while panning, with representative bent paths and adjacent towers.
 - [x] Inspect idle, hover, placement, selection, attacks, damaged/full health, mixed-enemy streams, and crowded combat. Check overlap, depth sorting, clipping, and health/endpoint visibility.
