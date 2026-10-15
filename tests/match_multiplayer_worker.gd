@@ -32,7 +32,6 @@ func _planning_rules() -> CombatRules:
 		definition.cost = source.cost
 		definition.upgrade_base_cost = source.upgrade_base_cost
 		definition.damage_upgrade_bonus = source.damage_upgrade_bonus
-		definition.upgrade_cost_step = source.upgrade_cost_step
 		definition.speed_upgrade_multiplier = source.speed_upgrade_multiplier
 		definition.area_attack = source.area_attack
 		definitions.append(definition)

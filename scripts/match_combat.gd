@@ -104,8 +104,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			push_error("Combat tower definition '%s' has no reward" % definition.resource_path)
 			continue
 		var type_id: String = String(definition.reward.id)
-		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0 or definition.cost <= 0 or definition.upgrade_base_cost <= 0 or definition.upgrade_cost_step < 0 or definition.damage_upgrade_bonus <= 0 or not is_finite(definition.speed_upgrade_multiplier) or definition.speed_upgrade_multiplier <= 0.0 or definition.speed_upgrade_multiplier >= 1.0:
-			push_error("Invalid combat tower definition '%s' (%s): positive stats/prices, nonnegative upgrade cost step and speed multiplier between zero and one are required" % [type_id, definition.resource_path])
+		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0 or definition.cost <= 0 or definition.upgrade_base_cost <= 0 or definition.damage_upgrade_bonus <= 0 or not is_finite(definition.speed_upgrade_multiplier) or definition.speed_upgrade_multiplier <= 0.0 or definition.speed_upgrade_multiplier >= 1.0:
+			push_error("Invalid combat tower definition '%s' (%s): positive stats/prices and speed multiplier between zero and one are required" % [type_id, definition.resource_path])
 			continue
 		if _tower_types.has(type_id):
 			push_error("Duplicate combat tower definition '%s': keeping the first valid definition" % type_id)
@@ -115,7 +115,6 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"range": definition.range_cells, "interval": definition.interval,
 			"cost": definition.cost, "upgrade_base_cost": definition.upgrade_base_cost,
 			"damage_upgrade_bonus": definition.damage_upgrade_bonus,
-			"upgrade_cost_step": definition.upgrade_cost_step,
 			"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
 			"area_attack": definition.area_attack,
 		}
@@ -196,7 +195,8 @@ static func tower_level(tower: Dictionary) -> int:
 
 
 static func tower_upgrade_cost(tower: Dictionary, definition: Dictionary) -> int:
-	return int(definition["upgrade_base_cost"]) + (tower_level(tower) - 1) * int(definition["upgrade_cost_step"])
+	# Each level adds half the original price, not half the previous price.
+	return ceili(float(definition["upgrade_base_cost"]) * (1.0 + 0.5 * (tower_level(tower) - 1)))
 
 
 static func _sell_value(invested: int) -> int:
