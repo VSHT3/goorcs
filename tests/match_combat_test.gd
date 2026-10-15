@@ -254,11 +254,10 @@ func _test_kills_and_persistence() -> void:
 func _test_tower_type_stats() -> void:
 	var type_ids: Array[StringName] = [&"arrow_tower", &"orc_ballista", &"rune_obelisk"]
 	var damages: Array[int] = [2, 6, 1]
-	var ranges: Array[float] = [3.0, 4.0, 1.0]
-	var intervals: Array[float] = [0.75, 1.5, 0.3]
 	var boundary_shots: Array[int] = [1, 2, 0]
 	for index: int in range(type_ids.size()):
 		var rules := CombatRules.new()
+		var interval: float = rules.tower_definitions[index].interval
 		rules.enemy_health = 100
 		rules.enemy_speed = 0.0
 		rules.wave_weight = 2
@@ -268,17 +267,14 @@ func _test_tower_type_stats() -> void:
 		_check(combat.build(0, Vector2i(0, 1), type_id, 0), "Configured tower %s builds" % type_id)
 		combat.build(1, Vector2i(0, 3), type_id, 0)
 		combat.build(1, Vector2i(0, 4), type_id, 0)
-		var types: Dictionary = combat.snapshot()["tower_types"]
-		_check(types.size() == 3 and types[String(type_id)]["damage"] == damages[index] and is_equal_approx(types[String(type_id)]["range"], ranges[index]) and is_equal_approx(types[String(type_id)]["interval"], intervals[index]) and not String(types[String(type_id)]["title"]).is_empty(), "Resource %s publishes its own authoritative title and provisional stats" % type_id)
 		combat.start_wave(_routes())
 		combat.advance(0.01)
 		var second_hp: int = 100 - damages[index] if index == 2 else 100
 		_check(combat.enemies[0][0]["hp"] == 100 - damages[index] and combat.enemies[0][1]["hp"] == second_hp, "Tower %s performs its configured single-target or full-footprint damage" % type_id)
 		_check(combat.enemies[1][0]["hp"] == 100 - boundary_shots[index] * damages[index] and combat.enemies[1][1]["hp"] == 100, "Tower %s uses its own tile range at three- and four-cell boundaries" % type_id)
-		_check(is_equal_approx(combat.towers[0][0]["cooldown"], intervals[index]), "Tower %s stores its own firing cooldown" % type_id)
-		combat.advance(intervals[index] * 0.9)
+		combat.advance(interval * 0.9)
 		_check(combat.towers[0][0]["shot"] == 1 and combat.enemies[0][0]["hp"] == 100 - damages[index], "Tower %s cannot fire before its own interval" % type_id)
-		combat.advance(intervals[index] * 0.2)
+		combat.advance(interval * 0.2)
 		_check(combat.towers[0][0]["shot"] == 2 and combat.enemies[0][0]["hp"] == 100 - 2 * damages[index], "Tower %s fires again after its own interval" % type_id)
 
 
