@@ -218,6 +218,8 @@ The tower palette stays visible with collection/funds/Ready locks. Click-select 
 
 Regular waves fill a growing integer weight budget with one host-randomized ordered roster shared by both players. Resources own weight, introduction wave, growing count cap, share limit, HP/speed multipliers, and base damage. Grunts are weight-one remainder; Runner/Brute constraints and scaling remain documented in development. Brutes leak for three, other shipped types for one. Weight replaces part of head count; it does not stack another count curve. Values and expansion allowance remain playtest balance, not measured fairness. No armor/status, relocation, footprint, loadout, or permanent-growth system is added; separate-network reachability remains unverified.
 
+Regular spawn spacing uses a separate host-owned random timetable shared by both players. Bounded variation permits close groups without unbounded gaps; first and last regular spawn times retain the previous window. This changes spacing, not roster size, weight, income, speed, or damage. Clustered AoE effectiveness still needs playtesting before any broader horde balance change.
+
 The horde presentation uses smaller resource-sized enemies with Brutes still visibly heavier, plus narrow deterministic cosmetic spread within paths. Existing continuous movement already permits shared tiles; no crowd collisions, physics steering, or gameplay hitbox change is introduced. Actual-size artwork and overlap/AoE readability remain playtest concerns before changing counts or animation assets.
 
 ## First playable proof of the core rules

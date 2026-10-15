@@ -69,6 +69,10 @@ godot --headless --path . --script tests/match_drag_test.gd
 # Run deterministic combat-rule regressions.
 godot --headless --path . --script tests/match_combat_test.gd
 
+# Run bounded portal timetable rules and separate host/client spawn agreement.
+godot --headless --path . --script tests/match_spawn_timing_test.gd
+godot --headless --path . --script tests/match_spawn_timing_peer_test.gd
+
 # Run real two-process combat/result regressions.
 godot --headless --path . --script tests/match_multiplayer_test.gd
 
@@ -309,6 +313,16 @@ Provisional type values, applied to the delivery wave's baseline:
 Maximum health is `max(1, ceil(baseline HP × multiplier))`; movement speed is `baseline speed × multiplier`. First-wave sends therefore still produce 5-HP Runners at 3.4 cells/s and 20-HP Brutes at 1.3 cells/s, although regular waves unlock them later. Grunt/Runner leaks deal 1 base damage; Brutes deal 3. Normal kill bounties remain shared across types; no armor, resistances, or status effects are introduced.
 
 `MatchCombat` captures the configured type definitions on admission, just like tower stats. Each enemy snapshot carries its stable type ID and actual speed, so mixed streams never inherit a shared global movement speed. `enemy_types` publishes detached prices/income/multipliers plus current-wave effective HP/speed, or next-wave values during planning. `send_queues` preserves ordered IDs by target; `queued_sends` is a derived count, not another mutable queue owner. Type selection, artwork, facing, and interpolation stay cosmetic/local.
+
+#### Shared irregular portal schedule
+
+Previously regular enemy `i` spawned at `i × spawn_interval`. Each accepted wave now captures one host-generated `spawn_times` array. First remains 0 and last remains `(count−1) × spawn_interval`; interior entries add a uniform signed offset up to `spawn_jitter_ratio × spawn_interval`. Shipped interval stays 0.75 simulation seconds and jitter ratio is 0.4. The ratio must be finite in [0,0.5), ensuring ordered spawns; adjacent gaps stay bounded, and the same total regular-spawn window is retained exactly. A singleton stays at 0, a pair retains both endpoints, and interval 0 remains simultaneous.
+
+The timetable belongs to MatchCombat, is generated once with its separate timing RNG, and is detached in snapshots. Composition and terminal coin-flip RNG streams are independent. Both boards consume the same planned times; fractional-tick travel uses each scheduled enemy's actual type speed. Queued/immediate sends stay extra and keep existing delivery behavior; they cannot alter the regular schedule. 2× scales simulation time as before. No counts, weights, HP/speed curves, damage, rewards, income or Ready/main-round rules change.
+
+**Tradeoffs and future plans:** this is bounded irregular spacing, not an unlimited random rate, guaranteed simultaneous packets, a shorter global spawn window, or more enemies. Clusters can improve Rune/AoE value even with the same count and window; test that matchup before changing weights, HP, rewards, average interval, or counts. Source sprites may need lower-detail cleanup at the new size. Profile actual late-run simulation/snapshot/render load before claiming a maximum horde capacity. No API generation or new runtime dependency is involved.
+
+Timing regressions passed offset/gap/order/window bounds, singleton/pair/zero interval, invalid-rule rejection, seeded repeatability/diversity, detached snapshots, actual mixed-type boundary/progress checks, sends, and RNG isolation. Real separate host/client processes with divergent local timing/speed accepted the same timetable and actual spawn state. Combat/economy, progression/real peer deadlines-growth, pacing, multiplayer, mirrored solo, split routes, camera/input, drag/drop, navigation, selection, rendered horde/board/inspection and startup passed. Graphical main-scene mixed-stream captures at 1280×720/1000×720 and both orientations were inspected using isolated saves; temporary smoke code was removed.
 
 #### Weighted regular waves
 

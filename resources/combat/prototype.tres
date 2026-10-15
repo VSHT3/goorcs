@@ -9,6 +9,7 @@ enemy_health = 8
 enemy_speed = 2.0
 wave_weight = 6
 spawn_interval = 0.75
+spawn_jitter_ratio = 0.4
 health_growth = 2
 speed_growth = 0.15
 wave_weight_growth = 2

@@ -19,6 +19,7 @@ var towers: Array[Array] = [[], []]
 var enemies: Array[Array] = [[], []]
 # One host-generated ordered regular stream, replayed independently on both boards.
 var wave_roster: Array[String] = []
+var spawn_times: Array[float] = []
 
 var _rules: CombatRules
 # Captured once from resources so commands, attacks, and snapshots share host-owned stats.
@@ -27,6 +28,7 @@ var _enemy_types: Dictionary = {}
 var _send_queues: Array[Array] = [[], []]
 var _random: RandomNumberGenerator
 var _wave_random: RandomNumberGenerator
+var _timing_random: RandomNumberGenerator
 var _roster_configuration_valid: bool = true
 var _routes: Array[Array] = [[], []]
 var _routing_next: Array[Dictionary] = [{}, {}]
@@ -37,7 +39,7 @@ var _next_tower_id: int = 1
 var _next_enemy_id: int = 1
 
 
-func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null) -> void:
+func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
 	_rules = rules
 	_random = random
 	if _random == null:
@@ -47,6 +49,10 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 	if _wave_random == null:
 		_wave_random = RandomNumberGenerator.new()
 		_wave_random.randomize()
+	_timing_random = timing_random
+	if _timing_random == null:
+		_timing_random = RandomNumberGenerator.new()
+		_timing_random.randomize()
 	if rules.wave_weight <= 0 or rules.wave_weight_growth < 0 or not is_finite(rules.spawn_interval) or rules.spawn_interval < 0.0:
 		push_error("Combat waves require positive weight, nonnegative growth and a finite nonnegative spawn interval")
 		_roster_configuration_valid = false
@@ -223,7 +229,7 @@ func _sends_open() -> bool:
 
 
 func start_wave(routing: Array[Dictionary]) -> bool:
-	if phase != Phase.PLANNING or not _roster_configuration_valid or routing.size() != 2:
+	if phase != Phase.PLANNING or not _roster_configuration_valid or routing.size() != 2 or not _valid_spawn_timing():
 		return false
 	for captured: Dictionary in routing:
 		if not _valid_routing(captured):
@@ -232,6 +238,7 @@ func start_wave(routing: Array[Dictionary]) -> bool:
 	if roster.is_empty():
 		return false
 	wave_roster = roster
+	spawn_times = _generate_spawn_times(roster.size())
 	_routes = [routing[0]["route"].duplicate(), routing[1]["route"].duplicate()]
 	_routing_next = [routing[0]["next"].duplicate(true), routing[1]["next"].duplicate(true)]
 	_fork_cursors = [{}, {}]
@@ -244,6 +251,21 @@ func start_wave(routing: Array[Dictionary]) -> bool:
 			_spawn_enemy(slot, type_id, 0.0)
 		_send_queues[slot].clear()
 	return true
+
+
+func _valid_spawn_timing() -> bool:
+	return is_finite(_rules.spawn_interval) and _rules.spawn_interval >= 0.0 and is_finite(_rules.spawn_jitter_ratio) and _rules.spawn_jitter_ratio >= 0.0 and _rules.spawn_jitter_ratio < 0.5
+
+
+func _generate_spawn_times(count: int) -> Array[float]:
+	var times: Array[float] = []
+	times.resize(count)
+	for index: int in range(count):
+		var time: float = index * _rules.spawn_interval
+		if index > 0 and index < count - 1 and _rules.spawn_interval > 0.0 and _rules.spawn_jitter_ratio > 0.0:
+			time += _timing_random.randf_range(-_rules.spawn_jitter_ratio, _rules.spawn_jitter_ratio) * _rules.spawn_interval
+		times[index] = time
+	return times
 
 
 # Validate the whole graph in linear space, without enumerating complete paths.
@@ -351,6 +373,7 @@ func snapshot() -> Dictionary:
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
 		"wave_roster": wave_roster.duplicate(), "wave_weight": _wave_weight(maxi(1, wave)),
+		"spawn_times": spawn_times.duplicate(),
 		"tower_types": _tower_types.duplicate(true),
 		"rules": {
 			"enemy_speed": _wave_speed(wave), "enemy_health": _wave_health(wave),
@@ -451,7 +474,7 @@ func _move_enemies(slot: int, delta: float) -> void:
 func _spawn_enemies(slot: int) -> void:
 	var total: int = wave_roster.size()
 	while _spawned[slot] < total:
-		var spawn_time: float = _spawned[slot] * _rules.spawn_interval
+		var spawn_time: float = spawn_times[_spawned[slot]]
 		if spawn_time > _elapsed:
 			break
 		# Account for the fraction of this tick after the scheduled spawn time.

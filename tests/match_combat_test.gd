@@ -44,6 +44,8 @@ func _rules() -> CombatRules:
 	rules.enemy_speed = 1.0
 	rules.wave_weight = 3
 	rules.spawn_interval = 0.5
+	# These combat/economy fixtures intentionally isolate regular cadence from timing variation.
+	rules.spawn_jitter_ratio = 0.0
 	rules.tower_definitions = [_definition(&"arrow_tower", 2, 20.0, 0.5)]
 	rules.health_growth = 2
 	rules.speed_growth = 0.0
@@ -645,6 +647,8 @@ func _test_weighted_wave_constraints_and_streams() -> void:
 	for seed_value: int in range(16):
 		var rules := CombatRules.new()
 		rules.base_health = 10000
+		# Roster/stat regression deliberately fixes delivery cadence; jitter has its own actual-spawn suite.
+		rules.spawn_jitter_ratio = 0.0
 		var tie_random: RandomNumberGenerator = _wave_rng(999)
 		var frozen_tie_state: int = tie_random.state
 		var combat := MatchCombat.new(rules, tie_random, _wave_rng(seed_value))
