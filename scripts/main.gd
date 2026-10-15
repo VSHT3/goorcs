@@ -146,7 +146,9 @@ func _input(event: InputEvent) -> void:
 		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
 			var screen: MatchPlanningScreen = play_screen.planning_screen
 			if screen != null and screen.is_visible_in_tree():
-				if screen.pause_menu.visible:
+				if screen.debug_popup.visible:
+					screen.debug_popup.hide()
+				elif screen.pause_menu.visible:
 					screen.pause_menu.handle_escape()
 				elif not screen.cancel_interaction():
 					screen.open_pause_menu()

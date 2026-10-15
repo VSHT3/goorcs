@@ -112,6 +112,7 @@ func _check_identity_and_stats() -> void:
 	var actual: Dictionary = _host_enemy(0, first_id)
 	actual["hp"] = 27
 	actual["speed"] = 0.75
+	actual["base_speed"] = 0.75
 	actual["damage"] = 3
 	_publish()
 	await _settle()
@@ -256,6 +257,7 @@ func _check_lifecycle() -> void:
 	var health_before: int = int(main.planning.combat["health"][1])
 	var damage: int = int(leaker["damage"])
 	_host_enemy(1, leak_id)["speed"] = 200.0
+	_host_enemy(1, leak_id)["base_speed"] = 200.0
 	_advance(0.1)
 	await _settle()
 	_check(_accepted_enemy(1, leak_id).is_empty() and int(main.planning.combat["health"][1]) == health_before - damage,

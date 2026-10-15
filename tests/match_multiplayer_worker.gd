@@ -42,6 +42,8 @@ func _planning_rules() -> CombatRules:
 			for branch: Dictionary in definition.evolutions.values():
 				branch["cost"] = 1
 				branch["damage"] = 99
+				if branch.has("followup"):
+					branch["followup"]["cost"] = 1
 		definitions.append(definition)
 	rules.tower_definitions = definitions
 	var enemy_definitions: Array[EnemyDefinition] = []
@@ -96,6 +98,8 @@ func _execute_command(command: Dictionary) -> void:
 			rules.spawn_interval_reduction_per_wave = 0.005 if _lane == "host" else 0.25
 			rules.max_spawn_interval_reduction = 0.5 if _lane == "host" else 0.9
 		planning.combat_rules = rules
+	elif action == "debug":
+		planning.debug_set_values(int(command["round"]), int(command["money"]))
 	elif action == "step":
 		if _lane == "host":
 			planning._physics_process(float(command["delta"]))

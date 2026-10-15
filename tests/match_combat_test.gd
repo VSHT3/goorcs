@@ -36,6 +36,11 @@ func _init() -> void:
 	_test_onyx_pulses()
 	_test_rune_evolution_persistence()
 	_test_special_snapshot_and_growth()
+	_test_freeze_transactions()
+	_test_freeze_damage_and_expiry()
+	_test_freeze_source_isolation()
+	_test_slow_motion_history()
+	_test_debug_round_reset()
 	if failures == 0:
 		print("PASS: authoritative purchases/upgrades/sales, currency and reward atomicity, per-tower kills, tile range/AoE, scaling, resource stats, targeting, captured routes and frozen outcomes")
 	quit(1 if failures > 0 else 0)
@@ -1180,12 +1185,8 @@ func _prepared_evolution(branch: String, rules: CombatRules) -> MatchCombat:
 func _test_evolution_configuration() -> void:
 	var rules := _special_rules(&"rune_obelisk")
 	var definition: TowerDefinition = rules.tower_definitions[0]
-	var expected: Dictionary = {
-		"boulders": {"title": "Boulders", "cost": 250, "damage": 6, "interval": 0.0, "continuous": true},
-		"onyx_ring": {"title": "Onyx Ring", "cost": 250, "damage": 6, "interval": 0.75, "continuous": false},
-	}
-	_check(definition.evolutions == expected and MatchCombat._valid_evolutions(definition), "Rune publishes both provisional fixed-price branches with DPS versus pulse semantics")
-	_check(definition.special_upgrade.is_empty() and definition.special_upgrade_title.is_empty() and definition.special_upgrade_cost == 0 and is_equal_approx(definition.interval, 0.7), "Rune removes generic special metadata without changing its base attack interval")
+	definition.evolutions["boulders"]["followup"]["cost"] = 137
+	var expected: Dictionary = definition.evolutions.duplicate(true)
 	var invalid_configs: Array[Dictionary] = [
 		{"field": "title", "value": ""},
 		{"field": "title", "value": 12},
@@ -1219,17 +1220,32 @@ func _test_evolution_configuration() -> void:
 	candidate = definition.duplicate(true)
 	candidate.special_upgrade = "bounce"
 	_check(not MatchCombat._valid_evolutions(candidate), "Generic special and mutually exclusive evolutions cannot coexist")
+	for invalid: Variant in [null, {}, {"id": "unknown", "title": "Freeze Runes", "cost": 250}, {"id": "freeze_runes", "title": "", "cost": 250}, {"id": "freeze_runes", "title": "Freeze Runes", "cost": 0}, {"id": "freeze_runes", "title": "Freeze Runes", "cost": 250.0}]:
+		candidate = definition.duplicate(true)
+		candidate.evolutions["boulders"]["followup"] = invalid
+		_check(not MatchCombat._valid_evolutions(candidate), "Malformed Freeze followup cannot enter captured configuration")
+	candidate = definition.duplicate(true)
+	candidate.evolutions["boulders"].erase("followup")
+	_check(not MatchCombat._valid_evolutions(candidate), "Boulders requires its explicit followup metadata")
+	candidate = definition.duplicate(true)
+	candidate.evolutions["onyx_ring"]["followup"] = candidate.evolutions["boulders"]["followup"]
+	_check(not MatchCombat._valid_evolutions(candidate), "Onyx cannot advertise the exclusive Boulders followup")
 	var combat := _prepared_special(rules, &"rune_obelisk")
 	var captured: Dictionary = combat.snapshot()["tower_types"]["rune_obelisk"]["evolutions"]
 	definition.evolutions["boulders"]["damage"] = 999
 	definition.evolutions["boulders"]["cost"] = 1
 	definition.evolutions["onyx_ring"]["interval"] = 0.01
+	definition.evolutions["boulders"]["followup"]["cost"] = 1
+	definition.evolutions["boulders"]["followup"]["title"] = "Changed"
 	var copy: Dictionary = combat.snapshot()
 	copy["tower_types"]["rune_obelisk"]["evolutions"]["boulders"]["damage"] = 888
+	copy["tower_types"]["rune_obelisk"]["evolutions"]["boulders"]["followup"]["cost"] = 2
 	copy["towers"][0][0]["evolution"] = "onyx_ring"
 	_check(captured == expected and combat.snapshot()["tower_types"]["rune_obelisk"]["evolutions"] == expected and combat.towers[0][0]["evolution"] == "", "Source resources and nested consumer snapshots cannot rewrite host evolution configuration")
 	var before: int = combat.coins[0]
-	_check(combat.upgrade_tower(0, combat.towers[0][0]["id"], "boulders") and before - combat.coins[0] == 250 and combat.towers[0][0]["damage"] == 6, "Purchase uses captured branch damage and price, never subsequently edited resource values")
+	_check(combat.upgrade_tower(0, combat.towers[0][0]["id"], "boulders") and before - combat.coins[0] == expected["boulders"]["cost"] and combat.towers[0][0]["damage"] == expected["boulders"]["damage"], "Purchase uses captured branch damage and price, never subsequently edited resource values")
+	before = combat.coins[0]
+	_check(combat.upgrade_tower(0, combat.towers[0][0]["id"], "freeze_runes") and before - combat.coins[0] == expected["boulders"]["followup"]["cost"] and combat.snapshot()["tower_types"]["rune_obelisk"]["evolutions"]["boulders"]["followup"] == expected["boulders"]["followup"], "Followup price and nested metadata remain captured despite resource and snapshot mutation")
 
 
 func _test_rune_continuous_damage() -> void:
@@ -1477,3 +1493,156 @@ func _test_special_snapshot_and_growth() -> void:
 	var secondary_shots: int = tower["secondary_shot"]
 	combat.grow_for_main_round()
 	_check(tower["cell"] == Vector2i(0, 2) and tower["aim"] == old_aim + Vector2.DOWN and tower["secondary_aim"] == old_secondary + Vector2.DOWN and tower["bounce_aim"] == old_bounce + Vector2.DOWN and tower["shot"] == primary_shots and tower["secondary_shot"] == secondary_shots, "Board growth shifts every cosmetic endpoint exactly once without inventing a shot")
+
+
+func _test_freeze_transactions() -> void:
+	for count: int in [0, 1]:
+		var unprepared := MatchCombat.new(_special_rules(&"rune_obelisk"))
+		unprepared.build(0, Vector2i(0, 1), &"rune_obelisk", 0)
+		var early: Dictionary = unprepared.towers[0][0]
+		if count == 1:
+			unprepared.upgrade_tower(0, early["id"], "damage")
+		var before: Dictionary = unprepared.snapshot()
+		_check(not unprepared.upgrade_tower(0, early["id"], "freeze_runes") and unprepared.snapshot() == before, "Levels I and II cannot skip Boulders prerequisites with Freeze")
+	for type_id: StringName in [&"rune_obelisk", &"arrow_tower", &"orc_ballista"]:
+		var combat := _prepared_special(_special_rules(type_id), type_id)
+		var tower: Dictionary = combat.towers[0][0]
+		var frozen: Dictionary = combat.snapshot()
+		_check(not tower["freeze_upgraded"] and not combat.upgrade_tower(0, tower["id"], "freeze_runes") and combat.snapshot() == frozen, "Freeze requires Boulders, never ordinary level III or another tower type")
+	var rules := _special_rules(&"rune_obelisk")
+	var combat := _prepared_evolution("onyx_ring", rules)
+	var tower: Dictionary = combat.towers[0][0]
+	var frozen: Dictionary = combat.snapshot()
+	_check(not combat.upgrade_tower(0, tower["id"], "freeze_runes") and combat.snapshot() == frozen and MatchCombat.tower_level(tower) == 4, "Onyx remains level IV and cannot purchase Freeze")
+	combat = _prepared_evolution("boulders", rules)
+	tower = combat.towers[0][0]
+	for slot: int in [-1, 1, 2]:
+		frozen = combat.snapshot()
+		_check(not combat.upgrade_tower(slot, tower["id"], "freeze_runes") and combat.snapshot() == frozen, "Freeze rejects invalid ownership atomically")
+	combat.coins[0] = 249
+	frozen = combat.snapshot()
+	_check(not combat.upgrade_tower(0, tower["id"], "freeze_runes") and combat.snapshot() == frozen, "Freeze cannot spend partial payment")
+	combat.coins[0] = 250
+	var investment: int = tower["invested"]
+	var cooldown: float = tower["cooldown"]
+	_check(combat.upgrade_tower(0, tower["id"], "freeze_runes") and combat.coins[0] == 0 and tower["freeze_upgraded"] and MatchCombat.tower_level(tower) == 5, "Boulders buys Freeze for exactly 250 and becomes level V")
+	_check(tower["invested"] == investment + 250 and tower["sell_value"] == floori((investment + 250) * 0.6) and tower["damage"] == 6 and tower["interval"] == 0.0 and tower["cooldown"] == cooldown, "Followup adds refundable investment but changes neither DPS nor attack timing")
+	frozen = combat.snapshot()
+	_check(not combat.upgrade_tower(0, tower["id"], "freeze_runes") and not combat.upgrade_tower(0, tower["id"], "onyx_ring") and combat.snapshot() == frozen, "Freeze cannot be duplicated or used to switch branches")
+	var refund: int = tower["sell_value"]
+	_check(combat.sell_tower(0, tower["id"]) and combat.coins[0] == refund and combat.towers[0].is_empty(), "Selling level V refunds sixty percent of the complete paid upgrade chain")
+	combat = _prepared_evolution("boulders", rules)
+	tower = combat.towers[0][0]
+	combat.phase = MatchCombat.Phase.FINISHED
+	frozen = combat.snapshot()
+	_check(not combat.upgrade_tower(0, tower["id"], "freeze_runes") and combat.snapshot() == frozen, "Finished matches reject followup transactions")
+
+
+func _test_freeze_damage_and_expiry() -> void:
+	var combat := _prepared_special(_special_rules(&"rune_obelisk", 20, 1), &"rune_obelisk")
+	var tower: Dictionary = combat.towers[0][0]
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.01)
+	var enemy: Dictionary = combat.enemies[0][0]
+	_check(enemy["hp"] == 18 and not enemy["slowed"], "Ordinary Rune damage is real HP damage, not an early slow")
+	combat.upgrade_tower(0, tower["id"], "boulders")
+	combat.advance(0.34)
+	_check(enemy["hp"] == 16 and not enemy["slowed"] and combat._rune_damage[tower["id"]][enemy["id"]] == 4, "Host keeps prior base and Boulders actual damage for the same source")
+	var hp: int = enemy["hp"]
+	combat.upgrade_tower(0, tower["id"], "freeze_runes")
+	_check(enemy["hp"] == hp and not enemy["slowed"] and enemy["slow_remaining"] == 0.0, "Buying Freeze above threshold grants neither retroactive slow nor damage")
+	combat.advance(0.17)
+	_check(enemy["hp"] == hp - 1 and enemy["slowed"] and enemy["slow_remaining"] == 2.0, "The next qualifying upgraded damage tick activates a two-second slow")
+	combat.advance(0.05)
+	_check(is_equal_approx(enemy["slow_remaining"], 1.95), "Fractional exposure without actual HP damage does not refresh Freeze")
+	combat.advance(0.12)
+	_check(enemy["slow_remaining"] == 2.0, "Later actual damage above threshold refreshes rather than stacks the timer")
+	var id: int = tower["id"]
+	combat.sell_tower(0, id)
+	_check(enemy["slowed"] and not combat._rune_damage.has(id) and not combat._continuous_damage.has(id), "Sale retires both source ledgers without cancelling an existing enemy slow")
+	combat.advance(1.99)
+	_check(enemy["slowed"] and is_equal_approx(enemy["slow_remaining"], 0.01), "Sold-tower slow persists for its remaining simulation lifetime")
+	combat.advance(0.01)
+	_check(not enemy["slowed"] and enemy["slow_remaining"] == 0.0 and enemy["speed"] == enemy["base_speed"], "Slow expires exactly and restores effective base speed")
+
+
+func _test_freeze_source_isolation() -> void:
+	var combat := _prepared_evolution("boulders", _special_rules(&"rune_obelisk", 101, 2))
+	var first: Dictionary = combat.towers[0][0]
+	combat.upgrade_tower(0, first["id"], "freeze_runes")
+	combat.build(0, Vector2i(1, 1), &"rune_obelisk", 0)
+	var second: Dictionary = combat.towers[0][1]
+	for upgrade: String in ["damage", "speed", "boulders", "freeze_runes"]:
+		combat.upgrade_tower(0, second["id"], upgrade)
+	combat.start_wave(_routes(100, 100))
+	combat.advance(2.0)
+	var untouched: Dictionary = combat.enemies[0][0]
+	var qualifying: Dictionary = combat.enemies[0][1]
+	_check(untouched["hp"] == 77 and not untouched["slowed"] and not qualifying["slowed"], "Two sources dealing 12 HP each cannot pool their damage toward one Freeze threshold")
+	second["cell"] = Vector2i(20, 20)
+	untouched["progress"] = 10.0
+	combat.advance(1.3333333333333333)
+	_check(qualifying["hp"] == 69 and not qualifying["slowed"], "Twenty source damage stays below ceil(101 times .2), even after combined damage exceeds it")
+	combat.advance(1.0 / 6.0)
+	_check(qualifying["slowed"] and qualifying["slow_remaining"] == 2.0 and not untouched["slowed"], "Twenty-one actual source damage freezes only that source/enemy pair")
+	var enemy_id: int = qualifying["id"]
+	combat._hit(0, first, 1, 1000)
+	_check(not combat._rune_damage[first["id"]].has(enemy_id) and not combat._rune_damage[second["id"]].has(enemy_id) and not combat._enemy_spawn_times.has(enemy_id), "Enemy retirement erases damage credit from every source")
+
+
+func _slow_expiry_fixture(branch: String) -> MatchCombat:
+	var rules := _special_rules(&"rune_obelisk", 25, 1)
+	rules.enemy_speed = 2.0
+	var combat := _prepared_evolution("boulders", rules)
+	var source: Dictionary = combat.towers[0][0]
+	source["cell"] = Vector2i(1, 1)
+	combat.upgrade_tower(0, source["id"], "freeze_runes")
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.84)
+	var enemy: Dictionary = combat.enemies[0][0]
+	_check(enemy["hp"] == 20 and enemy["slowed"] and enemy["base_speed"] == 2.0 and enemy["speed"] == 1.6 and is_equal_approx(enemy["progress"], 1.68), "Actual ceil-five threshold applies a nonstacking twenty-percent movement slow")
+	combat.sell_tower(0, source["id"])
+	combat.build(0, Vector2i(4, 1), &"rune_obelisk", 0)
+	var observer: Dictionary = combat.towers[0][0]
+	for upgrade: String in ["damage", "speed", branch]:
+		combat.upgrade_tower(0, observer["id"], upgrade)
+	return combat
+
+
+func _test_slow_motion_history() -> void:
+	for branch: String in ["boulders", "onyx_ring"]:
+		var coarse := _slow_expiry_fixture(branch)
+		var fine := _slow_expiry_fixture(branch)
+		coarse.advance(3.0)
+		for tick: int in range(300):
+			fine.advance(0.01)
+		var enemy: Dictionary = coarse.enemies[0][0]
+		var fine_enemy: Dictionary = fine.enemies[0][0]
+		var expected_hp: int = 10 if branch == "boulders" else 2
+		_check(is_equal_approx(enemy["progress"], 6.88) and is_equal_approx(enemy["progress"], fine_enemy["progress"]) and not enemy["slowed"] and enemy["speed"] == 2.0, "Coarse and fine movement split exactly at sold-source slow expiry")
+		_check(enemy["hp"] == expected_hp and fine_enemy["hp"] == expected_hp, "Continuous exposure and historical Onyx pulses both honor the mixed-speed path")
+		_check(coarse._rune_damage[coarse.towers[0][0]["id"]][enemy["id"]] == 20 - expected_hp, "Damage ledger counts actual observer HP removed, not nominal DPS or pulses")
+
+
+func _test_debug_round_reset() -> void:
+	var combat := _slow_expiry_fixture("boulders")
+	combat.advance(0.1)
+	combat.send_enemy(0, &"grunt")
+	combat.send_enemy(0, &"grunt")
+	var tower: Dictionary = combat.towers[0][0]
+	var retained: Dictionary = tower.duplicate(true)
+	var coins: Array[int] = combat.coins.duplicate()
+	var health: Array[int] = combat.base_health.duplicate()
+	var income: Array[int] = combat.income.duplicate()
+	var frozen: Dictionary = combat.snapshot()
+	_check(not combat.debug_set_round(0) and not combat.debug_set_round(1001) and combat.snapshot() == frozen, "Invalid debug rounds reject before mutating live combat")
+	_check(combat.debug_set_round(31) and combat.wave == 30 and combat.phase == MatchCombat.Phase.PLANNING, "Debug round denotes the upcoming displayed round")
+	_check(combat.coins == coins and combat.base_health == health and combat.income == income and combat.towers[0][0] == retained, "Debug abandonment keeps the build, upgrades, currency, income and base health without a clear reward")
+	_check(combat.enemies == [[], []] and combat.queued_sends == [0, 0] and combat.wave_roster.is_empty() and combat.spawn_times.is_empty() and combat._routes == [[], []] and combat._routing_next == [{}, {}] and combat._fork_cursors == [{}, {}] and combat._spawned == [0, 0], "Debug abandonment clears every enemy, route, fork, send and spawn timetable")
+	_check(combat._elapsed == 0.0 and combat._continuous_damage.is_empty() and combat._rune_damage.is_empty() and combat._enemy_spawn_times.is_empty() and combat._slow_motion.is_empty(), "Debug abandonment clears all elapsed-time, fractional and damage-credit accounting")
+	_check(combat.start_wave(_routes(100, 100)) and combat.wave == 31, "A debug jump restarts using newly captured routes at the chosen round")
+	_check(combat.debug_set_round(31) and combat.phase == MatchCombat.Phase.PLANNING and combat.wave == 30, "Selecting the same displayed active round restarts its planning phase")
+	_check(combat.debug_set_round(1) and combat.wave == 0 and combat.debug_set_round(1000) and combat.wave == 999, "Both debug round bounds are accepted")
+	combat.phase = MatchCombat.Phase.FINISHED
+	frozen = combat.snapshot()
+	_check(not combat.debug_set_round(1) and combat.snapshot() == frozen, "Debug cannot revive a finished match")

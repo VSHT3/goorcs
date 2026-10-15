@@ -3,6 +3,9 @@ extends Resource
 
 const SECOND_ARCHER_ATTACK_RATE_MULTIPLIER: float = 1.1
 const BOUNCE_DAMAGE_MULTIPLIER: float = 0.5
+const FREEZE_DAMAGE_THRESHOLD: float = 0.2
+const FREEZE_SPEED_MULTIPLIER: float = 0.8
+const FREEZE_DURATION: float = 2.0
 
 @export var reward: TowerReward
 @export var damage: int = 2

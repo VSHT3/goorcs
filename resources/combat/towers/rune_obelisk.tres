@@ -20,7 +20,12 @@ evolutions = {
 "cost": 250,
 "damage": 6,
 "interval": 0.0,
-"continuous": true
+"continuous": true,
+"followup": {
+"id": "freeze_runes",
+"title": "Freeze Runes",
+"cost": 250
+}
 },
 "onyx_ring": {
 "title": "Onyx Ring",

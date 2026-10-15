@@ -299,6 +299,16 @@ text = ""
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
+[node name="DebugButton" type="Button" parent="HUD/Bottom/Content/Actions"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(24, 22)
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+text = "#"
+
 
 [node name="CancelPlacement" type="Button" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true
@@ -462,6 +472,57 @@ theme_override_constants/shadow_offset_x = 1
 theme_override_constants/shadow_offset_y = 1
 theme_override_font_sizes/font_size = 16
 autowrap_mode = 2
+
+[node name="DebugPopup" type="PopupPanel" parent="."]
+size = Vector2i(320, 144)
+exclusive = false
+popup_window = true
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="Content" type="VBoxContainer" parent="DebugPopup"]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 308.0
+offset_bottom = 136.0
+theme_override_constants/separation = 8
+
+[node name="Values" type="GridContainer" parent="DebugPopup/Content"]
+layout_mode = 2
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="RoundLabel" type="Label" parent="DebugPopup/Content/Values"]
+layout_mode = 2
+text = "Round"
+
+[node name="DebugRound" type="SpinBox" parent="DebugPopup/Content/Values"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(208, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 1000.0
+value = 1.0
+rounded = true
+
+[node name="MoneyLabel" type="Label" parent="DebugPopup/Content/Values"]
+layout_mode = 2
+text = "Money"
+
+[node name="DebugMoney" type="SpinBox" parent="DebugPopup/Content/Values"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(208, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1000000000.0
+rounded = true
+
+[node name="DebugApply" type="Button" parent="DebugPopup/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+text = "Apply"
 
 [node name="FeedbackTimer" type="Timer" parent="."]
 wait_time = 3.5

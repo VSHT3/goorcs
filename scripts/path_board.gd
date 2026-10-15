@@ -111,6 +111,7 @@ var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
 var _enemy_hit_images: Dictionary[Texture2D, Image] = {}
+var _slowed_enemy_textures: Dictionary[Texture2D, Texture2D] = {}
 var _portal_texture: AtlasTexture
 var _crystal_texture: AtlasTexture
 var _endpoint_frame: int = 0
@@ -127,6 +128,7 @@ func _ready() -> void:
 	for definition: EnemyDefinition in CombatRules.DEFAULT_ENEMIES:
 		_enemy_art[String(definition.id)] = definition
 		_cache_texture_bounds(definition.texture)
+		_cache_slow_texture(definition.texture)
 	_portal_texture = _endpoint_texture(preload("res://assets/world/enemy_portal_idle.png"))
 	_crystal_texture = _endpoint_texture(preload("res://assets/world/health_crystal_idle.png"))
 	_cache_texture_bounds(_portal_texture)
@@ -631,6 +633,25 @@ func _cache_texture_bounds(texture: Texture2D) -> void:
 	_texture_bounds[texture] = Rect2(image.get_used_rect()) if image != null else Rect2(Vector2.ZERO, texture.get_size())
 
 
+func _cache_slow_texture(texture: Texture2D) -> void:
+	if texture == null or _slowed_enemy_textures.has(texture):
+		return
+	var image: Image = texture.get_image()
+	if image == null:
+		return
+	if image.is_compressed():
+		image.decompress()
+	_enemy_hit_images[texture] = image
+	var tinted: Image = image.duplicate()
+	tinted.convert(Image.FORMAT_RGBA8)
+	for y: int in range(tinted.get_height()):
+		for x: int in range(tinted.get_width()):
+			var pixel: Color = tinted.get_pixel(x, y)
+			if pixel.a > 0.0:
+				tinted.set_pixel(x, y, pixel.lerp(Color(0.40, 0.68, 0.91, pixel.a), 0.38))
+	_slowed_enemy_textures[texture] = ImageTexture.create_from_image(tinted)
+
+
 func _sprite_rect(texture: Texture2D, height: float, anchor: Vector2, foot: Vector2, flip: bool = false) -> Rect2:
 	_cache_texture_bounds(texture)
 	var bounds: Rect2 = _texture_bounds[texture]
@@ -766,16 +787,19 @@ func _draw_boulders(tower: Dictionary, foot: Vector2, front: bool) -> void:
 		if (offset.y >= 0.0) != front:
 			continue
 		_draw_rune_stone(foot + offset + Vector2(0, -_cell_size() * 0.46),
-			_cell_size() * 0.14, _boulder_phase * 0.35 + index, false)
+			_cell_size() * 0.14, _boulder_phase * 0.35 + index, false, 1.0, bool(tower.get("freeze_upgraded", false)))
 
 
-func _draw_rune_stone(position: Vector2, radius: float, rotation: float, onyx: bool, alpha: float = 1.0) -> void:
+func _draw_rune_stone(position: Vector2, radius: float, rotation: float, onyx: bool, alpha: float = 1.0, frozen: bool = false) -> void:
+	var stone := Color("1c1b27") if onyx else (Color("7193a4") if frozen else Color("716b5d"))
+	var edge := Color("8e859e") if onyx else (Color("c2e5ed") if frozen else Color("c1b496"))
+	var rune := Color("514a64") if onyx else (Color("92c5d9") if frozen else Color("978a70"))
 	draw_set_transform(position, rotation, Vector2.ONE * radius)
-	draw_colored_polygon(_rune_stone_shape, Color(Color("1c1b27") if onyx else Color("716b5d"), alpha))
-	draw_line(_rune_stone_shape[0], _rune_stone_shape[1], Color(Color("8e859e") if onyx else Color("c1b496"), alpha), 0.12, true)
-	draw_line(_rune_stone_shape[1], _rune_stone_shape[2], Color(Color("8e859e") if onyx else Color("c1b496"), alpha), 0.12, true)
-	draw_line(_rune_stone_shape[1], Vector2(0.10, 0.05), Color(Color("514a64") if onyx else Color("978a70"), alpha), 0.10, true)
-	draw_line(Vector2(0.10, 0.05), _rune_stone_shape[4], Color(Color("514a64") if onyx else Color("978a70"), alpha), 0.10, true)
+	draw_colored_polygon(_rune_stone_shape, Color(stone, alpha))
+	draw_line(_rune_stone_shape[0], _rune_stone_shape[1], Color(edge, alpha), 0.12, true)
+	draw_line(_rune_stone_shape[1], _rune_stone_shape[2], Color(edge, alpha), 0.12, true)
+	draw_line(_rune_stone_shape[1], Vector2(0.10, 0.05), Color(rune, alpha), 0.10, true)
+	draw_line(Vector2(0.10, 0.05), _rune_stone_shape[4], Color(rune, alpha), 0.10, true)
 	draw_set_transform(Vector2.ZERO)
 
 
@@ -786,7 +810,8 @@ func _draw_enemy(item: Dictionary) -> void:
 	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, item["foot"], flip)
 	if flip:
 		rect.size.x = -rect.size.x
-	draw_texture_rect(artwork.texture, rect, false)
+	var texture: Texture2D = _slowed_enemy_textures.get(artwork.texture, artwork.texture) if bool(enemy.get("slowed", false)) else artwork.texture
+	draw_texture_rect(texture, rect, false)
 
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:

@@ -91,6 +91,7 @@ func _run() -> void:
 	_check(screen.shop_buttons[&"orc_ballista"].disabled and screen._placement_type() == &"", "Insufficient host funds disable purchase and cancel stale placement")
 	_check_send_visibility(main, screen)
 	await _check_rune_evolutions(main, screen)
+	await _check_debug_popup(main, screen)
 	main.planning.stop_singleplayer()
 	main.queue_free()
 	await create_timer(0.2).timeout
@@ -116,6 +117,8 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		planning.build_tower(0, Vector2i(3, 3), &"rune_obelisk", MatchCombat.TargetMode.FURTHEST)
 		_check(model.towers[0].size() == 1 and model.towers[1].size() == 1, "Real planning command creates mirrored Rune fixtures")
 		if model.towers[0].is_empty():
+			planning.stop_singleplayer()
+			await create_timer(0.2).timeout
 			continue
 		var tower: Dictionary = model.towers[0][0]
 		var id: int = int(tower["id"])
@@ -125,7 +128,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		var frozen: Dictionary = planning.combat.duplicate(true)
 		screen.special_upgrade.pressed.emit()
 		screen.onyx_ring_upgrade.pressed.emit()
-		for command: String in ["boulders", "onyx_ring", "special"]:
+		for command: String in ["boulders", "onyx_ring", "special", "freeze_runes"]:
 			planning.upgrade_tower(0, id, command)
 		_check(planning.combat == frozen, "Hidden buttons and real evolution commands cannot bypass level-I prerequisites")
 		var first: Button = screen.damage_upgrade if evolution == "boulders" else screen.speed_upgrade
@@ -168,11 +171,148 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		frozen = planning.combat.duplicate(true)
 		chosen.pressed.emit()
 		other.pressed.emit()
-		for command: String in ["boulders", "onyx_ring", "special"]:
+		for command: String in ["boulders", "onyx_ring", "special", "freeze_runes"]:
 			planning.upgrade_tower(0, id, command)
 		_check(planning.combat == frozen, "Purchased UI and real commands reject repeats, the other branch, and obsolete generic special")
+		if evolution == "boulders":
+			_check(screen.special_upgrade.visible and not screen.onyx_ring_upgrade.visible, "Boulders replaces the exclusive choices with its follow-up control")
+			var followup: Dictionary = planning.combat["tower_types"]["rune_obelisk"]["evolutions"]["boulders"]["followup"]
+			var followup_price: int = int(followup["cost"])
+			model.coins = [followup_price - 1, followup_price - 1]
+			planning._publish_snapshot()
+			_check(screen.special_upgrade.disabled, "Follow-up affordability uses the accepted Boulders configuration")
+			model.coins = [followup_price, followup_price]
+			planning._publish_snapshot()
+			_check(not screen.special_upgrade.disabled, "Exact funds enable Boulders' second evolution")
+			# A host-captured catalog, not a hardcoded UI price, governs affordability.
+			planning.combat = planning.combat.duplicate(true)
+			var captured_followup: Dictionary = planning.combat["tower_types"]["rune_obelisk"]["evolutions"]["boulders"]["followup"]
+			captured_followup["cost"] = followup_price + 1
+			planning.changed.emit()
+			_check(screen.special_upgrade.disabled, "Follow-up control follows a changed accepted catalog cost")
+			planning._publish_snapshot()
+			var stats_before: String = screen._tower_stats.text
+			planning._host_ready[0] = true
+			planning._publish_snapshot()
+			frozen = planning.combat.duplicate(true)
+			screen.special_upgrade.pressed.emit()
+			_check(screen.special_upgrade.disabled and planning.combat == frozen, "Ready also commits the follow-up purchase")
+			planning._host_ready[0] = false
+			planning._publish_snapshot()
+			screen.special_upgrade.pressed.emit()
+			for slot: int in range(2):
+				_check(model.towers[slot][0].get("freeze_upgraded", false) and MatchCombat.tower_level(model.towers[slot][0]) == 5 and model.coins[slot] == 0, "Follow-up button dispatches its real command and reaches level V on both solo boards")
+			_check(screen.special_upgrade.disabled and not screen.onyx_ring_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up stays visible without changing continuous damage stats or reviving Onyx")
+			_check(screen._tower_title.text.ends_with(MatchPlanningScreen.TOWER_LEVEL_NUMERALS[4]), "Management displays the accepted fifth tower level")
+			await process_frame
+			var row: Control = screen.special_upgrade.get_parent()
+			_check(is_equal_approx(screen.special_upgrade.size.x, row.size.x), "Boulders follow-up uses the entire existing upgrade row")
+			frozen = planning.combat.duplicate(true)
+			screen.special_upgrade.pressed.emit()
+			planning.upgrade_tower(0, id, "freeze_runes")
+			_check(planning.combat == frozen, "Purchased follow-up rejects duplicate UI and model commands")
+		else:
+			model.coins = [2000, 2000]
+			planning._publish_snapshot()
+			frozen = planning.combat.duplicate(true)
+			screen.special_upgrade.pressed.emit()
+			planning.upgrade_tower(0, id, "freeze_runes")
+			_check(planning.combat == frozen and MatchCombat.tower_level(tower) == 4 and not tower.get("freeze_upgraded", false), "Onyx never exposes or accepts the Boulders follow-up")
 		planning.stop_singleplayer()
-		await create_timer(0.1).timeout
+		# Let the audio mixer release each stopped solo fixture before starting another.
+		await create_timer(0.2).timeout
+
+
+func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
+	var planning: MatchPlanning = main.planning
+	planning.start_singleplayer()
+	planning.set_physics_process(false)
+	await create_timer(0.05).timeout
+	_check(screen.debug_button.visible and planning.can_debug(), "Solo exposes the compact authoritative debug control")
+	var original_size: Vector2i = root.size
+	for width: int in [1000, 1280]:
+		root.size = Vector2i(width, 720)
+		await process_frame
+		var world_rect: Rect2 = screen.world.get_global_rect()
+		var header: Control = screen.get_node("HUD/Header")
+		var header_rect: Rect2 = header.get_global_rect()
+		screen.debug_button.pressed.emit()
+		await process_frame
+		_check(screen.debug_popup.visible and int(screen.debug_round.value) == 1 and int(screen.debug_money.value) == int(planning.combat["coins"][0]), "Opening debug uses accepted displayed round and own money")
+		_check(screen.world.get_global_rect() == world_rect and header.get_global_rect() == header_rect, "Opening the debug popup cannot reflow world or HUD at width %d" % width)
+		_check(Rect2(screen.global_position, screen.size).encloses(screen.debug_button.get_global_rect()), "Tiny debug control stays inside the game surface at width %d" % width)
+		var camera_position: Vector2 = screen.world.camera.position
+		var camera_zoom: Vector2 = screen.world.camera.zoom
+		var wheel := InputEventMouseButton.new()
+		wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+		wheel.pressed = true
+		wheel.position = screen.world.size * 0.5
+		screen.world._handle_camera_input(wheel)
+		var key := InputEventKey.new()
+		key.keycode = KEY_D
+		key.pressed = true
+		screen.world._handle_camera_input(key)
+		screen.world._process(0.2)
+		_check(screen.world.camera.position == camera_position and screen.world.camera.zoom == camera_zoom and screen.world._world_viewport.gui_disable_input, "Popup scroll, typing and board input remain isolated from the world")
+		screen.debug_round.value = 1001
+		screen.debug_money.value = 1000000001
+		_check(int(screen.debug_round.value) == 1000 and int(screen.debug_money.value) == 1000000000, "Popup accepts the full supported upper bounds without overflowing")
+		screen.debug_round.value = 0
+		screen.debug_money.value = -1
+		_check(int(screen.debug_round.value) == 1 and int(screen.debug_money.value) == 0, "Popup keeps both values inside the supported lower bounds")
+		screen.debug_popup.hide()
+		_check(not screen.world._world_viewport.gui_disable_input, "Closing debug restores board input")
+	root.size = original_size
+	await process_frame
+	screen.debug_button.pressed.emit()
+	screen.debug_round.get_line_edit().text = "31"
+	screen.debug_money.get_line_edit().text = "123456"
+	screen.debug_apply.pressed.emit()
+	_check(not screen.debug_popup.visible and int(planning.combat["wave"]) == 30 and planning.combat["coins"] == [123456, 123456], "Apply commits typed values through the real authoritative debug operation and closes")
+	screen.debug_button.pressed.emit()
+	_check(int(screen.debug_round.value) == 31 and int(screen.debug_money.value) == 123456, "Reopening reflects the accepted upcoming round rather than a stale draft")
+	screen.debug_popup.hide()
+	planning._host_combat.phase = MatchCombat.Phase.WAVE
+	planning._host_combat.wave = 31
+	planning._publish_snapshot()
+	screen.debug_button.pressed.emit()
+	_check(int(screen.debug_round.value) == 31, "During combat debug uses the current displayed round rather than the next one")
+	screen.debug_apply.pressed.emit()
+	_check(int(planning.combat["phase"]) == MatchCombat.Phase.WAVE and int(planning.combat["wave"]) == 31, "Applying the same displayed round preserves ongoing combat")
+	screen.debug_button.pressed.emit()
+	screen.open_pause_menu()
+	_check(not screen.debug_popup.visible and screen.pause_menu.visible, "Pause closes debug before opening its own input layer")
+	screen._resume_match()
+	screen.debug_button.pressed.emit()
+	main.play_screen.hide()
+	_check(not screen.debug_popup.visible, "Leaving the play screen closes the debug window")
+	main.play_screen.show()
+	planning.start_singleplayer()
+	planning.set_physics_process(false)
+	await create_timer(0.05).timeout
+	var was_host: bool = main.session.is_host
+	var was_state: MultiplayerSession.State = main.session.state
+	var was_peer: int = planning._active_peer_id
+	planning.singleplayer = false
+	main.session.is_host = false
+	planning.changed.emit()
+	_check(not screen.debug_button.visible, "Guests never receive the debug entry point")
+	screen.debug_button.pressed.emit()
+	_check(not screen.debug_popup.visible, "Programmatic guest presses cannot open debug")
+	main.session.is_host = true
+	main.session.state = MultiplayerSession.State.CONNECTED
+	planning._active_peer_id = 77
+	planning.changed.emit()
+	_check(screen.debug_button.visible, "An active host retains the same local debug control")
+	planning.singleplayer = true
+	main.session.is_host = was_host
+	main.session.state = was_state
+	planning._active_peer_id = was_peer
+	planning._host_combat.phase = MatchCombat.Phase.FINISHED
+	planning._publish_snapshot()
+	_check(not screen.debug_button.visible and not screen.debug_popup.visible, "Finished matches do not expose a revival control")
+	planning.stop_singleplayer()
+	await create_timer(0.2).timeout
 
 
 func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:

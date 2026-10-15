@@ -9,7 +9,7 @@ const TARGET_HELP: Array[String] = [
 	"Nearest to this tower.",
 	"Highest current HP.",
 ]
-const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III", "IV"]
+const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III", "IV", "V"]
 
 var planning: MatchPlanning
 var selected_tower_id: int = -1
@@ -26,6 +26,11 @@ var _owns_tree_pause: bool = false
 @onready var boards: Array[PathBoard] = world.boards
 @onready var menu_button: Button = %MenuButton
 @onready var pause_menu: MatchPauseMenu = $PauseMenu
+@onready var debug_button: Button = %DebugButton
+@onready var debug_popup: PopupPanel = $DebugPopup
+@onready var debug_round: SpinBox = %DebugRound
+@onready var debug_money: SpinBox = %DebugMoney
+@onready var debug_apply: Button = %DebugApply
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
 @onready var _ready_timer: Label = %ReadyTimer
@@ -92,6 +97,13 @@ func _ready() -> void:
 	speed_button.pressed.connect(_request_pacing.bind("speed"))
 	autoplay_button.pressed.connect(_request_pacing.bind("autoplay"))
 	menu_button.pressed.connect(open_pause_menu)
+	debug_button.pressed.connect(_open_debug)
+	debug_apply.pressed.connect(_apply_debug)
+	debug_popup.popup_hide.connect(_debug_closed)
+	debug_popup.window_input.connect(_debug_window_input)
+	for spin: SpinBox in [debug_round, debug_money]:
+		spin.get_line_edit().add_theme_font_override("font", _coins.get_theme_font("font"))
+		spin.get_line_edit().add_theme_font_size_override("font_size", 16)
 	pause_menu.resume_requested.connect(_resume_match)
 	pause_menu.quit_requested.connect(_quit_match)
 	visibility_changed.connect(_visibility_changed)
@@ -118,6 +130,7 @@ func cancel_strokes() -> void:
 func open_pause_menu() -> void:
 	if planning == null or not planning.active or not is_visible_in_tree() or pause_menu.visible:
 		return
+	debug_popup.hide()
 	cancel_interaction()
 	cancel_strokes()
 	for selector: OptionButton in [targeting_button, secondary_targeting, enemy_selector]:
@@ -160,6 +173,7 @@ func _visibility_changed() -> void:
 	if not is_node_ready():
 		return
 	if not is_visible_in_tree():
+		debug_popup.hide()
 		_close_pause_menu()
 		world.set_active(false)
 		cancel_strokes()
@@ -173,8 +187,41 @@ func _visibility_changed() -> void:
 		_refresh()
 
 
+func _open_debug() -> void:
+	if planning == null or not planning.can_debug() or not is_visible_in_tree() or pause_menu.visible:
+		return
+	cancel_interaction()
+	cancel_strokes()
+	for selector: OptionButton in [targeting_button, secondary_targeting, enemy_selector]:
+		selector.get_popup().hide()
+	var state: Dictionary = planning.combat
+	debug_round.value = int(state.get("wave", 0)) + (1 if int(state.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.PLANNING else 0)
+	debug_money.value = _own_coins()
+	world.set_input_blocked(true)
+	debug_popup.popup_centered()
+	debug_round.get_line_edit().grab_focus()
+	debug_round.get_line_edit().select_all()
+
+
+func _apply_debug() -> void:
+	debug_round.apply()
+	debug_money.apply()
+	if planning != null and planning.debug_set_values(int(debug_round.value), int(debug_money.value)):
+		debug_popup.hide()
+
+
+func _debug_closed() -> void:
+	world.set_input_blocked(pause_menu.visible)
+
+
+func _debug_window_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		debug_popup.hide()
+		debug_popup.set_input_as_handled()
+
+
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or pause_menu.visible or (_placement_id == &"" and selected_enemy_id < 0):
+	if not is_visible_in_tree() or pause_menu.visible or debug_popup.visible or (_placement_id == &"" and selected_enemy_id < 0):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		cancel_interaction()
@@ -550,10 +597,16 @@ func _refresh_targeting() -> void:
 	damage_upgrade.visible = not unlocked_special
 	speed_upgrade.visible = not unlocked_special
 	special_upgrade.visible = unlocked_special
-	onyx_ring_upgrade.visible = unlocked_special and not evolutions.is_empty()
-	special_upgrade.custom_minimum_size.x = 140.0 if not evolutions.is_empty() else 288.0
+	var boulders: bool = evolution == "boulders"
+	onyx_ring_upgrade.visible = unlocked_special and not evolutions.is_empty() and not boulders
+	if not onyx_ring_upgrade.visible:
+		onyx_ring_upgrade.disabled = true
+	special_upgrade.custom_minimum_size.x = 140.0 if onyx_ring_upgrade.visible else 288.0
 	if evolutions.is_empty():
 		_refresh_special_upgrade(tower, stats)
+	elif boulders:
+		var boulder_definition: Dictionary = evolutions.get("boulders", {})
+		_refresh_freeze_upgrade(tower, boulder_definition.get("followup", {}))
 	else:
 		_refresh_evolution(special_upgrade, tower, evolutions, "boulders")
 		_refresh_evolution(onyx_ring_upgrade, tower, evolutions, "onyx_ring")
@@ -595,6 +648,15 @@ func _refresh_special_upgrade(tower: Dictionary, stats: Dictionary) -> void:
 		special_upgrade.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
 
 
+func _refresh_freeze_upgrade(tower: Dictionary, definition: Dictionary) -> void:
+	var purchased: bool = bool(tower.get("freeze_upgraded", false))
+	var price: int = int(definition.get("cost", 0))
+	var title: String = String(definition.get("title", "Freeze Runes"))
+	special_upgrade.text = "%s\nPurchased" % title if purchased else "%s\n%d" % [title, price]
+	special_upgrade.disabled = definition.is_empty() or purchased or targeting_button.disabled or _own_coins() < price
+	special_upgrade.tooltip_text = ""
+
+
 func _refresh_evolution(button: Button, tower: Dictionary, evolutions: Dictionary, evolution: String) -> void:
 	var definition: Dictionary = evolutions.get(evolution, {})
 	var chosen: String = String(tower.get("evolution", ""))
@@ -626,13 +688,13 @@ func _special_upgrade_pressed() -> void:
 	var types: Dictionary = planning.combat.get("tower_types", {})
 	var stats: Dictionary = types.get(String(tower["type_id"]), {})
 	var evolutions: Dictionary = stats.get("evolutions", {})
-	_upgrade("boulders" if not evolutions.is_empty() else "special")
+	_upgrade("freeze_runes" if String(tower.get("evolution", "")) == "boulders" else ("boulders" if not evolutions.is_empty() else "special"))
 
 
 func _upgrade(upgrade: String) -> void:
 	var button: Button
 	match upgrade:
-		"special", "boulders":
+		"special", "boulders", "freeze_runes":
 			button = special_upgrade
 		"onyx_ring":
 			button = onyx_ring_upgrade
@@ -664,6 +726,9 @@ func _toggle_ready() -> void:
 func _refresh() -> void:
 	if not is_node_ready():
 		return
+	debug_button.visible = planning != null and planning.can_debug()
+	if not debug_button.visible:
+		debug_popup.hide()
 	if planning == null:
 		world.set_active(false)
 		cancel_strokes()

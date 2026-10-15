@@ -68,6 +68,7 @@ func _run() -> void:
 	await _check_rune_evolutions(board, viewport)
 	await _check_special_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
+	await _check_slowed_enemies(board, viewport)
 	await _check_source_facing(board, viewport)
 	await _check_split_routes(board, viewport)
 	await _check_depth_overlap(board, viewport)
@@ -418,6 +419,19 @@ func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 		var counter_changed: Image = await _board_image(board, viewport)
 		_check(board._shot_traces.is_empty() and int(_changed_geometry(repeated, counter_changed, region)["pixels"]) == 0,
 			"Boulder damage counter changes never create discrete pulses or shimmer")
+		var phase_before_freeze: float = board._boulder_phase
+		tower = tower.duplicate(true)
+		tower["freeze_upgraded"] = true
+		board.combat_towers = [tower]
+		var icy: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(counter_changed, icy, region)["pixels"]) > 25,
+			"Purchased Freeze makes the same orbiting Boulders visibly icy, mirrored=%s" % mirrored)
+		_check(is_equal_approx(board._boulder_phase, phase_before_freeze) and board._shot_traces.is_empty(),
+			"Freeze's visual indication neither restarts the orbit nor creates a damage pulse")
+		board._process(0.19)
+		var icy_moved: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(icy, icy_moved, region)["pixels"]) > 25,
+			"Icy Boulders retain independent local orbit animation")
 		var enemy: Dictionary = _enemy(301, 0.0, Vector2(3, 3), [])
 		var enemy_before: Dictionary = enemy.duplicate(true)
 		board.combat_enemies = [enemy]
@@ -627,6 +641,61 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			"Facing follows the displayed horizontal leg and remains stable along vertical turns")
 		_check(board._enemy_faces_left(turning_route, 2.5) != mirrored,
 			"Facing reverses on leftward route segments in either board orientation")
+
+
+func _check_slowed_enemies(board: PathBoard, viewport: SubViewport) -> void:
+	board.combat_towers = []
+	board.combat_enemies = []
+	board.selected_enemy_id = -1
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		for type_id: String in ["grunt", "runner", "brute"]:
+			var enemy: Dictionary = _enemy(501, 0.0, Vector2(2, 2), [])
+			enemy["type_id"] = type_id
+			board.combat_enemies = []
+			var empty: Image = await _board_image(board, viewport)
+			board.combat_enemies = [enemy]
+			var ordinary: Image = await _board_image(board, viewport)
+			var center := Vector2i(board.cell_center(Vector2i(2, 2)))
+			var region := Rect2i(center + Vector2i(-40, -100), Vector2i(80, 140))
+			var original_body: Dictionary = _changed_geometry(empty, ordinary, region)
+			var texture: Texture2D = board._enemy_art[type_id].texture
+			var cached: Texture2D = board._slowed_enemy_textures[texture]
+			enemy = enemy.duplicate(true)
+			enemy["slowed"] = true
+			enemy["slow_remaining"] = 2.0
+			enemy["speed"] = 1.6
+			var accepted: Dictionary = enemy.duplicate(true)
+			board.combat_enemies = [enemy]
+			var slowed: Image = await _board_image(board, viewport)
+			var slowed_body: Dictionary = _changed_geometry(empty, slowed, region)
+			_check(int(_changed_geometry(ordinary, slowed, region)["pixels"]) > 25,
+				"Slowed enemy gains a visible restrained blue tint, type=%s mirrored=%s" % [type_id, mirrored])
+			_check(original_body["bounds"] == slowed_body["bounds"],
+				"Slow tint preserves the original sprite silhouette, scale and facing")
+			var normal_pixels: Image = texture.get_image()
+			var blue_pixels: Image = cached.get_image()
+			var blue_gain: float = 0.0
+			for y: int in range(normal_pixels.get_height()):
+				for x: int in range(normal_pixels.get_width()):
+					var normal: Color = normal_pixels.get_pixel(x, y)
+					var blue: Color = blue_pixels.get_pixel(x, y)
+					if normal.a > 0.5:
+						blue_gain += (blue.b - blue.r) - (normal.b - normal.r)
+			_check(blue_gain > 1.0, "The cached slow palette shifts toward blue rather than merely darkening the sprite")
+			board.combat_enemies = [enemy.duplicate(true)]
+			var repeated: Image = await _board_image(board, viewport)
+			_check(board._slowed_enemy_textures[texture] == cached and repeated.get_data() == slowed.get_data() and enemy == accepted,
+				"Repeated slow snapshots reuse the same texture without changing accepted state or local visuals")
+			enemy = enemy.duplicate(true)
+			enemy["slowed"] = false
+			enemy["slow_remaining"] = 0.0
+			enemy["speed"] = enemy["base_speed"]
+			board.combat_enemies = [enemy]
+			var expired: Image = await _board_image(board, viewport)
+			_check(expired.get_data() == ordinary.get_data(), "An accepted expiry restores the original sprite without lingering blue")
+	board.combat_enemies = []
 
 
 func _check_source_facing(board: PathBoard, viewport: SubViewport) -> void:
@@ -886,12 +955,12 @@ func _pixels_changed_near(before: Image, after: Image, position: Vector2) -> boo
 
 
 func _tower(id: int, cell: Vector2i, type_id: String) -> Dictionary:
-	return {"id": id, "cell": cell, "type_id": type_id, "evolution": "", "shot": 0, "aim": Vector2(cell)}
+	return {"id": id, "cell": cell, "type_id": type_id, "evolution": "", "freeze_upgraded": false, "shot": 0, "aim": Vector2(cell)}
 
 
 func _enemy(id: int, progress: float, position: Vector2, route: Array) -> Dictionary:
 	# Empty routes are explicit position-only fixtures, never a board-wide route.
-	return {"id": id, "type_id": "grunt", "speed": 2.0, "progress": progress, "pos": position, "hp": 8, "max_hp": 8, "route": route}
+	return {"id": id, "type_id": "grunt", "base_speed": 2.0, "speed": 2.0, "slowed": false, "slow_remaining": 0.0, "progress": progress, "pos": position, "hp": 8, "max_hp": 8, "route": route}
 
 
 func _check(condition: bool, description: String) -> void:

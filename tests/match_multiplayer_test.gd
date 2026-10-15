@@ -278,6 +278,14 @@ func _peer_specials(code: String) -> void:
 		var rune: Dictionary = await _wait_tower(observer, slot, Vector2i(0, 3), 0)
 		for upgrade: String in ["damage", "speed", "boulders" if slot == 0 else "onyx_ring"]:
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": int(rune["id"]), "upgrade": upgrade})
+		var before_followup: Dictionary = _snapshot("host")["combat"]
+		await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": int(rune["id"]), "upgrade": "freeze_runes"})
+		await create_timer(0.1).timeout
+		if slot == 0:
+			rune = await _wait_tower(observer, slot, Vector2i(0, 3), 0)
+			_check(rune["freeze_upgraded"] and MatchCombat.tower_level(rune) == 5, "Freeze Runes follows Boulders and replicates level V using the host price")
+		else:
+			_check(_snapshot("host")["combat"] == before_followup and _snapshot("guest")["combat"] == before_followup, "Remote Onyx Ring cannot purchase the Boulders follow-up")
 	await _paths()
 	await _both_ready()
 	await _command("host", {"action": "step", "delta": 0.1})
@@ -288,6 +296,24 @@ func _peer_specials(code: String) -> void:
 	_check(_snapshot("guest")["combat"] == accepted, "Both real peers receive identical accepted evolution damage, enemy HP and attack events")
 	for slot: int in range(2):
 		_check(not accepted["enemies"][slot].is_empty() and int(accepted["enemies"][slot][0]["hp"]) < 100, "Rune branch damages enemies through the host simulation, slot=%d" % slot)
+	await _command("host", {"action": "step", "delta": 1.6})
+	await create_timer(0.15).timeout
+	accepted = _snapshot("host")["combat"]
+	_check(_snapshot("guest")["combat"] == accepted and accepted["enemies"][0][0]["slowed"] and not accepted["enemies"][1][0]["slowed"], "Real peers receive the host's damage-gated Freeze effect only from upgraded Boulders")
+	var before_debug: Dictionary = _snapshot("host").duplicate(true)
+	await _command("guest", {"action": "debug", "round": 31, "money": 999999})
+	await create_timer(0.1).timeout
+	for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
+		_check(_snapshot("host")[field] == before_debug[field] and _snapshot("guest")[field] == before_debug[field], "Guest debug API cannot mutate accepted match field: %s" % field)
+	await _command("host", {"action": "debug", "round": 21, "money": 5000})
+	await _wait_combat("guest", {"phase": 0, "wave": 20, "coins": [5000, accepted["coins"][1]], "board_origin_y": -1, "enemies": [[], []], "queued_sends": [0, 0]}, "Host debug jump publishes planning, money and passed growth milestones to its real peer")
+	await _command("host", {"action": "debug", "round": 31, "money": 6000})
+	await _wait_combat("guest", {"phase": 0, "wave": 30, "board_origin_y": -2}, "Second debug jump applies the next growth milestone")
+	await _command("host", {"action": "debug", "round": 1, "money": 7000})
+	await _wait_combat("guest", {"phase": 0, "wave": 0, "board_origin_y": -2}, "Backward debug jump preserves grown layouts instead of deleting built ground")
+	var host_debug: Dictionary = _snapshot("host")
+	for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
+		_check(_snapshot("guest")[field] == host_debug[field], "Both peers agree on debug-jumped match field: %s" % field)
 
 
 

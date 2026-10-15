@@ -48,6 +48,12 @@ var _next_enemy_id: int = 1
 var _continuous_damage: Dictionary = {}
 # Spawn times cap first-tick exposure even when due events arrive mid-tick.
 var _enemy_spawn_times: Dictionary = {}
+# Actual Rune HP removed, including damage before either evolution purchase.
+var _rune_damage: Dictionary = {}
+# Only enemies slowed at tick start need a two-speed historical motion record.
+# Reused float records retain precision without per-tick history allocations.
+var _slow_motion: Dictionary = {}
+var _step_start_time: float = 0.0
 
 
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
@@ -147,6 +153,14 @@ static func _valid_evolutions(definition: TowerDefinition) -> bool:
 			return false
 		if bool(config["continuous"]) != (branch == "boulders") or not definition.area_attack:
 			return false
+		if branch == "boulders" and not config.has("followup"):
+			return false
+		if config.has("followup"):
+			if branch != "boulders" or not config["followup"] is Dictionary:
+				return false
+			var followup: Dictionary = config["followup"]
+			if followup.get("id") != "freeze_runes" or not followup.get("title") is String or String(followup["title"]).is_empty() or not followup.get("cost") is int or int(followup["cost"]) <= 0:
+				return false
 	return true
 
 
@@ -161,7 +175,7 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
 		"kills": 0, "damage_upgraded": false, "speed_upgraded": false,
-		"special_upgraded": false, "evolution": "", "secondary_mode": mode,
+		"special_upgraded": false, "freeze_upgraded": false, "evolution": "", "secondary_mode": mode,
 		"secondary_shot": 0, "secondary_aim": Vector2(cell), "secondary_target_id": -1,
 		"bounce_active": false, "bounce_aim": Vector2(cell),
 		"damage": definition["damage"], "interval": definition["interval"],
@@ -205,14 +219,17 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 			continue
 		var definition: Dictionary = _tower_types[tower["type_id"]]
 		var evolution: bool = definition["evolutions"].has(upgrade)
-		if upgrade not in ["damage", "speed", "special"] and not evolution:
+		var freeze: bool = upgrade == "freeze_runes"
+		if upgrade not in ["damage", "speed", "special"] and not evolution and not freeze:
 			return false
-		var flag: String = "special_upgraded" if evolution else upgrade + "_upgraded"
+		if freeze and (tower["evolution"] != "boulders" or not definition["evolutions"].get("boulders", {}).has("followup")):
+			return false
+		var flag: String = "freeze_upgraded" if freeze else ("special_upgraded" if evolution else upgrade + "_upgraded")
 		if (evolution or upgrade == "special") and (not tower["damage_upgraded"] or not tower["speed_upgraded"]):
 			return false
 		if upgrade == "special" and definition["special_upgrade"].is_empty():
 			return false
-		var cost: int = int(definition["evolutions"][upgrade]["cost"]) if evolution else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition))
+		var cost: int = int(definition["evolutions"]["boulders"]["followup"]["cost"]) if freeze else (int(definition["evolutions"][upgrade]["cost"]) if evolution else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition)))
 		if tower[flag] or coins[slot] < cost:
 			return false
 		coins[slot] -= cost
@@ -233,7 +250,7 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 			tower["interval"] *= definition["speed_upgrade_multiplier"]
 			# Accelerate the current reload, but never grant an immediate extra shot.
 			tower["cooldown"] *= definition["speed_upgrade_multiplier"]
-		elif definition["special_upgrade"] == "second_archer":
+		elif upgrade == "special" and definition["special_upgrade"] == "second_archer":
 			tower["interval"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
 			tower["cooldown"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
 		return true
@@ -249,6 +266,7 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 			continue
 		coins[slot] += _sell_value(tower["invested"])
 		_continuous_damage.erase(tower_id)
+		_rune_damage.erase(tower_id)
 		towers[slot].remove_at(index)
 		return true
 	return false
@@ -256,7 +274,7 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 
 # Level is derived from accepted upgrades, never a second mutable copy of tower state.
 static func tower_level(tower: Dictionary) -> int:
-	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"])) + int(bool(tower.get("special_upgraded", false)))
+	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"])) + int(bool(tower.get("special_upgraded", false))) + int(bool(tower.get("freeze_upgraded", false)))
 
 
 static func tower_upgrade_cost(tower: Dictionary, definition: Dictionary) -> int:
@@ -318,6 +336,45 @@ func _valid_send_timing() -> bool:
 func _pending_sends(slot: int) -> int:
 	return _send_queues[slot].size() - _send_heads[slot]
 
+
+
+# Debug jumps abandon a round, never clear it: no bounty, income or wave reward.
+func debug_set_round(round_number: int) -> bool:
+	if phase == Phase.FINISHED or round_number < 1 or round_number > 1000:
+		return false
+	phase = Phase.PLANNING
+	wave = round_number - 1
+	winner = -1
+	coin_flip = false
+	enemies = [[], []]
+	wave_roster.clear()
+	spawn_times.clear()
+	_send_queues = [[], []]
+	_send_heads = [0, 0]
+	_next_send_times = [0.0, 0.0]
+	_active_send_spawn_interval = 0.0
+	_routes = [[], []]
+	_routing_next = [{}, {}]
+	_fork_cursors = [{}, {}]
+	_spawned = [0, 0]
+	_elapsed = 0.0
+	_step_start_time = 0.0
+	_continuous_damage.clear()
+	_rune_damage.clear()
+	_enemy_spawn_times.clear()
+	_slow_motion.clear()
+	for board: Array in towers:
+		for tower: Dictionary in board:
+			tower["cooldown"] = tower["interval"] if tower["evolution"] == "onyx_ring" else 0.0
+			tower["target_id"] = -1
+			tower["secondary_target_id"] = -1
+			tower["shot"] = 0
+			tower["secondary_shot"] = 0
+			tower["aim"] = Vector2(tower["cell"])
+			tower["secondary_aim"] = Vector2(tower["cell"])
+			tower["bounce_aim"] = Vector2(tower["cell"])
+			tower["bounce_active"] = false
+	return true
 
 func start_wave(routing: Array[Dictionary]) -> bool:
 	if phase != Phase.PLANNING or not _roster_configuration_valid or routing.size() != 2 or not _valid_spawn_timing() or not _valid_send_timing():
@@ -444,6 +501,7 @@ func _assign_route(slot: int) -> Array[Vector2i]:
 func advance(delta: float) -> bool:
 	if phase != Phase.WAVE or delta <= 0.0:
 		return false
+	_step_start_time = _elapsed
 	_elapsed += delta
 	for slot: int in range(2):
 		_move_enemies(slot, delta)
@@ -568,7 +626,26 @@ func _valid_mode(mode: int) -> bool:
 
 func _move_enemies(slot: int, delta: float) -> void:
 	for enemy: Dictionary in enemies[slot]:
-		enemy["progress"] += float(enemy["speed"]) * delta
+		var base_speed: float = enemy["base_speed"]
+		var slowed_seconds: float = minf(delta, float(enemy["slow_remaining"]))
+		if slowed_seconds > 0.0:
+			var slow_speed: float = base_speed * TowerDefinition.FREEZE_SPEED_MULTIPLIER
+			if not _slow_motion.has(enemy["id"]):
+				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
+			var motion: Array = _slow_motion[enemy["id"]]
+			motion[0] = float(enemy["progress"])
+			motion[1] = slowed_seconds
+			motion[2] = slow_speed
+			motion[3] = base_speed
+			enemy["progress"] += slow_speed * slowed_seconds + base_speed * (delta - slowed_seconds)
+			enemy["slow_remaining"] = maxf(0.0, float(enemy["slow_remaining"]) - delta)
+			enemy["slowed"] = float(enemy["slow_remaining"]) > 0.000000001
+			if not enemy["slowed"]:
+				enemy["slow_remaining"] = 0.0
+			enemy["speed"] = slow_speed if enemy["slowed"] else base_speed
+		else:
+			_slow_motion.erase(enemy["id"])
+			enemy["progress"] += base_speed * delta
 		enemy["pos"] = _position(enemy["route"], enemy["progress"])
 
 
@@ -610,7 +687,8 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 	var speed: float = _enemy_speed(type_id, wave)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
-		"type_id": type_id, "speed": speed,
+		"type_id": type_id, "base_speed": speed, "speed": speed,
+		"slowed": false, "slow_remaining": 0.0,
 		"damage": _enemy_types[type_id]["base_damage"],
 		"route": route, "progress": progress, "pos": _position(route, progress),
 	})
@@ -680,7 +758,7 @@ func _attack_pulses(slot: int, tower: Dictionary, range_cells: float, delta: flo
 			var enemy: Dictionary = enemies[slot][index]
 			if float(_enemy_spawn_times[enemy["id"]]) > pulse_time + 0.000000001:
 				continue
-			var progress: float = maxf(0.0, float(enemy["progress"]) - float(enemy["speed"]) * (_elapsed - pulse_time))
+			var progress: float = _historical_progress(enemy, pulse_time)
 			var position: Vector2 = _position(enemy["route"], progress)
 			if not cell_in_range(tower["cell"], Vector2i(position.round()), range_cells):
 				continue
@@ -712,18 +790,37 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 			_hit(slot, tower, index, damage)
 
 
-# Movement precedes attacks. Integrate the path actually traversed this tick,
-# not a full delta at its final tile; otherwise entering/leaving range and
-# mid-tick spawns would manufacture damage and depend on frame splitting.
+# Read the motion captured before attacks, not a slow refreshed by an earlier
+# tower this tick. This also makes Onyx pulses sample the correct side of expiry.
+func _historical_progress(enemy: Dictionary, time: float) -> float:
+	if _slow_motion.has(enemy["id"]):
+		var motion: Array = _slow_motion[enemy["id"]]
+		var duration: float = maxf(0.0, time - _step_start_time)
+		return float(motion[0]) + minf(duration, float(motion[1])) * float(motion[2]) + maxf(0.0, duration - float(motion[1])) * float(motion[3])
+	return maxf(0.0, float(enemy["progress"]) - float(enemy["base_speed"]) * (_elapsed - time))
+
+
+# Integrate each constant-speed span separately when a slow expires mid-tick.
 func _continuous_exposure(cell: Vector2i, range_cells: float, enemy: Dictionary, delta: float) -> float:
 	if delta <= 0.0:
 		return 0.0
-	var speed: float = enemy["speed"]
+	if _slow_motion.has(enemy["id"]):
+		var motion: Array = _slow_motion[enemy["id"]]
+		var slowed_seconds: float = minf(delta, float(motion[1]))
+		var exposure: float = _exposure_span(cell, range_cells, enemy, motion[0], motion[2], slowed_seconds)
+		var remainder: float = maxf(0.0, delta - slowed_seconds)
+		return exposure + _exposure_span(cell, range_cells, enemy, float(motion[0]) + slowed_seconds * float(motion[2]), motion[3], remainder)
+	var speed: float = enemy["base_speed"]
+	return _exposure_span(cell, range_cells, enemy, maxf(0.0, float(enemy["progress"]) - speed * delta), speed, delta)
+
+
+func _exposure_span(cell: Vector2i, range_cells: float, enemy: Dictionary, start: float, speed: float, duration: float) -> float:
+	if duration <= 0.0:
+		return 0.0
 	if speed <= 0.0:
-		return delta if cell_in_range(cell, Vector2i(enemy["pos"].round()), range_cells) else 0.0
+		return duration if cell_in_range(cell, Vector2i(_position(enemy["route"], start).round()), range_cells) else 0.0
 	var route: Array = enemy["route"]
-	var finish: float = minf(float(enemy["progress"]), float(route.size() - 1))
-	var start: float = maxf(0.0, float(enemy["progress"]) - speed * delta)
+	var finish: float = minf(start + speed * duration, float(route.size() - 1))
 	var distance: float = 0.0
 	var radius: int = floori(range_cells)
 	for segment: int in range(floori(start), ceili(finish)):
@@ -746,14 +843,27 @@ func _continuous_exposure(cell: Vector2i, range_cells: float, enemy: Dictionary,
 
 func _retire_enemy(enemy_id: int) -> void:
 	_enemy_spawn_times.erase(enemy_id)
+	_slow_motion.erase(enemy_id)
+	for tower_id: int in _rune_damage:
+		_rune_damage[tower_id].erase(enemy_id)
 	for tower_id: int in _continuous_damage:
 		_continuous_damage[tower_id].erase(enemy_id)
 
 
 func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> void:
 	var enemy: Dictionary = enemies[slot][enemy_index]
-	var hit_damage: int = int(tower["damage"]) if damage < 0 else damage
+	var hit_damage: int = mini(int(enemy["hp"]), int(tower["damage"]) if damage < 0 else damage)
 	enemy["hp"] -= hit_damage
+	if _tower_types[tower["type_id"]]["evolutions"].has("boulders"):
+		var tower_id: int = tower["id"]
+		if not _rune_damage.has(tower_id):
+			_rune_damage[tower_id] = {}
+		var credit: Dictionary = _rune_damage[tower_id]
+		credit[enemy["id"]] = int(credit.get(enemy["id"], 0)) + hit_damage
+		if hit_damage > 0 and tower["evolution"] == "boulders" and tower["freeze_upgraded"] and int(credit[enemy["id"]]) >= ceili(float(enemy["max_hp"]) * TowerDefinition.FREEZE_DAMAGE_THRESHOLD):
+			enemy["slowed"] = true
+			enemy["slow_remaining"] = TowerDefinition.FREEZE_DURATION
+			enemy["speed"] = float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1
 		coins[slot] += _rules.kill_bounty

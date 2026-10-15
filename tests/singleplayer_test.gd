@@ -138,6 +138,16 @@ func _solo_specials(planning: MatchPlanning) -> void:
 			before = planning.combat.duplicate(true)
 			planning.upgrade_tower(0, id, "onyx_ring" if upgrade == "boulders" else "boulders")
 			_check(planning.combat == before, "Mirrored Rune evolution cannot switch branches or spend again")
+		if upgrade == "boulders":
+			planning.upgrade_tower(0, id, "freeze_runes")
+			for slot: int in range(2):
+				var tower: Dictionary = planning.combat["towers"][slot].back()
+				_check(tower["freeze_upgraded"] and MatchCombat.tower_level(tower) == 5, "Boulders follow-up mirrors Freeze Runes and level V")
+			_check(planning.combat["coins"][0] == planning.combat["coins"][1], "Mirrored Freeze Runes purchases charge each owner equally")
+		elif upgrade == "onyx_ring":
+			before = planning.combat.duplicate(true)
+			planning.upgrade_tower(0, id, "freeze_runes")
+			_check(planning.combat == before, "Onyx cannot buy the Boulders follow-up")
 		if type_id == &"arrow_tower":
 			planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
 			for slot: int in range(2):

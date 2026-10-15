@@ -83,6 +83,8 @@ func _run() -> void:
 				var expected_tower: Dictionary = original_towers[slot][0].duplicate(true)
 				expected_tower["cell"] = str(Vector2i(0, expansions))
 				expected_tower["aim"] = str(Vector2(0, expansions))
+				expected_tower["secondary_aim"] = str(Vector2(0, expansions))
+				expected_tower["bounce_aim"] = str(Vector2(0, expansions))
 				_check(snapshot["combat"]["towers"][slot][0] == expected_tower, "Growth preserves tower IDs, stats, investment and world-positioned bases/aim on both peers")
 		if expansions > 0:
 			var outer_x: int = 13 + expansions

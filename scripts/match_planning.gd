@@ -122,6 +122,31 @@ func can_manage_towers(slot: int) -> bool:
 	return phase == MatchCombat.Phase.WAVE or (phase == MatchCombat.Phase.PLANNING and not ready_flags[slot])
 
 
+func can_debug() -> bool:
+	if not active or _host_combat == null or _host_combat.phase == MatchCombat.Phase.FINISHED:
+		return false
+	return singleplayer or (session != null and session.is_host and session.state == MultiplayerSession.State.CONNECTED and _active_peer_id != 0)
+
+
+func debug_set_values(round_number: int, money: int) -> bool:
+	if not can_debug() or round_number < 1 or round_number > 1000 or money < 0 or money > 1000000000:
+		return false
+	var displayed_round: int = _host_combat.wave + 1 if _host_combat.phase == MatchCombat.Phase.PLANNING else _host_combat.wave
+	if round_number != displayed_round:
+		if not _host_combat.debug_set_round(round_number):
+			return false
+		_host_routes = [[], []]
+		_host_speed_votes = [false, false]
+		_host_autoplay_votes = [false, false]
+		_enter_planning()
+	_host_combat.coins[0] = money
+	if singleplayer:
+		_host_combat.coins[1] = money
+	_update_processing()
+	_publish_snapshot()
+	return true
+
+
 func request_edit(slot: int, cell: Vector2i, place: bool) -> void:
 	_request_command("edit", slot, cell, place)
 
@@ -470,9 +495,11 @@ func _enter_planning() -> void:
 	_host_ready = [false, false]
 	_ready_seconds_left = -1.0
 	_combat_publish_elapsed = 0.0
-	if not _is_main_round():
-		return
-	var required_expansions: int = (_host_combat.wave + 1) / combat_rules.main_round_interval - 1
+	_grow_to_round(_host_combat.wave + 1)
+
+
+func _grow_to_round(round_number: int) -> void:
+	var required_expansions: int = maxi(0, round_number / combat_rules.main_round_interval - 1)
 	while _expansion_count < required_expansions:
 		for layout: PathLayout in _host_layouts:
 			layout.grow_for_main_round(combat_rules.tiles_per_expansion)
