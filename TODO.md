@@ -58,14 +58,20 @@ Creator chose **Keep current sprites** for the initial presentation change. Exis
 
 Portable review artifacts: [shared-scene candidate comparison](docs/visual-reference/coherent-candidates.png) and [provenance](docs/visual-reference/coherent-candidates.provenance.json). These are unapproved static proposals, kept outside Godot imports; the updated original-asset lineup uses the corrected terrain palette.
 
-### 3. Structure perspective and eight-way ballista — paused, not implemented
+### 3. Structure perspective and ballista — starting image delivered; rotations creator-led
 
 The creator preferred the original heavy crossbow over a front-facing masonry base, but rejected that rough composite's quality. The later `swappy-20261014_223240.png` sketch supersedes the completely frontal box in `swappy-20261014_223203.png`: retain a broad front wall, show a narrower right wall, and reveal more roof. The earlier equal-sided corner-facing appearance in `swappy-20261014_215908.png` is not the target. These references are local Desktop screenshots; the geometry description here is the portable direction.
 
+**Current handoff (2026-10-15):** the creator selected the taller, manually drawn buttressed foundation, retained the original crossbow design, and requested additional weapon detail without enlargement. The deliverable is now **one good starting image**, not an assistant-produced rotation set; the creator will use PixelLab for rotations.
+
+Use the transparent [128×128 starting image](archive_assets/towers/ballista/manual-master/ballista.png), with separate [fixed base](archive_assets/towers/ballista/manual-master/base.png) and [detailed crossbow](archive_assets/towers/ballista/manual-master/crossbow.png). Rotate the weapon layer rather than regenerating the masonry. The [enlarged preview](archive_assets/towers/ballista/manual-master/preview.png), native-pixel preparation script, provenance, and direct Godot board captures are in the [manual-master archive](archive_assets/README.md#manual-ballista-starting-image).
+
+The final image was rendered through the real `PathBoard` at 1280×720 and 1000×720, on both board orientations, beside original towers/enemies and adjacent copies. The approved base remains byte-identical; the crossbow retains its bounds, hard alpha, and native pixel scale. This is an artwork preview, **not a gameplay cutover or directional tracking implementation**.
+
 #### Artwork changes
 
-- [ ] Refine the ballista into a convincing, substantial structure in that front-dominant perspective. Preserve the recognizable heavy timber crossbow, pale stone, steel fittings, upper-left light, and readable dark contours. Improve masonry and roof depth; avoid a skinny box, repetitive tiny bricks, or a miniature weapon.
-- [ ] Produce **eight distinct crossbow poses: N, NE, E, SE, S, SW, W, NW**. Generate poses individually against one consistent design/perspective reference; keep the process direct and show useful results promptly instead of repeating a prolonged guide/composite/isolation workflow.
+- [x] Refine one ballista starting pose around the approved taller buttressed base, preserving the recognizable heavy timber crossbow, pale stone, steel fittings, upper-left light, and dark contours. Add steel bindings, stock highlights, a windlass, and rivets without enlarging the weapon.
+- [ ] Produce **eight distinct crossbow poses: N, NE, E, SE, S, SW, W, NW**. The creator will handle these in PixelLab from the starting image; do not resume automated rotation generation unless requested.
 - [ ] Keep the **base identical in every pose**. Only the crossbow assembly turns around its vertical swivel: stock, bow limbs, string, and bolt move together. One shared base with eight weapon layers or full frames assembled from that same base are acceptable; independently changing masonry is not.
 - [ ] Align all poses to one swivel point, consistent scale, and canvas. Match physical weapon proportions and materials across views; ensure each bolt points in its named direction, strings meet the stock correctly, and nothing floats or detaches. Draw directional perspective rather than rotating the PNG in its image plane.
 - [ ] Apply the same accepted structure perspective to the other towers, crystal pedestal, and portal rim. Preserve crystal facets and portal-opening readability; do not change the square-grid map or gameplay camera to accommodate sprites.
@@ -80,7 +86,7 @@ The creator preferred the original heavy crossbow over a front-facing masonry ba
 
 #### Experiment handoff
 
-Work stopped at the creator's request; **no replacement sprites were imported and no tracking behavior was implemented**. Eight individual full-pose generations and isolated weapon candidates exist, but the set is not approved or fully cleaned/aligned. The south full-pose generation was oversized; a smaller isolated alternative exists. Other observed issues include inconsistent bow/stock/string geometry, mount alignment gaps, and a detached fragment in the west extraction. The draft assembly is not acceptance evidence.
+The earlier generation experiments stopped at the creator's request; **no replacement sprites were imported and no tracking behavior was implemented**. Those eight full-pose generations and isolated weapon candidates are not the current handoff and remain unapproved. The south full-pose generation was oversized; other observed issues included inconsistent bow/stock/string geometry, mount alignment gaps, and a detached west fragment. Use the manual starting image above instead of treating those draft assemblies as acceptance evidence.
 
 - Initial rough front-facing studies: `~/Pictures/Gorcs-PixelArt/ballista-facing-experiment/`.
 - Later generations, direction references, requests/history, and draft assemblies: `~/Pictures/Gorcs-PixelArt/ballista-eight-directions-v2/`.

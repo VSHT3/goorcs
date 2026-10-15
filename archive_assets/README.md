@@ -12,9 +12,10 @@
 | `chests/prepared/` | Aligned open frame and padded closed reference | 2 |
 | `chests/source_sheets/` | Original 4×4 treasure-chest sheet | 1 |
 | `towers/ballista/source/` | Original PixelLab ballista sprite | 1 |
+| `towers/ballista/manual-master/` | Manual starting pose, source layers, preview and rendered checks | 7 |
 | `world/idle/` | Review-only portal/crystal idle sheets and animated previews | 5 |
 
-Numbers such as `0001` identify downloaded variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared chest pair has derivation links in `assets.json`; the endpoint animation manifest records its own source links.
+Numbers such as `0001` identify downloaded variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared chest pair has derivation links in `assets.json`; the endpoint and manual-ballista manifests record their own source links.
 
 ## Tags and provenance
 
@@ -36,6 +37,20 @@ jq -r '.assets[] | select(.tags | index("open")) | .path' archive_assets/assets.
 Useful tags include `chest`, `treasure`, `orc`, `closed`, `open`, `variant`, `prepared`, `reference`, `sprite-sheet`, `ballista`, `source-original`, and `runtime-exact-match`.
 
 Source URLs and license terms were not supplied and are explicitly unspecified, not assumed cleared for redistribution. PixelLab provenance is recorded only where filenames or the documented project workflow identify it.
+
+## Manual ballista starting image
+
+[`towers/ballista/manual-master/ballista.png`](towers/ballista/manual-master/ballista.png) is the creator-requested **single starting pose for PixelLab rotations**, not a runtime replacement or an approved eight-direction set. The taller hand-pixeled foundation has projecting corner piers, a recessed stone wall, a thick roof cap and a stepped footing. The retained crossbow gains native-pixel steel bindings, stock highlights, winding-mechanism detail and rivets without enlargement.
+
+- `ballista.png`: complete transparent 128×128 starting image, facing south-east.
+- `base.png` and `crossbow.png`: aligned full-canvas layers. Rotate only the weapon if the masonry must remain identical; keep the shared canvas and anchors.
+- `source-crossbow.png`: preserved source extraction and manual saddle repair before the detail pass. The original PixelLab sprite remains unchanged in `assets/towers/ballista_tower.png`.
+- `preview.png`: enlarged nearest-neighbor review, not a game screenshot.
+- `manifest.json`: source provenance, hashes, layer order, foot anchor `(64, 117)`, roof swivel `(64, 52)`, and export checks.
+
+Run `python3 archive_assets/towers/ballista/manual-master/prepare.py` to reproduce the detailed layer, composite and preview; Pillow is authoring-only. No new AI generation is involved in this final master. Export checks preserve the approved base hash, weapon bounds, binary alpha and unclipped margins.
+
+The [1280×720](towers/ballista/manual-master/godot-review-1280.png) and [1000×720](towers/ballista/manual-master/godot-review-1000.png) captures are direct graphical `PathBoard` renders with both board orientations, adjacent candidates, top-row placement, original towers and enemies. The sprite displayed at 67.2px opaque height on 48px cells. This was an isolated in-memory art preview; collection/save identities, gameplay resources and host-selected target tracking were not changed. `verification.json` ties these captures to the checked master PNG.
 
 ## Endpoint idle animation candidates
 
