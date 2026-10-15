@@ -15,9 +15,9 @@ var _extents := Rect2()
 var _gap := Rect2()
 
 
-func configure(board_size: Vector2, board_gap: float, extents: Rect2) -> void:
+func configure(board_size: Vector2, board_gap: float, extents: Rect2, origin_x: float = 0.0) -> void:
 	_extents = extents
-	_gap = Rect2(Vector2(board_size.x, extents.position.y), Vector2(board_gap, extents.size.y))
+	_gap = Rect2(Vector2(origin_x + board_size.x, extents.position.y), Vector2(board_gap, extents.size.y))
 	queue_redraw()
 
 

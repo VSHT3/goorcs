@@ -13,7 +13,7 @@
 | `chests/source_sheets/` | Original 4×4 treasure-chest sheet | 1 |
 | `towers/ballista/source/` | Original PixelLab ballista sprite | 1 |
 | `towers/ballista/manual-master/` | Manual starting pose, source layers, preview and rendered checks | 7 |
-| `world/idle/` | Review-only portal/crystal idle sheets and animated previews | 5 |
+| `world/idle/` | Approved portal/crystal idle sheets and animated previews | 5 |
 
 Numbers such as `0001` identify downloaded variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared chest pair has derivation links in `assets.json`; the endpoint and manual-ballista manifests record their own source links.
 
@@ -52,21 +52,21 @@ Run `python3 archive_assets/towers/ballista/manual-master/prepare.py` to reprodu
 
 The [1280×720](towers/ballista/manual-master/godot-review-1280.png) and [1000×720](towers/ballista/manual-master/godot-review-1000.png) captures are direct graphical `PathBoard` renders with both board orientations, adjacent candidates, top-row placement, original towers and enemies. The sprite displayed at 67.2px opaque height on 48px cells. This was an isolated in-memory art preview; collection/save identities, gameplay resources and host-selected target tracking were not changed. `verification.json` ties these captures to the checked master PNG.
 
-## Endpoint idle animation candidates
+## Approved endpoint idle animations
 
-[`world/idle/idle_comparison.gif`](world/idle/idle_comparison.gif) compares the original portal and crystal with their proposed idle loops. These are **review candidates, not installed game artwork**; approval is required before enabling them in matches or the workshop.
+[`world/idle/idle_comparison.gif`](world/idle/idle_comparison.gif) compares the original portal and crystal with their approved idle loops. Byte-identical PNG sheets are installed in `assets/world/` and enabled in matches and the workshop; this archive preserves the authoring inputs, reproducible exports, and previews.
 
 - Both loops contain sixteen 96×96 frames at 5 fps: a 3.2-second repeating cycle. PNG sheets store one horizontal row; separate transparent GIFs are also included.
 - The portal preserves its stone ring, runes, silhouette, and pedestal while the red aperture distorts slightly, small wisps circulate, and existing embers drift. The crystal retains its shape and stone base while facets shimmer and existing sparks twinkle.
 - Sprite exports use only their respective source palettes and binary alpha, without blur or antialiasing. Fixed original framing bounds prevent particle changes from shifting sprite scale or anchors.
-- [`world/idle/manifest.json`](world/idle/manifest.json) records source/output hashes, timing, frame layout, anchors, and adjacent-frame changes including the loop seam. Sources remain `assets/world/enemy_portal.png` and `assets/world/health_crystal.png`, unchanged.
+- [`world/idle/manifest.json`](world/idle/manifest.json) records source/output hashes, runtime sheet paths, timing, frame layout, anchors, and adjacent-frame changes including the loop seam. Sources remain `assets/world/enemy_portal.png` and `assets/world/health_crystal.png`, unchanged.
 
-Regenerate with `python3 archive_assets/world/idle/generate.py` from the project root; authoring was verified with Pillow 12.3.0. Pillow is development-only, not a game dependency. Generation validates source-palette membership, hard alpha, fixed non-magical body pixels, unique frames, and loop boundaries.
+Regenerate with `python3 archive_assets/world/idle/generate.py` from the project root; authoring was verified with Pillow 12.3.0. This rebuilds archived exports, not the installed runtime copies. Pillow is development-only, not a game dependency. Generation validates source-palette membership, hard alpha, fixed non-magical body pixels, unique frames, and loop boundaries.
 
-A throwaway graphical main-scene preview played all frames in the workshop and Singleplayer, both match orientations, at 1280×720 and 1000×720. Captured frames were inspected and endpoint framing/path state stayed unchanged. Decoded transparent GIF frames matched the PNG sheets exactly. This was an in-memory preview, not a runtime cutover; the regular game still uses the original static sprites.
+Graphical verification played the installed sheets automatically through every frame in the actual workshop and Singleplayer, both match orientations, at 1280×720 and 1000×720, including 2× combat and hide/resume/leave/reopen. Captured frames were inspected; endpoint framing and idle accepted state stayed unchanged. Native clicks still built paths, purchased towers, and started waves. Decoded transparent GIF frames match the PNG sheets exactly.
 
 ## Runtime separation
 
-`.gdignore` keeps this archive out of Godot resource imports. The game's active assets remain in `../assets/`; no runtime references were changed.
+`.gdignore` keeps this archive out of Godot resource imports. Approved runtime copies live in `../assets/`; the game never loads the archive, GIFs, manifest, or Python authoring script.
 
 The ballista original, prepared open chest, and padded closed reference are byte-identical to the corresponding active game PNGs. Other candidates are archived alternatives, not approved runtime replacements. See [the pixel-art workflow](../docs/development.md#pixel-art-asset-workflow) before replacing game art.

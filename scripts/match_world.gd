@@ -46,6 +46,7 @@ var _camera_input: CameraInput
 
 func _ready() -> void:
 	_world_viewport.world_2d = World2D.new()
+	_world_viewport.process_mode = Node.PROCESS_MODE_DISABLED
 	resized.connect(_fit_camera)
 	for path: String in ["%Targeting", "%EnemyType"]:
 		var selector := get_parent().get_node_or_null(path) as OptionButton
@@ -64,18 +65,23 @@ func configure(dimensions: Vector2i, own_slot: int, board_origin_y: int = 0) -> 
 	if dimensions == _dimensions and own_slot == _own_slot and board_origin_y == _board_origin_y:
 		return
 	var fresh_focus: bool = _dimensions == Vector2i.ZERO or own_slot != _own_slot
+	var grew: bool = _dimensions != Vector2i.ZERO and dimensions.y > _dimensions.y and board_origin_y < _board_origin_y
 	_cancel_motion()
 	_dimensions = dimensions
 	_own_slot = own_slot
 	_board_origin_y = board_origin_y
 	var board_size := Vector2(dimensions) * CELL_SIZE
+	# Shift the mirrored host outward while keeping both portal-facing edges fixed.
+	var board_origin := Vector2.ONE * board_origin_y * CELL_SIZE
 	for slot: int in range(boards.size()):
 		boards[slot].size = board_size
-		boards[slot].position = Vector2(slot * (board_size.x + BOARD_GAP), board_origin_y * CELL_SIZE)
+		boards[slot].position = board_origin + Vector2(slot * (board_size.x + BOARD_GAP), 0.0)
 		boards[slot].mirror_horizontal = slot == 0
 	_fit_camera()
 	if fresh_focus:
 		_reset_camera()
+	elif grew:
+		_frame_expanded_board()
 
 
 func set_active(value: bool) -> void:
@@ -85,6 +91,8 @@ func set_active(value: bool) -> void:
 	_cancel_motion()
 	visible = value
 	_world_viewport.gui_disable_input = not value
+	# Canvas visibility does not propagate into a SubViewport; pause its local effects explicitly.
+	_world_viewport.process_mode = Node.PROCESS_MODE_INHERIT if value else Node.PROCESS_MODE_DISABLED
 	_world_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if value else SubViewport.UPDATE_DISABLED
 	set_process(value)
 	_camera_input.set_process_input(value)
@@ -168,7 +176,7 @@ func zoom_at(factor: float, screen_position: Vector2) -> bool:
 		return false
 	var viewport_position: Vector2 = local_position * Vector2(_world_viewport.size) / size
 	var canvas_before: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * viewport_position
-	var next_zoom: float = clampf(camera.zoom.x * factor, _fit_zoom * MIN_ZOOM_RATIO, _fit_zoom * MAX_ZOOM_RATIO)
+	var next_zoom: float = clampf(camera.zoom.x * factor, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
 	_cancel_strokes()
 	camera.zoom = Vector2.ONE * next_zoom
 	camera.force_update_scroll()
@@ -237,11 +245,11 @@ func _fit_camera() -> void:
 		return
 	_cancel_strokes()
 	var ratio: float = camera.zoom.x / _fit_zoom if _fit_zoom > 0.0 else 1.0
-	var initial_size := Vector2(_dimensions.x, maxi(_dimensions.y + 2 * _board_origin_y, 1)) * CELL_SIZE
+	var initial_size := Vector2(maxi(_dimensions.x + _board_origin_y, 1), maxi(_dimensions.y + 2 * _board_origin_y, 1)) * CELL_SIZE
 	_headroom = maxf(boards[0].visual_headroom(), boards[1].visual_headroom())
 	var gameplay_height: float = maxf(size.y - HUD_TOP - HUD_BOTTOM, 1.0)
 	_fit_zoom = minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / initial_size.x, gameplay_height / (initial_size.y + _headroom))
-	camera.zoom = Vector2.ONE * _fit_zoom * clampf(ratio, MIN_ZOOM_RATIO, MAX_ZOOM_RATIO)
+	camera.zoom = Vector2.ONE * clampf(_fit_zoom * ratio, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
 	_update_camera_bounds()
 	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
@@ -251,7 +259,7 @@ func _fit_camera() -> void:
 func _update_camera_bounds() -> void:
 	var board_size := Vector2(_dimensions) * CELL_SIZE
 	var half_width: float = minf(board_size.x * 0.5, maxf(size.x - SIDE_MARGIN * 2.0, 1.0) * 0.5 / camera.zoom.x)
-	camera_bounds = Vector2(half_width, board_size.x * 2.0 + BOARD_GAP - half_width)
+	camera_bounds = Vector2(boards[0].position.x + half_width, boards[1].position.x + board_size.x - half_width)
 	_bounds_zoom = camera.zoom
 	var half_height: float = maxf(size.y - HUD_TOP - HUD_BOTTOM, 1.0) * 0.5 / camera.zoom.y
 	var hud_offset: float = (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y
@@ -270,7 +278,28 @@ func _configure_terrain() -> void:
 	var half_view: Vector2 = size / camera.zoom * 0.5
 	var terrain_start := Vector2(camera_bounds.x - half_view.x, camera_vertical_bounds.x - half_view.y) - Vector2.ONE * CELL_SIZE
 	var terrain_end := Vector2(camera_bounds.y + half_view.x, camera_vertical_bounds.y + half_view.y) + Vector2.ONE * CELL_SIZE
-	_terrain.configure(Vector2(_dimensions) * CELL_SIZE, BOARD_GAP, Rect2(terrain_start, terrain_end - terrain_start))
+	_terrain.configure(Vector2(_dimensions) * CELL_SIZE, BOARD_GAP, Rect2(terrain_start, terrain_end - terrain_start), boards[0].position.x)
+
+
+func _expanded_fit_zoom() -> float:
+	var board_size := Vector2(_dimensions) * CELL_SIZE
+	return minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / board_size.x,
+		maxf(size.y - HUD_TOP - HUD_BOTTOM - 24.0, 1.0) / (board_size.y + _headroom))
+
+
+func _minimum_zoom() -> float:
+	return minf(_fit_zoom * MIN_ZOOM_RATIO, _expanded_fit_zoom())
+
+
+func _frame_expanded_board() -> void:
+	camera.zoom = Vector2.ONE * _expanded_fit_zoom()
+	_update_camera_bounds()
+	var board_size := Vector2(_dimensions) * CELL_SIZE
+	camera.position = boards[_own_slot].position + Vector2(board_size.x * 0.5,
+		(board_size.y - _headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y)
+	camera.position = _clamped_position(camera.position)
+	camera.force_update_scroll()
+	_configure_terrain()
 
 
 func _reset_camera() -> void:
@@ -280,8 +309,8 @@ func _reset_camera() -> void:
 	_fit_camera()
 	var board_size := Vector2(_dimensions) * CELL_SIZE
 	var headroom: float = _headroom
-	camera.position = Vector2(board_size.x * 0.5 + _own_slot * (board_size.x + BOARD_GAP),
-		_board_origin_y * CELL_SIZE + (board_size.y - headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y)
+	camera.position = boards[_own_slot].position + Vector2(board_size.x * 0.5,
+		(board_size.y - headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y)
 	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
 

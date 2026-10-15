@@ -64,12 +64,12 @@ func clear() -> void:
 	_recalculate()
 
 
-func grow_vertical(extra_tiles: int) -> void:
+func grow_for_main_round(extra_tiles: int) -> void:
 	assert(extra_tiles >= 0)
 	var shifted: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _tiles:
 		shifted[cell + Vector2i.DOWN] = true
-	dimensions.y += 2
+	dimensions += Vector2i(1, 2)
 	entrance += Vector2i.DOWN
 	base += Vector2i.DOWN
 	budget += extra_tiles
