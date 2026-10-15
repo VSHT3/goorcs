@@ -80,6 +80,8 @@ const IDLE_START: float = 2.1
 const IDLE_END: float = 2.65
 const CYCLE_SECONDS: float = 6.8
 const INTRO_DURATION: float = 1.86
+const ROAR_START: float = 0.50
+const ROAR_DURATION: float = 0.96
 const FACE_LIFT: float = 2.0
 const SUFFIX: Array[String] = ["R", "C", "S"]
 
@@ -94,6 +96,7 @@ var _entrance_material: ShaderMaterial
 var _letter_advances: PackedFloat32Array = []
 var _face_pose: FacePose = FacePose.NEUTRAL
 var _face_offset := Vector2.ZERO
+var _roar_time: float = -1.0
 
 
 func _ready() -> void:
@@ -115,7 +118,7 @@ func _process(delta: float) -> void:
 		_intro_time = minf(_intro_time + delta, INTRO_DURATION)
 		_entrance_material.set_shader_parameter("intro_time", _intro_time)
 		_entrance_material.set_shader_parameter("logo_center", size.x * 0.5)
-		_update_intro_pose()
+		_update_roar_pose(_intro_time - ROAR_START)
 		_intro_finished = _intro_time >= INTRO_DURATION
 		if _intro_finished:
 			material = null
@@ -125,38 +128,84 @@ func _process(delta: float) -> void:
 	_elapsed = fmod(_elapsed + delta, CYCLE_SECONDS)
 	var eyes_closed: bool = _elapsed >= BLINK_START and _elapsed < BLINK_END
 	var idle_offset: float = -1.0 if _elapsed >= IDLE_START and _elapsed < IDLE_END else 0.0
+	if _roar_time >= 0.0:
+		_idle_offset = idle_offset
+		_roar_time = minf(_roar_time + delta, ROAR_DURATION)
+		_update_roar_pose(_roar_time)
+		if _roar_time >= ROAR_DURATION:
+			_roar_time = -1.0
+		queue_redraw()
+		return
 	if eyes_closed != _eyes_closed or idle_offset != _idle_offset:
 		_eyes_closed = eyes_closed
 		_idle_offset = idle_offset
 		queue_redraw()
 
 
-func _update_intro_pose() -> void:
-	_eyes_closed = _intro_time >= 0.50 and _intro_time < 1.46
+func _update_roar_pose(time: float) -> void:
+	_eyes_closed = time >= 0.0 and time < ROAR_DURATION
 	_face_offset = Vector2.ZERO
-	if _intro_time < 0.50 or _intro_time >= 1.34:
+	if time < 0.0 or time >= 0.84:
 		_face_pose = FacePose.NEUTRAL
-	elif _intro_time < 0.64:
+	elif time < 0.14:
 		_face_pose = FacePose.BRACED
 		_face_offset.y = 2.0
-	elif _intro_time < 0.76:
+	elif time < 0.26:
 		_face_pose = FacePose.OPEN
-	elif _intro_time < 1.10:
+	elif time < 0.60:
 		_face_pose = FacePose.ROARING
 		_face_offset.y = -2.0
-	elif _intro_time < 1.24:
+	elif time < 0.74:
 		_face_pose = FacePose.OPEN
 	else:
 		_face_pose = FacePose.BRACED
 
 
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if _intro_finished and _roar_time < 0.0 and is_visible_in_tree():
+			_roar_time = 0.0
+			_update_roar_pose(_roar_time)
+			queue_redraw()
+		accept_event()
+
+
+func _has_point(point: Vector2) -> bool:
+	var pixel: Vector2i = Vector2i(((point - _face_origin()) / PIXEL).floor())
+	var jaw: Array = JAW_POSES[_face_pose]
+	var row_count: int = FACE_ROWS.size() if jaw.is_empty() else JAW_START_ROW + jaw.size()
+	if pixel.y < 0 or pixel.y >= row_count:
+		return false
+	var row: String = _face_row(pixel.y)
+	return pixel.x >= 0 and pixel.x < row.length() and row.substr(pixel.x, 1) != "."
+
+
+func _word_origin_x() -> float:
+	var word_width: float = _g_width + FACE_ROWS[0].length() * PIXEL + 8.0 + _suffix_width
+	return floorf((size.x - word_width) * 0.5)
+
+
+func _baseline() -> float:
+	# Pixelify's uppercase ink runs from -12 to 631 in a 1000-unit em.
+	return floorf((size.y + 0.619 * FONT_SIZE) * 0.5) + _idle_offset
+
+
+func _face_origin() -> Vector2:
+	return Vector2(floorf(_word_origin_x() + _g_width + 4.0), _baseline() - FACE_ROWS.size() * PIXEL - FACE_LIFT) + _face_offset
+
+
+func _face_row(index: int) -> String:
+	if _eyes_closed and index >= 6 and index <= 7:
+		return CLOSED_EYE_ROWS[index - 6]
+	var jaw: Array = JAW_POSES[_face_pose]
+	return jaw[index - JAW_START_ROW] if index >= JAW_START_ROW and not jaw.is_empty() else FACE_ROWS[index]
+
+
 func _draw() -> void:
 	var face_width: float = FACE_ROWS[0].length() * PIXEL
 	var gap: float = 4.0
-	var word_width: float = _g_width + face_width + gap * 2.0 + _suffix_width
-	var origin_x: float = floorf((size.x - word_width) * 0.5)
-	# Pixelify's uppercase ink runs from -12 to 631 in a 1000-unit em.
-	var baseline: float = floorf((size.y + 0.619 * FONT_SIZE) * 0.5) + _idle_offset
+	var origin_x: float = _word_origin_x()
+	var baseline: float = _baseline()
 	var g_position: Vector2 = Vector2(origin_x, baseline)
 	var suffix_position: Vector2 = Vector2(origin_x + _g_width + face_width + gap * 2.0, baseline)
 	var settle: float = clampf(_intro_time / 0.58, 0.0, 1.0)
@@ -176,7 +225,7 @@ func _draw() -> void:
 		draw_string(TITLE_FONT, position, letter, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, IVORY)
 		advance += _letter_advances[index]
 	draw_set_transform(Vector2.ZERO)
-	var face_origin: Vector2 = Vector2(floorf(origin_x + _g_width + gap), baseline - FACE_ROWS.size() * PIXEL - FACE_LIFT) + _face_offset
+	var face_origin: Vector2 = _face_origin()
 	_draw_face(face_origin + Vector2(2, 3), true)
 	_draw_face(face_origin, false)
 
@@ -185,9 +234,7 @@ func _draw_face(origin: Vector2, shadow: bool) -> void:
 	var jaw: Array = JAW_POSES[_face_pose]
 	var row_count: int = FACE_ROWS.size() if jaw.is_empty() else JAW_START_ROW + jaw.size()
 	for row_index: int in range(row_count):
-		var row: String = jaw[row_index - JAW_START_ROW] if row_index >= JAW_START_ROW and not jaw.is_empty() else FACE_ROWS[row_index]
-		if _eyes_closed and row_index >= 6 and row_index <= 7:
-			row = CLOSED_EYE_ROWS[row_index - 6]
+		var row: String = _face_row(row_index)
 		for column in row.length():
 			var pixel: String = row.substr(column, 1)
 			if pixel == ".":
@@ -213,6 +260,7 @@ func _on_visibility_changed() -> void:
 		material = null
 		_entrance_material = null
 		_elapsed = 0.0
+		_roar_time = -1.0
 		_eyes_closed = false
 		_face_pose = FacePose.NEUTRAL
 		_face_offset = Vector2.ZERO

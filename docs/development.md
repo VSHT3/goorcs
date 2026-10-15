@@ -87,6 +87,9 @@ godot --path . --script tests/path_board_test.gd
 # Run rendered enemy-inspection and live-instance UI regressions.
 godot --path . --script tests/enemy_inspection_test.gd
 
+# Run native Orc-O hit testing, visible replay, spam, and navigation lifecycle.
+godot --path . --script tests/menu_wordmark_test.gd
+
 # Run collection-driven tower-selection and resource-extension regressions.
 godot --headless --path . --script tests/tower_selection_test.gd
 ```
@@ -459,6 +462,12 @@ The orc mark now occupies an 18×17 pixel grid at the existing four-pixel scale 
 The startup roar uses hand-authored braced, open, and roaring lower-face pixel poses sharing the original head. It is not a stretched mouth texture: the cavity widens, the lower jaw descends in two stages, the tusks travel with it, and a muted tongue becomes visible. Tight closed-eye artwork, a small anticipation dip/head recoil, a held peak, and staged recovery give the movement weight. Peak artwork extends downward inside the existing title bounds; normal alignment/size and button bounds stay fixed. Idle blinking uses the closed-eye artwork without triggering a roar. No audio is added.
 
 Roar verification captured real-time anticipation, opening, peak, and recovery in the actual main scene at 1280×720 and 1000×720, with rendered jaw/tusk/eye poses inspected. Actual Play clicks during the peak worked; hiding/stopping/returning restored the calm face and released the shader without replay. Navigation, workshop feedback/layout, chest flow, import, and startup checks passed. Collection saves were isolated and the temporary capture harness removed.
+
+Clicking the actual painted Orc-O replays the shared braced/open/roaring/recovery poses without recreating the entrance shader or letter assembly. Native `_has_point` follows face pixels, including jaw/idle offsets; letters, whitespace, transparent corners, and right clicks do not trigger it. Busy/startup clicks are ignored, and hiding cancels to neutral. The cursor indicates the face interaction without adding a caption.
+
+**Evolution, drawbacks, and future plans:** the earlier roar was startup-only; manual replay now uses the same pose owner/timing, not a second mouth implementation or gameplay state. It is deliberately silent and mouse-only, with no queued spam. If sound or another input affordance is later approved, keep it local, optional, and independent of match audio/networking. Do not replay the expensive whole-logo effect or restart navigation for this cosmetic interaction.
+
+The rendered wordmark regression passed visible eyes/jaw changes, glyph-only isolation, stable letter/control geometry, spam/repeat behavior, startup cancellation, and idle blink/lift. Actual main-menu clicks visibly replayed the roar, Play interrupted it, Escape returned to neutral, and another face click replayed/settled again. No audio or match behavior changed.
 
 Workshop header/sidebar use the match HUD palette. The shared `PathBoard` draws grass/soil, connected stonework, rim, portal, and crystal for both local and command boards. A fixed visual margin keeps the workshop rim clear of controls. Rejection feedback moved out of the content VBox into a screen-anchored footer: warnings remain visible, but their appearance/expiry cannot change board bounds or cell coordinates.
 

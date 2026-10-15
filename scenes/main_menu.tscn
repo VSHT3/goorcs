@@ -32,7 +32,7 @@ theme_override_constants/separation = 20
 [node name="Title" type="Control" parent="Center/Panel"]
 custom_minimum_size = Vector2(0, 112)
 layout_mode = 2
-mouse_filter = 2
+mouse_default_cursor_shape = 2
 script = ExtResource("1_title")
 
 [node name="Play" type="Button" parent="Center/Panel"]
