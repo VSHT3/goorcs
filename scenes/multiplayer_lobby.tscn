@@ -104,7 +104,6 @@ layout_mode = 2
 mouse_default_cursor_shape = 2
 theme_type_variation = &"PrimaryButton"
 text = "Singleplayer"
-tooltip_text = "Local testing: the opponent mirrors your paths, towers, and readiness. No connection required."
 script = ExtResource("4_button")
 
 [node name="Multiplayer" type="HBoxContainer" parent="Margin/Scroll/Center/Content/Body/Choices"]
@@ -120,7 +119,6 @@ size_flags_horizontal = 3
 mouse_default_cursor_shape = 2
 toggle_mode = true
 text = "Host"
-tooltip_text = "Create a private room on this computer."
 script = ExtResource("4_button")
 
 [node name="Join" type="Button" parent="Margin/Scroll/Center/Content/Body/Choices/Multiplayer"]
@@ -131,7 +129,6 @@ size_flags_horizontal = 3
 mouse_default_cursor_shape = 2
 toggle_mode = true
 text = "Join"
-tooltip_text = "Connect using your friend's complete invite code."
 script = ExtResource("4_button")
 
 [node name="HostForm" type="VBoxContainer" parent="Margin/Scroll/Center/Content/Body"]
@@ -151,7 +148,6 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_digits")
-tooltip_text = "Use an IP your friend can reach over the same LAN or a private VPN / Tailscale. 127.0.0.1 works only on this computer."
 placeholder_text = "192.168.1.20"
 max_length = 45
 keep_editing_on_text_submit = true
@@ -171,7 +167,6 @@ text = "Port"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(160, 46)
 layout_mode = 2
-tooltip_text = "Allow this UDP port through the host firewall. Internet connections also need a reachable IP and UDP port forwarding."
 min_value = 1.0
 max_value = 65535.0
 value = 7000.0
@@ -201,7 +196,6 @@ text = "Invite code"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
-tooltip_text = "Paste the complete invite code. It includes the host IP and a private room credential; share it only with your friend."
 placeholder_text = "Paste invite code"
 keep_editing_on_text_submit = true
 
@@ -230,7 +224,6 @@ text = "Invite code"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 92)
 layout_mode = 2
-tooltip_text = "Share this code privately with one friend. It contains your IP and room credential and expires when you leave."
 editable = false
 wrap_mode = 1
 scroll_fit_content_height = true

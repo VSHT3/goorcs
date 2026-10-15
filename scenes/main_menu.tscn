@@ -45,7 +45,6 @@ focus_next = NodePath("../Open")
 focus_previous = NodePath("../Quit")
 theme_type_variation = &"PrimaryButton"
 text = "Play"
-tooltip_text = "Host or join a two-player match."
 script = ExtResource("2_button")
 
 [node name="Open" type="Button" parent="Center/Panel"]
@@ -57,7 +56,6 @@ focus_neighbor_bottom = NodePath("../Collection")
 focus_next = NodePath("../Collection")
 focus_previous = NodePath("../Play")
 text = "Workshop"
-tooltip_text = "Edit a local maze. The layout lasts until you quit."
 script = ExtResource("2_button")
 
 [node name="Collection" type="Button" parent="Center/Panel"]
@@ -69,7 +67,6 @@ focus_neighbor_bottom = NodePath("../Quit")
 focus_next = NodePath("../Quit")
 focus_previous = NodePath("../Open")
 text = "Collection"
-tooltip_text = "View tower unlocks and open chests."
 script = ExtResource("2_button")
 
 [node name="Quit" type="Button" parent="Center/Panel"]

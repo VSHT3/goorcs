@@ -94,6 +94,25 @@ func _run() -> void:
 	title._process(WORDMARK_SCRIPT.CYCLE_SECONDS - title._elapsed + (WORDMARK_SCRIPT.IDLE_START + WORDMARK_SCRIPT.IDLE_END) * 0.5)
 	_check(title._idle_offset < 0.0 and title._roar_time < 0.0, "Tiny idle lift remains active without replaying the roar")
 
+	# Pointer navigation transfers keyboard focus instead of leaving two selections.
+	var workshop: Button = menu.get_node("Center/Panel/Open")
+	var collection: Button = menu.get_node("Center/Panel/Collection")
+	button.grab_focus()
+	for hovered: Button in [workshop, collection, button]:
+		var motion := InputEventMouseMotion.new()
+		motion.position = hovered.get_global_rect().get_center()
+		motion.global_position = motion.position
+		viewport.push_input(motion, true)
+		await process_frame
+		_check(viewport.gui_get_focus_owner() == hovered, "Mouse hover transfers the menu selection")
+	for pressed: bool in [true, false]:
+		var key := InputEventKey.new()
+		key.keycode = KEY_DOWN
+		key.pressed = pressed
+		viewport.push_input(key, true)
+		await process_frame
+	_check(viewport.gui_get_focus_owner() == workshop, "Arrow navigation continues from the hovered menu item")
+
 	# Interrupting the first entrance also stays completed on menu return.
 	var interrupted: Control = load("res://scenes/main_menu.tscn").instantiate()
 	viewport.add_child(interrupted)

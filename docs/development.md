@@ -98,7 +98,7 @@ godot --path . --script tests/horde_presentation_test.gd
 # Run rendered enemy-inspection and live-instance UI regressions.
 godot --path . --script tests/enemy_inspection_test.gd
 
-# Run native Orc-O hit testing, visible replay, spam, and navigation lifecycle.
+# Run native Orc-O replay/lifecycle and mouse-to-keyboard menu focus transfer.
 godot --path . --script tests/menu_wordmark_test.gd
 
 # Run collection-driven tower-selection and resource-extension regressions.

@@ -22,6 +22,8 @@ Click the orc O to replay just his silent roar. Other letters do not trigger it;
 
 **Play** uses a centered menu with a primary Singleplayer action, paired Host/Join choices, and the same button styling/hover effects as the title screen. Connection forms, waiting rooms, real errors, and Cancel/Leave stay in the compact column rather than spanning the screen.
 
+Title and Play menus share one hover/keyboard selection: moving onto an enabled button moves focus there, and arrow navigation continues from it. These menus have no explanatory hover popups. Locally authored hard-edged ivory/green cursors replace the default arrow (32×40) and clickable hand (32×32) throughout the game; text editing and resize cursors retain their native shapes.
+
 ## Test solo
 
 - Choose **Play → Singleplayer** to start immediately without a connection, port, or invite.
