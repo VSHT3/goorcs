@@ -84,6 +84,9 @@ godot --path . --script tests/tower_icon_test.gd
 # Run movement interpolation and rendered path-junction regressions.
 godot --path . --script tests/path_board_test.gd
 
+# Run small mixed-body, cosmetic spread, overlap picking, and corner regressions.
+godot --path . --script tests/horde_presentation_test.gd
+
 # Run rendered enemy-inspection and live-instance UI regressions.
 godot --path . --script tests/enemy_inspection_test.gd
 
@@ -164,7 +167,18 @@ The rendered enemy-inspection regression also passed: same-type ID isolation, ac
 
 `assets/audio/orcish_drone.mp3` is the unchanged user-supplied `Orcish_Drone_FULL_SONG_musicgpt.mp3` (SHA-256 `fd8ce059f07bc3de311caa7cb8805b7076c5bc286dd888ea97d544cf107ca2df`, approximately 178.57 seconds, stereo 48kHz MP3). The main scene's local `MatchMusic` player loops at −12 dB during active match planning, combat, and wave breaks. Menus, connection setup, workshop, collection, results, and leaving are silent. Match snapshots do not restart playback. This is presentation only; no host audio clock or network messages were added.
 
-`TowerReward` and `EnemyDefinition` own `board_height` (opaque height in cells) and normalized `board_anchor` (base/feet within the displayed texture). Collection/chest icon sizing is unchanged. Shipped tower heights are Arrow 1.42, Ballista 1.40, Rune 1.50; enemies are Grunt 0.84, Runner 0.74, Brute 1.02. The common foot point is the cell center plus 0.28 cells downward. Cached opaque bounds prevent transparent padding from determining size. Foot-y sorting includes towers, enemies, and endpoints; health bars render above bodies only when damaged.
+`TowerReward` and `EnemyDefinition` own `board_height` (opaque height in cells) and normalized `board_anchor` (base/feet within the texture). Tower heights remain Arrow 1.42, Ballista 1.40, Rune 1.50. Enemy heights are now Grunt 0.50, Runner 0.45, Brute 0.70; the ordinary enemy default is 0.50. PNGs/anchors and collection/chest artwork are unchanged. A shared visual foot combines the interpolated route position, cosmetic sideways offset, and existing 0.28-cell downward anchor. Shadows, depth, sprite, damaged-only bar, hit testing, and selected brackets follow that foot.
+
+#### First-pass horde presentation
+
+Previously, larger enemies occupied most of a tile and every sprite followed the exact visual centerline. The first pass reduces silhouette size and derives a stable signed sideways offset (at most 0.10 cells) from each ID, without random draws. Route normals blend near corners, narrowing the spread through turns rather than jumping or steering off the route. `_enemy_position` remains the interpolated centerline; `_enemy_visual_position` is local presentation only. Authoritative `pos`/progress/routes, range membership, path splits, speeds, and collision-free movement remain unchanged.
+
+Small body-scaled shadows/bars avoid old billboard-sized feedback. Picking uses cached texture alpha inside opaque bounds in front-to-back visual order, so transparent corners of an overlapping neighbor cannot steal an enemy click. No per-frame image readbacks or per-frame randomness were added. Multiple enemies may still occupy the same gameplay tile/position; this is not a crowd-collision/avoidance system.
+
+**Tradeoffs and future work:** smaller sprites lose fine detail, so source art may need a deliberate low-resolution cleanup after actual-size playtests. Close units can still occlude one another; picking selects the visible foreground body, not a hidden enemy behind it. Wider collision lanes, more enemies, changed rewards/damage, walk-cycle frames, and automatic AI animation are not part of this presentation pass. Measure dense-wave performance and Rune/AoE readability before increasing counts or rebalancing.
+
+Rendered horde, board, and enemy-inspection regressions passed shipped mixed-size hierarchy, overlapping opacity selection, selected-only highlighting, mirrored corner continuity, snapshot stability/nonmutation, and compact health bars. A real sixth-round main-scene smoke used mixed regular/sent streams and overlapping sends, clicked an actual visible instance, inspected both orientations and 1280×720/1000×720 captures, and confirmed unchanged accepted gameplay state. Source PNGs remain untouched.
+
 
 Match grass/soil and connected stone materials are cosmetic, not blocked cells or path rules. The playable field contrasts with a darker, quieter exterior; broad stepped sod variation replaces scattered rectangle noise. An external earth apron/rim marks the existing bounds, and a continuous jagged ravine separates the match boards without adding traversable cells. Orderly world-aligned masonry uses quiet stone variation, mortar, and soil/contact edges. Cached ground drawing remains continuous through bends, branches, endpoints, and mirroring. Workshop rendering now reuses the terrain/stone/rim drawing paths; `command_mode` controls edit authority rather than artwork. Selected towers get a base marker and quiet tile range; explicit click/native-drag placement shows legal/illegal cells. Idle combat has no hover square or permanent tower rectangles. Arrow/Ballista retain brief directional traces; Rune uses a 0.14-second faint neighborhood shimmer with local hit sparks instead of expanding gold rings.
 

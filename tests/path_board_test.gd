@@ -394,6 +394,8 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			var body_bounds: Rect2i = body["bounds"]
 			_check(int(health["pixels"]) > 0 and health_bounds.end.y <= body_bounds.position.y,
 				"Damage reveals health information above the opaque body without repainting it, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
+			_check(health_bounds.size.x <= ceili(board._cell_size() * 0.38) + 1 and health_bounds.size.y <= 4,
+				"Damaged shipped enemies use compact body-sized bars instead of the old wide health billboards")
 		_check(masses[2] > masses[1], "Brute has more visible mass than Runner on either board")
 	board.combat_enemies = []
 	var turning_route: Array = [Vector2i(0, 2), Vector2i(1, 2), Vector2i(1, 1), Vector2i(0, 1)]
@@ -422,11 +424,14 @@ func _check_source_facing(board: PathBoard, viewport: SubViewport) -> void:
 		var baseline: Image = await _board_image(board, viewport)
 		board.combat_enemies = [_enemy(104, 1.0, Vector2(1, 2), route)]
 		var image: Image = await _board_image(board, viewport)
-		var center := Vector2i(board.cell_center(Vector2i(1, 2)))
-		var geometry: Dictionary = _changed_geometry(baseline, image, Rect2i(center + Vector2i(-50, -90), Vector2i(100, 130)))
+		var enemy: Dictionary = board.combat_enemies[0]
+		var foot: Vector2 = board._position_center(board._enemy_visual_position(enemy)) + Vector2(0,board._cell_size()*0.28)
+		var rect: Rect2 = board._sprite_rect(artwork.texture,artwork.board_height,artwork.board_anchor,foot,mirrored != artwork.source_faces_left)
+		var region := Rect2i(Vector2i(rect.position)-Vector2i.ONE,Vector2i(rect.size)+Vector2i(2,2))
+		var geometry: Dictionary = _changed_geometry(baseline,image,region)
 		var bounds: Rect2i = geometry["bounds"]
-		var offset: int = bounds.get_center().x - center.x
-		_check(offset < -8 if mirrored else offset > 8, "Left-authored artwork faces along the route on either board, not backward")
+		var offset: float = bounds.get_center().x - rect.get_center().x
+		_check(offset < 0 if mirrored else offset > 0, "Left-authored artwork faces along the route on either board, not backward")
 	board._enemy_art["grunt"] = original
 	board.combat_enemies = []
 
@@ -481,7 +486,7 @@ func _check_split_routes(board: PathBoard, viewport: SubViewport) -> void:
 			var image: Image = await _board_image(board, viewport)
 			for index: int in range(2):
 				var enemy: Dictionary = board.combat_enemies[index]
-				var center: Vector2 = board._position_center(expected[index])
+				var center: Vector2 = board._position_center(board._enemy_visual_position(enemy))
 				var foot: Vector2 = center + Vector2(0, board._cell_size() * 0.28)
 				var rect := Rect2(foot - Vector2(18, 36), Vector2(36, 36))
 				var region := Rect2i(rect.grow(4))
@@ -501,7 +506,7 @@ func _check_split_routes(board: PathBoard, viewport: SubViewport) -> void:
 		var unselected: Image = await _board_image(board, viewport)
 		for index: int in range(2):
 			var enemy: Dictionary = board.combat_enemies[index]
-			var foot: Vector2 = board._position_center(steps[2][index]) + Vector2(0, board._cell_size() * 0.28)
+			var foot: Vector2 = board._position_center(board._enemy_visual_position(enemy)) + Vector2(0, board._cell_size() * 0.28)
 			var click := InputEventMouseButton.new()
 			click.position = foot - Vector2(0, 18)
 			click.button_index = MOUSE_BUTTON_LEFT
@@ -512,7 +517,7 @@ func _check_split_routes(board: PathBoard, viewport: SubViewport) -> void:
 			board.selected_enemy_id = int(enemy["id"])
 			var highlighted: Image = await _board_image(board, viewport)
 			for branch: int in range(2):
-				var branch_foot: Vector2 = board._position_center(steps[2][branch]) + Vector2(0, board._cell_size() * 0.28)
+				var branch_foot: Vector2 = board._position_center(board._enemy_visual_position(board.combat_enemies[branch])) + Vector2(0, board._cell_size() * 0.28)
 				var region := Rect2i(Rect2(branch_foot - Vector2(18, 36), Vector2(36, 36)).grow(6))
 				var pixels: int = int(_changed_geometry(unselected, highlighted, region)["pixels"])
 				_check(pixels > 0 if branch == index else pixels == 0,

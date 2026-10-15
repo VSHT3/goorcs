@@ -20,5 +20,5 @@ max_weight_share = 0.35
 send_cost = 40
 send_income = 4
 texture = ExtResource("2_sprite")
-board_height = 1.02
+board_height = 0.70
 board_anchor = Vector2(0.5, 0.92)

@@ -24,6 +24,8 @@ const STONE_DARK := Color("676b55")
 const ENEMY_BLEND_DURATION: float = 0.1
 const SHOT_DURATION: float = 0.18
 const PULSE_DURATION: float = 0.14
+const ENEMY_LATERAL_SPREAD: float = 0.10
+const ENEMY_CORNER_BLEND: float = 0.25
 
 var layout: PathLayout
 var command_mode: bool = false
@@ -92,6 +94,7 @@ var _texture_bounds: Dictionary[Texture2D, Rect2] = {}
 var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
+var _enemy_hit_images: Dictionary[Texture2D, Image] = {}
 var _portal_texture: Texture2D
 var _crystal_texture: Texture2D
 var _ground_canvas: Node2D
@@ -181,6 +184,35 @@ func _enemy_position(enemy: Dictionary) -> Vector2:
 	if route.size() == 1:
 		return Vector2(route[0])
 	return _route_position(route, _enemy_route_progress(enemy))
+
+
+func _enemy_visual_position(enemy: Dictionary) -> Vector2:
+	var route: Array = enemy["route"]
+	if route.size() < 2:
+		return _enemy_position(enemy)
+	var progress: float = _enemy_route_progress(enemy)
+	return _route_position(route, progress) + _route_normal(route, progress) * _enemy_lateral_offset(int(enemy["id"]))
+
+
+func _enemy_lateral_offset(id: int) -> float:
+	# Integer-only mixing is stable across snapshots and never consumes combat RNG.
+	var mixed: int = (id * 1103515245 + 12345) & 0x7fffffff
+	return (float(mixed % 2001) / 1000.0 - 1.0) * ENEMY_LATERAL_SPREAD
+
+
+func _route_normal(route: Array, progress: float) -> Vector2:
+	var index: int = mini(floori(progress), route.size() - 2)
+	var fraction: float = progress - index
+	var direction: Vector2 = (Vector2(route[index + 1]) - Vector2(route[index])).normalized()
+	if index > 0 and fraction < ENEMY_CORNER_BLEND:
+		var incoming: Vector2 = (Vector2(route[index]) - Vector2(route[index - 1])).normalized()
+		direction = incoming.lerp(direction, smoothstep(-ENEMY_CORNER_BLEND, ENEMY_CORNER_BLEND, fraction))
+	elif index + 2 < route.size() and fraction > 1.0 - ENEMY_CORNER_BLEND:
+		var outgoing: Vector2 = (Vector2(route[index + 2]) - Vector2(route[index + 1])).normalized()
+		direction = direction.lerp(outgoing, smoothstep(1.0 - ENEMY_CORNER_BLEND, 1.0 + ENEMY_CORNER_BLEND, fraction))
+	# Do not renormalize the blend: bends gently narrow the spread, and even a
+	# reversing fixture passes continuously through zero instead of flipping.
+	return Vector2(-direction.y, direction.x)
 
 
 func _enemy_route_progress(enemy: Dictionary) -> float:
@@ -275,14 +307,13 @@ func _update_input_filter() -> void:
 
 func enemy_at(position: Vector2) -> int:
 	# Match the interpolated sprite and front-to-back drawing order, not its path cell.
+	_update_draw_order()
 	for index: int in range(_draw_order.size() - 1, -1, -1):
 		var item: Dictionary = _draw_order[index]
 		if int(item["kind"]) != 2:
 			continue
 		var enemy: Dictionary = item["data"]
-		var foot: Vector2 = _position_center(_enemy_position(enemy)) + Vector2(0, _cell_size() * 0.28)
-		var progress: float = _enemy_route_progress(enemy)
-		if _enemy_sprite_bounds(enemy, foot, progress).has_point(position):
+		if _enemy_contains_point(enemy, item["foot"], item["progress"], position):
 			return int(enemy["id"])
 	return -1
 
@@ -574,7 +605,7 @@ func _depth_before(a: Dictionary, b: Dictionary) -> bool:
 	return int(a["data"]["id"]) < int(b["data"]["id"]) if int(a["kind"]) != 0 else false
 
 
-func _draw_combat() -> void:
+func _update_draw_order() -> void:
 	var cell_size: float = _cell_size()
 	for item: Dictionary in _draw_order:
 		var center: Vector2
@@ -588,12 +619,20 @@ func _draw_combat() -> void:
 				var enemy: Dictionary = item["data"]
 				var progress: float = _enemy_route_progress(enemy)
 				item["progress"] = progress
-				center = _position_center(_enemy_position(enemy))
+				center = _position_center(_enemy_visual_position(enemy))
 		item["foot"] = center + Vector2(0, cell_size * 0.28)
 	_draw_order.sort_custom(_depth_before)
+
+
+func _draw_combat() -> void:
+	_update_draw_order()
+	var cell_size: float = _cell_size()
 	# All contact shadows belong to the ground, not in front of foreground units.
 	for item: Dictionary in _draw_order:
-		var width: float = cell_size * (0.22 if int(item["kind"]) == 2 else 0.35)
+		var width: float = cell_size * 0.35
+		if int(item["kind"]) == 2:
+			var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
+			width = cell_size * artwork.board_height * 0.26
 		draw_set_transform(item["foot"], 0.0, Vector2(1.0, 0.30))
 		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, 0.35))
 	draw_set_transform(Vector2.ZERO)
@@ -639,6 +678,23 @@ func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> 
 	return Rect2(rect.position + bounds.position * scale, bounds.size * scale)
 
 
+func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, position: Vector2) -> bool:
+	if not _enemy_sprite_bounds(enemy, foot, progress).has_point(position):
+		return false
+	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
+	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
+	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, foot, flip)
+	var uv: Vector2 = (position - rect.position) / rect.size
+	if flip:
+		uv.x = 1.0 - uv.x
+	if not _enemy_hit_images.has(artwork.texture):
+		_enemy_hit_images[artwork.texture] = artwork.texture.get_image()
+	var image: Image = _enemy_hit_images[artwork.texture]
+	var pixel := Vector2i(uv * Vector2(image.get_size()))
+	pixel = pixel.clamp(Vector2i.ZERO, image.get_size() - Vector2i.ONE)
+	return image.get_pixelv(pixel).a >= 0.1
+
+
 func _draw_enemy_selection(item: Dictionary) -> void:
 	var rect: Rect2 = _enemy_sprite_bounds(item["data"], item["foot"], item["progress"]).grow(3.0)
 	var color := Color("e0bc77")
@@ -653,12 +709,10 @@ func _draw_enemy_health(item: Dictionary) -> void:
 	var enemy: Dictionary = item["data"]
 	if float(enemy["hp"]) >= float(enemy["max_hp"]):
 		return
-	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
-	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, item["foot"])
-	var bounds: Rect2 = _texture_bounds[artwork.texture]
-	var visual_top: float = rect.position.y + bounds.position.y * rect.size.y / artwork.texture.get_height()
-	var bar_size := Vector2(_cell_size() * 0.48, maxf(3.0, _cell_size() * 0.055))
-	var bar_position := Vector2(item["foot"].x - bar_size.x * 0.5, visual_top - bar_size.y - 3.0)
+	var bounds: Rect2 = _enemy_sprite_bounds(enemy, item["foot"], item["progress"])
+	var bar_size := Vector2(clampf(bounds.size.x * 0.85, _cell_size() * 0.22, _cell_size() * 0.38),
+		maxf(2.0, _cell_size() * 0.04))
+	var bar_position := Vector2(item["foot"].x - bar_size.x * 0.5, bounds.position.y - bar_size.y - 3.0)
 	draw_rect(Rect2(bar_position, bar_size), Color("172120"))
 	var fraction: float = clampf(float(enemy["hp"]) / maxf(1.0, float(enemy["max_hp"])), 0.0, 1.0)
 	draw_rect(Rect2(bar_position, Vector2(bar_size.x * fraction, bar_size.y)), Color("8bac77"))
