@@ -22,7 +22,7 @@ Click the orc O to replay just his silent roar. Other letters do not trigger it;
 
 **Play** uses a centered menu with a primary Singleplayer action, paired Host/Join choices, and the same button styling/hover effects as the title screen. Connection forms, waiting rooms, real errors, and Cancel/Leave stay in the compact column rather than spanning the screen.
 
-Title and Play menus share one hover/keyboard selection: moving onto an enabled button moves focus there, and arrow navigation continues from it. These menus have no explanatory hover popups. Locally authored 32×32 pixel cursors replace the default arrow and clickable hand throughout the game. The arrow uses a regular two-pixel grid, solid ivory silhouette, dark outline, and muted sage shading; its hotspot sits at the tip. Text editing and resize cursors retain their native shapes.
+Title and Play menus share one hover/keyboard selection: moving onto an enabled button moves focus there, and arrow navigation continues from it. These menus have no explanatory hover popups. The pointer uses the original 32×32 [“iron dagger” by ACC_10](https://www.cursor.cc/?action=icon&file_id=161259), listed by cursor.cc as “Creative Commons, no attribution,” with its original tip hotspot. Battlefield and workshop terrain, towers, and enemies retain the dagger; UI controls that request a hand use the locally authored ivory/green hand. Text editing and resize cursors retain their native shapes.
 
 ## Test solo
 

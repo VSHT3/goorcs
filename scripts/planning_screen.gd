@@ -667,7 +667,6 @@ func _refresh() -> void:
 		board.tower_types = state.get("tower_types", {})
 		board.combat_towers = all_towers[slot]
 		board.combat_enemies = all_enemies[slot]
-		board.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if board.input_enabled or board.enemy_inspection_enabled else Control.CURSOR_ARROW
 		board.queue_redraw()
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
 		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")

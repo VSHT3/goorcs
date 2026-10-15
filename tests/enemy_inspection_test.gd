@@ -72,6 +72,8 @@ func _open_match() -> void:
 	_freeze()
 	await _settle()
 
+	_check_cursor(screen.menu_button.get_global_rect().get_center(), Input.CURSOR_POINTING_HAND, "HUD cog uses the UI hand")
+	_check_cursor(world.cell_screen_position(0, Vector2i(5, 3)), Input.CURSOR_ARROW, "Moving from HUD to terrain restores the gameplay pointer")
 
 func _start_wave() -> void:
 	for x: int in range(1, 13):
@@ -375,7 +377,16 @@ func _click_enemy(slot: int, id: int) -> void:
 	var viewport: SubViewport = world.get_node("Viewport")
 	var point: Vector2 = world.get_global_transform_with_canvas() * (viewport_position * world.size / Vector2(viewport.size))
 	_check(world.get_global_rect().has_point(point), "Selected sprite body is actually inside the visible transformed gameplay viewport")
+	_check_cursor(point, Input.CURSOR_ARROW, "Hovering an inspectable enemy keeps the gameplay pointer")
 	await _click(point)
+
+
+func _check_cursor(point: Vector2, expected: Input.CursorShape, message: String) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	motion.global_position = point
+	root.push_input(motion, true)
+	_check(Input.get_current_cursor_shape() == expected, message)
 
 
 func _image_region(board: PathBoard, rect: Rect2) -> Rect2i:

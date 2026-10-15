@@ -176,6 +176,12 @@ Graphical smoke used actual main-scene enemy clicks and inspected 1280×720 and 
 
 The rendered enemy-inspection regression also passed: same-type ID isolation, accepted per-instance HP/speed/damage changes, interpolation-following hit tests and highlight pixels, both board orientations, opponent read-only input, stable overlay anchoring, placement priority, Close/Escape, real kills/leaks, results, and leave/reopen with reused IDs. Native tower drag/drop and main-scene startup checks passed.
 
+### Pointer artwork and gameplay hover
+
+`assets/ui/cursor_arrow.png` is the unchanged 32×32 [“iron dagger” by ACC_10](https://www.cursor.cc/?action=icon&file_id=161259), downloaded from [the original PNG](https://www.cursor.cc/cursor/259/161/cursor.png). The source page lists its license as “Creative Commons, no attribution” (checked 2026-10-15); it does not name a specific license version. Source SHA-256: `027de9a3fe3b2704353fca14a5fafa3f33fe1f20b7d9f7ac4afe216e428e0cba`. Colors, hard alpha, and native dimensions are preserved. The embedded source CUR header supplies hotspot `(4, 0)`, registered unchanged in `main.gd`. The locally authored 32×32 UI hand remains separate.
+
+Interactive match boards previously requested a hand whenever editing or enemy inspection was enabled. That override is removed: terrain, towers, enemies, and the workshop use the pointer regardless of interactivity; UI controls retain their own cursor shapes. Native cursor captures verified unchanged dagger pixels/hotspot over ground, an owned Rune tower, a live enemy, and workshop, including hand-to-pointer roundtrips from the HUD cog. Tower clicking still opened inspection. The rendered enemy-inspection regression covers UI-hand → terrain-pointer transitions and pointer retention over inspectable enemy bodies; navigation, import, and startup passed.
+
 ### In-game menu and audio settings
 
 The match HUD cogwheel and Escape open `MatchPauseMenu` with Resume, Settings, and Quit. Escape retains selection/placement cancellation priority; in Settings it returns to the choices, and in the choices it resumes. Quit returns to the main menu through the existing session teardown. Connection-form Escape remains cancellation, and workshop navigation is unchanged.
