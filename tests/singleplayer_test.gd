@@ -38,7 +38,8 @@ func _run() -> void:
 	_check(not planning.layouts[0].has_path(Vector2i(1, 4)) and not planning.layouts[1].has_path(Vector2i(1, 4)), "Erasing mirrors")
 	planning.request_edit(0, Vector2i(1, 4), true)
 	planning.request_clear(0)
-	_check(planning.layouts[0].used_tiles() == 0 and planning.layouts[1].used_tiles() == 0, "Clearing mirrors")
+	_check(planning.layouts[0].used_tiles() == 1 and planning.layouts[1].used_tiles() == 1, "Initial setup rejects Clear on both mirrored boards")
+	planning.request_edit(0, Vector2i(1, 4), false)
 	for x: int in range(1, 13):
 		planning.request_edit(0, Vector2i(x, 4), true)
 	_check(planning.layouts[0].is_ready() and planning.layouts[0].route == planning.layouts[1].route, "Both routes are legal and identical")

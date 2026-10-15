@@ -4,7 +4,7 @@ var planning_worker_path: String = "res://tests/match_planning_worker.gd"
 
 
 func _run() -> void:
-	success_message = "PASS: two-peer distinct paths, ownership/bounds/endpoints/budget, readiness invalidation/withdrawal, route capture/lock, disconnect and fresh rejoin"
+	success_message = "PASS: two-peer distinct paths, ownership/bounds/endpoints/budget, committed readiness, route capture/lock, disconnect and fresh rejoin"
 	_suite_deadline_msec = Time.get_ticks_msec() + 60000
 	_directory = OS.get_temp_dir().path_join("goorcs_planning_test_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	DirAccess.make_dir_recursive_absolute(_directory)
@@ -40,14 +40,12 @@ func _run() -> void:
 	await _command("host", {"action": "ready", "value": true})
 	await _wait_for("guest", {"flags": [true, false]}, "Host readiness replicated")
 	await _edit("host", 0, 1, 3)
-	await _wait_for("guest", {"flags": [false, false]}, "Accepted edit clears readiness")
-	await _edit("host", 0, 1, 3, false)
-	await _command("guest", {"action": "ready", "value": true})
-	await _wait_for("host", {"flags": [false, true]}, "Guest readiness replicated")
-	await _command("guest", {"action": "ready", "value": false})
-	await _wait_for("host", {"flags": [false, false]}, "Guest can withdraw readiness")
-	await _command("guest", {"action": "ready", "value": true})
+	await _command("host", {"action": "ready", "value": false})
 	await _command("host", {"action": "ready", "value": true})
+	await create_timer(0.15).timeout
+	_check(_snapshot("host")["boards"] == before and _snapshot("guest")["flags"] == [true, false], "Committed readiness rejects edits and withdrawal; repeated Ready is harmless")
+	_check(_snapshot("guest")["combat"]["ready_seconds_left"] == -1.0, "Initial strategy waits indefinitely after the first Ready")
+	await _command("guest", {"action": "ready", "value": true})
 	await _wait_for("host", {"locked": true}, "Both legal ready routes lock atomically")
 	await _wait_for("guest", {"locked": true}, "Guest observes route lock")
 	var locked: Dictionary = _snapshot("host")
@@ -73,6 +71,10 @@ func _run() -> void:
 				placed += 1
 	await _wait_board("guest", 0, 30, false)
 	await _command("host", {"action": "clear", "slot": 0})
+	await create_timer(0.15).timeout
+	_check(_snapshot("guest")["boards"][0]["used"] == 30, "Initial setup has no Clear command")
+	for tile: Array in _snapshot("host")["boards"][0]["tiles"]:
+		await _edit("host", 0, int(tile[0]), int(tile[1]), false)
 	await _wait_board("guest", 0, 0, false)
 	await _finish()
 

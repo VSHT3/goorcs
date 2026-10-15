@@ -265,6 +265,11 @@ func _check_drop_input(board: PathBoard) -> void:
 		_check(drops.size() == before + 1, "Invalid drop callbacks emit no build commands")
 		for invalid: Variant in [null, "arrow_tower", {}, {"tower_type": 3}, {"tower_type": ""}, {"tower_type": "unknown"}]:
 			_check(not board._can_drop_data(position, invalid), "Malformed or unsupported tower payloads cannot be dropped")
+		board.placement_enabled = false
+		_check(not board._can_drop_data(position, payload) and not board._placement_is_legal(destination, "arrow_tower"), "Committed planning blocks drops and legal-placement previews while inspection stays enabled")
+		board._drop_data(position, payload)
+		_check(drops.size() == before + 1 and board.input_enabled, "Ready placement lock cannot emit a build and does not disable board inspection")
+		board.placement_enabled = true
 		board.input_enabled = false
 		_check(not board._can_drop_data(position, payload), "Opponent and finished-run boards reject tower drops")
 		board._drop_data(position, payload)

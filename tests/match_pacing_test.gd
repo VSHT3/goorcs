@@ -66,7 +66,9 @@ func _test_solo_autoplay() -> void:
 	_model_route(planning)
 	_check(planning.combat["wave"] == 0, "A connected base is insufficient while disconnected path islands remain")
 	planning.request_edit(0, Vector2i(0, 0), false)
-	_check(planning.combat["wave"] == 1 and planning.locked and planning.locked_routes[0] == planning.layouts[0].route and planning.locked_routes[1] == planning.layouts[1].route, "The accepted legalizing edit starts autoplay using both real legal routes")
+	_check(planning.combat["wave"] == 0 and planning.can_edit_path(0) and not planning.is_physics_processing(), "A legal initial strategy still pauses autoplay for manual Ready")
+	planning.submit_ready(true)
+	_check(planning.combat["wave"] == 1 and planning.locked and planning.locked_routes[0] == planning.layouts[0].route and planning.locked_routes[1] == planning.layouts[1].route, "Manual initial Ready captures both legal mirrored routes")
 	var initial_coins: Array = planning.combat["coins"].duplicate()
 	# Mutable presentation copies must not become gameplay consent or route state.
 	planning.combat["speed_votes"][0] = false
@@ -191,7 +193,11 @@ func _test_peer_pacing(port: int) -> void:
 	await _edit("guest", 1, 13, 2)
 	await _wait_combat("host", {"wave": 0}, "Incomplete guest route pauses autoplay")
 	await _edit("guest", 1, 13, 3)
-	await _wait_combat("host", {"wave": 1, "phase": MatchCombat.Phase.WAVE}, "Final accepted route edit starts both peers automatically")
+	await _wait_combat("host", {"wave": 0, "setup_round": true, "ready_seconds_left": -1.0}, "Complete initial routes still require manual Ready under autoplay")
+	await _command("host", {"action": "ready", "value": true})
+	await _wait_for("guest", {"flags": [true, false]}, "First initial Ready remains committed without a timer")
+	await _command("guest", {"action": "ready", "value": true})
+	await _wait_combat("host", {"wave": 1, "phase": MatchCombat.Phase.WAVE}, "Both manual Ready votes launch initial strategy")
 	await _wait_combat("guest", {"wave": 1, "phase": MatchCombat.Phase.WAVE}, "Guest receives autoplay start")
 	await _pacing("guest", "speed", true)
 	await _wait_combat("host", {"speed_multiplier": 2.0}, "Live unanimous speed activation is accepted")
@@ -241,6 +247,8 @@ func _test_peer_pacing(port: int) -> void:
 	for lane: String in ["host", "guest"]:
 		await _pacing(lane, "speed", true)
 		await _pacing(lane, "autoplay", true)
+	await _command("host", {"action": "ready", "value": true})
+	await _command("guest", {"action": "ready", "value": true})
 	await _wait_combat("host", {"phase": MatchCombat.Phase.FINISHED}, "Autoplay reaches a real terminal result")
 	await _wait_combat("guest", {"phase": MatchCombat.Phase.FINISHED}, "Terminal state is accepted by the guest")
 	var terminal: Dictionary = _snapshot("host")["combat"].duplicate(true)

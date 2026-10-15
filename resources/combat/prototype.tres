@@ -17,3 +17,6 @@ kill_bounty = 3
 wave_reward = 30
 wave_reward_growth = 5
 send_cutoff_seconds = 3.0
+main_round_interval = 10
+ready_window_seconds = 20.0
+tiles_per_expansion = 6

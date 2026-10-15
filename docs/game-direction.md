@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Matches place both boards in a continuous world with local WASD scouting, bounded wheel/pinch zoom, and a fixed HUD. Match Coins, paid towers, kill/wave rewards, upgrades, selling, and enemy sends with recurring income are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Loadouts, permanent stat growth, map expansion, and final art are not implemented. The full first playable milestone below is not complete.
+The project contains a playable local path workshop, persistent collection chests, and host-authoritative two-player defense with shared planning, weighted waves, tower economy/management, sends/income, persistent health, and results. Matches use a continuous world with local WASD and bounded wheel/pinch zoom. Committed readiness, ordinary-round deadlines, ten-round strategy breaks, and vertical growth from round 20 are implemented. Singleplayer mirrors the same rules locally. Loadouts, permanent stat growth, and final art remain unimplemented; the full milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -36,9 +36,9 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 
 ### Working preference
 
-Keep and expand the same maze, towers, and upgrades throughout the run. A **round** would be a stage introducing threats, rewards, or modifiers, rather than a fresh scored match. The creator is leaning toward this continuity but has not finalized it.
+The implemented **round** is the current numbered regular wave; there is no second mutable round counter. Maze, towers, upgrades, health, and economy persist through the run. **Main rounds** are the strategy phases immediately before rounds 10, 20, 30…; initial round-1 setup is also a strategy phase.
 
-The number of waves per round, round boundaries, and boss cadence remain open. Construction is not limited to breaks. **Confirmed wave-start rule:** manual play requires both players ready; edits clear readiness. Optional autoplay starts legal waves only with both players' consent, and either can stop automatic starts. Optional 2× speed has the same unanimity rule. Singleplayer applies either option immediately. There is no planning timer or opponent countdown. **30 seconds was an earlier example, not a chosen duration.**
+**Confirmed pacing:** Ready is committed until combat starts and locks that player's planning transactions. Normal rounds start a host-owned 20-real-second window on the first Ready, with both-ready starting sooner and expiry starting automatically. Setup and main rounds are untimed and always require both Ready. Autoplay preserves unanimous consent but pauses at these strategy phases. Combat construction remains allowed. These choices supersede the former reversible Ready/no-countdown and every-break path-editing rules.
 
 ## Core player loop
 
@@ -60,13 +60,13 @@ Players lay walkable path tiles on a square grid. Both players start with the sa
 
 The presentation places the host board on the left and guest on the right in one continuous world, with both streams entering from the middle toward outer bases. The left board mirrors rendering/input, not authoritative coordinates. Each player initially views their own side; WASD pans continuously and wheel/pinch zoom stays bounded and cursor-anchored. A separate world viewport keeps the HUD fixed. Camera control is available in multiplayer and mirrored Singleplayer; gameplay commands remain restricted to the owned board. Both enemy sources join each board's stream, without requiring identical mazes, commanders, or defenses.
 
-Current matches retain the fixed grid dimensions and equal path-tile budget; camera travel exposes the opposing board, not new buildable territory. Match and workshop bases use the blue crystal and entrances use the red stone-ring portal, with shared terrain/stonework. Workshop rules remain local-only; its notices no longer reflow the board. These assets are locally authored without external generation costs.
+The initial match grid remains 14×9 with equal 30-tile budgets. Before main round 20 and every main round after it, both boards gain a top and bottom row plus six path tiles. Match/workshop share portal/crystal artwork and ground materials, but workshop dimensions and rules remain local-only.
 
-In the intended expansion system, the entrance and crystal stay in place as the board expands. New territory becomes available around the existing board, and extra path tiles let players route enemies through it. That growth is not implemented by the camera cutover. Final crystal art and initial endpoint positions still need map sketches.
+Expansion preserves physical endpoint, tower, and existing path positions: logical y coordinates shift down one while the accepted world origin shifts up one cell. No route or investment is silently cleared. Camera framing is preserved rather than zooming out automatically. Final art remains provisional.
 
 Enemies take shortest routes across connected path tiles, not placement order. When more than one next branch has the same remaining shortest distance, the host alternates assignments in stable round-robin order at that fork. Regular and sent enemies share a board's rotation, reset each wave; longer alternatives remain unused. Each enemy receives its complete captured route at spawn. Adjacent path sections can still create shortcuts. Towers and walls do not define routes by blocking otherwise walkable ground.
 
-Both the available path tiles and the map's buildable area grow during the run. The whole board expands at milestones rather than the player selecting individual land sections to unlock. Milestone timing, amounts, and whether both players expand at the same time remain open.
+The whole board grows at the same host-owned milestones for both players, rather than selecting territory to buy. Main round 10 is the first redesign window without growth; rounds 20, 30, 40… each grow once. The +6 allowance supports routing through the new strips without granting either player extra Coins or bypassing connectivity. Final growth/budget balance remains subject to playtests.
 
 The current wave's routing graph and each enemy's assigned shortest route are preserved throughout combat. Redesigning paths happens between waves, not as a tactic for repeatedly redirecting moving enemies.
 
@@ -87,9 +87,9 @@ There are no waves in the workshop. Free editing here does not decide combat rou
 
 ### Open implementation-shaping decisions
 
-- Initial path-budget size and the timing and amounts of milestone-based path-tile and whole-board growth.
+- Final growth/budget balance and long-run board limits; the implemented baseline is +2 rows/+6 path tiles before every main round after the first.
 - Final route-preview presentation; the workshop retains a stable representative route, while match enemies alternate among equal shortest branches.
-- Whether paths can be redrawn freely between waves and whether unused tiles are retained.
+- Additional route mechanics beyond initial/main-round redraw; current paths remain locked on all ordinary rounds and retain unused budget.
 - Placement relative to path tiles, initial board dimensions, terrain, and the placement of the fixed entrance and crystal.
 - Final zoom limits and large-map readability/performance targets; current WASD and bounded wheel/pinch controls preserve local framing through snapshots and growth.
 - Sale refunds, purchase/roll costs, and restrictions needed to prevent unlimited trait rerolls through sale/rebuy.
@@ -208,15 +208,15 @@ The run should start small and become increasingly extreme: larger towers, stron
 
 Host migration, public matchmaking, accounts, monetization, and real-money purchases have not been requested. The game is intended for trusted friends. Real internet play must be checked between separate machines and networks, not inferred from localhost success.
 
-Admission opens shared planning with the local camera focused on the owned side of the continuous world. The host validates ownership, cells, paths, funds, upgrades, sales, and pacing consent; scouting never grants opponent-side commands. Accepted planning edits and tower transactions clear readiness. Manual both-ready and unanimously enabled autoplay use the same legal-route capture/start rule. Path edits remain locked during combat, while construction and management remain available.
+Admission opens initial planning with local owned-side focus. The host validates ownership, cells, paths, funds, tower transactions, readiness, and pacing; scouting grants no opponent commands. Ready locks own planning mutations. Manual both-ready, normal deadline, and ordinary autoplay all use the same legal capture/start gate. Initial/main strategy remains untimed. Paths edit only in an uncommitted strategy phase; tower management resumes in combat.
 
 **Implemented defense slice:** Arrow, Ballista, and Rune use resource-defined prices and stats. Coins pay for towers and one damage plus one speed upgrade per tower, with distinct gains/costs. Kills belong to the final attacking tower and pay its board once. Clearing both boards grants wave income once; selling refunds 60% of actual purchase/upgrade investment. All three targeting policies remain available. Range uses tile neighborhoods; Rune range one covers the center and eight neighbors and damages all enemies inside. Brief ground shimmer and local hit sparks show attacks; quiet tile highlights show selected range.
 
-**Implemented send slice:** a local enemy selector and one send button request a payer slot plus a stable type ID. The host derives the opposing target, validates ownership, funds, configured type, and phase, then charges and delivers or queues the type plus its recurring income gain atomically. The first 3 simulation seconds permit immediate delivery; planning/later orders queue for the next wave. Any accepted wave start drains queued orders exactly once with delivery-wave stats. Sends remain extra to the regular weighted roster and do not obey regular-wave composition caps. Planning sends clear readiness. Singleplayer mirrors accepted types through the same validator.
+**Implemented sends:** local type selection submits a stable ID and payer through the existing authenticated command path. The host validates ownership, funds, type, phase, and committed planning permissions, then charges/delivers-or-queues/increases income atomically. The first three simulation seconds permit immediate delivery; planning/later orders queue for the next legal wave start. Sends are extra to the shared regular roster/caps. A committed Ready rejects sends without spending. Singleplayer mirrors through the same validator.
 
-All tower types remain visible in a normal palette, with locked/unaffordable entries disabled. Placement supports both click-then-place and native drag/drop. Clicking an owned tower opens kills, effective stats, targeting, upgrade prices/status, and Sell. Close dismisses selection; right-click/Escape cancels placement. Without placement selected, breaks enable path editing and combat permits inspection only.
+The tower palette stays visible with collection/funds/Ready locks. Click-select and native drag/drop share owned placement rules. Tower inspection exposes stats/kills/targeting/upgrades/refund; committed planning disables mutations but not inspection. Right-click/Escape cancels selection. Without placement selected, only uncommitted initial/main strategy accepts path strokes.
 
-Regular waves fill a growing integer weight budget with one host-randomized ordered roster shared by both players. Enemy resources define spawn weight, first eligible wave, starting count cap, count-cap growth/interval, and maximum share of the budget. Grunts are the always-eligible weight-one remainder. Runners are fast/fragile weight-two enemies from wave 3, with a cap starting at four and increasing by one every three waves after unlock, still limited to 30% weight. Brutes are slow/durable weight-five enemies from wave 6, with a cap starting at two and increasing by one every four waves after unlock, still limited to 35% weight. Brutes leak for 3 base damage; the other two leak for 1. HP/speed still scale by wave and resource multipliers, while heavier types replace some head count instead of stacking a separate count increase. These are provisional playtest values, not proven competitive balance. No armor/status mechanics are added. Artwork, collection/workshop ownership, camera scouting, and the unimplemented relocation/footprint/loadout/map-growth systems remain unchanged; separate-network internet reachability remains unverified.
+Regular waves fill a growing integer weight budget with one host-randomized ordered roster shared by both players. Resources own weight, introduction wave, growing count cap, share limit, HP/speed multipliers, and base damage. Grunts are weight-one remainder; Runner/Brute constraints and scaling remain documented in development. Brutes leak for three, other shipped types for one. Weight replaces part of head count; it does not stack another count curve. Values and expansion allowance remain playtest balance, not measured fairness. No armor/status, relocation, footprint, loadout, or permanent-growth system is added; separate-network reachability remains unverified.
 
 ## First playable proof of the core rules
 
@@ -230,12 +230,12 @@ The first implementation milestone remains deliberately smaller than the full di
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. Same-tick destruction of both bases is resolved by one host-owned random coin flip.
 
-The current slice implements authoritative planning, paid construction, tower management, upgrades/sales, kill and wave income, enemy sends with recurring income and a delivery cutoff/next-wave queue, escalating regular waves, route locks, results, and local camera scouting across a continuous world behind a fixed HUD. It does not implement randomized purchases, relocation, expanding footprints, loadouts, or map growth.
+The current slice implements authoritative planning, committed readiness/deadlines, ten-round strategy phases, repeated map growth, paid construction/management, kill/wave/send income, weighted waves, split shortest routes, results, and local four-way/zoom scouting. Randomized purchases, relocation, expanding tower footprints, and loadouts are not implemented.
 
 ## Decisions still needed before their implementation
 
-- **Board interaction:** final path-budget and map-expansion rules, placement relative to the path, final entrance/crystal positions, and sale/refund rules.
-- **Run pacing:** confirm continuity across rounds; define round boundaries, boss cadence, final weight/composition/scaling and send cutoff/income balance, and endgame pressure. Manual both-ready, unanimous autoplay/2× speed, host-owned regular-wave rolls, and coin-flip simultaneous defeat are confirmed.
+- **Board interaction:** final growth/budget tuning, long-run size limits, initial endpoint/art choices, and future relocation/footprints. Current main-round timing and symmetric vertical growth are explicit rules.
+- **Run pacing:** boss cadence, encounters beyond current numbered waves, final weighted/scaling/economy balance, and endgame pressure. Committed Ready, normal 20-second windows, untimed initial/main strategy, preserved autoplay consent, and terminal coin flips are confirmed.
 - **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules, additional structure/enemy archetypes, defenses, and counters. Arrow supports Furthest/Closest/Strongest targeting; tower stats and the weighted three-enemy roster remain provisional.
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.
 - **Randomness and progression:** trait reveal/reroll rules, run reward choices, loadout limits, starter collection, permanent stat growth, and post-run payouts.

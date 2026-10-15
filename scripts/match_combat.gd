@@ -191,6 +191,14 @@ func has_tower(slot: int, cell: Vector2i) -> bool:
 	return false
 
 
+func grow_vertical() -> void:
+	assert(phase == Phase.PLANNING)
+	for board: Array in towers:
+		for tower: Dictionary in board:
+			tower["cell"] += Vector2i.DOWN
+			tower["aim"] += Vector2.DOWN
+
+
 func send_enemy(slot: int, type_id: StringName) -> bool:
 	if phase == Phase.FINISHED or not _valid_slot(slot) or not _enemy_types.has(String(type_id)):
 		return false
@@ -350,6 +358,9 @@ func snapshot() -> Dictionary:
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
 			"send_cutoff_seconds": _rules.send_cutoff_seconds,
+			"main_round_interval": _rules.main_round_interval,
+			"ready_window_seconds": _rules.ready_window_seconds,
+			"tiles_per_expansion": _rules.tiles_per_expansion,
 		},
 	}
 

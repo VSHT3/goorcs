@@ -27,3 +27,6 @@ const DEFAULT_ENEMIES: Array[EnemyDefinition] = [
 @export var wave_reward: int = 30
 @export var wave_reward_growth: int = 5
 @export var send_cutoff_seconds: float = 3.0
+@export var main_round_interval: int = 10
+@export var ready_window_seconds: float = 20.0
+@export var tiles_per_expansion: int = 6

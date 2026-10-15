@@ -25,6 +25,7 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var leave_button: Button = %Leave
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
+@onready var _ready_timer: Label = %ReadyTimer
 @onready var send_button: Button = %SendEnemy
 @onready var enemy_selector: OptionButton = %EnemyType
 @onready var speed_button: Button = %Speed
@@ -139,7 +140,7 @@ func cancel_interaction() -> bool:
 
 
 func _request_edit(cell: Vector2i, place: bool, slot: int) -> void:
-	if planning != null and planning.active and not planning.locked and slot == planning.local_slot() and _placement_id == &"":
+	if planning != null and planning.can_edit_path(slot) and slot == planning.local_slot() and _placement_id == &"":
 		planning.request_edit(slot, cell, place)
 
 
@@ -187,6 +188,8 @@ func _tower_dropped(cell: Vector2i, type_id: StringName, slot: int) -> void:
 
 
 func _buy_tower(cell: Vector2i, type_id: StringName, slot: int) -> void:
+	if not planning.can_manage_towers(slot):
+		return
 	_pending_tower_cell = cell
 	planning.build_tower(slot, cell, type_id, _default_targeting)
 	_refresh()
@@ -230,7 +233,7 @@ func _create_palette() -> void:
 func _refresh_palette() -> void:
 	var types: Dictionary = planning.combat.get("tower_types", {}) if planning != null else {}
 	var coins: int = _own_coins()
-	var available: bool = planning != null and planning.active and int(planning.combat.get("phase", MatchCombat.Phase.PLANNING)) != MatchCombat.Phase.FINISHED
+	var available: bool = planning != null and planning.can_manage_towers(planning.local_slot())
 	for id: StringName in shop_buttons:
 		var button: TowerShopButton = shop_buttons[id]
 		var stats: Dictionary = types.get(String(id), {})
@@ -253,7 +256,10 @@ func _refresh_palette() -> void:
 		if not unlocked:
 			button.tooltip_text = "Unlock this tower in Collection before buying it."
 		elif not available:
-			button.tooltip_text += "\nPurchases are unavailable outside an active run."
+			if planning != null and planning.active:
+				button.tooltip_text += "\nMatch finished." if int(planning.combat.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.FINISHED else "\nReady: planning actions are committed until the round starts."
+			else:
+				button.tooltip_text += "\nPurchases are unavailable outside an active run."
 		if id == _placement_id and button.disabled:
 			_placement_id = &""
 			button.set_pressed_no_signal(false)
@@ -284,7 +290,7 @@ func _refresh_sends() -> void:
 	var configured: bool = not stats.is_empty() and rules.has("send_cutoff_seconds")
 	var cost: int = int(stats.get("send_cost", 0))
 	var gain: int = int(stats.get("send_income", 0))
-	var available: bool = planning != null and planning.active and not finished and configured
+	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured
 	var delivers_now: bool = phase == MatchCombat.Phase.WAVE and bool(state.get("sends_open", false))
 	enemy_selector.disabled = planning == null or not planning.active or finished or types.is_empty()
 	send_button.disabled = not available or _own_coins() < cost
@@ -311,7 +317,7 @@ func _refresh_sends() -> void:
 		return
 	var delivery: String = "Delivered to the opponent now, in wave %d." % int(state.get("wave", 0)) if delivers_now else "Queued for the opponent's next wave (%d)." % (int(state.get("wave", 0)) + 1)
 	if not available:
-		delivery = "Match finished." if finished else "Waiting for match."
+		delivery = "Match finished." if finished else ("Ready: planning actions are committed until the round starts." if planning != null and planning.active else "Waiting for match.")
 	elif _own_coins() < cost:
 		delivery += "\nNeed %d more Coins." % (cost - _own_coins())
 	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
@@ -416,6 +422,8 @@ func _refresh_pacing() -> void:
 			button.tooltip_text += " · Opponent enabled"
 		if option == "autoplay" and agreed and not planning.locked and (not planning.layouts[0].is_ready() or not planning.layouts[1].is_ready()):
 			button.tooltip_text += "\nWaiting for legal paths"
+		if option == "autoplay" and agreed and bool(state.get("path_editing", false)):
+			button.tooltip_text += "\nStrategy break: both players must press Ready."
 
 
 func _enemy_clicked(enemy_id: int, slot: int) -> void:
@@ -469,7 +477,7 @@ func _refresh_targeting() -> void:
 		1.0 / interval, int(stats.get("range", 0)),
 	]
 	targeting_button.select(int(tower["mode"]))
-	targeting_button.disabled = not planning.active or int(planning.combat.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.FINISHED
+	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
 	_refresh_upgrade(damage_upgrade, tower, stats, "damage")
 	_refresh_upgrade(speed_upgrade, tower, stats, "speed")
 	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
@@ -506,7 +514,7 @@ func _clear() -> void:
 
 func _toggle_ready() -> void:
 	if planning != null and not ready_button.disabled:
-		planning.submit_ready(not planning.ready_flags[planning.local_slot()])
+		planning.submit_ready(true)
 
 
 func _refresh() -> void:
@@ -518,6 +526,7 @@ func _refresh() -> void:
 		_clear_feedback()
 		clear_button.disabled = true
 		ready_button.disabled = true
+		_ready_timer.hide()
 		_refresh_pacing()
 		_refresh_palette()
 		_management.hide()
@@ -529,7 +538,7 @@ func _refresh() -> void:
 	var own_slot: int = planning.local_slot()
 	for slot: int in range(boards.size()):
 		boards[slot].layout = planning.layouts[slot]
-	world.configure(planning.layouts[0].dimensions, own_slot)
+	world.configure(planning.layouts[0].dimensions, own_slot, int(planning.combat.get("board_origin_y", 0)))
 	if not planning.active:
 		_clear_feedback()
 		selected_tower_id = -1
@@ -541,7 +550,7 @@ func _refresh() -> void:
 	var phase: int = int(state.get("phase", MatchCombat.Phase.PLANNING))
 	var finished: bool = phase == MatchCombat.Phase.FINISHED
 	var in_wave: bool = phase == MatchCombat.Phase.WAVE
-	var editable: bool = planning.active and not planning.locked
+	var editable: bool = planning.can_edit_path(own_slot)
 	var all_towers: Array = state.get("towers", [[], []])
 	var all_enemies: Array = state.get("enemies", [[], []])
 	var health: Array = state.get("health", [10, 10])
@@ -564,7 +573,8 @@ func _refresh() -> void:
 		var layout: PathLayout = planning.layouts[slot]
 		var board: PathBoard = boards[slot]
 		board.cell_click_mode = _placement_id != &"" or not editable
-		board.input_enabled = planning.active and not finished and slot == own_slot and (editable or board.cell_click_mode)
+		board.input_enabled = planning.active and not finished and slot == own_slot
+		board.placement_enabled = slot == own_slot and planning.can_manage_towers(slot)
 		board.enemy_inspection_enabled = planning.active and in_wave and _placement_id == &""
 		board.selected_enemy_id = selected_enemy_id if slot == selected_enemy_slot else -1
 		board.placement_id = _placement_id if slot == own_slot else &""
@@ -582,41 +592,48 @@ func _refresh() -> void:
 		_states[slot].tooltip_text = "Base health. %s\n%s" % [role, path_state]
 		_states[slot].modulate = Color("d99578") if int(health[slot]) <= 0 else Color("b5e2b7")
 		_states[slot].text = "HP %d/%d" % [int(health[slot]), int(rules.get("base_health", 10))]
-		_budgets[slot].text = "Ready" if editable and slot != own_slot and planning.ready_flags[slot] else ""
+		_budgets[slot].text = "Ready" if phase == MatchCombat.Phase.PLANNING and slot != own_slot and planning.ready_flags[slot] else ""
 		_budgets[slot].modulate = Color("b5e2b7")
 		_counts[slot].visible = not finished and (in_wave or slot == own_slot)
 		if in_wave:
 			_counts[slot].text = "Alive %d" % all_enemies[slot].size()
-			_counts[slot].tooltip_text = "Regular enemies spawned: %d/%d.\nHold A / D to scout." % [int(spawned[slot]), int(state.get("total", 0))]
+			_counts[slot].tooltip_text = "Regular enemies spawned: %d/%d.\nWASD: pan · Scroll / pinch: zoom." % [int(spawned[slot]), int(state.get("total", 0))]
 			_counts[slot].modulate = Color("b5e2b7")
 		else:
-			_counts[slot].text = "%d/%d tiles" % [layout.used_tiles(), layout.budget]
-			_counts[slot].tooltip_text = "%s\nOnly your board accepts edits. Hold A / D to scout." % path_state
+			_counts[slot].text = "%d/%d tiles%s" % [layout.used_tiles(), layout.budget, " · Main" if bool(state.get("main_round", false)) else ""]
+			_counts[slot].tooltip_text = "%s\nPaths change only in setup and main rounds. WASD: pan · Scroll / pinch: zoom." % path_state
 			_counts[slot].modulate = Color("b5e2b7") if layout.is_ready() else Color("e0bc77")
 	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
-	ready_button.disabled = not editable or (not planning.ready_flags[own_slot] and not planning.layouts[own_slot].is_ready())
-	clear_button.visible = editable and phase == MatchCombat.Phase.PLANNING
-	ready_button.visible = editable and phase == MatchCombat.Phase.PLANNING
-	ready_button.text = "Unready" if planning.ready_flags[own_slot] else "Ready"
+	ready_button.disabled = not planning.active or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[own_slot] or not planning.layouts[own_slot].is_ready()
+	clear_button.visible = planning.active and bool(state.get("main_round", false))
+	ready_button.visible = planning.active and phase == MatchCombat.Phase.PLANNING
+	ready_button.text = "Ready"
+	var time_left: float = float(state.get("ready_seconds_left", -1.0))
+	_ready_timer.visible = planning.active and phase == MatchCombat.Phase.PLANNING and time_left >= 0.0
+	_ready_timer.text = "%ds" % ceili(time_left) if time_left >= 0.0 else ""
 	var own_layout: PathLayout = planning.layouts[own_slot]
-	if own_layout.is_ready():
-		ready_button.tooltip_text = "Both players must ready for wave %d. Edits clear readiness." % (int(state.get("wave", 0)) + 1)
-	else:
+	if planning.ready_flags[own_slot]:
+		ready_button.tooltip_text = "Committed until the round starts."
+	elif not own_layout.is_ready():
 		ready_button.tooltip_text = "Connect the entrance to the base and all placed path tiles before readying."
+	elif bool(state.get("path_editing", false)):
+		ready_button.tooltip_text = "Untimed strategy break. Both players must ready; Ready commits your planning actions."
+	else:
+		ready_button.tooltip_text = "First Ready starts the host's %ds window; both Ready starts immediately." % int(rules.get("ready_window_seconds", 20))
 	if finished:
 		var winning_slot: int = int(state.get("winner", -1))
-		_status.text = "%s · Wave %d" % ["Victory" if winning_slot == own_slot else "Defeat", int(state.get("wave", 0))]
+		_status.text = "%s · Round %d" % ["Victory" if winning_slot == own_slot else "Defeat", int(state.get("wave", 0))]
 		if bool(state.get("coin_flip", false)):
 			_status.text += " · Coin flip"
 			_status.tooltip_text = "Both bases fell in one tick; a coin flip decided the winner."
 		else:
 			_status.tooltip_text = ""
 	elif in_wave:
-		_status.text = "Wave %d" % int(state.get("wave", 0))
+		_status.text = "Round %d" % int(state.get("wave", 0))
 		_status.tooltip_text = ""
 	else:
-		_status.text = "Wave %d" % (int(state.get("wave", 0)) + 1)
-		_status.tooltip_text = "Planning: build a legal route, then ready for the next wave."
+		_status.text = "Round %d" % (int(state.get("wave", 0)) + 1)
+		_status.tooltip_text = "Untimed strategy break: redesign your path, then both Ready." if bool(state.get("path_editing", false)) else "Paths stay locked until the next main round. Ready commits your planning actions."
 	_refresh_targeting()
 	_refresh_pacing()
 	_refresh_enemy_inspector()

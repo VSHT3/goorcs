@@ -32,23 +32,43 @@ var _pending_snapshot_peer: int = 0
 var _host_combat: MatchCombat
 var _combat_publish_elapsed: float = 0.0
 
+var _ready_seconds_left: float = -1.0
+var _expansion_count: int = 0
 
 func _physics_process(delta: float) -> void:
-	if not active or (not singleplayer and not session.is_host) or _host_combat.phase != MatchCombat.Phase.WAVE:
+	if not active or (not singleplayer and (session == null or not session.is_host)):
+		return
+	if _host_combat.phase == MatchCombat.Phase.PLANNING:
+		if _ready_seconds_left < 0.0:
+			return
+		# Readiness consumes wall time, independently of the simulation speed vote.
+		_ready_seconds_left = maxf(0.0, _ready_seconds_left - delta)
+		_combat_publish_elapsed += delta
+		if _ready_seconds_left == 0.0:
+			_try_start_wave()
+			_update_processing()
+			_publish_snapshot()
+		elif _combat_publish_elapsed >= 0.1:
+			_combat_publish_elapsed = 0.0
+			_publish_combat()
+		return
+	if _host_combat.phase != MatchCombat.Phase.WAVE:
 		return
 	var previous_phase: MatchCombat.Phase = _host_combat.phase
 	if not _host_combat.advance(delta * _speed_multiplier()):
 		return
 	_combat_publish_elapsed += delta
 	if _host_combat.phase != previous_phase:
-		_host_locked = _host_combat.phase != MatchCombat.Phase.PLANNING
-		_host_ready = [false, false]
 		if _host_combat.phase == MatchCombat.Phase.FINISHED:
+			_host_locked = true
+			_host_ready = [false, false]
+			_ready_seconds_left = -1.0
 			_host_speed_votes = [false, false]
 			_host_autoplay_votes = [false, false]
-		elif _autoplay_enabled():
+		else:
+			_enter_planning()
 			_try_start_wave()
-		set_physics_process(_host_combat.phase == MatchCombat.Phase.WAVE)
+		_update_processing()
 		_publish_snapshot()
 	elif _combat_publish_elapsed >= 0.1:
 		_combat_publish_elapsed = 0.0
@@ -89,6 +109,17 @@ func stop_singleplayer() -> void:
 
 func local_slot() -> int:
 	return 0 if singleplayer or (session != null and session.is_host) else 1
+
+
+func can_edit_path(slot: int) -> bool:
+	return active and slot in [0, 1] and bool(combat.get("path_editing", false)) and not ready_flags[slot]
+
+
+func can_manage_towers(slot: int) -> bool:
+	if not active or slot not in [0, 1]:
+		return false
+	var phase: int = int(combat.get("phase", MatchCombat.Phase.FINISHED))
+	return phase == MatchCombat.Phase.WAVE or (phase == MatchCombat.Phase.PLANNING and not ready_flags[slot])
 
 
 func request_edit(slot: int, cell: Vector2i, place: bool) -> void:
@@ -208,6 +239,8 @@ func _reset_match() -> void:
 	_synced_guest_id = 0
 	_pending_snapshot_peer = 0
 	_host_combat = MatchCombat.new(combat_rules)
+	_ready_seconds_left = -1.0
+	_expansion_count = 0
 	combat = _combat_snapshot()
 	_combat_publish_elapsed = 0.0
 	set_physics_process(false)
@@ -254,6 +287,9 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	if _host_combat.phase == MatchCombat.Phase.FINISHED:
 		_reject(sender, "The run has ended. Leave to start another room.")
 		return
+	if not _host_can_manage_towers(slot):
+		_reject(sender, "Ready commits your planning actions until combat starts.")
+		return
 	# IDs are globally unique, so resolve the counterpart by cell before a sale.
 	var mirror_id: int = -1
 	if singleplayer and sender == 1 and command not in ["build", "send"]:
@@ -291,8 +327,6 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	else:
 		_reject(sender, "Unknown tower command.")
 		return
-	if _host_combat.phase == MatchCombat.Phase.PLANNING:
-		_host_ready[slot] = false
 	if singleplayer and sender == 1:
 		_apply_tower_command(2, command, 1, cell, mirror_id, mode, argument)
 		return
@@ -321,6 +355,20 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 	if _host_locked:
 		_reject(sender, "Paths and readiness are locked during a wave or after the run ends.")
 		return
+	if _host_ready[permitted_slot]:
+		if command == "ready" and value:
+			# A solo mirror may already be committed when the local vote arrives.
+			if _try_start_wave():
+				_publish_snapshot()
+		else:
+			_reject(sender, "Ready commits your planning actions until combat starts.")
+		return
+	if command in ["edit", "clear"] and not _host_can_edit_path(permitted_slot):
+		_reject(sender, "Paths can only change during initial setup and main-round planning.")
+		return
+	if command == "clear" and not _is_main_round():
+		_reject(sender, "Clear is available only during main-round planning.")
+		return
 	var layout: PathLayout = _host_layouts[permitted_slot]
 	match command:
 		"edit":
@@ -337,28 +385,28 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 			var edited: bool = layout.place(cell) if value else layout.erase(cell)
 			if not edited:
 				return
-			_host_ready[permitted_slot] = false
 		"clear":
 			if layout.used_tiles() == 0:
 				return
 			layout.clear()
-			_host_ready[permitted_slot] = false
 		"ready":
-			if value and not layout.is_ready():
+			if not value:
+				return
+			if not layout.is_ready():
 				_reject(sender, "Connect the entrance to the base and remove all disconnected path tiles before readying.")
 				return
-			if _host_ready[permitted_slot] == value:
-				return
-			_host_ready[permitted_slot] = value
-			# Manual readiness and autoplay capture routes through the same gate.
+			_host_ready[permitted_slot] = true
+			if not _is_strategy_round() and _ready_seconds_left < 0.0:
+				_ready_seconds_left = combat_rules.ready_window_seconds
+				_combat_publish_elapsed = 0.0
+				_update_processing()
 		_:
 			_reject(sender, "Unknown planning command.")
 			return
 	if singleplayer and sender == 1:
 		_apply_command(2, command, 1, cell, value)
 		return
-	if (_host_ready[0] and _host_ready[1]) or _autoplay_enabled():
-		_try_start_wave()
+	_try_start_wave()
 	_publish_snapshot()
 
 
@@ -384,9 +432,54 @@ func _autoplay_enabled() -> bool:
 	return _host_autoplay_votes[0] and _host_autoplay_votes[1]
 
 
+
+func _is_main_round() -> bool:
+	return _host_combat.phase == MatchCombat.Phase.PLANNING and (_host_combat.wave + 1) % combat_rules.main_round_interval == 0
+
+
+func _is_setup_round() -> bool:
+	return _host_combat.phase == MatchCombat.Phase.PLANNING and _host_combat.wave == 0
+
+
+func _is_strategy_round() -> bool:
+	return _is_setup_round() or _is_main_round()
+
+
+func _host_can_edit_path(slot: int) -> bool:
+	return slot in [0, 1] and _is_strategy_round() and not _host_ready[slot]
+
+
+func _host_can_manage_towers(slot: int) -> bool:
+	return slot in [0, 1] and (_host_combat.phase == MatchCombat.Phase.WAVE or (_host_combat.phase == MatchCombat.Phase.PLANNING and not _host_ready[slot]))
+
+
+func _update_processing() -> void:
+	set_physics_process(_host_combat.phase == MatchCombat.Phase.WAVE or (_host_combat.phase == MatchCombat.Phase.PLANNING and _ready_seconds_left > 0.0))
+
+
+func _enter_planning() -> void:
+	_host_locked = false
+	_host_ready = [false, false]
+	_ready_seconds_left = -1.0
+	_combat_publish_elapsed = 0.0
+	if not _is_main_round():
+		return
+	var required_expansions: int = (_host_combat.wave + 1) / combat_rules.main_round_interval - 1
+	while _expansion_count < required_expansions:
+		for layout: PathLayout in _host_layouts:
+			layout.grow_vertical(combat_rules.tiles_per_expansion)
+		_host_combat.grow_vertical()
+		for route: Array in _host_routes:
+			for index: int in range(route.size()):
+				route[index] += Vector2i.DOWN
+		_expansion_count += 1
+
 func _try_start_wave() -> bool:
 	if not active or _host_combat.phase != MatchCombat.Phase.PLANNING:
 		return false
+	if not (_host_ready[0] and _host_ready[1]):
+		if _is_strategy_round() or (not _autoplay_enabled() and _ready_seconds_left != 0.0):
+			return false
 	if not _host_layouts[0].is_ready() or not _host_layouts[1].is_ready():
 		return false
 	var routes: Array[Array] = [_host_layouts[0].route.duplicate(), _host_layouts[1].route.duplicate()]
@@ -395,6 +488,7 @@ func _try_start_wave() -> bool:
 		return false
 	_host_routes = routes
 	_host_locked = true
+	_ready_seconds_left = -1.0
 	_combat_publish_elapsed = 0.0
 	set_physics_process(true)
 	return true
@@ -406,6 +500,11 @@ func _combat_snapshot() -> Dictionary:
 	snapshot["autoplay_votes"] = _host_autoplay_votes.duplicate()
 	snapshot["speed_multiplier"] = _speed_multiplier()
 	snapshot["autoplay"] = _autoplay_enabled()
+	snapshot["main_round"] = _is_main_round()
+	snapshot["setup_round"] = _is_setup_round()
+	snapshot["path_editing"] = _is_strategy_round()
+	snapshot["board_origin_y"] = -_expansion_count
+	snapshot["ready_seconds_left"] = _ready_seconds_left
 	return snapshot
 
 
@@ -432,10 +531,10 @@ func _snapshot() -> Dictionary:
 				if not layout.is_endpoint(cell) and layout.has_path(cell):
 					tiles[slot].append(cell)
 	return {
-		"dimensions": _dimensions,
-		"budget": _budget,
-		"entrance": _entrance,
-		"base": _base,
+		"dimensions": _host_layouts[0].dimensions,
+		"budget": _host_layouts[0].budget,
+		"entrance": _host_layouts[0].entrance,
+		"base": _host_layouts[0].base,
 		"tiles": tiles,
 		"ready": _host_ready.duplicate(),
 		"locked": _host_locked,

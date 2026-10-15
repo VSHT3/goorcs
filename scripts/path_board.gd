@@ -69,6 +69,11 @@ var tower_catalog: Array[TowerReward] = CollectionStore.DEFAULT_CATALOG:
 			_tower_art[String(reward.id)] = reward
 			_cache_texture_bounds(reward.icon_texture)
 		queue_redraw()
+var placement_enabled: bool = true:
+	set(value):
+		placement_enabled = value
+		if not value:
+			clear_drag_preview()
 var input_enabled: bool = true:
 	set(value):
 		input_enabled = value
@@ -230,7 +235,7 @@ func _cell_at(position: Vector2) -> Vector2i:
 
 
 func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
-	if not input_enabled or layout == null or _cell_size() <= 0.0:
+	if not input_enabled or not placement_enabled or layout == null or _cell_size() <= 0.0:
 		return false
 	if not data is Dictionary or not data.get("tower_type") is String:
 		return false
@@ -249,7 +254,7 @@ func clear_drag_preview() -> void:
 
 
 func _placement_is_legal(cell: Vector2i, type_id: String) -> bool:
-	if not tower_types.has(type_id) or not layout.contains(cell) or layout.has_path(cell):
+	if not placement_enabled or not tower_types.has(type_id) or not layout.contains(cell) or layout.has_path(cell):
 		return false
 	for tower: Dictionary in combat_towers:
 		if tower["cell"] == cell:
