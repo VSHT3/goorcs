@@ -122,7 +122,7 @@ Towers use the same grid. Their placement must preserve the route. Some major up
 )
 
 == Enemy sends and spells
-Purchased enemies enter the opponent’s current wave until a cutoff. Later orders wait for the next wave. Both boards clear before the planning break.
+Purchased enemies arrive throughout combat in an independent, paced stream alongside regular spawns. Planning orders wait for combat. Both boards finish all deliveries and living enemies before the break.
 
 Spells aimed at the opponent cause temporary disruption. They cannot permanently destroy towers or directly damage the base.
 
@@ -180,7 +180,7 @@ Planning could use a fixed timer, a ready button that starts a short countdown f
 )
 
 #v(4mm)
-#note([Where the project stands], [The Godot prototype connects two players by invite and synchronizes their boards. Both-ready locks routes for escalating waves. Coins pay for three tower types, damage/speed upgrades and partial-refund selling. Tower menus show kills and targeting; Rune uses a short-range area pulse. Enemy sends, loadouts and the full progression systems remain planned. Local workshop and collection chests are also playable.])
+#note([Where the project stands], [The Godot prototype connects two players by invite and synchronizes their boards. Both-ready locks routes for escalating waves. Coins pay for three tower types, damage/speed upgrades and partial-refund selling. Tower menus show kills and targeting; Rune uses a short-range area pulse. Paid enemy sends use independent streams and add recurring clear income. Loadouts and full progression remain planned. Local workshop and collection chests are also playable.])
 #v(3mm)
 #text(size: 9.5pt)[*First playable:* connect two boards with one tower type and one enemy type. Prove the path rules, live building and upgrades, selling, income from sends, and base defeat before adding the collection and larger content roster.]
 #v(2mm)

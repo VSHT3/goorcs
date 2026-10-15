@@ -103,12 +103,14 @@ func _test_stream_and_isolation() -> void:
 	var combat := _combat(rules)
 	var tie_state: int = combat._random.state
 	combat.send_enemy(0, &"runner")
+	combat.send_enemy(0, &"brute")
 	combat.start_wave(_routing())
 	var planned: Array[float] = combat.spawn_times.duplicate()
 	var wave_state: int = combat._wave_random.state
 	var timing_state: int = combat._timing_random.state
 	combat.send_enemy(1, &"brute")
-	_check(combat.spawn_times == planned and combat._timing_random.state == timing_state and combat._wave_random.state == wave_state and combat._random.state == tie_state, "Queued/immediate sends do not alter timetable or consume any random stream")
+	combat.send_enemy(1, &"runner")
+	_check(combat.queued_sends == [1, 1] and combat.spawn_times == planned and combat._timing_random.state == timing_state and combat._wave_random.state == wave_state and combat._random.state == tie_state, "Independent FIFO reservations do not alter timetable or consume any random stream")
 	# Resource mutation after capture cannot retime an active wave.
 	rules.spawn_interval = 99.0
 	rules.spawn_jitter_ratio = 0.0
@@ -126,7 +128,8 @@ func _test_stream_and_isolation() -> void:
 		_check(combat.snapshot()["spawned"] == [index + 1, index + 1], "Both boards spawn immediately after the captured boundary")
 		for slot: int in range(2):
 			for regular_index: int in range(index + 1):
-				var enemy: Dictionary = combat.enemies[slot][regular_index + 1]
+				var send_offset: int = 1 if regular_index == 0 else 2
+				var enemy: Dictionary = combat.enemies[slot][regular_index + send_offset]
 				var type_id: String = combat.wave_roster[regular_index]
 				types[type_id] = true
 				_check(enemy["type_id"] == type_id and is_equal_approx(enemy["progress"], (elapsed - planned[regular_index]) * float(enemy["speed"])), "Actual mixed-type progress uses planned time and host type speed on both boards")

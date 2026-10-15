@@ -30,7 +30,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - A **run** is the complete 1v1 contest. Enemies reaching a base damage it; a destroyed base ends the entire run.
 - Base health carries between rounds. Losing a base is not merely losing one round or spending a run life.
 - A crystal represents the base and its health. The current match sprite is a blue faceted crystal on a stone pedestal; final art is not settled.
-- A **wave** is a group of regular enemies. Opponent-sent enemies join the current wave until a delivery cutoff. Later orders wait for the next wave. The implemented provisional cutoff is 3 seconds after wave start; it prevents sending from indefinitely extending delivery. Both boards may clear earlier; there is no minimum combat timer.
+- A **wave** is a group of regular enemies. Opponent-sent enemies arrive concurrently through an independent, paced FIFO stream throughout combat, outside the regular budget/caps. Planning purchases wait for combat. Both boards must finish regular spawns, pending sends, and living enemies before the planning break; there is no minimum combat timer. Continuous funded sending can prolong combat.
 - The desired format combines a standalone competitive match with development across multiple encounters.
 - **Confirmed simultaneous defeat:** if both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the run winner. The result is shared and terminal; clients do not roll independently.
 
@@ -230,7 +230,7 @@ The first implementation milestone remains deliberately smaller than the full di
 2. At least one known tower type and one enemy type support a basic defense loop.
 3. Each player draws a legal path within an equal tile budget. Enemies follow the chosen route; route edits are unavailable during the current wave.
 4. Construction, individual upgrades, and selling work during combat without obstructing the route. Direct relocation is free only during breaks; expanding upgrades require a legal enlarged footprint.
-5. Regular waves threaten both bases. Sending enemies costs currency and increases the sender's future income. Sends enter the current wave until a delivery cutoff; later orders wait for the next wave.
+5. Regular waves threaten both bases. Sending enemies costs currency and increases the sender's future income. Each opponent-bound FIFO stream runs throughout combat independently of regular spawns; planning orders wait until combat starts. Pending sends prevent premature clearance.
 6. Both players observe consistent currency, income, enemy state, health, and match results.
 7. A base reaching zero health ends the run. Same-tick destruction of both bases is resolved by one host-owned random coin flip.
 

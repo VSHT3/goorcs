@@ -12,7 +12,7 @@ var coins: Array[int] = []
 var income: Array[int] = [0, 0]
 var queued_sends: Array[int]:
 	get:
-		return [_send_queues[0].size(), _send_queues[1].size()]
+		return [_pending_sends(0), _pending_sends(1)]
 var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
@@ -26,6 +26,10 @@ var _rules: CombatRules
 var _tower_types: Dictionary = {}
 var _enemy_types: Dictionary = {}
 var _send_queues: Array[Array] = [[], []]
+# Consumed prefixes are compacted amortized, never shifted for each delivery.
+var _send_heads: Array[int] = [0, 0]
+var _next_send_times: Array[float] = [0.0, 0.0]
+var _send_spawn_interval: float
 var _random: RandomNumberGenerator
 var _wave_random: RandomNumberGenerator
 var _timing_random: RandomNumberGenerator
@@ -41,6 +45,7 @@ var _next_enemy_id: int = 1
 
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
 	_rules = rules
+	_send_spawn_interval = rules.send_spawn_interval
 	_random = random
 	if _random == null:
 		_random = RandomNumberGenerator.new()
@@ -206,30 +211,35 @@ func grow_for_main_round() -> void:
 
 
 func send_enemy(slot: int, type_id: StringName) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or not _enemy_types.has(String(type_id)):
+	if phase == Phase.FINISHED or not _valid_slot(slot) or not _enemy_types.has(String(type_id)) or not _valid_send_timing():
 		return false
 	var definition: Dictionary = _enemy_types[String(type_id)]
 	var cost: int = definition["send_cost"]
 	if coins[slot] < cost:
 		return false
 	var target: int = 1 - slot
-	# Acceptance purchases either immediate delivery or a typed next-wave order.
-	# Neither editable routes nor client-provided stats enter this transaction.
+	# Payment, recurring income and FIFO reservation form one host transaction.
+	# An idle stream starts now, never at an old due time or in a catch-up burst.
+	if _pending_sends(target) == 0 and phase == Phase.WAVE:
+		_next_send_times[target] = maxf(_next_send_times[target], _elapsed)
+	_send_queues[target].append(String(type_id))
 	coins[slot] -= cost
 	income[slot] += int(definition["send_income"])
-	if _sends_open():
-		_spawn_enemy(target, String(type_id), 0.0)
-	else:
-		_send_queues[target].append(String(type_id))
+	if phase == Phase.WAVE and _next_send_times[target] <= _elapsed:
+		_spawn_send(target)
 	return true
 
 
-func _sends_open() -> bool:
-	return phase == Phase.WAVE and _elapsed < _rules.send_cutoff_seconds
+func _valid_send_timing() -> bool:
+	return is_finite(_send_spawn_interval) and _send_spawn_interval > 0.0
+
+
+func _pending_sends(slot: int) -> int:
+	return _send_queues[slot].size() - _send_heads[slot]
 
 
 func start_wave(routing: Array[Dictionary]) -> bool:
-	if phase != Phase.PLANNING or not _roster_configuration_valid or routing.size() != 2 or not _valid_spawn_timing():
+	if phase != Phase.PLANNING or not _roster_configuration_valid or routing.size() != 2 or not _valid_spawn_timing() or not _valid_send_timing():
 		return false
 	for captured: Dictionary in routing:
 		if not _valid_routing(captured):
@@ -244,12 +254,12 @@ func start_wave(routing: Array[Dictionary]) -> bool:
 	_fork_cursors = [{}, {}]
 	_spawned = [0, 0]
 	_elapsed = 0.0
+	_next_send_times = [0.0, 0.0]
 	wave += 1
 	phase = Phase.WAVE
 	for slot: int in range(2):
-		for type_id: String in _send_queues[slot]:
-			_spawn_enemy(slot, type_id, 0.0)
-		_send_queues[slot].clear()
+		if _pending_sends(slot) > 0:
+			_spawn_send(slot)
 	return true
 
 
@@ -353,7 +363,7 @@ func advance(delta: float) -> bool:
 		phase = Phase.FINISHED
 		coin_flip = base_health[0] == 0 and base_health[1] == 0
 		winner = _random.randi_range(0, 1) if coin_flip else (1 if base_health[0] == 0 else 0)
-	elif _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and enemies[0].is_empty() and enemies[1].is_empty():
+	elif _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and _pending_sends(0) == 0 and _pending_sends(1) == 0 and enemies[0].is_empty() and enemies[1].is_empty():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
 		coins[0] += reward + income[0]
 		coins[1] += reward + income[1]
@@ -367,9 +377,8 @@ func snapshot() -> Dictionary:
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
 		"income": income.duplicate(), "queued_sends": queued_sends,
-		"send_queues": _send_queues.duplicate(true),
+		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
 		"enemy_types": _enemy_types_snapshot(),
-		"sends_open": _sends_open(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
 		"wave_roster": wave_roster.duplicate(), "wave_weight": _wave_weight(maxi(1, wave)),
@@ -380,7 +389,7 @@ func snapshot() -> Dictionary:
 			"starting_coins": _rules.starting_coins, "kill_bounty": _rules.kill_bounty,
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
-			"send_cutoff_seconds": _rules.send_cutoff_seconds,
+			"send_spawn_interval": _send_spawn_interval,
 			"main_round_interval": _rules.main_round_interval,
 			"ready_window_seconds": _rules.ready_window_seconds,
 			"tiles_per_expansion": _rules.tiles_per_expansion,
@@ -473,15 +482,34 @@ func _move_enemies(slot: int, delta: float) -> void:
 
 func _spawn_enemies(slot: int) -> void:
 	var total: int = wave_roster.size()
-	while _spawned[slot] < total:
-		var spawn_time: float = spawn_times[_spawned[slot]]
-		if spawn_time > _elapsed:
+	# Merge only due events, preserving actual portal order even on a coarse tick.
+	# The two clocks and regular spawn counters remain entirely independent.
+	while true:
+		var regular_time: float = spawn_times[_spawned[slot]] if _spawned[slot] < total else INF
+		var send_time: float = _next_send_times[slot] if _pending_sends(slot) > 0 else INF
+		if minf(regular_time, send_time) > _elapsed:
 			break
-		# Account for the fraction of this tick after the scheduled spawn time.
-		var type_id: String = wave_roster[_spawned[slot]]
-		var progress: float = (_elapsed - spawn_time) * _enemy_speed(type_id, wave)
-		_spawn_enemy(slot, type_id, progress)
-		_spawned[slot] += 1
+		if send_time < regular_time:
+			_spawn_send(slot)
+		else:
+			var type_id: String = wave_roster[_spawned[slot]]
+			var progress: float = (_elapsed - regular_time) * _enemy_speed(type_id, wave)
+			_spawn_enemy(slot, type_id, progress)
+			_spawned[slot] += 1
+
+
+func _spawn_send(slot: int) -> void:
+	var type_id: String = _send_queues[slot][_send_heads[slot]]
+	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave)
+	_spawn_enemy(slot, type_id, progress)
+	_next_send_times[slot] += _send_spawn_interval
+	_send_heads[slot] += 1
+	if _send_heads[slot] == _send_queues[slot].size():
+		_send_queues[slot].clear()
+		_send_heads[slot] = 0
+	elif _send_heads[slot] >= 64 and _send_heads[slot] * 2 >= _send_queues[slot].size():
+		_send_queues[slot] = _send_queues[slot].slice(_send_heads[slot])
+		_send_heads[slot] = 0
 
 
 func _spawn_enemy(slot: int, type_id: String, progress: float) -> void:

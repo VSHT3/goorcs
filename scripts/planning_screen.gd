@@ -287,14 +287,13 @@ func _refresh_sends() -> void:
 	var phase: int = int(state.get("phase", MatchCombat.Phase.PLANNING))
 	var finished: bool = phase == MatchCombat.Phase.FINISHED
 	var stats: Dictionary = types.get(String(_selected_enemy_type), {})
-	var configured: bool = not stats.is_empty() and rules.has("send_cutoff_seconds")
+	var configured: bool = not stats.is_empty() and rules.has("send_spawn_interval")
 	var cost: int = int(stats.get("send_cost", 0))
 	var gain: int = int(stats.get("send_income", 0))
 	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured
-	var delivers_now: bool = phase == MatchCombat.Phase.WAVE and bool(state.get("sends_open", false))
 	enemy_selector.disabled = planning == null or not planning.active or finished or types.is_empty()
 	send_button.disabled = not available or _own_coins() < cost
-	send_button.text = "%s · %d/+%d" % ["Send now" if delivers_now else "Send next", cost, gain] if configured else "Send unavailable"
+	send_button.text = "Send · %d/+%d" % [cost, gain] if configured else "Send unavailable"
 	if finished:
 		send_button.text = "Match finished"
 	var recurring: int = int(income[own_slot])
@@ -307,7 +306,7 @@ func _refresh_sends() -> void:
 		summary += (" · " if not summary.is_empty() else "") + "Out %d" % outgoing
 	_income.text = summary
 	_income.visible = not finished and not summary.is_empty()
-	var queue_feedback: String = "Next-wave queues:\nIncoming to you: %d (%s).\nOutgoing to opponent: %d (%s)." % [int(queued[own_slot]), _queue_composition(queues[own_slot], types), int(queued[1 - own_slot]), _queue_composition(queues[1 - own_slot], types)]
+	var queue_feedback: String = "Pending send streams:\nIncoming to you: %d (%s).\nOutgoing to opponent: %d (%s)." % [int(queued[own_slot]), _queue_composition(queues[own_slot], types), int(queued[1 - own_slot]), _queue_composition(queues[1 - own_slot], types)]
 	if finished:
 		queue_feedback += "\nMatch finished; no further delivery or income payouts."
 	_income.tooltip_text = "Your recurring bonus: %d Coins at every both-board wave clear, on top of the regular reward. No immediate or terminal payout.\n%s" % [int(income[own_slot]), queue_feedback]
@@ -315,15 +314,13 @@ func _refresh_sends() -> void:
 		send_button.tooltip_text = "Waiting for host enemy types and send rules.\n" + queue_feedback
 		enemy_selector.tooltip_text = send_button.tooltip_text
 		return
-	var delivery: String = "Delivered to the opponent now, in wave %d." % int(state.get("wave", 0)) if delivers_now else "Queued for the opponent's next wave (%d)." % (int(state.get("wave", 0)) + 1)
+	var delivery: String = "Opponent's independent send stream, delivering during this round." if phase == MatchCombat.Phase.WAVE else "Queued for the opponent's independent stream when combat starts."
 	if not available:
 		delivery = "Match finished." if finished else ("Ready: planning actions are committed until the round starts." if planning != null and planning.active else "Waiting for match.")
 	elif _own_coins() < cost:
 		delivery += "\nNeed %d more Coins." % (cost - _own_coins())
 	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
-	send_button.tooltip_text = "%s\n%s\nHost stats for wave %d: %d HP · %.2f cells/s.\n%s\nCurrent-wave delivery closes %.1fs after wave start; breaks and later sends queue for the next wave." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules.get("send_cutoff_seconds", 0.0))]
-	if phase == MatchCombat.Phase.WAVE and not delivers_now and not finished:
-		send_button.tooltip_text += "\nQueued enemies use next-wave health and speed when delivered."
+	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nSend cadence: one enemy every %.2f simulation seconds, independently of regular spawns. No combat cutoff." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules["send_spawn_interval"])]
 	enemy_selector.tooltip_text = send_button.tooltip_text
 	for index: int in range(enemy_selector.item_count):
 		var type_stats: Dictionary = types[String(enemy_selector.get_item_metadata(index))]

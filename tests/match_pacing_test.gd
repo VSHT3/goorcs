@@ -114,7 +114,7 @@ func _test_simulation_clock() -> void:
 	var rules: CombatRules = _model_rules()
 	rules.enemy_speed = 2.0
 	rules.enemy_health = 1000
-	rules.send_cutoff_seconds = 0.4
+	rules.send_spawn_interval = 0.4
 	var tower := rules.tower_definitions[0].duplicate() as TowerDefinition
 	tower.damage = 1
 	tower.interval = 1.0
@@ -128,6 +128,9 @@ func _test_simulation_clock() -> void:
 	fast.request_pacing("speed", true)
 	normal.submit_ready(true)
 	fast.submit_ready(true)
+	for planning: MatchPlanning in [normal, fast]:
+		planning.send_enemy(0, &"grunt")
+		planning.send_enemy(0, &"grunt")
 	var publications: Array[int] = [0, 0]
 	normal.changed.connect(func() -> void: publications[0] += 1)
 	fast.changed.connect(func() -> void: publications[1] += 1)
@@ -147,10 +150,8 @@ func _test_simulation_clock() -> void:
 	for tick: int in range(3):
 		normal._physics_process(0.04)
 		fast._physics_process(0.04)
-	_check(publications == [2, 2] and normal.combat["sends_open"] and not fast.combat["sends_open"], "Delivery cutoff doubles in simulation time while network publication counts remain equal")
-	normal.send_enemy(0, &"grunt")
-	fast.send_enemy(0, &"grunt")
-	_check(normal.combat["queued_sends"] == [0, 0] and fast.combat["queued_sends"] == [1, 1], "The scaled cutoff changes actual immediate versus next-wave send delivery")
+	_check(publications == [2, 2] and normal.combat["queued_sends"] == [1, 1] and fast.combat["queued_sends"] == [0, 0], "Double speed delivers the second FIFO order after 0.4 simulation seconds while network publication counts remain equal")
+	_check(normal.combat["enemies"][0].size() == 2 and fast.combat["enemies"][0].size() == 3 and normal.combat["spawned"] == [1, 1] and fast.combat["spawned"] == [1, 1], "Send cadence doubles independently of unchanged regular-spawn counts")
 	for tick: int in range(9):
 		normal._physics_process(0.04)
 		fast._physics_process(0.04)

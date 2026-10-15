@@ -1,5 +1,15 @@
 extends "res://tests/match_planning_worker.gd"
 
+var _manual_sends: bool = false
+
+
+func _new_session() -> void:
+	super._new_session()
+	planning.changed.connect(func() -> void:
+		if _manual_sends:
+			planning.set_physics_process(false)
+	)
+
 
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
@@ -47,13 +57,28 @@ func _planning_rules() -> CombatRules:
 
 func _execute_command(command: Dictionary) -> void:
 	var action: String = String(command.get("action", ""))
-	if action in ["send_scenario", "typed_send_scenario"]:
+	if action in ["send_scenario", "typed_send_scenario", "stream_scenario"]:
 		var rules: CombatRules = _planning_rules()
 		var typed: bool = action == "typed_send_scenario"
 		rules.base_health = (12 if typed else 6) if _lane == "host" else 99
 		rules.starting_coins = (200 if typed else 45) if _lane == "host" else 999
 		rules.health_growth = 2
-		rules.send_cutoff_seconds = (0.8 if typed else 0.5) if _lane == "host" else 99.0
+		rules.enemy_speed = 2.0
+		_manual_sends = true
+		planning.set_physics_process(false)
+		rules.send_spawn_interval = (0.35 if typed else 0.25) if _lane == "host" else 99.0
+		if action == "stream_scenario":
+			rules.base_health = 20
+			rules.starting_coins = 400
+			rules.wave_weight = 2
+			rules.enemy_speed = 26.0 if _lane == "host" else 0.01
+			rules.spawn_interval = 1.0
+			rules.spawn_jitter_ratio = 0.0
+			rules.send_spawn_interval = 1.0 if _lane == "host" else 99.0
 		planning.combat_rules = rules
+	elif action == "step":
+		if _lane == "host":
+			planning._physics_process(float(command["delta"]))
+			planning._publish_snapshot()
 	else:
 		super._execute_command(command)

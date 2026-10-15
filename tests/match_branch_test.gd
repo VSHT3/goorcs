@@ -27,19 +27,21 @@ func _run() -> void:
 	await _both_ready()
 	await _wait_combat("guest", {"phase": 1, "wave": 1}, "Peer receives captured wave")
 	await _command("guest", {"action": "send", "slot": 1, "type_id": "grunt"})
-	await _wait_combat("host", {"income": [0, 4]}, "Remote immediate send shares wave")
+	await _wait_combat("host", {"income": [0, 4], "queued_sends": [1, 0]}, "Remote send reserves the next current-combat delivery")
 	await _command("host", {"action": "step", "delta": 2.5})
 	var accepted: Dictionary = await _agree("Moving branches and host-supplied speed agree")
 	var board_zero: Array = accepted["enemies"][0]
 	var board_one: Array = accepted["enemies"][1]
-	_check(board_zero.size() == 6 and board_one.size() == 4, "Queued/immediate sends and regular streams all survive on accepted paths")
+	_check(board_zero.size() == 6 and board_one.size() == 4 and _matches(accepted, {"queued_sends": [0, 0]}), "Paced sends and unchanged regular streams all survive on accepted paths")
 	for slot: int in range(2):
 		var enemies: Array = accepted["enemies"][slot]
 		for index: int in range(enemies.size()):
 			var enemy: Dictionary = enemies[index]
 			var y: int = 3 if index % 2 == 0 else 1
 			_check(enemy["route"].size() == 8 and enemy["route"][2] == str(Vector2i(1, y)), "Peer publishes full alternating equal-length instance route")
-			_check(enemy["pos"] == str(Vector2(1.5, y)), "Host movement follows the accepted instance branch")
+			var progress: float = float(enemy["progress"])
+			var expected_progress: float = 2.5 - (float(accepted["rules"]["send_spawn_interval"]) if slot == 0 and index == 5 else 0.0)
+			_check(is_equal_approx(progress, expected_progress) and enemy["pos"] == str(Vector2(progress - 1.0, y)), "Host movement follows each assigned branch from its actual delivery time")
 	await _command("guest", {"action": "step", "delta": 100.0})
 	var after_client_step: Dictionary = await _agree("Client cannot independently move or reroll accepted routes")
 	_check(after_client_step == accepted, "Client step cannot affect authoritative wave, routes or positions")

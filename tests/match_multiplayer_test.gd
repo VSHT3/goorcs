@@ -215,8 +215,8 @@ func _peer_sends(code: String) -> void:
 	for lane: String in ["host", "guest"]:
 		await _command(lane, {"action": "send_scenario"})
 	await _connect_guest("guest", "host", code)
-	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0], "sends_open": false}, "Fresh send scenario uses host resources and zero income")
-	_check(fresh["enemy_types"]["grunt"]["send_cost"] == 20 and fresh["enemy_types"]["grunt"]["send_income"] == 2 and fresh["rules"]["send_cutoff_seconds"] == 0.5, "Guest receives host enemy prices instead of its cheap/high-income/long-cutoff local rules")
+	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0]}, "Fresh send scenario uses host resources and zero income")
+	_check(fresh["enemy_types"]["grunt"]["send_cost"] == 20 and fresh["enemy_types"]["grunt"]["send_income"] == 2 and fresh["rules"]["send_spawn_interval"] == 0.25, "Guest receives host prices and send cadence instead of its cheap/high-income/slow local rules")
 	var before: Dictionary = _snapshot("host")["combat"]
 	await _command("guest", {"action": "send", "slot": 0, "type_id": "grunt"})
 	await _command("host", {"action": "send", "slot": 1, "type_id": "grunt"})
@@ -235,34 +235,50 @@ func _peer_sends(code: String) -> void:
 	await create_timer(0.15).timeout
 	_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Insufficient funds change neither Coins, income, queued delivery nor enemies")
 	await _paths()
-	await _both_ready()
-	await _wait_combat("guest", {"phase": 1, "wave": 1, "queued_sends": [0, 0], "spawned": [1, 1], "total": 1}, "Starting the wave drains queues without counting sends as regular spawns")
-	await _wait_enemy_counts("guest", [2, 3], "Queued orders become real enemies on their captured target routes")
+	await _command("guest", {"action": "ready", "value": true})
+	await _wait_for("host", {"flags": [false, true]}, "Affordable send payer commits initial Ready")
+	before = _snapshot("host")["combat"]
+	await _command("guest", {"action": "send", "slot": 1, "type_id": "grunt"})
+	await create_timer(0.15).timeout
+	_check(await _send_agreement("Ready send rejection") == before, "Committed planning rejects an affordable send without changing payment, income or queues")
+	await _command("host", {"action": "ready", "value": true})
+	await _wait_combat("guest", {"phase": 1, "wave": 1, "queued_sends": [0, 1], "spawned": [0, 0], "total": 1}, "Wave start delivers at most one pending send per board before regular spawning")
+	await _send_step(0.25)
+	await _wait_combat("guest", {"phase": 1, "queued_sends": [0, 0], "spawned": [1, 1]}, "Independent sends and regular timetable progress concurrently")
+	await _wait_enemy_counts("guest", [2, 3], "Paced orders become real enemies without extra ordinary-spawn counts")
+	await _send_step(7.0)
 	await _wait_combat("host", {"phase": 0, "wave": 1, "health": [4, 3], "coins": [44, 62], "income": [4, 2]}, "Regular plus sent leaks affect only their target, and first clear pays base reward plus accumulated income")
 	await _wait_combat("guest", {"phase": 0, "health": [4, 3], "coins": [44, 62]}, "Remote sees exact authoritative target damage and first income payout")
 	await _both_ready()
-	await _wait_combat("host", {"phase": 1, "wave": 2, "sends_open": true}, "Next wave reopens immediate send delivery")
+	await _wait_combat("guest", {"phase": 1, "wave": 2}, "Second send round is admitted before manually ticking")
+	await _send_step(0.1)
+	await _wait_combat("host", {"phase": 1, "wave": 2}, "Next wave resets the independent send clocks")
 	await _command("host", {"action": "send", "slot": 0, "type_id": "grunt"})
 	var immediate: Dictionary = await _wait_combat("guest", {"phase": 1, "coins": [24, 62], "income": [6, 2], "queued_sends": [0, 0], "spawned": [1, 1], "total": 1}, "An early live send debits now and enters combat instead of a queue")
 	await _wait_enemy_counts("guest", [1, 2], "Immediate host order appears only on the guest board")
 	for enemy: Dictionary in immediate["enemies"][1]:
 		_check(enemy["hp"] == 6 and enemy["max_hp"] == 6, "Live sent enemies reuse the current wave-scaled enemy health")
-	await _wait_combat("guest", {"phase": 1, "sends_open": false}, "Host cutoff closes delivery despite the guest's longer local cutoff")
+	await _send_step(3.1)
 	await _command("guest", {"action": "send", "slot": 1, "type_id": "grunt"})
-	await _wait_combat("host", {"phase": 1, "coins": [24, 42], "income": [6, 4], "queued_sends": [1, 0]}, "Late remote order pays and gains income now but queues for the host's next wave")
-	await _wait_enemy_counts("host", [1, 2], "Late send creates no extra current-wave enemy")
-	await _wait_combat("host", {"phase": 0, "wave": 2, "health": [3, 1], "coins": [70, 86], "income": [6, 4], "queued_sends": [1, 0]}, "Second clear pays recurring income again without consuming next-wave delivery")
-	await _wait_combat("guest", {"phase": 0, "coins": [70, 86], "income": [6, 4], "queued_sends": [1, 0]}, "Both peers agree on repeated income and the deferred send")
+	await _wait_combat("host", {"phase": 1, "coins": [24, 42], "income": [6, 4], "queued_sends": [0, 0]}, "A remote send after three seconds delivers in the current combat on the host's idle stream")
+	await _wait_enemy_counts("host", [2, 2], "Late current-combat send creates its enemy without changing the other stream")
+	await _send_step(10.0)
+	await _wait_combat("host", {"phase": 0, "wave": 2, "health": [2, 1], "coins": [70, 86], "income": [6, 4], "queued_sends": [0, 0]}, "Second clear waits for the late current-combat delivery and pays recurring income again")
+	await _wait_combat("guest", {"phase": 0, "coins": [70, 86], "income": [6, 4]}, "Both peers agree on complete delivery and repeated income")
+	await _command("guest", {"action": "send", "slot": 1, "type_id": "grunt"})
+	await _wait_combat("host", {"phase": 0, "coins": [70, 66], "income": [6, 6], "queued_sends": [1, 0]}, "Post-clear commands queue for the next combat without reopening a cleared wave")
 	await _both_ready()
-	await _wait_combat("guest", {"phase": 1, "wave": 3, "queued_sends": [0, 0], "spawned": [1, 1], "total": 1}, "Deferred send drains at the following wave start")
-	await _wait_enemy_counts("guest", [2, 1], "Deferred remote send becomes a real host-board enemy")
-	await _wait_combat("host", {"phase": 2, "wave": 3, "health": [1, 0], "winner": 0, "coins": [70, 86], "income": [6, 4]}, "Terminal leaks finish the run without a wave or recurring-income payout")
-	await _wait_combat("guest", {"phase": 2, "winner": 0, "coins": [70, 86]}, "Guest agrees on terminal send scenario")
+	await _wait_combat("guest", {"phase": 1, "wave": 3}, "Third send round is admitted before manually ticking")
+	await _send_step(0.1)
+	await _wait_enemy_counts("guest", [2, 1], "Planning remote send delivers once alongside the following ordinary wave")
+	await _send_step(7.0)
+	var terminal: Dictionary = await _wait_combat("host", {"phase": 2, "wave": 3, "health": [0, 0], "coins": [70, 66], "income": [6, 6], "coin_flip": true}, "Terminal leaks finish the run without a wave or recurring-income payout")
+	await _wait_combat("guest", {"phase": 2, "winner": terminal.get("winner", -1), "coins": [70, 66]}, "Guest agrees on terminal send scenario")
 	await _assert_terminal(-1)
 	await _command("guest", {"action": "leave"})
 	await _wait_for("host", {"active": false}, "Leaving removes send state")
 	await _connect_guest("guest", "host", code)
-	await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0], "sends_open": false, "enemies": [[], []]}, "Rejoin resets Coins, recurring income, queues, delivery cutoff and enemies")
+	await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0], "enemies": [[], []]}, "Rejoin resets Coins, recurring income, queues, send clocks and enemies")
 
 
 func _wait_enemy_counts(lane: String, expected: Array, description: String) -> void:
@@ -286,7 +302,7 @@ func _peer_typed_sends(code: String) -> void:
 	for type_id: String in ["runner", "brute"]:
 		var definition: Dictionary = fresh["enemy_types"][type_id]
 		_check(definition["send_cost"] == (25 if type_id == "runner" else 40) and definition["send_income"] == (2 if type_id == "runner" else 4), "Guest receives host-owned %s economy despite different local resources" % type_id)
-		_check(definition["health"] == (3 if type_id == "runner" else 10) and is_equal_approx(float(definition["speed"]), 6.5 * (1.7 if type_id == "runner" else 0.65)), "Planning catalog previews host-scaled %s HP and speed" % type_id)
+		_check(definition["health"] == (3 if type_id == "runner" else 10) and is_equal_approx(float(definition["speed"]), 2.0 * (1.7 if type_id == "runner" else 0.65)), "Planning catalog previews host-scaled %s HP and speed" % type_id)
 	var before: Dictionary = _snapshot("host")["combat"]
 	for type_id: String in ["runner", "brute", "missing_enemy"]:
 		await _command("guest", {"action": "send", "slot": 0, "type_id": type_id})
@@ -301,49 +317,60 @@ func _peer_typed_sends(code: String) -> void:
 	await _wait_combat("guest", {"coins": [135, 135], "income": [6, 6], "queued_sends": [2, 2], "send_queues": [["runner", "brute"], ["runner", "brute"]]}, "Each peer pays host per-type prices and preserves mixed send order on its target")
 	await _paths()
 	await _both_ready()
-	await _wait_enemy_counts("guest", [3, 3], "Mixed planning queues join one baseline Grunt per board")
-	await create_timer(0.15).timeout
-	for lane: String in ["host", "guest"]:
-		var moving: Dictionary = _snapshot(lane)["combat"]
-		_check_peer_enemy_types(moving, [["runner", "brute", "grunt"], ["runner", "brute", "grunt"]], 4, "First-wave %s replication" % lane)
-		for slot: int in range(2):
-			var runner: Dictionary = moving["enemies"][slot][0]
-			var brute: Dictionary = moving["enemies"][slot][1]
-			_check(float(brute["progress"]) > 0.0 and is_equal_approx(float(runner["progress"]) / float(brute["progress"]), 1.7 / 0.65), "Host movement advances simultaneous Runner and Brute at independent actual speeds on %s" % lane)
-	for lane: String in ["host", "guest"]:
-		var runner_leaked: Dictionary = await _wait_combat(lane, {"phase": 1, "health": [11, 11]}, "Runner leaks before Grunt or Brute on %s" % lane)
-		_check_peer_enemy_types(runner_leaked, [["brute", "grunt"], ["brute", "grunt"]], 4, "Fast Runner is removed, not just relabeled")
-	for lane: String in ["host", "guest"]:
-		var grunt_leaked: Dictionary = await _wait_combat(lane, {"phase": 1, "health": [10, 10]}, "Baseline Grunt leaks while slow Brute still travels on %s" % lane)
-		_check_peer_enemy_types(grunt_leaked, [["brute"], ["brute"]], 4, "Slow Brute remains independently alive")
+	var opening: Dictionary = await _wait_combat("guest", {"phase": 1, "queued_sends": [1, 1], "spawned": [0, 0]}, "Mixed planning queues deliver only their FIFO heads at combat start")
+	_check_peer_enemy_types(opening, [["runner"], ["runner"]], 4, "Initial typed sends retain their chosen identity")
+	var frozen: Dictionary = await _send_agreement("Frozen initial delivery")
+	await _command("guest", {"action": "step", "delta": 100.0})
+	_check(await _send_agreement("Client step rejection") == frozen, "Client cannot independently advance either send or regular clocks")
+	await _send_step(0.5)
+	var moving: Dictionary = await _send_agreement("Paced mixed delivery")
+	_check_peer_enemy_types(moving, [["runner", "grunt", "brute"], ["runner", "grunt", "brute"]], 4, "First-wave replication")
+	for slot: int in range(2):
+		var enemies: Array = moving["enemies"][slot]
+		_check(is_equal_approx(float(enemies[0]["progress"]), 1.7) and is_equal_approx(float(enemies[1]["progress"]), 1.0) and is_equal_approx(float(enemies[2]["progress"]), 0.195), "Both peers accept actual typed speeds and fractional travel from each delivery time")
+	await _send_step(3.4)
+	var runner_leaked: Dictionary = await _send_agreement("Runner leak")
+	_check(_matches(runner_leaked, {"health": [11, 11]}), "Runner leaks before slower enemies")
+	_check_peer_enemy_types(runner_leaked, [["grunt", "brute"], ["grunt", "brute"]], 4, "Fast Runner is removed, not relabeled")
+	await _send_step(2.7)
+	var grunt_leaked: Dictionary = await _send_agreement("Grunt leak")
+	_check(_matches(grunt_leaked, {"health": [10, 10]}), "Baseline Grunt leaks while Brute still travels")
+	_check_peer_enemy_types(grunt_leaked, [["brute"], ["brute"]], 4, "Slow Brute remains independently alive")
+	await _send_step(4.0)
 	await _wait_combat("guest", {"phase": 0, "wave": 1, "health": [7, 7], "coins": [176, 176], "income": [6, 6]}, "Brutes leak three damage and one clear pays each accumulated income")
 	await _both_ready()
+	await _wait_combat("guest", {"phase": 1, "wave": 2}, "Second typed round is admitted before manually ticking")
+	await _send_step(0.1)
 	await _wait_enemy_counts("guest", [1, 1], "Wave two first spawns its baseline Grunts")
 	await _command("host", {"action": "send", "slot": 0, "type_id": "runner"})
 	await _command("guest", {"action": "send", "slot": 1, "type_id": "brute"})
 	var live: Dictionary = await _wait_combat("guest", {"phase": 1, "wave": 2, "coins": [151, 136], "income": [8, 10], "send_queues": [[], []]}, "Early typed sends use different prices and immediate delivery")
 	_check_peer_enemy_types(live, [["grunt", "brute"], ["grunt", "runner"]], 6, "Live Runner and Brute use current-wave scaled HP")
-	await _wait_combat("guest", {"phase": 1, "sends_open": false}, "Host cutoff applies despite guest enemy-resource differences")
+	await _send_step(3.0)
 	for type_id: String in ["brute", "runner"]:
 		await _command("host", {"action": "send", "slot": 0, "type_id": type_id})
 	for type_id: String in ["runner", "brute"]:
 		await _command("guest", {"action": "send", "slot": 1, "type_id": type_id})
-	await _wait_combat("guest", {"phase": 1, "coins": [86, 71], "income": [14, 16], "queued_sends": [2, 2], "send_queues": [["runner", "brute"], ["brute", "runner"]]}, "Cutoff queues retain each target's independent mixed-type order")
-	await _wait_combat("host", {"phase": 0, "wave": 2, "health": [3, 5], "coins": [140, 127], "send_queues": [["runner", "brute"], ["brute", "runner"]]}, "Queued types survive wave clear and recurring income pays again")
-	await _wait_combat("guest", {"phase": 0, "health": [3, 5], "coins": [140, 127]}, "Guest agrees on typed leak outcomes and recurring rewards")
-	await _both_ready()
-	await _wait_enemy_counts("guest", [3, 3], "Next-wave mixed queues drain once alongside regular Grunts")
-	for lane: String in ["host", "guest"]:
-		var delivered: Dictionary = _snapshot(lane)["combat"]
-		_check_peer_enemy_types(delivered, [["runner", "brute", "grunt"], ["brute", "runner", "grunt"]], 8, "Deferred sends recompute next-wave HP without losing type or order")
-		_check(_matches(delivered, {"send_queues": [[], []], "queued_sends": [0, 0]}), "Typed deliveries drain ordered queues and HUD counts together")
-	var finished: Dictionary = await _wait_combat("host", {"phase": 2, "wave": 3, "health": [0, 0], "coins": [140, 127], "income": [14, 16], "coin_flip": true}, "Brutes arrive together and clamp both bases after faster leaks, freezing the terminal outcome without payout")
-	await _wait_combat("guest", {"phase": 2, "winner": finished.get("winner", -1), "health": [0, 0], "coins": [140, 127]}, "Both ENet peers agree on typed-send terminal result")
+	var pending: Dictionary = await _wait_combat("guest", {"phase": 1, "coins": [86, 71], "income": [14, 16], "queued_sends": [1, 1], "send_queues": [["brute"], ["runner"]]}, "After three seconds idle streams deliver one new head immediately and retain each mixed FIFO tail")
+	_check_peer_enemy_types(pending, [["grunt", "brute", "runner"], ["grunt", "runner", "brute"]], 6, "Late current-combat sends use current-wave HP")
+	await _send_step(0.349)
+	var before_due: Dictionary = await _send_agreement("Before host send interval")
+	_check(before_due["send_queues"] == [["brute"], ["runner"]], "Neither peer delivers a FIFO tail before the host interval")
+	await _send_step(0.002)
+	var delivered: Dictionary = await _send_agreement("At host send interval")
+	_check_peer_enemy_types(delivered, [["grunt", "brute", "runner", "brute"], ["grunt", "runner", "brute", "runner"]], 6, "Both streams use host cadence rather than the client's ninety-nine-second interval")
+	_check(_matches(delivered, {"queued_sends": [0, 0], "spawned": [1, 1], "total": 1}), "Mixed deliveries consume pending counts but never regular budget or spawn counters")
+	await _send_step(11.0)
+	var finished: Dictionary = await _wait_combat("host", {"phase": 2, "wave": 2, "health": [0, 1], "coins": [86, 71], "income": [14, 16], "coin_flip": false, "winner": 1}, "All typed current-combat leaks reach the normal terminal result without a clear payout")
+	await _wait_combat("guest", {"phase": 2, "winner": finished.get("winner", -1), "health": [0, 1], "coins": [86, 71]}, "Both ENet peers agree on typed-send terminal result")
 	await _assert_terminal(-1)
+	var terminal_state: Dictionary = await _send_agreement("Frozen typed terminal result")
+	await _send_step(100.0)
+	_check(await _send_agreement("No delayed terminal delivery") == terminal_state, "Terminal clocks cannot move surviving enemies, deliver orders, pay rewards or reroll")
 	await _command("guest", {"action": "leave"})
 	await _wait_for("host", {"active": false}, "Leaving clears typed enemy state")
 	await _connect_guest("guest", "host", code)
-	await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [12, 12], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []], "queued_sends": [0, 0], "enemies": [[], []], "sends_open": false}, "Rejoin resets both typed queues, income, enemies and delivery window")
+	await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [12, 12], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []], "queued_sends": [0, 0], "enemies": [[], []]}, "Rejoin resets both typed queues, income, enemies and delivery clocks")
 	for lane: String in ["host", "guest"]:
 		for type_id: String in ["brute", "brute", "brute", "brute", "runner"]:
 			await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": type_id})
@@ -365,7 +392,23 @@ func _check_peer_enemy_types(combat: Dictionary, expected: Array, wave_health: i
 			identities.append(type_id)
 			var hp_multiplier: float = 0.6 if type_id == "runner" else (2.5 if type_id == "brute" else 1.0)
 			var speed_multiplier: float = 1.7 if type_id == "runner" else (0.65 if type_id == "brute" else 1.0)
-			_check(enemy["hp"] == ceili(wave_health * hp_multiplier) and enemy["max_hp"] == ceili(wave_health * hp_multiplier) and is_equal_approx(float(enemy.get("speed", 0.0)), 6.5 * speed_multiplier), "%s: %s carries authoritative HP and speed on board %d" % [description, type_id, slot])
+			_check(enemy["hp"] == ceili(wave_health * hp_multiplier) and enemy["max_hp"] == ceili(wave_health * hp_multiplier) and is_equal_approx(float(enemy.get("speed", 0.0)), 2.0 * speed_multiplier), "%s: %s carries authoritative HP and speed on board %d" % [description, type_id, slot])
 			_check(int(enemy["damage"]) == (3 if type_id == "brute" else 1), "%s: %s carries resource-owned base damage" % [description, type_id])
 		_check(identities == expected[slot], "%s: board %d keeps ordered typed identities; observed %s" % [description, slot, identities])
 
+
+func _send_step(delta: float) -> void:
+	await _command("host", {"action": "step", "delta": delta})
+	await _send_agreement("Host send/combat step replicates")
+
+
+func _send_agreement(description: String) -> Dictionary:
+	var deadline: int = Time.get_ticks_msec() + 5000
+	while Time.get_ticks_msec() < deadline:
+		var host: Dictionary = _snapshot("host").get("combat", {})
+		var guest: Dictionary = _snapshot("guest").get("combat", {})
+		if not host.is_empty() and host == guest:
+			return guest
+		await create_timer(0.02).timeout
+	_check(false, description)
+	return _snapshot("guest").get("combat", {})

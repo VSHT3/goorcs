@@ -88,6 +88,7 @@ func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:
 	var model := MatchCombat.new(main.combat_rules)
 	var income: Control = screen.get_node("%Income")
 	_check(model.send_enemy(1, &"grunt"), "Opponent purchase creates a real incoming-only planning queue")
+	_check(model.send_enemy(1, &"runner"), "A second purchase reserves a different type in the same incoming stream")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
 	_check(income.visible, "An incoming queue remains discoverable even without local recurring income")
@@ -96,6 +97,10 @@ func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:
 		layout.place(Vector2i(x, 4))
 	var routes: Array[Dictionary] = [layout.capture_routing(), layout.capture_routing()]
 	_check(model.start_wave(routes), "Legal routes deliver the accepted queue")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(income.visible and model.queued_sends == [1, 0], "Incoming summary stays visible while a paced delivery remains pending")
+	model.advance(main.combat_rules.send_spawn_interval)
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
 	_check(not income.visible, "Delivered queues with no local income remove their obsolete HUD summary")
