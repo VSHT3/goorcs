@@ -1,0 +1,51 @@
+{
+  "status": "Single starting image for creator-led PixelLab rotations; not installed in gameplay",
+  "canvas": [
+    128,
+    128
+  ],
+  "source_facing": "south-east",
+  "foot_anchor_pixels": [
+    64,
+    117
+  ],
+  "swivel_socket_pixels": [
+    64,
+    52
+  ],
+  "layer_order": [
+    "base.png",
+    "crossbow.png"
+  ],
+  "master": "ballista.png",
+  "rotation_guidance": "Rotate crossbow.png only; retain the identical base.png and full canvas/anchor.",
+  "provenance": {
+    "base": "Hand-pixeled taller buttressed foundation approved by the creator in this session.",
+    "crossbow": "Existing PixelLab source manually separated, saddle repaired, then steel bindings, stock highlights, windlass and rivets edited at native pixel scale.",
+    "original_source": "assets/towers/ballista_tower.png",
+    "original_source_sha256": "9ac5e953f4e02e4f18aa20064b392a09f6c5b6938b69248fd6720c68f79ae38a",
+    "source_layer_translation": [
+      16,
+      4
+    ],
+    "new_ai_generations": 0
+  },
+  "validation": {
+    "approved_base_unchanged": true,
+    "crossbow_bounds_unchanged": true,
+    "alpha": [
+      0,
+      255
+    ],
+    "native_scale": true,
+    "margins_unclipped": true
+  },
+  "files": {
+    "base.png": "761d8984cde66a1bf0b05ce51cf403a9f527e7bee0bcead10382151b1c8b4225",
+    "source-crossbow.png": "be158233891450efc47f8b7a5c27978b13c901ad274d68123e4eb9a440317b77",
+    "crossbow.png": "e08555b0ef4a58ac11b1c45bc46e0b3a726155f643acf9e9cfa8de63dee583d6",
+    "ballista.png": "6ab94889ee013542e2124964fb65dabb15ea71136b52636539f66771c52fba05",
+    "preview.png": "752fde06b0c3dfd588d21eef7bcf6117fa0f336b572e5a823d1a03fa9474b828",
+    "prepare.py": "28a32dc5092dc8d91d3fb874975a630e0162b4a65830869c0fa560e055dd6111"
+  }
+}
