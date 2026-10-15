@@ -83,40 +83,68 @@ func _run() -> void:
 
 func _check_growth() -> void:
 	var cells: Array[Vector2i] = [Vector2i(0, 4), Vector2i(13, 4), Vector2i(6, 3)]
-	var old_positions: Array[Vector2] = []
-	for slot: int in range(2):
-		world.boards[slot].layout.place(cells[2])
-		for cell: Vector2i in cells:
-			old_positions.append(world.boards[slot].get_global_transform() * world.boards[slot].cell_center(cell))
-	world.pan(0.07, Vector2.RIGHT)
-	var panned: Vector2 = world.camera.position
-	var before_zoom: Vector2 = world.camera.zoom
-	for board: PathBoard in world.boards:
-		board.layout.grow_vertical(6)
-	world.configure(Vector2i(14, 11), 0, -1)
-	await _settle()
-	_check(world.camera.zoom.x < before_zoom.x, "Growth reveals the enlarged board instead of keeping new rows outside the viewport")
-	var growth_zoom: Vector2 = world.camera.zoom
-	for corner: Vector2i in [Vector2i.ZERO,Vector2i(13,0),Vector2i(0,10),Vector2i(13,10)]:
-		var point: Vector2 = world.cell_screen_position(0,corner)
-		_check(point.x >= 0 and point.x <= world.size.x and point.y >= MatchWorld.HUD_TOP and point.y <= world.size.y-MatchWorld.HUD_BOTTOM, "All newly added rows are immediately visible without manual camera input")
-	for slot: int in range(2):
-		for index: int in range(cells.size()):
-			var shifted: Vector2i = cells[index] + Vector2i.DOWN
-			var actual: Vector2 = world.boards[slot].get_global_transform() * world.boards[slot].cell_center(shifted)
-			_check(actual.is_equal_approx(old_positions[slot * cells.size() + index]), "Existing endpoint/path/tower cell world position survives top-and-bottom growth slot=%d cell=%s" % [slot, shifted])
-	world.pan(100.0, Vector2.UP)
-	_check(is_equal_approx(world.camera.position.y, world.camera_vertical_bounds.x), "Top scrolling clamps on enlarged terrain")
-	var top_cell: Vector2 = world.cell_screen_position(0, Vector2i(6, 0))
-	_check(top_cell.y >= MatchWorld.HUD_TOP, "Top clamp exposes the added top row below the HUD")
-	world.pan(100.0, Vector2.DOWN)
-	_check(is_equal_approx(world.camera.position.y, world.camera_vertical_bounds.y), "Bottom scrolling clamps on enlarged terrain")
-	var bottom_cell: Vector2 = world.cell_screen_position(0, Vector2i(6, 10))
-	_check(bottom_cell.y <= world.size.y - MatchWorld.HUD_BOTTOM, "Bottom clamp exposes the added bottom row above the footer")
-	world.camera.position = panned
-	world.camera.force_update_scroll()
-	world.configure(Vector2i(14, 11), 0, -1)
-	_check(world.camera.position.is_equal_approx(panned) and world.camera.zoom.is_equal_approx(growth_zoom), "Repeated accepted board configuration preserves camera state")
+	# End on the host so the remaining input-priority checks keep their fixture.
+	for own_slot: int in [1, 0]:
+		for slot: int in range(2):
+			world.boards[slot].layout = PathLayout.new()
+			world.boards[slot].input_enabled = slot == own_slot
+		world.configure(Vector2i(14, 9), own_slot)
+		await _settle()
+		var old_positions: Array[Vector2] = []
+		var initial_gap: Rect2 = world._terrain._gap
+		for slot: int in range(2):
+			world.boards[slot].layout.place(cells[2])
+			for cell: Vector2i in cells:
+				old_positions.append(world.boards[slot].get_global_transform() * world.boards[slot].cell_center(cell))
+		world.pan(0.07, Vector2.RIGHT)
+		var panned: Vector2 = world.camera.position
+		var before_zoom: Vector2 = world.camera.zoom
+		for board: PathBoard in world.boards:
+			board.layout.grow_for_main_round(6)
+		world.configure(Vector2i(15, 11), own_slot, -1)
+		await _settle()
+		_check(world.camera.zoom.x < before_zoom.x, "Growth reveals the enlarged three-edge board, own slot=%d" % own_slot)
+		_check(is_equal_approx(world._fit_zoom, initial_zoom), "Growth retains the original width and height as the manual zoom reference")
+		var growth_zoom: Vector2 = world.camera.zoom
+		var own_board: PathBoard = world.boards[own_slot]
+		_check(is_equal_approx(world.camera.position.x, own_board.position.x + own_board.size.x * 0.5), "Growth framing uses the translated owned-board center, slot=%d" % own_slot)
+		for corner: Vector2i in [Vector2i.ZERO, Vector2i(14, 0), Vector2i(0, 10), Vector2i(14, 10)]:
+			var point: Vector2 = world.cell_screen_position(own_slot, corner)
+			_check(point.x >= MatchWorld.SIDE_MARGIN and point.x <= world.size.x - MatchWorld.SIDE_MARGIN and point.y >= MatchWorld.HUD_TOP and point.y <= world.size.y - MatchWorld.HUD_BOTTOM, "All new outer/top/bottom cells are immediately visible, slot=%d cell=%s" % [own_slot, corner])
+		for slot: int in range(2):
+			for index: int in range(cells.size()):
+				var shifted: Vector2i = cells[index] + Vector2i.DOWN
+				var actual: Vector2 = world.boards[slot].get_global_transform() * world.boards[slot].cell_center(shifted)
+				_check(actual == old_positions[slot * cells.size() + index], "Existing portal/crystal/path cell world position stays exact, slot=%d cell=%s" % [slot, shifted])
+		_check(world.boards[0].position == Vector2(-48, -48) and world.boards[1].position == Vector2(768, -48), "Mirrored host grows left and guest grows right without moving inward edges")
+		_check(world._terrain._gap.position.x == initial_gap.position.x and world._terrain._gap.end.x == initial_gap.end.x, "Ravine banks remain at the original world x coordinates")
+		_check(world.boards[0].position.x + world.boards[0].size.x == initial_gap.position.x and world.boards[1].position.x == initial_gap.end.x, "Both portal-facing board edges stay flush with the fixed central gap")
+		var clicks: Array[Vector2i] = []
+		var collect := func(cell: Vector2i, _button: MouseButton) -> void: clicks.append(cell)
+		own_board.cell_clicked.connect(collect)
+		var new_cells: Array[Vector2i] = [Vector2i(14, 5), Vector2i(6, 0), Vector2i(6, 10)]
+		for cell: Vector2i in new_cells:
+			await _click(world.cell_screen_position(own_slot, cell))
+		own_board.cell_clicked.disconnect(collect)
+		_check(clicks == new_cells, "Real root clicks on all three added sides emit exact authoritative logical cells, slot=%d" % own_slot)
+		world.pan(100.0, Vector2.LEFT)
+		var half_width: float = minf(own_board.size.x * 0.5, (world.size.x - MatchWorld.SIDE_MARGIN * 2.0) * 0.5 / world.camera.zoom.x)
+		_check(is_equal_approx(world.camera.position.x, -MatchWorld.CELL_SIZE + half_width), "Left camera bound follows the host's new world minimum")
+		world.pan(100.0, Vector2.RIGHT)
+		_check(is_equal_approx(world.camera.position.x, -MatchWorld.CELL_SIZE + own_board.size.x * 2.0 + MatchWorld.BOARD_GAP - half_width), "Right camera bound follows the guest's new world maximum")
+		world.pan(100.0, Vector2.LEFT)
+		world.pan(100.0, Vector2.UP)
+		_check(is_equal_approx(world.camera.position.y, world.camera_vertical_bounds.x), "Top scrolling clamps on enlarged terrain")
+		var top_cell: Vector2 = world.cell_screen_position(0, Vector2i(6, 0))
+		_check(top_cell.y >= MatchWorld.HUD_TOP, "Top clamp exposes the added top row below the HUD")
+		world.pan(100.0, Vector2.DOWN)
+		_check(is_equal_approx(world.camera.position.y, world.camera_vertical_bounds.y), "Bottom scrolling clamps on enlarged terrain")
+		var bottom_cell: Vector2 = world.cell_screen_position(0, Vector2i(6, 10))
+		_check(bottom_cell.y <= world.size.y - MatchWorld.HUD_BOTTOM, "Bottom clamp exposes the added bottom row above the footer")
+		world.camera.position = panned
+		world.camera.force_update_scroll()
+		world.configure(Vector2i(15, 11), own_slot, -1)
+		_check(world.camera.position.is_equal_approx(panned) and world.camera.zoom.is_equal_approx(growth_zoom), "Repeated accepted board configuration preserves camera state")
 
 
 func _check_four_way_keys() -> void:
@@ -176,20 +204,41 @@ func _check_zoom() -> void:
 	root.size = Vector2i(1500, 900)
 	await _settle()
 	_check(is_equal_approx(world.camera.zoom.x / world._fit_zoom, ratio), "Window resize retains the user's zoom ratio")
+	root.content_scale_size = Vector2i(640, 900)
+	root.size = Vector2i(640, 900)
+	await _settle()
+	var reference_fit: float = minf((world.size.x - MatchWorld.SIDE_MARGIN * 2.0) / (14.0 * MatchWorld.CELL_SIZE),
+		(world.size.y - MatchWorld.HUD_TOP - MatchWorld.HUD_BOTTOM) / (9.0 * MatchWorld.CELL_SIZE + world._headroom))
+	_check(is_equal_approx(world._fit_zoom, reference_fit), "A width-limited resize still uses the original 14-column zoom reference after growth")
 	root.content_scale_size = Vector2i(1280, 720)
 	root.size = Vector2i(1280, 720)
 	await _settle()
 	var position: Vector2 = world.camera.position
 	var retained_zoom: Vector2 = world.camera.zoom
-	world.configure(Vector2i(14, 11), 0, -1)
+	world.configure(Vector2i(15, 11), 0, -1)
 	_check(world.camera.position.is_equal_approx(position) and world.camera.zoom.is_equal_approx(retained_zoom), "Accepted snapshot refresh retains zoom and pan")
+	var old_positions: Array[Vector2] = []
+	var cells: Array[Vector2i] = [Vector2i(0, 5), Vector2i(13, 5), Vector2i(6, 4)]
+	var initial_gap: Rect2 = world._terrain._gap
 	for board: PathBoard in world.boards:
-		board.layout.grow_vertical(6)
-	world.configure(Vector2i(14, 13), 0, -2)
+		for cell: Vector2i in cells:
+			old_positions.append(board.get_global_transform() * board.cell_center(cell))
+	for board: PathBoard in world.boards:
+		board.layout.grow_for_main_round(6)
+	world.configure(Vector2i(16, 13), 0, -2)
+	await _settle()
+	for slot: int in range(2):
+		for index: int in range(cells.size()):
+			var actual: Vector2 = world.boards[slot].get_global_transform() * world.boards[slot].cell_center(cells[index] + Vector2i.DOWN)
+			_check(actual == old_positions[slot * cells.size() + index], "Repeated three-edge growth keeps both portal/crystal/path world positions exact, slot=%d" % slot)
+	_check(world._terrain._gap.position.x == initial_gap.position.x and world._terrain._gap.end.x == initial_gap.end.x, "Later expansion cannot shift the central ravine")
+	for corner: Vector2i in [Vector2i.ZERO, Vector2i(15, 0), Vector2i(0, 12), Vector2i(15, 12)]:
+		var corner_point: Vector2 = world.cell_screen_position(0, corner)
+		_check(corner_point.x >= MatchWorld.SIDE_MARGIN and corner_point.x <= world.size.x - MatchWorld.SIDE_MARGIN and corner_point.y >= MatchWorld.HUD_TOP and corner_point.y <= world.size.y - MatchWorld.HUD_BOTTOM, "Later growth also exposes all three added edges")
 	_check(world.camera.zoom.x < retained_zoom.x, "Later growth also frames the complete enlarged playable area")
 	var revealed: Vector2 = world.camera.position
 	var revealed_zoom: Vector2 = world.camera.zoom
-	world.configure(Vector2i(14,13),0,-2)
+	world.configure(Vector2i(16, 13), 0, -2)
 	_check(world.camera.position.is_equal_approx(revealed) and world.camera.zoom.is_equal_approx(revealed_zoom), "Ordinary snapshots do not repeat growth framing")
 
 
@@ -257,6 +306,11 @@ func _check_lifecycle() -> void:
 	world._process(0.2)
 	_check(world.camera.position.is_equal_approx(resumed), "Showing cannot revive a key held before hiding")
 	await _key(KEY_S, false)
+	world.set_active(false)
+	world.set_active(true)
+	world.set_process(false)
+	var grown_center: Vector2 = world.boards[0].position + world.boards[0].size * 0.5
+	_check(is_equal_approx(world.camera.position.x, grown_center.x) and is_equal_approx(world.camera.zoom.x, initial_zoom), "Reactivation resets to the translated grown owned side with the original manual fit")
 	world.set_active(false)
 	for board: PathBoard in world.boards:
 		board.layout = PathLayout.new()

@@ -74,11 +74,6 @@ var tower_catalog: Array[TowerReward] = CollectionStore.DEFAULT_CATALOG:
 			_tower_art[String(reward.id)] = reward
 			_cache_texture_bounds(reward.icon_texture)
 		queue_redraw()
-var expansion_rows_visible: bool = false:
-	set(value):
-		if expansion_rows_visible != value:
-			expansion_rows_visible = value
-			queue_redraw()
 var placement_enabled: bool = true:
 	set(value):
 		placement_enabled = value
@@ -443,22 +438,10 @@ func _on_mouse_exited() -> void:
 	queue_redraw()
 
 
-func _draw_expansion_rows() -> void:
-	if not expansion_rows_visible:
-		return
-	var cell_size: float = _cell_size()
-	var origin: Vector2 = _board_origin()
-	for row: int in [0, layout.dimensions.y - 1]:
-		var strip := Rect2(origin + Vector2(0, row * cell_size), Vector2(layout.dimensions.x * cell_size, cell_size))
-		draw_rect(strip, Color(0.72, 0.80, 0.43, 0.12))
-		draw_rect(strip.grow(-1.0), Color(0.78, 0.85, 0.53, 0.75), false, 1.5)
-
-
 func _draw() -> void:
 	if layout == null or _cell_size() <= 0.0:
 		return
 	_update_ground()
-	_draw_expansion_rows()
 	_draw_ranges()
 	_draw_hover()
 	_draw_attacks()

@@ -161,8 +161,9 @@ func _test_strategy_growth_and_reset() -> void:
 		var strategy: bool = upcoming == 1 or upcoming % 10 == 0
 		var expansions: int = maxi(0, upcoming / 10 - 1)
 		_check(planning.combat["main_round"] == (upcoming % 10 == 0) and planning.combat["setup_round"] == (upcoming == 1) and planning.combat["path_editing"] == strategy and planning.can_edit_path(0) == strategy, "Upcoming round %d exposes its actual phase path permission" % upcoming)
-		_check(planning.layouts[0].dimensions == Vector2i(14, 9 + expansions * 2) and planning.layouts[0].budget == 30 + expansions * 6 and planning.combat["board_origin_y"] == -expansions, "Round %d has exactly the scheduled dimensions, +6 budget, and world origin" % upcoming)
+		_check(planning.combat["board_origin_y"] == -expansions, "Round %d has exactly the scheduled world origin" % upcoming)
 		for slot: int in range(2):
+			_check(planning.layouts[slot].dimensions == Vector2i(14 + expansions, 9 + expansions * 2) and planning.layouts[slot].budget == 30 + expansions * 6, "Round %d gives both boards exactly one outer column, two rows and +6 tiles per growth" % upcoming)
 			var expected_route: Array[Vector2i] = []
 			for cell: Vector2i in original_route:
 				expected_route.append(cell + Vector2i(0, expansions))
@@ -171,8 +172,22 @@ func _test_strategy_growth_and_reset() -> void:
 			expected_tower["cell"] += Vector2i(0, expansions)
 			expected_tower["aim"] += Vector2(0, expansions)
 			_check(planning.combat["towers"][slot][0] == expected_tower, "Expansion preserves tower IDs, targeting, upgrades, stats, reload, kills and actual investment")
-			_check(planning.layouts[slot].entrance.y - expansions == 4 and planning.layouts[slot].base.y - expansions == 4 and int(expected_tower["cell"].y) - expansions == 0 and is_equal_approx(float(expected_tower["aim"].y) - expansions, 0.0), "Endpoints, tower base and aim remain fixed in world coordinates")
+			_check(planning.layouts[slot].entrance == Vector2i(0, 4 + expansions) and planning.layouts[slot].base == Vector2i(13, 4 + expansions) and expected_tower["cell"] == original_towers[slot][0]["cell"] + Vector2i(0, expansions) and expected_tower["aim"] == original_towers[slot][0]["aim"] + Vector2(0, expansions), "Endpoints, tower cells and aim retain their old x coordinates and only reindex y")
 		if upcoming in [10, 20, 30]:
+			if expansions > 0:
+				var outer_x: int = planning.layouts[0].dimensions.x - 1
+				var base_y: int = planning.layouts[0].base.y
+				for x: int in range(14, outer_x + 1):
+					planning.request_edit(0, Vector2i(x, base_y), true)
+				for slot: int in range(2):
+					_check(planning.layouts[slot].has_path(Vector2i(outer_x, base_y)) and planning.layouts[slot].is_ready() and planning.layouts[slot].route.back() == Vector2i(13, base_y), "Authoritative edits and accepted snapshots make the new outer column usable beyond the stationary base on both boards")
+				for x: int in range(outer_x, 13, -1):
+					planning.request_edit(0, Vector2i(x, base_y), false)
+				planning.build_tower(0, Vector2i(outer_x, 0), &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
+				for slot: int in range(2):
+					_check(planning.combat["towers"][slot].size() == 2 and planning.combat["towers"][slot][1]["cell"] == Vector2i(outer_x, 0), "The new outer column also accepts a tower through the shared build validator")
+				if planning.combat["towers"][0].size() == 2:
+					planning.sell_tower(0, planning.combat["towers"][0][1]["id"])
 			var before_growth: Dictionary = planning._snapshot().duplicate(true)
 			planning._enter_planning()
 			planning._publish_snapshot()
@@ -198,7 +213,9 @@ func _test_strategy_growth_and_reset() -> void:
 			_clear_wave(planning)
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
-	_check(planning.layouts[0].dimensions == Vector2i(14, 9) and planning.layouts[0].budget == 30 and planning.layouts[0].entrance == Vector2i(0, 4) and planning.layouts[0].base == Vector2i(13, 4) and planning.layouts[0].used_tiles() == 0 and planning.combat["board_origin_y"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["ready_seconds_left"] == -1.0, "Leaving an expanded match restores the captured initial configuration for a fresh run")
+	_check(planning.combat["board_origin_y"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["ready_seconds_left"] == -1.0, "Leaving an expanded match restores initial combat and origin state for a fresh run")
+	for slot: int in range(2):
+		_check(planning.layouts[slot].dimensions == Vector2i(14, 9) and planning.layouts[slot].budget == 30 and planning.layouts[slot].entrance == Vector2i(0, 4) and planning.layouts[slot].base == Vector2i(13, 4) and planning.layouts[slot].used_tiles() == 0 and planning.layouts[slot].route.is_empty(), "A fresh run restores the captured initial grid, endpoints, budget and empty path on both boards")
 	_dispose(planning)
 
 

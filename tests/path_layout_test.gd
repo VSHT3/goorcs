@@ -8,7 +8,7 @@ func _init() -> void:
 	_test_shortcuts_and_islands()
 	_test_diagonals_and_ties()
 	_test_captured_shortest_successors()
-	_test_vertical_growth()
+	_test_main_round_growth()
 	if failures == 0:
 		print("PASS: path budget, immutable endpoints, shortcuts, islands, diagonals, and route ties")
 	quit(1 if failures > 0 else 0)
@@ -80,18 +80,27 @@ func _test_captured_shortest_successors() -> void:
 	_check(not layout.capture_routing()["next"][layout.entrance].is_empty() and not layout.route.is_empty(), "Captured dictionaries and route arrays cannot mutate the layout")
 
 
-func _test_vertical_growth() -> void:
-	var layout := PathLayout.new(Vector2i(5, 5), 12, Vector2i(0, 2), Vector2i(4, 2))
-	for x: int in range(1, 4):
-		layout.place(Vector2i(x, 2))
+func _test_main_round_growth() -> void:
+	var layout := PathLayout.new()
+	for x: int in range(1, 13):
+		layout.place(Vector2i(x, 4))
 	var original_route: Array[Vector2i] = layout.route.duplicate()
 	for event: int in range(1, 4):
-		layout.grow_vertical(6)
-		_check(layout.dimensions == Vector2i(5, 5 + event * 2) and layout.budget == 12 + event * 6, "Each expansion adds two rows and its explicit tile allowance")
-		_check(layout.used_tiles() == 3 and layout.is_ready() and layout.route.size() == original_route.size(), "Expansion preserves placed tiles, connectivity and route length")
+		var previous_width: int = layout.dimensions.x
+		layout.grow_for_main_round(6)
+		_check(layout.dimensions == Vector2i(14 + event, 9 + event * 2) and layout.budget == 30 + event * 6, "Each expansion adds one outer column, two rows and its explicit tile allowance")
+		_check(layout.entrance == Vector2i(0, 4 + event) and layout.base == Vector2i(13, 4 + event), "Growth never shifts logical entrance/base x coordinates or adds a portal-side column")
+		_check(layout.used_tiles() == 12 and layout.is_ready() and layout.route.size() == original_route.size(), "Expansion preserves placed tiles, connectivity and route length")
 		for index: int in range(original_route.size()):
-			_check(layout.route[index] - Vector2i(0, event) == original_route[index], "Moving the world origin up cancels logical coordinate shifts")
-		_check(layout.place(Vector2i(0, 0)) and layout.place(Vector2i(4, layout.dimensions.y - 1)), "New top and bottom rows are genuinely buildable")
+			_check(layout.route[index] - Vector2i(0, event) == original_route[index], "Growth reindexes only old path y coordinates")
+		_check(layout.place(Vector2i(0, 0)) and layout.place(Vector2i(13, layout.dimensions.y - 1)), "New top and bottom rows are genuinely buildable")
 		layout.erase(Vector2i(0, 0))
-		layout.erase(Vector2i(4, layout.dimensions.y - 1))
+		layout.erase(Vector2i(13, layout.dimensions.y - 1))
+		var retained_route: Array[Vector2i] = layout.route.duplicate()
+		for x: int in range(14, layout.dimensions.x):
+			_check(layout.place(Vector2i(x, layout.base.y)), "Every outer column beyond the stationary base accepts connected pavement")
+		_check(layout.has_path(Vector2i(previous_width, layout.base.y)) and layout.is_ready() and layout.route == retained_route, "The newly added outer column is usable without moving the base or changing the existing route")
+		for x: int in range(layout.dimensions.x - 1, 13, -1):
+			layout.erase(Vector2i(x, layout.base.y))
+		_check(not layout.contains(Vector2i(-1, layout.entrance.y)) and not layout.contains(Vector2i(layout.dimensions.x, layout.base.y)), "Growth leaves the portal-side boundary fixed and adds exactly one outer column")
 		_check(not layout.erase(layout.entrance) and not layout.erase(layout.base), "Grown endpoints retain protection")

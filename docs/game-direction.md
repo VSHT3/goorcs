@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, persistent collection chests, and host-authoritative two-player defense with shared planning, weighted waves, tower economy/management, sends/income, persistent health, and results. Matches use a continuous world with local WASD and bounded wheel/pinch zoom. Committed readiness, ordinary-round deadlines, ten-round strategy breaks, and vertical growth from round 20 are implemented. Singleplayer mirrors the same rules locally. Loadouts, permanent stat growth, and final art remain unimplemented; the full milestone below is not complete.
+The project contains a playable local path workshop, persistent collection chests, and host-authoritative two-player defense with shared planning, weighted waves, tower economy/management, sends/income, persistent health, and results. Matches use a continuous world with local WASD and bounded wheel/pinch zoom. Committed readiness, ordinary-round deadlines, ten-round strategy breaks, and three-sided growth from round 20 are implemented. Singleplayer mirrors the same rules locally. Loadouts, permanent stat growth, and final art remain unimplemented; the full milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -60,9 +60,9 @@ Players lay walkable path tiles on a square grid. Both players start with the sa
 
 The presentation places the host board on the left and guest on the right in one continuous world, with both streams entering from the middle toward outer bases. The left board mirrors rendering/input, not authoritative coordinates. Each player initially views their own side; WASD pans continuously and wheel/pinch zoom stays bounded and cursor-anchored. A separate world viewport keeps the HUD fixed. Camera control is available in multiplayer and mirrored Singleplayer; gameplay commands remain restricted to the owned board. Both enemy sources join each board's stream, without requiring identical mazes, commanders, or defenses.
 
-The initial match grid remains 14×9 with equal 30-tile budgets. Before main round 20 and every main round after it, both boards gain a top and bottom row plus six path tiles. Match/workshop share portal/crystal artwork and ground materials, but workshop dimensions and rules remain local-only.
+The initial match grid is 14×9 with equal 30-tile budgets. Before round 20 and every main round after it, each board gains a row above/below and a column beyond its outer/crystal side, plus six path tiles. Portal-facing edges do not expand. Match/workshop share artwork, but the workshop remains local and fixed-size.
 
-Expansion preserves physical endpoint, tower, and existing path positions: logical y coordinates shift down one while the accepted world origin shifts up one cell. No route or investment is silently cleared. Each growth event frames the enlarged owned board and highlights the newly added strips during main planning, so players can see and use them immediately. Ordinary snapshots do not reset camera choices. Final art remains provisional.
+Both portal and crystal stay at exactly the same world positions, as do existing towers/paths. Logical x stays unchanged; logical y shifts down one. The mirrored host board's world origin moves left/up while the guest's centre-facing origin stays horizontally fixed and moves up. The central ravine/portal edges remain stationary. Each growth event frames the enlarged owned board once. Expansion overlays are removed; ordinary snapshots preserve the camera.
 
 Enemies take shortest routes across connected path tiles, not placement order. When more than one next branch has the same remaining shortest distance, the host alternates assignments in stable round-robin order at that fork. Regular and sent enemies share a board's rotation, reset each wave; longer alternatives remain unused. Each enemy receives its complete captured route at spawn. Adjacent path sections can still create shortcuts. Towers and walls do not define routes by blocking otherwise walkable ground.
 
@@ -87,7 +87,7 @@ There are no waves in the workshop. Free editing here does not decide combat rou
 
 ### Open implementation-shaping decisions
 
-- Final growth/budget balance and long-run board limits; the implemented baseline is +2 rows/+6 path tiles before every main round after the first.
+- Final growth/budget balance and long-run board limits; current milestones add one outer column, two rows, and six path tiles.
 - Final route-preview presentation; the workshop retains a stable representative route, while match enemies alternate among equal shortest branches.
 - Additional route mechanics beyond initial/main-round redraw; current paths remain locked on all ordinary rounds and retain unused budget.
 - Placement relative to path tiles, initial board dimensions, terrain, and the placement of the fixed entrance and crystal.
@@ -238,7 +238,7 @@ The current slice implements authoritative planning, committed readiness/deadlin
 
 ## Decisions still needed before their implementation
 
-- **Board interaction:** final growth/budget tuning, long-run size limits, initial endpoint/art choices, and future relocation/footprints. Current main-round timing and symmetric vertical growth are explicit rules.
+- **Board interaction:** final growth/budget tuning, long-run size limits, initial endpoint/art choices, and future relocation/footprints. Current timing and three-edge growth away from the portal are explicit rules.
 - **Run pacing:** boss cadence, encounters beyond current numbered waves, final weighted/scaling/economy balance, and endgame pressure. Committed Ready, normal 20-second windows, untimed initial/main strategy, preserved autoplay consent, and terminal coin flips are confirmed.
 - **Commanders, towers, and enemies:** choose between commander-linked boards and independent commander/map selection; define commander rules, additional structure/enemy archetypes, defenses, and counters. Arrow supports Furthest/Closest/Strongest targeting; tower stats and the weighted three-enemy roster remain provisional.
 - **Active systems:** concrete ability effects on both boards and their targeting, costs, warnings, and counterplay; map interactions; non-tower buildings; and the selection and rules of multiple gambling activities.

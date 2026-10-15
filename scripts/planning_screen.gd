@@ -575,7 +575,6 @@ func _refresh() -> void:
 		board.cell_click_mode = _placement_id != &"" or not editable
 		board.input_enabled = planning.active and not finished and slot == own_slot
 		board.placement_enabled = slot == own_slot and planning.can_manage_towers(slot)
-		board.expansion_rows_visible = bool(state.get("main_round", false)) and int(state.get("board_origin_y", 0)) < 0
 		board.enemy_inspection_enabled = planning.active and in_wave and _placement_id == &""
 		board.selected_enemy_id = selected_enemy_id if slot == selected_enemy_slot else -1
 		board.placement_id = _placement_id if slot == own_slot else &""

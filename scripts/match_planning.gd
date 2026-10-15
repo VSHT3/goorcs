@@ -467,8 +467,8 @@ func _enter_planning() -> void:
 	var required_expansions: int = (_host_combat.wave + 1) / combat_rules.main_round_interval - 1
 	while _expansion_count < required_expansions:
 		for layout: PathLayout in _host_layouts:
-			layout.grow_vertical(combat_rules.tiles_per_expansion)
-		_host_combat.grow_vertical()
+			layout.grow_for_main_round(combat_rules.tiles_per_expansion)
+		_host_combat.grow_for_main_round()
 		for route: Array in _host_routes:
 			for index: int in range(route.size()):
 				route[index] += Vector2i.DOWN

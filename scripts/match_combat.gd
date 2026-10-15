@@ -197,7 +197,7 @@ func has_tower(slot: int, cell: Vector2i) -> bool:
 	return false
 
 
-func grow_vertical() -> void:
+func grow_for_main_round() -> void:
 	assert(phase == Phase.PLANNING)
 	for board: Array in towers:
 		for tower: Dictionary in board:

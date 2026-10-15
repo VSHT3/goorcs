@@ -75,7 +75,7 @@ func _run() -> void:
 		for lane: String in ["host", "guest"]:
 			var snapshot: Dictionary = _snapshot(lane)
 			for slot: int in range(2):
-				_check(_equal_state(snapshot["board_settings"][slot], {"dimensions": [14, 9 + expansions * 2], "budget": 30 + expansions * 6, "entrance": [0, 4 + expansions], "base": [13, 4 + expansions]}), "Both real peers share grown dimensions, budget and fixed-world endpoints before round %d" % upcoming)
+				_check(_equal_state(snapshot["board_settings"][slot], {"dimensions": [14 + expansions, 9 + expansions * 2], "budget": 30 + expansions * 6, "entrance": [0, 4 + expansions], "base": [13, 4 + expansions]}), "Both real peers share grown width/height, budget and unchanged endpoint x before round %d" % upcoming)
 				var expected_route: Array = []
 				for cell: Array in ordinary_boards[slot]["route"]:
 					expected_route.append([cell[0], int(cell[1]) + expansions])
@@ -84,6 +84,28 @@ func _run() -> void:
 				expected_tower["cell"] = str(Vector2i(0, expansions))
 				expected_tower["aim"] = str(Vector2(0, expansions))
 				_check(snapshot["combat"]["towers"][slot][0] == expected_tower, "Growth preserves tower IDs, stats, investment and world-positioned bases/aim on both peers")
+		if expansions > 0:
+			var outer_x: int = 13 + expansions
+			var base_y: int = 4 + expansions
+			for lane: String in ["host", "guest"]:
+				var slot: int = 0 if lane == "host" else 1
+				for x: int in range(14, outer_x + 1):
+					await _edit(lane, slot, x, base_y)
+			for lane: String in ["host", "guest"]:
+				for slot: int in range(2):
+					await _wait_board(lane, slot, 12 + expansions, true)
+					var snapshot: Dictionary = _snapshot(lane)
+					var expected_route: Array = []
+					for cell: Array in ordinary_boards[slot]["route"]:
+						expected_route.append([cell[0], int(cell[1]) + expansions])
+					_check(_equal_state(snapshot["boards"][slot]["route"], expected_route), "Building beyond the fixed base preserves the original shortest route on both real peers")
+			for lane: String in ["host", "guest"]:
+				var slot: int = 0 if lane == "host" else 1
+				for x: int in range(outer_x, 13, -1):
+					await _edit(lane, slot, x, base_y, false)
+			for lane: String in ["host", "guest"]:
+				for slot: int in range(2):
+					await _wait_board(lane, slot, 12, true)
 		var before_repeat: Dictionary = _snapshot("host").duplicate(true)
 		await _command("host", {"action": "repeat_planning"})
 		await create_timer(0.1).timeout
