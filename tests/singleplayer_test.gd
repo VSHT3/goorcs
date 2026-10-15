@@ -109,22 +109,35 @@ func _solo_specials(planning: MatchPlanning) -> void:
 	planning.combat_rules = rules
 	planning.start_singleplayer()
 	var x: int = 2
-	for type_id: StringName in [&"arrow_tower", &"orc_ballista", &"rune_obelisk"]:
+	for choice: Dictionary in [
+		{"type": &"arrow_tower", "upgrade": "special"},
+		{"type": &"orc_ballista", "upgrade": "special"},
+		{"type": &"rune_obelisk", "upgrade": "boulders"},
+		{"type": &"rune_obelisk", "upgrade": "onyx_ring"},
+	]:
+		var type_id: StringName = choice["type"]
+		var upgrade: String = choice["upgrade"]
 		planning.build_tower(0, Vector2i(x, 3), type_id, 0)
 		var id: int = planning.combat["towers"][0].back()["id"]
 		var before: Dictionary = planning.combat.duplicate(true)
-		planning.upgrade_tower(0, id, "special")
+		planning.upgrade_tower(0, id, upgrade)
 		_check(planning.combat == before, "Solo special stays locked before both base upgrades")
 		planning.upgrade_tower(0, id, "speed")
 		before = planning.combat.duplicate(true)
-		planning.upgrade_tower(0, id, "special")
+		planning.upgrade_tower(0, id, upgrade)
 		_check(planning.combat == before, "One purchased stat is not enough to unlock a solo special")
 		planning.upgrade_tower(0, id, "damage")
-		planning.upgrade_tower(0, id, "special")
+		planning.upgrade_tower(0, id, upgrade)
 		for slot: int in range(2):
 			var tower: Dictionary = planning.combat["towers"][slot].back()
 			_check(tower["special_upgraded"] and MatchCombat.tower_level(tower) == 4, "Accepted specials mirror to level IV through the same validator")
+			if type_id == &"rune_obelisk":
+				_check(tower["evolution"] == upgrade, "The chosen Rune branch mirrors to both owners")
 		_check(planning.combat["coins"][0] == planning.combat["coins"][1], "Mirrored special prices debit each owner equally")
+		if type_id == &"rune_obelisk":
+			before = planning.combat.duplicate(true)
+			planning.upgrade_tower(0, id, "onyx_ring" if upgrade == "boulders" else "boulders")
+			_check(planning.combat == before, "Mirrored Rune evolution cannot switch branches or spend again")
 		if type_id == &"arrow_tower":
 			planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
 			for slot: int in range(2):

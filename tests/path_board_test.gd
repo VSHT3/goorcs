@@ -65,6 +65,7 @@ func _run() -> void:
 	await _check_workshop_materials_and_editing()
 	_check_drop_input(board)
 	await _check_ranges_and_attacks(board, viewport)
+	await _check_rune_evolutions(board, viewport)
 	await _check_special_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
 	await _check_source_facing(board, viewport)
@@ -378,6 +379,115 @@ func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		board.combat_towers = []
 
 
+func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	board.tower_types = {"rune_obelisk": {"range": 1.0, "area_attack": true}}
+	board.selected_tower_id = -1
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_towers = []
+		board.combat_enemies = []
+		var tower: Dictionary = _tower(92, Vector2i(2, 2), "rune_obelisk")
+		board.combat_towers = [tower]
+		var ordinary: Image = await _board_image(board, viewport)
+		var center := Vector2i(board.cell_center(tower["cell"]))
+		var region := Rect2i(center + Vector2i(-65, -90), Vector2i(130, 135))
+		tower = tower.duplicate(true)
+		tower["evolution"] = "boulders"
+		tower["special_upgraded"] = true
+		board.combat_towers = [tower]
+		_check(board.is_processing(), "Boulders keep local animation active even without enemies or shot events")
+		var accepted: Dictionary = tower.duplicate(true)
+		var orbit_start: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(ordinary, orbit_start, region)["pixels"]) > 25,
+			"Boulders visibly add stone silhouettes without replacing Rune art, mirrored=%s" % mirrored)
+		board._process(0.27)
+		var orbit_moved: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(orbit_start, orbit_moved, region)["pixels"]) > 25,
+			"Rendered Boulders move between accepted snapshots, mirrored=%s" % mirrored)
+		_check(not _pixels_changed_near(orbit_start, orbit_moved, board.cell_center(Vector2i(3, 3))),
+			"Boulder motion never paints an unselected permanent neighborhood indicator")
+		_check(tower == accepted, "Orbit animation cannot mutate the accepted tower snapshot")
+		board.combat_towers = [tower.duplicate(true)]
+		var repeated: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(orbit_moved, repeated, region)["pixels"]) == 0,
+			"Repeated snapshots neither reset nor jump Boulders' local orbit")
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		board.combat_towers = [tower]
+		var counter_changed: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.is_empty() and int(_changed_geometry(repeated, counter_changed, region)["pixels"]) == 0,
+			"Boulder damage counter changes never create discrete pulses or shimmer")
+		var enemy: Dictionary = _enemy(301, 0.0, Vector2(3, 3), [])
+		var enemy_before: Dictionary = enemy.duplicate(true)
+		board.combat_enemies = [enemy]
+		board._process(0.2)
+		board.set_process(false)
+		_check(enemy == enemy_before and board.combat_towers[0] == tower,
+			"Local evolution animation never applies damage or changes accepted enemy/tower state")
+		board.combat_enemies = []
+		var phase: float = board._boulder_phase
+		board.hide()
+		board._process(0.3)
+		_check(is_equal_approx(board._boulder_phase, phase) and not board.is_processing(),
+			"Hidden boards pause their orbit without resetting phase")
+		board.show()
+		_check(board.is_processing(), "Showing the board resumes Boulders without another snapshot")
+		paused = true
+		await create_timer(0.06).timeout
+		paused = false
+		board.set_process(false)
+		_check(is_equal_approx(board._boulder_phase, phase), "Local tree pause freezes the Boulders clock")
+		var resumed: Image = await _board_image(board, viewport)
+		board._sync_combat_animation()
+		await create_timer(0.10).timeout
+		var live_motion: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(resumed, live_motion, region)["pixels"]) > 20,
+			"Real scene processing keeps Boulders visibly moving without snapshot delivery")
+		board.selected_tower_id = 92
+		var selected: Image = await _board_image(board, viewport)
+		_check(_pixels_changed_near(live_motion, selected, board.cell_center(Vector2i(3, 3))),
+			"Selected Boulders still expose the true neighborhood independently of their cosmetic orbit")
+		board.selected_tower_id = -1
+		board.combat_towers = []
+		tower = _tower(93, Vector2i(2, 2), "rune_obelisk")
+		tower["evolution"] = "onyx_ring"
+		tower["special_upgraded"] = true
+		board.combat_towers = [tower]
+		var onyx_idle: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(ordinary, onyx_idle, region)["pixels"]) > 10,
+			"Idle Onyx has a distinct dark stone keystone rather than a permanent range ring")
+		board._process(0.5)
+		var onyx_waiting: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(onyx_idle, onyx_waiting, region)["pixels"]) == 0 and board._shot_traces.is_empty(),
+			"Onyx never pulses merely because local time advances")
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		accepted = tower.duplicate(true)
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 1 and board._shot_traces[0]["evolution"] == "onyx_ring",
+			"A real Onyx shot counter captures exactly one branch-specific pulse")
+		board._process(PathBoard.ONYX_PULSE_DURATION * 0.5)
+		var onyx_attack: Image = await _board_image(board, viewport)
+		var ring_edge: Vector2 = board.cell_center(tower["cell"]) + Vector2(-board._cell_size() * 0.775, board._cell_size() * 0.28)
+		_check(_region_luminance(onyx_attack, ring_edge) < _region_luminance(onyx_idle, ring_edge) - 0.03,
+			"Onyx's discrete expanding ring visibly uses dark stone, mirrored=%s" % mirrored)
+		_check(_pixels_changed_near(onyx_idle, onyx_attack, board.cell_center(Vector2i(3, 3)))
+			and not _pixels_changed_near(onyx_idle, onyx_attack, board.cell_center(Vector2i(4, 4))),
+			"Onyx retains readable hit-neighborhood feedback without painting distant ground")
+		board.combat_towers = [tower.duplicate(true)]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 1, "Repeated Onyx snapshots cannot duplicate or restart the pulse")
+		board._process(PathBoard.ONYX_PULSE_DURATION)
+		var onyx_expired: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.is_empty() and int(_changed_geometry(onyx_idle, onyx_expired, region)["pixels"]) == 0,
+			"Onyx ring fully disappears between discrete shots instead of becoming a range indicator")
+		_check(tower == accepted and board.combat_towers[0] == accepted,
+			"Capturing, rendering and expiring Onyx effects cannot mutate accepted snapshots")
+		board.combat_towers = []
+
+
 func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 	board.combat_enemies = []
 	board.selected_tower_id = -1
@@ -498,21 +608,6 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			var full_stronger: Image = await _board_image(board, viewport)
 			_check(int(_changed_geometry(full, full_stronger, region)["pixels"]) == 0,
 				"Full health adds no routine bar clutter regardless of actual maximum HP")
-			var slowed: Dictionary = stronger.duplicate(true)
-			slowed["slowed"] = true
-			board.combat_enemies = [slowed]
-			var chilled: Image = await _board_image(board, viewport)
-			var blue_shifted: int = 0
-			for y: int in range(region.position.y, region.end.y):
-				for x: int in range(region.position.x, region.end.x):
-					if chilled.get_pixel(x, y).b > full_stronger.get_pixel(x, y).b + 0.06:
-						blue_shifted += 1
-			_check(blue_shifted > 20,
-				"Accepted slow adds visible blue to enemy bodies rather than merely darkening their original hue, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
-			board.combat_enemies = [stronger.duplicate(true)]
-			var restored: Image = await _board_image(board, viewport)
-			_check(int(_changed_geometry(full_stronger, restored, region)["pixels"]) == 0,
-				"An absent slowed flag preserves the original artwork without tint leaking between snapshots")
 			stronger["hp"] = 8
 			board.combat_enemies = [stronger]
 			var damaged: Image = await _board_image(board, viewport)
@@ -791,7 +886,7 @@ func _pixels_changed_near(before: Image, after: Image, position: Vector2) -> boo
 
 
 func _tower(id: int, cell: Vector2i, type_id: String) -> Dictionary:
-	return {"id": id, "cell": cell, "type_id": type_id, "shot": 0, "aim": Vector2(cell)}
+	return {"id": id, "cell": cell, "type_id": type_id, "evolution": "", "shot": 0, "aim": Vector2(cell)}
 
 
 func _enemy(id: int, progress: float, position: Vector2, route: Array) -> Dictionary:

@@ -33,8 +33,12 @@ const ARROW_ART: TowerReward = preload("res://resources/collection/arrow_tower.t
 const ARCHER_CROP := Rect2(29, 0, 25, 31)
 const SECOND_ARCHER_OFFSET := Vector2(-20, 0)
 const ARCHER_BOW := Vector2(46, 19)
-const SLOWED_BLEND: float = 0.65
-static var _slowed_textures: Dictionary[Texture2D, Texture2D] = {}
+const ONYX_PULSE_DURATION: float = 0.30
+const BOULDER_ORBIT_SPEED: float = 1.8
+static var _rune_stone_shape := PackedVector2Array([
+	Vector2(-0.85, -0.45), Vector2(-0.25, -0.95), Vector2(0.60, -0.75),
+	Vector2(1.0, 0.15), Vector2(0.35, 0.85), Vector2(-0.65, 0.70),
+])
 
 var layout: PathLayout
 var command_mode: bool = false
@@ -49,6 +53,7 @@ var combat_towers: Array = []:
 		combat_towers = value
 		_capture_shots()
 		_rebuild_draw_order()
+		_sync_combat_animation()
 		queue_redraw()
 var combat_enemies: Array = []:
 	# Only presentation state is blended; accepted enemy dictionaries stay untouched.
@@ -56,7 +61,7 @@ var combat_enemies: Array = []:
 		combat_enemies = value
 		_blend_enemies()
 		_rebuild_draw_order()
-		set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
+		_sync_combat_animation()
 		queue_redraw()
 var selected_tower_id: int = -1
 var selected_enemy_id: int = -1:
@@ -96,6 +101,8 @@ var _paint_button: MouseButton = MOUSE_BUTTON_NONE
 var _last_painted := Vector2i(-1, -1)
 var _seen_shots: Dictionary = {}
 var _shot_traces: Array[Dictionary] = []
+var _has_boulders: bool = false
+var _boulder_phase: float = 0.0
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 var _tower_art: Dictionary[String, TowerReward] = {}
@@ -120,7 +127,6 @@ func _ready() -> void:
 	for definition: EnemyDefinition in CombatRules.DEFAULT_ENEMIES:
 		_enemy_art[String(definition.id)] = definition
 		_cache_texture_bounds(definition.texture)
-		_slowed_texture(definition.texture)
 	_portal_texture = _endpoint_texture(preload("res://assets/world/enemy_portal_idle.png"))
 	_crystal_texture = _endpoint_texture(preload("res://assets/world/health_crystal_idle.png"))
 	_cache_texture_bounds(_portal_texture)
@@ -139,7 +145,7 @@ func _ready() -> void:
 	add_child(_ground_canvas)
 	mouse_exited.connect(_on_mouse_exited)
 	resized.connect(queue_redraw)
-	set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
+	_sync_combat_animation()
 
 
 func _endpoint_texture(sheet: Texture2D) -> AtlasTexture:
@@ -154,6 +160,7 @@ func _sync_endpoint_animation() -> void:
 		_endpoint_timer.start()
 	else:
 		_endpoint_timer.stop()
+	_sync_combat_animation()
 
 
 func _advance_endpoints() -> void:
@@ -163,23 +170,30 @@ func _advance_endpoints() -> void:
 	_crystal_texture.region.position.x = _endpoint_frame * ENDPOINT_FRAME_SIZE
 	queue_redraw()
 
+func _sync_combat_animation() -> void:
+	set_process(is_visible_in_tree() and (_has_boulders or not combat_enemies.is_empty() or not _shot_traces.is_empty()))
+
 
 func _process(delta: float) -> void:
+	if not is_visible_in_tree():
+		return
+	if _has_boulders:
+		_boulder_phase = fposmod(_boulder_phase + delta * BOULDER_ORBIT_SPEED, TAU)
 	_enemy_blend_elapsed = minf(_enemy_blend_elapsed + delta, ENEMY_BLEND_DURATION)
 	for index: int in range(_shot_traces.size() - 1, -1, -1):
 		_shot_traces[index]["life"] -= delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
 			_shot_traces.remove_at(index)
 	queue_redraw()
-	if _shot_traces.is_empty() and combat_enemies.is_empty():
-		set_process(false)
+	_sync_combat_animation()
 
 
 func _capture_shots() -> void:
+	_has_boulders = false
 	if combat_towers.is_empty():
 		_seen_shots.clear()
 		_shot_traces.clear()
-		set_process(not combat_enemies.is_empty())
+		_sync_combat_animation()
 		return
 	for tower: Dictionary in combat_towers:
 		var tower_id: int = int(tower["id"])
@@ -187,7 +201,9 @@ func _capture_shots() -> void:
 		var secondary_shot: int = int(tower.get("secondary_shot", 0))
 		var previous: Vector2i = _seen_shots.get(tower_id, Vector2i.ZERO)
 		var definition: Dictionary = tower_types.get(tower["type_id"], {})
-		if shot > previous.x:
+		var boulders: bool = tower.get("evolution", "") == "boulders"
+		_has_boulders = _has_boulders or boulders
+		if shot > previous.x and not boulders:
 			_capture_attack(tower, definition, false)
 		if secondary_shot > previous.y and bool(tower.get("special_upgraded", false)):
 			_capture_attack(tower, definition, true)
@@ -197,7 +213,8 @@ func _capture_shots() -> void:
 func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool) -> void:
 	var area_attack: bool = bool(definition.get("area_attack", false))
 	var bounce: bool = not secondary and bool(tower.get("bounce_active", false))
-	var duration: float = PULSE_DURATION if area_attack else SHOT_DURATION * (2.0 if bounce else 1.0)
+	var evolution: String = tower.get("evolution", "")
+	var duration: float = (ONYX_PULSE_DURATION if evolution == "onyx_ring" else PULSE_DURATION) if area_attack else SHOT_DURATION * (2.0 if bounce else 1.0)
 	var hits: Array[Vector2] = []
 	if area_attack:
 		for enemy: Dictionary in combat_enemies:
@@ -207,6 +224,7 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool)
 	_shot_traces.append({
 		"cell": tower["cell"],
 		"type_id": tower["type_id"],
+		"evolution": evolution,
 		"aim": tower.get("secondary_aim" if secondary else "aim", Vector2(tower["cell"])),
 		"secondary": secondary,
 		"bounce_active": bounce,
@@ -217,7 +235,7 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool)
 		"range": float(definition.get("range", 0.0)),
 		"hits": hits,
 	})
-	set_process(true)
+	_sync_combat_animation()
 
 
 func _blend_enemies() -> void:
@@ -693,6 +711,15 @@ func _draw_combat() -> void:
 		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, 0.35))
 	draw_set_transform(Vector2.ZERO)
 	for item: Dictionary in _draw_order:
+		if int(item["kind"]) != 1 or item["data"].get("evolution", "") != "boulders":
+			continue
+		for index: int in range(3):
+			var offset: Vector2 = _boulder_offset(item["data"], index)
+			var shadow: Vector2 = item["foot"] + Vector2(offset.x, offset.y * 0.5)
+			draw_set_transform(shadow, 0.0, Vector2(1.0, 0.3))
+			draw_circle(Vector2.ZERO, cell_size * 0.12, Color(0.06, 0.10, 0.07, 0.24))
+	draw_set_transform(Vector2.ZERO)
+	for item: Dictionary in _draw_order:
 		match int(item["kind"]):
 			0:
 				var texture: Texture2D = _portal_texture if item["cell"] == layout.entrance else _crystal_texture
@@ -700,6 +727,8 @@ func _draw_combat() -> void:
 			1:
 				var tower: Dictionary = item["data"]
 				var artwork: TowerReward = _tower_art.get(tower["type_id"])
+				if tower.get("evolution", "") == "boulders":
+					_draw_boulders(tower, item["foot"], false)
 				if artwork != null and artwork.icon_texture != null:
 					var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, item["foot"])
 					draw_texture_rect(artwork.icon_texture, rect, false)
@@ -709,6 +738,12 @@ func _draw_combat() -> void:
 						var second_rect := Rect2(rect.position + (ARCHER_CROP.position + SECOND_ARCHER_OFFSET) * art_scale,
 							ARCHER_CROP.size * art_scale)
 						draw_texture_rect_region(artwork.icon_texture, second_rect, ARCHER_CROP)
+				match String(tower.get("evolution", "")):
+					"boulders":
+						_draw_boulders(tower, item["foot"], true)
+					"onyx_ring":
+						# A faceted keystone identifies the branch while its pulse is idle.
+						_draw_rune_stone(item["foot"] + Vector2(0, -cell_size * 0.54), cell_size * 0.13, 0.0, true)
 			2:
 				_draw_enemy(item)
 	# Bars are an information overlay; foreground bodies must not cover them.
@@ -719,23 +754,29 @@ func _draw_combat() -> void:
 			_draw_enemy_health(item)
 
 
-static func _slowed_texture(texture: Texture2D) -> Texture2D:
-	if _slowed_textures.has(texture):
-		return _slowed_textures[texture]
-	# Warm once per artwork, shared by every board; source pixels remain unchanged.
-	var image: Image = texture.get_image()
-	image.convert(Image.FORMAT_RGBA8)
-	for y: int in range(image.get_height()):
-		for x: int in range(image.get_width()):
-			var color: Color = image.get_pixel(x, y)
-			if color.a <= 0.0:
-				continue
-			var light: float = color.r * 0.35 + color.g * 0.50 + color.b * 0.15
-			var frost := Color(light * 0.60, light * 0.95, minf(1.0, light * 1.50), color.a)
-			image.set_pixel(x, y, color.lerp(frost, SLOWED_BLEND))
-	var tinted: Texture2D = ImageTexture.create_from_image(image)
-	_slowed_textures[texture] = tinted
-	return tinted
+func _boulder_offset(tower: Dictionary, index: int) -> Vector2:
+	var angle: float = _boulder_phase + float(index) * TAU / 3.0 + float(int(tower["id"]) % 17) * 0.37
+	return Vector2(cos(angle) * (-1.0 if mirror_horizontal else 1.0) * 0.51, sin(angle) * 0.20) * _cell_size()
+
+
+func _draw_boulders(tower: Dictionary, foot: Vector2, front: bool) -> void:
+	# The orbit is cosmetic, not a contact/range boundary or a damage event.
+	for index: int in range(3):
+		var offset: Vector2 = _boulder_offset(tower, index)
+		if (offset.y >= 0.0) != front:
+			continue
+		_draw_rune_stone(foot + offset + Vector2(0, -_cell_size() * 0.46),
+			_cell_size() * 0.14, _boulder_phase * 0.35 + index, false)
+
+
+func _draw_rune_stone(position: Vector2, radius: float, rotation: float, onyx: bool, alpha: float = 1.0) -> void:
+	draw_set_transform(position, rotation, Vector2.ONE * radius)
+	draw_colored_polygon(_rune_stone_shape, Color(Color("1c1b27") if onyx else Color("716b5d"), alpha))
+	draw_line(_rune_stone_shape[0], _rune_stone_shape[1], Color(Color("8e859e") if onyx else Color("c1b496"), alpha), 0.12, true)
+	draw_line(_rune_stone_shape[1], _rune_stone_shape[2], Color(Color("8e859e") if onyx else Color("c1b496"), alpha), 0.12, true)
+	draw_line(_rune_stone_shape[1], Vector2(0.10, 0.05), Color(Color("514a64") if onyx else Color("978a70"), alpha), 0.10, true)
+	draw_line(Vector2(0.10, 0.05), _rune_stone_shape[4], Color(Color("514a64") if onyx else Color("978a70"), alpha), 0.10, true)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _draw_enemy(item: Dictionary) -> void:
@@ -745,8 +786,7 @@ func _draw_enemy(item: Dictionary) -> void:
 	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, item["foot"], flip)
 	if flip:
 		rect.size.x = -rect.size.x
-	var texture: Texture2D = _slowed_texture(artwork.texture) if bool(enemy.get("slowed", false)) else artwork.texture
-	draw_texture_rect(texture, rect, false)
+	draw_texture_rect(artwork.texture, rect, false)
 
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
@@ -805,7 +845,10 @@ func _draw_attacks() -> void:
 	for trace: Dictionary in _shot_traces:
 		var remaining: float = clampf(float(trace["life"]) / float(trace["duration"]), 0.0, 1.0)
 		if bool(trace["area_attack"]):
-			# Brief ground shimmer communicates the actual tile footprint, never a range-like ring.
+			var onyx: bool = trace.get("evolution", "") == "onyx_ring"
+			if onyx:
+				_draw_onyx_pulse(trace, remaining)
+			# Both discrete Rune attacks communicate the actual neighborhood footprint.
 			for y: int in range(layout.dimensions.y):
 				for x: int in range(layout.dimensions.x):
 					var cell := Vector2i(x, y)
@@ -813,11 +856,25 @@ func _draw_attacks() -> void:
 						continue
 					var center: Vector2 = cell_center(cell)
 					draw_rect(Rect2(center - Vector2.ONE * cell_size * 0.43, Vector2.ONE * cell_size * 0.86),
-						Color(0.55, 0.66, 0.87, 0.06 * remaining))
+						Color(0.64, 0.55, 0.76, 0.10 * remaining) if onyx else Color(0.55, 0.66, 0.87, 0.06 * remaining))
 			for hit: Vector2 in trace["hits"]:
 				var foot: Vector2 = _position_center(hit) + Vector2(0, cell_size * 0.28)
 				draw_line(foot + Vector2(-cell_size * 0.10, 2), foot + Vector2(cell_size * 0.10, -4),
-					Color(0.73, 0.79, 0.96, remaining), 2.0)
+					Color(0.85, 0.75, 0.95, remaining) if onyx else Color(0.73, 0.79, 0.96, remaining), 2.0)
+
+
+func _draw_onyx_pulse(trace: Dictionary, remaining: float) -> void:
+	var foot: Vector2 = cell_center(trace["cell"]) + Vector2(0, _cell_size() * 0.28)
+	var radius: float = _cell_size() * lerpf(0.30, 1.25, 1.0 - remaining)
+	# An expanding, fading stone ring exists only for a captured discrete shot.
+	draw_set_transform(foot, 0.0, Vector2(1.0, 0.55))
+	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 32, Color(0.10, 0.08, 0.15, remaining * 0.9), _cell_size() * 0.07, true)
+	draw_arc(Vector2.ZERO, radius - 2.0, 0.0, TAU, 32, Color(0.65, 0.58, 0.76, remaining * 0.65), 1.0, true)
+	draw_set_transform(Vector2.ZERO)
+	for index: int in range(8):
+		var angle: float = float(index) * TAU / 8.0
+		var offset := Vector2(cos(angle), sin(angle) * 0.55) * radius
+		_draw_rune_stone(foot + offset, _cell_size() * 0.075, angle, true, remaining)
 
 
 func _projectile_origin(trace: Dictionary) -> Vector2:

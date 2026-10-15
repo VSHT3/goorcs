@@ -233,6 +233,7 @@ func _peer_specials(code: String) -> void:
 		var observer: String = "guest" if slot == 0 else "host"
 		var x: int = 2
 		for type_id: String in prices:
+			var upgrade: String = ("boulders" if slot == 0 else "onyx_ring") if type_id == "rune_obelisk" else "special"
 			await _build(lane, slot, x, 3, 0, type_id)
 			var tower: Dictionary = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
 			var id: int = int(tower["id"])
@@ -240,7 +241,7 @@ func _peer_specials(code: String) -> void:
 			balances[slot] -= int(stats["cost"])
 			await _wait_combat(observer, {"coins": balances}, "Placement pays host-defined type price")
 			var before: Dictionary = _snapshot("host")["combat"]
-			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
 			await create_timer(0.1).timeout
 			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Premature special request cannot bypass the two-upgrade prerequisite over the network")
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "damage"})
@@ -249,14 +250,18 @@ func _peer_specials(code: String) -> void:
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "speed"})
 			balances[slot] -= ceili(float(stats["upgrade_base_cost"]) * 1.5)
 			await _wait_combat(observer, {"coins": balances}, "Second stat upgrade pays increased price")
-			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
 			balances[slot] -= int(prices[type_id])
 			await _wait_combat(observer, {"coins": balances}, "Special upgrade pays its fixed price without a level multiplier")
 			tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
 			_check(tower["special_upgraded"] and MatchCombat.tower_level(tower) == 4 and int(tower["sell_value"]) == floori(float(tower["invested"]) * 0.6), "Remote peer sees level IV, accepted special and actual refund")
+			if type_id == "rune_obelisk":
+				_check(tower["evolution"] == upgrade and stats["evolutions"][upgrade]["cost"] == 250, "Both peers use the host's chosen Rune branch and price rather than guest resources")
 			before = _snapshot("host")["combat"]
-			await _command(observer, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
-			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
+			await _command(observer, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
+			if type_id == "rune_obelisk":
+				await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "onyx_ring" if upgrade == "boulders" else "boulders"})
 			await create_timer(0.1).timeout
 			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Cross-owner and repeat special requests cannot spend or mutate accepted state")
 			if type_id == "arrow_tower":
@@ -265,6 +270,25 @@ func _peer_specials(code: String) -> void:
 				tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
 				_check(tower["secondary_mode"] == 2 and tower["mode"] == 0, "Independent second-archer targeting replicates without changing the primary policy")
 			x += 2
+	# Put each branch beside the spawn; other towers cannot reach these stationary enemies.
+	for slot: int in range(2):
+		var lane: String = "host" if slot == 0 else "guest"
+		var observer: String = "guest" if slot == 0 else "host"
+		await _build(lane, slot, 0, 3, 0, "rune_obelisk")
+		var rune: Dictionary = await _wait_tower(observer, slot, Vector2i(0, 3), 0)
+		for upgrade: String in ["damage", "speed", "boulders" if slot == 0 else "onyx_ring"]:
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": int(rune["id"]), "upgrade": upgrade})
+	await _paths()
+	await _both_ready()
+	await _command("host", {"action": "step", "delta": 0.1})
+	await _command("host", {"action": "step", "delta": 0.9})
+	await _command("host", {"action": "step", "delta": 0.9})
+	await create_timer(0.15).timeout
+	var accepted: Dictionary = _snapshot("host")["combat"]
+	_check(_snapshot("guest")["combat"] == accepted, "Both real peers receive identical accepted evolution damage, enemy HP and attack events")
+	for slot: int in range(2):
+		_check(not accepted["enemies"][slot].is_empty() and int(accepted["enemies"][slot][0]["hp"]) < 100, "Rune branch damages enemies through the host simulation, slot=%d" % slot)
+
 
 
 func _peer_sends(code: String) -> void:

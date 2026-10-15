@@ -37,6 +37,11 @@ func _planning_rules() -> CombatRules:
 		definition.special_upgrade = source.special_upgrade
 		definition.special_upgrade_title = source.special_upgrade_title
 		definition.special_upgrade_cost = 1 if _lane == "guest" else source.special_upgrade_cost
+		definition.evolutions = source.evolutions.duplicate(true)
+		if _lane == "guest":
+			for branch: Dictionary in definition.evolutions.values():
+				branch["cost"] = 1
+				branch["damage"] = 99
 		definitions.append(definition)
 	rules.tower_definitions = definitions
 	var enemy_definitions: Array[EnemyDefinition] = []

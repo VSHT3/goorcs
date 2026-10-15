@@ -99,6 +99,7 @@ func _check_identity_and_stats() -> void:
 	world.boards[0].cell_clicked.connect(collect_cell)
 	world.pan(0.05, Vector2.RIGHT)
 	world.zoom_at(0.9, world.get_global_rect().get_center())
+	world._process(1.0)
 	await _settle()
 	await _click_enemy(0, first_id)
 	_check_selected(0, first_id, "Mirrored owned sprite body click")
@@ -330,6 +331,7 @@ func _check_closed(context: String) -> void:
 
 
 func _check_highlight(slot: int, id: int, old_bounds: Rect2 = Rect2()) -> void:
+	_freeze()
 	var board: PathBoard = world.boards[slot]
 	var selected: Image = await _world_image()
 	board.selected_enemy_id = -1
@@ -441,6 +443,7 @@ func _freeze() -> void:
 	world.set_process(false)
 	for board: PathBoard in world.boards:
 		board.set_process(false)
+		board._endpoint_timer.paused = true
 
 
 func _close_control() -> Button:

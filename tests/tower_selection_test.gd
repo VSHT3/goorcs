@@ -51,7 +51,7 @@ func _run() -> void:
 	_check(screen.selected_tower_id == id and screen.get_node("%TowerManagement").visible, "Owned inspection opens management")
 	_check(screen.targeting_button.selected == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
 	_check(screen.boards[0].selected_tower_id == id and screen.boards[1].selected_tower_id == -1, "Range selection stays local to owned board")
-	_check(not screen.special_upgrade.visible and screen.damage_upgrade.visible and screen.speed_upgrade.visible, "Special upgrade is hidden on a fresh tower")
+	_check(not screen.special_upgrade.visible and not screen.onyx_ring_upgrade.visible and screen.damage_upgrade.visible and screen.speed_upgrade.visible, "Special and Rune evolutions are hidden on a fresh non-Rune tower")
 	var definition: Dictionary = main.planning.combat["tower_types"]["orc_ballista"]
 	_check(model.upgrade_tower(0, id, "damage"), "First real stat upgrade succeeds")
 	main.planning.combat = model.snapshot()
@@ -62,7 +62,7 @@ func _run() -> void:
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
 	_check(screen.damage_upgrade.disabled and screen.speed_upgrade.disabled, "Purchased upgrades cannot be bought twice in management")
-	_check(screen.special_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible and not screen.special_upgrade.disabled, "Both purchased stats are replaced by one affordable special action")
+	_check(screen.special_upgrade.visible and not screen.onyx_ring_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible and not screen.special_upgrade.disabled, "Both purchased non-Rune stats are replaced by one affordable special action")
 	model.coins[0] = 299
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
@@ -90,13 +90,89 @@ func _run() -> void:
 	main.planning.changed.emit()
 	_check(screen.shop_buttons[&"orc_ballista"].disabled and screen._placement_type() == &"", "Insufficient host funds disable purchase and cancel stale placement")
 	_check_send_visibility(main, screen)
+	await _check_rune_evolutions(main, screen)
+	main.planning.stop_singleplayer()
 	main.queue_free()
-	await process_frame
+	await create_timer(0.2).timeout
 	DirAccess.remove_absolute(save_path)
 	DirAccess.remove_absolute(directory)
 	if failures == 0:
-		print("PASS: visible locked palette, click/cancel ownership, unlock/reset, effective owned stats, upgrades, close, sale and affordability snapshots")
+		print("PASS: visible locked palette, click/cancel ownership, unlock/reset, effective owned stats, upgrades, Rune evolution choices and command gates, close, sale and affordability snapshots")
 	quit(1 if failures else 0)
+
+
+func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
+	main.play_screen.show()
+	var planning: MatchPlanning = main.planning
+	var save_path: String = directory.path_join("collection.json")
+	FileAccess.open(save_path, FileAccess.WRITE).store_string(JSON.stringify({"version": 1, "unlocked": ["rune_obelisk"]}))
+	planning.collection_store = CollectionStore.new(save_path)
+	for evolution: String in ["boulders", "onyx_ring"]:
+		planning.start_singleplayer()
+		planning.set_physics_process(false)
+		await create_timer(0.05).timeout
+		var model: MatchCombat = planning._host_combat
+		model.coins = [2000, 2000]
+		planning.build_tower(0, Vector2i(3, 3), &"rune_obelisk", MatchCombat.TargetMode.FURTHEST)
+		_check(model.towers[0].size() == 1 and model.towers[1].size() == 1, "Real planning command creates mirrored Rune fixtures")
+		if model.towers[0].is_empty():
+			continue
+		var tower: Dictionary = model.towers[0][0]
+		var id: int = int(tower["id"])
+		var price: int = int(planning.combat["tower_types"]["rune_obelisk"]["evolutions"][evolution]["cost"])
+		screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+		_check(not screen.special_upgrade.visible and not screen.onyx_ring_upgrade.visible, "Both evolution buttons stay hidden at level I")
+		var frozen: Dictionary = planning.combat.duplicate(true)
+		screen.special_upgrade.pressed.emit()
+		screen.onyx_ring_upgrade.pressed.emit()
+		for command: String in ["boulders", "onyx_ring", "special"]:
+			planning.upgrade_tower(0, id, command)
+		_check(planning.combat == frozen, "Hidden buttons and real evolution commands cannot bypass level-I prerequisites")
+		var first: Button = screen.damage_upgrade if evolution == "boulders" else screen.speed_upgrade
+		var second: Button = screen.speed_upgrade if evolution == "boulders" else screen.damage_upgrade
+		first.pressed.emit()
+		_check(MatchCombat.tower_level(tower) == 2 and not screen.special_upgrade.visible and not screen.onyx_ring_upgrade.visible, "Either first stat leaves both evolution buttons hidden")
+		frozen = planning.combat.duplicate(true)
+		planning.upgrade_tower(0, id, evolution)
+		_check(planning.combat == frozen, "A real evolution command rejects one missing prerequisite")
+		second.pressed.emit()
+		_check(MatchCombat.tower_level(tower) == 3 and screen.special_upgrade.visible and screen.onyx_ring_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible, "Both stat purchase orders expose exactly the two Rune evolution choices at level III")
+		model.coins = [price - 1, price - 1]
+		planning._publish_snapshot()
+		_check(screen.special_upgrade.disabled and screen.onyx_ring_upgrade.disabled, "Both choices become unavailable one Coin short")
+		frozen = planning.combat.duplicate(true)
+		screen.special_upgrade.pressed.emit()
+		screen.onyx_ring_upgrade.pressed.emit()
+		planning.upgrade_tower(0, id, evolution)
+		_check(planning.combat == frozen, "Unaffordable button presses and authoritative commands leave both boards untouched")
+		model.coins = [price, price]
+		planning._publish_snapshot()
+		_check(not screen.special_upgrade.disabled and not screen.onyx_ring_upgrade.disabled, "Exact funds enable both exclusive alternatives")
+		planning._host_ready[0] = true
+		planning._publish_snapshot()
+		_check(screen.special_upgrade.disabled and screen.onyx_ring_upgrade.disabled, "Committed Ready disables both affordable branches")
+		frozen = planning.combat.duplicate(true)
+		screen.special_upgrade.pressed.emit()
+		screen.onyx_ring_upgrade.pressed.emit()
+		planning.upgrade_tower(0, id, evolution)
+		_check(planning.combat == frozen, "Committed buttons and real commands cannot purchase an evolution")
+		planning._host_ready[0] = false
+		planning._publish_snapshot()
+		var chosen: Button = screen.special_upgrade if evolution == "boulders" else screen.onyx_ring_upgrade
+		var other: Button = screen.onyx_ring_upgrade if evolution == "boulders" else screen.special_upgrade
+		chosen.pressed.emit()
+		for slot: int in range(2):
+			var evolved: Dictionary = model.towers[slot][0]
+			_check(evolved.get("evolution", "") == evolution and evolved["special_upgraded"] and MatchCombat.tower_level(evolved) == 4 and model.coins[slot] == 0, "Button command purchases the chosen evolution with exact funds on both real boards")
+		_check(chosen.disabled and other.disabled, "Purchased evolution disables both exclusive choices")
+		frozen = planning.combat.duplicate(true)
+		chosen.pressed.emit()
+		other.pressed.emit()
+		for command: String in ["boulders", "onyx_ring", "special"]:
+			planning.upgrade_tower(0, id, command)
+		_check(planning.combat == frozen, "Purchased UI and real commands reject repeats, the other branch, and obsolete generic special")
+		planning.stop_singleplayer()
+		await create_timer(0.1).timeout
 
 
 func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:

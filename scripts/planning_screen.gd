@@ -43,6 +43,7 @@ var _owns_tree_pause: bool = false
 @onready var damage_upgrade: Button = %DamageUpgrade
 @onready var speed_upgrade: Button = %SpeedUpgrade
 @onready var special_upgrade: Button = %SpecialUpgrade
+@onready var onyx_ring_upgrade: Button = %OnyxRingUpgrade
 @onready var secondary_targeting: OptionButton = %SecondaryTargeting
 @onready var _secondary_target_row: HBoxContainer = %SecondaryTargetRow
 @onready var sell_button: Button = %SellTower
@@ -79,7 +80,8 @@ func _ready() -> void:
 	_enemy_inspector.close_requested.connect(cancel_interaction)
 	damage_upgrade.pressed.connect(_upgrade.bind("damage"))
 	speed_upgrade.pressed.connect(_upgrade.bind("speed"))
-	special_upgrade.pressed.connect(_upgrade.bind("special"))
+	special_upgrade.pressed.connect(_special_upgrade_pressed)
+	onyx_ring_upgrade.pressed.connect(_upgrade.bind("onyx_ring"))
 	sell_button.pressed.connect(_sell)
 	targeting_button.item_selected.connect(_target_selected)
 	secondary_targeting.item_selected.connect(_secondary_target_selected)
@@ -528,19 +530,33 @@ func _refresh_targeting() -> void:
 	var stats: Dictionary = types.get(String(tower["type_id"]), {})
 	var interval: float = float(tower.get("interval", stats.get("interval", 1.0)))
 	_tower_title.text = "%s · Level %s" % [String(stats.get("title", "Tower")), TOWER_LEVEL_NUMERALS[MatchCombat.tower_level(tower) - 1]]
-	_tower_stats.text = "Kills %d · Damage %d\n%.2f attacks/s · Range %d" % [
-		int(tower.get("kills", 0)), int(tower.get("damage", stats.get("damage", 0))),
-		1.0 / interval, int(stats.get("range", 0)),
-	]
+	var evolution: String = String(tower.get("evolution", ""))
+	var damage: int = int(tower.get("damage", stats.get("damage", 0)))
+	if evolution == "boulders":
+		_tower_stats.text = "Kills %d · %d DPS\nContinuous · Range %d" % [int(tower.get("kills", 0)), damage, int(stats.get("range", 0))]
+	elif evolution == "onyx_ring":
+		_tower_stats.text = "Kills %d · Damage %d\nEvery %.2fs · Range %d" % [int(tower.get("kills", 0)), damage, interval, int(stats.get("range", 0))]
+	else:
+		_tower_stats.text = "Kills %d · Damage %d\n%.2f attacks/s · Range %d" % [
+			int(tower.get("kills", 0)), damage,
+			1.0 / interval, int(stats.get("range", 0)),
+		]
 	targeting_button.select(int(tower["mode"]))
 	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
 	_refresh_upgrade(damage_upgrade, tower, stats, "damage")
 	_refresh_upgrade(speed_upgrade, tower, stats, "speed")
-	var unlocked_special: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false)) and not String(stats.get("special_upgrade", "")).is_empty()
+	var evolutions: Dictionary = stats.get("evolutions", {})
+	var unlocked_special: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false)) and (not evolutions.is_empty() or not String(stats.get("special_upgrade", "")).is_empty())
 	damage_upgrade.visible = not unlocked_special
 	speed_upgrade.visible = not unlocked_special
 	special_upgrade.visible = unlocked_special
-	_refresh_special_upgrade(tower, stats)
+	onyx_ring_upgrade.visible = unlocked_special and not evolutions.is_empty()
+	special_upgrade.custom_minimum_size.x = 140.0 if not evolutions.is_empty() else 288.0
+	if evolutions.is_empty():
+		_refresh_special_upgrade(tower, stats)
+	else:
+		_refresh_evolution(special_upgrade, tower, evolutions, "boulders")
+		_refresh_evolution(onyx_ring_upgrade, tower, evolutions, "onyx_ring")
 	var second_archer: bool = bool(tower.get("special_upgraded", false)) and String(stats.get("special_upgrade", "")) == "second_archer"
 	_secondary_target_row.visible = second_archer
 	secondary_targeting.disabled = targeting_button.disabled or not second_archer
@@ -572,8 +588,6 @@ func _refresh_special_upgrade(tower: Dictionary, stats: Dictionary) -> void:
 			special_upgrade.tooltip_text = "Adds a second archer with independent targeting and 10% more attacks per second. Archers choose different enemies."
 		"bounce":
 			special_upgrade.tooltip_text = "Each bolt bounces once to the nearest other enemy for 50% damage, rounded up."
-		"freeze":
-			special_upgrade.tooltip_text = "After this obelisk has dealt 20% of an enemy's maximum HP, each hit applies a 20% slow for 2 simulation seconds and refreshes its duration. Does not stack."
 		_:
 			special_upgrade.tooltip_text = ""
 	special_upgrade.tooltip_text += "\nFixed price; unaffected by level pricing."
@@ -581,8 +595,53 @@ func _refresh_special_upgrade(tower: Dictionary, stats: Dictionary) -> void:
 		special_upgrade.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
 
 
+func _refresh_evolution(button: Button, tower: Dictionary, evolutions: Dictionary, evolution: String) -> void:
+	var definition: Dictionary = evolutions.get(evolution, {})
+	var chosen: String = String(tower.get("evolution", ""))
+	var purchased: bool = chosen == evolution
+	var locked: bool = not chosen.is_empty() and not purchased
+	var price: int = int(definition.get("cost", 0))
+	var title: String = String(definition.get("title", evolution))
+	var status: String = "Purchased" if purchased else ("Locked" if locked else str(price))
+	button.text = "%s\n%s" % [title, status]
+	button.disabled = not button.visible or purchased or locked or targeting_button.disabled or _own_coins() < price
+	if bool(definition.get("continuous", false)):
+		button.tooltip_text = "Deals %d damage per simulation second to every enemy in the surrounding 3x3 neighborhood. Orbiting boulders are cosmetic." % int(definition.get("damage", 0))
+	else:
+		button.tooltip_text = "Deals %d damage to every enemy in the surrounding 3x3 neighborhood every %.2f simulation seconds." % [int(definition.get("damage", 0)), float(definition.get("interval", 0.0))]
+	button.tooltip_text += "\nChoose one Rune evolution. Fixed price; unaffected by level pricing."
+	if locked:
+		var chosen_definition: Dictionary = evolutions.get(chosen, {})
+		button.tooltip_text += "\nLocked: %s was purchased." % String(chosen_definition.get("title", chosen))
+	elif not purchased and _own_coins() < price:
+		button.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
+	if targeting_button.disabled and planning.ready_flags[planning.local_slot()] and int(planning.combat.get("phase", MatchCombat.Phase.FINISHED)) == MatchCombat.Phase.PLANNING:
+		button.tooltip_text += "\nReady commits planning purchases until combat starts."
+
+
+func _special_upgrade_pressed() -> void:
+	var tower: Dictionary = _selected_tower()
+	if tower.is_empty():
+		return
+	var types: Dictionary = planning.combat.get("tower_types", {})
+	var stats: Dictionary = types.get(String(tower["type_id"]), {})
+	var evolutions: Dictionary = stats.get("evolutions", {})
+	_upgrade("boulders" if not evolutions.is_empty() else "special")
+
+
 func _upgrade(upgrade: String) -> void:
-	var button: Button = special_upgrade if upgrade == "special" else (damage_upgrade if upgrade == "damage" else speed_upgrade)
+	var button: Button
+	match upgrade:
+		"special", "boulders":
+			button = special_upgrade
+		"onyx_ring":
+			button = onyx_ring_upgrade
+		"damage":
+			button = damage_upgrade
+		"speed":
+			button = speed_upgrade
+		_:
+			return
 	if planning != null and button.is_visible_in_tree() and not button.disabled and not _selected_tower().is_empty():
 		planning.upgrade_tower(planning.local_slot(), selected_tower_id, upgrade)
 

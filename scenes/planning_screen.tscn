@@ -408,6 +408,15 @@ size_flags_horizontal = 3
 theme_override_fonts/font = ExtResource("3_numbers")
 theme_override_font_sizes/font_size = 16
 
+[node name="OnyxRingUpgrade" type="Button" parent="HUD/TowerManagement/Content/Upgrades"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(140, 56)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+
 [node name="Actions" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
 layout_mode = 2
 mouse_filter = 2

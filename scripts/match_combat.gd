@@ -44,8 +44,10 @@ var _spawned: Array[int] = [0, 0]
 var _elapsed: float = 0.0
 var _next_tower_id: int = 1
 var _next_enemy_id: int = 1
-# Actual HP damage credited to individual obelisks, retired with each enemy.
-var _obelisk_damage: Dictionary = {}
+# Host-only fractional HP, isolated by tower and enemy and retired with either.
+var _continuous_damage: Dictionary = {}
+# Spawn times cap first-tick exposure even when due events arrive mid-tick.
+var _enemy_spawn_times: Dictionary = {}
 
 
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
@@ -109,7 +111,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0 or definition.cost <= 0 or definition.upgrade_base_cost <= 0 or definition.damage_upgrade_bonus <= 0 or not is_finite(definition.speed_upgrade_multiplier) or definition.speed_upgrade_multiplier <= 0.0 or definition.speed_upgrade_multiplier >= 1.0:
 			push_error("Invalid combat tower definition '%s' (%s): positive stats/prices and speed multiplier between zero and one are required" % [type_id, definition.resource_path])
 			continue
-		if definition.special_upgrade not in ["", "second_archer", "bounce", "freeze"] or (not definition.special_upgrade.is_empty() and (definition.special_upgrade_title.is_empty() or definition.special_upgrade_cost <= 0)):
+		if definition.special_upgrade not in ["", "second_archer", "bounce"] or (not definition.special_upgrade.is_empty() and (definition.special_upgrade_title.is_empty() or definition.special_upgrade_cost <= 0)) or not _valid_evolutions(definition):
 			push_error("Invalid combat special upgrade for tower '%s'" % type_id)
 			continue
 		if _tower_types.has(type_id):
@@ -125,7 +127,27 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"special_upgrade": definition.special_upgrade,
 			"special_upgrade_title": definition.special_upgrade_title,
 			"special_upgrade_cost": definition.special_upgrade_cost,
+			"evolutions": definition.evolutions.duplicate(true),
 		}
+
+
+static func _valid_evolutions(definition: TowerDefinition) -> bool:
+	if not definition.evolutions.is_empty() and not definition.special_upgrade.is_empty():
+		return false
+	for branch: Variant in definition.evolutions:
+		if not branch is String or branch not in ["boulders", "onyx_ring"] or not definition.evolutions[branch] is Dictionary:
+			return false
+		var config: Dictionary = definition.evolutions[branch]
+		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0 or not config.get("damage") is int or int(config["damage"]) <= 0 or not config.get("continuous") is bool:
+			return false
+		if typeof(config.get("interval")) not in [TYPE_FLOAT, TYPE_INT]:
+			return false
+		var interval: float = float(config["interval"])
+		if not is_finite(interval) or (bool(config["continuous"]) and interval != 0.0) or (not bool(config["continuous"]) and interval <= 0.0):
+			return false
+		if bool(config["continuous"]) != (branch == "boulders") or not definition.area_attack:
+			return false
+	return true
 
 
 func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
@@ -139,7 +161,7 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
 		"kills": 0, "damage_upgraded": false, "speed_upgraded": false,
-		"special_upgraded": false, "secondary_mode": mode,
+		"special_upgraded": false, "evolution": "", "secondary_mode": mode,
 		"secondary_shot": 0, "secondary_aim": Vector2(cell), "secondary_target_id": -1,
 		"bounce_active": false, "bounce_aim": Vector2(cell),
 		"damage": definition["damage"], "interval": definition["interval"],
@@ -176,23 +198,36 @@ func set_secondary_targeting(slot: int, tower_id: int, mode: int) -> bool:
 
 
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or upgrade not in ["damage", "speed", "special"]:
+	if phase == Phase.FINISHED or not _valid_slot(slot):
 		return false
 	for tower: Dictionary in towers[slot]:
 		if tower["id"] != tower_id:
 			continue
-		var flag: String = upgrade + "_upgraded"
 		var definition: Dictionary = _tower_types[tower["type_id"]]
-		if upgrade == "special" and (definition["special_upgrade"].is_empty() or not tower["damage_upgraded"] or not tower["speed_upgraded"]):
+		var evolution: bool = definition["evolutions"].has(upgrade)
+		if upgrade not in ["damage", "speed", "special"] and not evolution:
 			return false
-		var cost: int = int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition)
+		var flag: String = "special_upgraded" if evolution else upgrade + "_upgraded"
+		if (evolution or upgrade == "special") and (not tower["damage_upgraded"] or not tower["speed_upgraded"]):
+			return false
+		if upgrade == "special" and definition["special_upgrade"].is_empty():
+			return false
+		var cost: int = int(definition["evolutions"][upgrade]["cost"]) if evolution else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition))
 		if tower[flag] or coins[slot] < cost:
 			return false
 		coins[slot] -= cost
 		tower[flag] = true
 		tower["invested"] += cost
 		tower["sell_value"] = _sell_value(tower["invested"])
-		if upgrade == "damage":
+		if evolution:
+			var config: Dictionary = definition["evolutions"][upgrade]
+			tower["evolution"] = upgrade
+			tower["damage"] = config["damage"]
+			tower["interval"] = config["interval"]
+			# A new pulse requires a full reload; continuous damage starts accruing
+			# only in future simulation time, without an immediate hit or old credit.
+			tower["cooldown"] = config["interval"]
+		elif upgrade == "damage":
 			tower["damage"] += definition["damage_upgrade_bonus"]
 		elif upgrade == "speed":
 			tower["interval"] *= definition["speed_upgrade_multiplier"]
@@ -213,6 +248,7 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 		if tower["id"] != tower_id:
 			continue
 		coins[slot] += _sell_value(tower["invested"])
+		_continuous_damage.erase(tower_id)
 		towers[slot].remove_at(index)
 		return true
 	return false
@@ -532,16 +568,7 @@ func _valid_mode(mode: int) -> bool:
 
 func _move_enemies(slot: int, delta: float) -> void:
 	for enemy: Dictionary in enemies[slot]:
-		var remaining: float = float(enemy.get("slow_remaining", 0.0))
-		if remaining > 0.0:
-			var slowed_time: float = minf(delta, remaining)
-			enemy["progress"] += float(enemy["speed"]) * slowed_time + float(enemy["base_speed"]) * (delta - slowed_time)
-			enemy["slow_remaining"] = maxf(0.0, remaining - delta)
-			if float(enemy["slow_remaining"]) <= 0.0:
-				enemy["slowed"] = false
-				enemy["speed"] = enemy["base_speed"]
-		else:
-			enemy["progress"] += float(enemy["speed"]) * delta
+		enemy["progress"] += float(enemy["speed"]) * delta
 		enemy["pos"] = _position(enemy["route"], enemy["progress"])
 
 
@@ -559,14 +586,14 @@ func _spawn_enemies(slot: int) -> void:
 		else:
 			var type_id: String = wave_roster[_spawned[slot]]
 			var progress: float = (_elapsed - regular_time) * _enemy_speed(type_id, wave)
-			_spawn_enemy(slot, type_id, progress)
+			_spawn_enemy(slot, type_id, progress, regular_time)
 			_spawned[slot] += 1
 
 
 func _spawn_send(slot: int) -> void:
 	var type_id: String = _send_queues[slot][_send_heads[slot]]
 	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave)
-	_spawn_enemy(slot, type_id, progress)
+	_spawn_enemy(slot, type_id, progress, _next_send_times[slot])
 	_next_send_times[slot] += _active_send_spawn_interval
 	_send_heads[slot] += 1
 	if _send_heads[slot] == _send_queues[slot].size():
@@ -577,16 +604,17 @@ func _spawn_send(slot: int) -> void:
 		_send_heads[slot] = 0
 
 
-func _spawn_enemy(slot: int, type_id: String, progress: float) -> void:
+func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float) -> void:
 	var hp: int = _enemy_health(type_id, wave)
 	var route: Array[Vector2i] = _assign_route(slot)
 	var speed: float = _enemy_speed(type_id, wave)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
-		"type_id": type_id, "base_speed": speed, "speed": speed, "slowed": false, "slow_remaining": 0.0,
+		"type_id": type_id, "speed": speed,
 		"damage": _enemy_types[type_id]["base_damage"],
 		"route": route, "progress": progress, "pos": _position(route, progress),
 	})
+	_enemy_spawn_times[_next_enemy_id] = spawn_time
 	_next_enemy_id += 1
 
 
@@ -600,10 +628,16 @@ func _position(route: Array, progress: float) -> Vector2:
 
 func _attack(slot: int, delta: float) -> void:
 	for tower: Dictionary in towers[slot]:
+		var definition: Dictionary = _tower_types[tower["type_id"]]
+		if tower["evolution"] != "":
+			if definition["evolutions"][tower["evolution"]]["continuous"]:
+				_attack_continuous(slot, tower, definition["range"], delta)
+			else:
+				_attack_pulses(slot, tower, definition["range"], delta)
+			continue
 		tower["cooldown"] = maxf(0.0, tower["cooldown"] - delta)
 		if tower["cooldown"] > 0.0:
 			continue
-		var definition: Dictionary = _tower_types[tower["type_id"]]
 		var target_index: int = _target(slot, tower, definition["range"])
 		if target_index < 0:
 			continue
@@ -636,25 +670,94 @@ func _attack(slot: int, delta: float) -> void:
 					_hit(slot, tower, bounce_index, ceili(float(tower["damage"]) * TowerDefinition.BOUNCE_DAMAGE_MULTIPLIER))
 
 
+func _attack_pulses(slot: int, tower: Dictionary, range_cells: float, delta: float) -> void:
+	tower["cooldown"] -= delta
+	while float(tower["cooldown"]) <= 0.000000001:
+		var pulse_time: float = _elapsed + float(tower["cooldown"])
+		tower["cooldown"] += float(tower["interval"])
+		var hit_any: bool = false
+		for index: int in range(enemies[slot].size() - 1, -1, -1):
+			var enemy: Dictionary = enemies[slot][index]
+			if float(_enemy_spawn_times[enemy["id"]]) > pulse_time + 0.000000001:
+				continue
+			var progress: float = maxf(0.0, float(enemy["progress"]) - float(enemy["speed"]) * (_elapsed - pulse_time))
+			var position: Vector2 = _position(enemy["route"], progress)
+			if not cell_in_range(tower["cell"], Vector2i(position.round()), range_cells):
+				continue
+			if not hit_any:
+				tower["target_id"] = enemy["id"]
+				tower["aim"] = position
+				hit_any = true
+			_hit(slot, tower, index)
+		if hit_any:
+			tower["shot"] += 1
+
+
+func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta: float) -> void:
+	var tower_id: int = tower["id"]
+	if not _continuous_damage.has(tower_id):
+		_continuous_damage[tower_id] = {}
+	var fractions: Dictionary = _continuous_damage[tower_id]
+	for index: int in range(enemies[slot].size() - 1, -1, -1):
+		var enemy: Dictionary = enemies[slot][index]
+		var exposure: float = _continuous_exposure(tower["cell"], range_cells, enemy, minf(delta, _elapsed - float(_enemy_spawn_times[enemy["id"]])))
+		if exposure <= 0.0:
+			continue
+		var total: float = float(fractions.get(enemy["id"], 0.0)) + float(tower["damage"]) * exposure
+		# Only whole HP reaches replicated state; retain sub-HP credit for this
+		# exact pair. The epsilon corrects floating-point addition at whole HP.
+		var damage: int = floori(total + 0.000000001)
+		fractions[enemy["id"]] = maxf(0.0, total - damage)
+		if damage > 0:
+			_hit(slot, tower, index, damage)
+
+
+# Movement precedes attacks. Integrate the path actually traversed this tick,
+# not a full delta at its final tile; otherwise entering/leaving range and
+# mid-tick spawns would manufacture damage and depend on frame splitting.
+func _continuous_exposure(cell: Vector2i, range_cells: float, enemy: Dictionary, delta: float) -> float:
+	if delta <= 0.0:
+		return 0.0
+	var speed: float = enemy["speed"]
+	if speed <= 0.0:
+		return delta if cell_in_range(cell, Vector2i(enemy["pos"].round()), range_cells) else 0.0
+	var route: Array = enemy["route"]
+	var finish: float = minf(float(enemy["progress"]), float(route.size() - 1))
+	var start: float = maxf(0.0, float(enemy["progress"]) - speed * delta)
+	var distance: float = 0.0
+	var radius: int = floori(range_cells)
+	for segment: int in range(floori(start), ceili(finish)):
+		var origin: Vector2i = route[segment]
+		var direction: Vector2i = route[segment + 1] - origin
+		var horizontal: bool = direction.x != 0
+		var fixed_offset: int = absi(origin.y - cell.y) if horizontal else absi(origin.x - cell.x)
+		if fixed_offset > radius:
+			continue
+		var axis_origin: float = origin.x if horizontal else origin.y
+		var axis_center: float = cell.x if horizontal else cell.y
+		var axis_direction: float = direction.x if horizontal else direction.y
+		var first: float = (axis_center - radius - 0.5 - axis_origin) / axis_direction
+		var last: float = (axis_center + radius + 0.5 - axis_origin) / axis_direction
+		var low: float = maxf(maxf(0.0, start - segment), minf(first, last))
+		var high: float = minf(minf(1.0, finish - segment), maxf(first, last))
+		distance += maxf(0.0, high - low)
+	return distance / speed
+
+
+func _retire_enemy(enemy_id: int) -> void:
+	_enemy_spawn_times.erase(enemy_id)
+	for tower_id: int in _continuous_damage:
+		_continuous_damage[tower_id].erase(enemy_id)
+
+
 func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> void:
 	var enemy: Dictionary = enemies[slot][enemy_index]
 	var hit_damage: int = int(tower["damage"]) if damage < 0 else damage
-	var actual_damage: int = mini(int(enemy["hp"]), hit_damage)
 	enemy["hp"] -= hit_damage
-	if _tower_types[tower["type_id"]]["special_upgrade"] == "freeze":
-		var enemy_id: int = enemy["id"]
-		if not _obelisk_damage.has(enemy_id):
-			_obelisk_damage[enemy_id] = {}
-		var credited: Dictionary = _obelisk_damage[enemy_id]
-		credited[tower["id"]] = int(credited.get(tower["id"], 0)) + actual_damage
-		if tower["special_upgraded"] and int(credited[tower["id"]]) >= ceili(float(enemy["max_hp"]) * TowerDefinition.FREEZE_DAMAGE_THRESHOLD):
-			enemy["slowed"] = true
-			enemy["slow_remaining"] = TowerDefinition.FREEZE_DURATION
-			enemy["speed"] = float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1
 		coins[slot] += _rules.kill_bounty
-		_obelisk_damage.erase(enemy["id"])
+		_retire_enemy(enemy["id"])
 		enemies[slot].remove_at(enemy_index)
 
 
@@ -707,6 +810,6 @@ func _apply_leaks(slot: int) -> void:
 	while index >= 0:
 		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1:
 			base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
-			_obelisk_damage.erase(enemies[slot][index]["id"])
+			_retire_enemy(enemies[slot][index]["id"])
 			enemies[slot].remove_at(index)
 		index -= 1
