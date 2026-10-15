@@ -44,6 +44,8 @@ var _spawned: Array[int] = [0, 0]
 var _elapsed: float = 0.0
 var _next_tower_id: int = 1
 var _next_enemy_id: int = 1
+# Actual HP damage credited to individual obelisks, retired with each enemy.
+var _obelisk_damage: Dictionary = {}
 
 
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
@@ -107,6 +109,9 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0 or definition.cost <= 0 or definition.upgrade_base_cost <= 0 or definition.damage_upgrade_bonus <= 0 or not is_finite(definition.speed_upgrade_multiplier) or definition.speed_upgrade_multiplier <= 0.0 or definition.speed_upgrade_multiplier >= 1.0:
 			push_error("Invalid combat tower definition '%s' (%s): positive stats/prices and speed multiplier between zero and one are required" % [type_id, definition.resource_path])
 			continue
+		if definition.special_upgrade not in ["", "second_archer", "bounce", "freeze"] or (not definition.special_upgrade.is_empty() and (definition.special_upgrade_title.is_empty() or definition.special_upgrade_cost <= 0)):
+			push_error("Invalid combat special upgrade for tower '%s'" % type_id)
+			continue
 		if _tower_types.has(type_id):
 			push_error("Duplicate combat tower definition '%s': keeping the first valid definition" % type_id)
 			continue
@@ -117,6 +122,9 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"damage_upgrade_bonus": definition.damage_upgrade_bonus,
 			"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
 			"area_attack": definition.area_attack,
+			"special_upgrade": definition.special_upgrade,
+			"special_upgrade_title": definition.special_upgrade_title,
+			"special_upgrade_cost": definition.special_upgrade_cost,
 		}
 
 
@@ -131,6 +139,9 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
 		"kills": 0, "damage_upgraded": false, "speed_upgraded": false,
+		"special_upgraded": false, "secondary_mode": mode,
+		"secondary_shot": 0, "secondary_aim": Vector2(cell), "secondary_target_id": -1,
+		"bounce_active": false, "bounce_aim": Vector2(cell),
 		"damage": definition["damage"], "interval": definition["interval"],
 		"invested": cost, "sell_value": _sell_value(cost),
 	})
@@ -151,15 +162,30 @@ func set_targeting(slot: int, tower_id: int, mode: int) -> bool:
 	return false
 
 
+func set_secondary_targeting(slot: int, tower_id: int, mode: int) -> bool:
+	if phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode):
+		return false
+	for tower: Dictionary in towers[slot]:
+		if tower["id"] != tower_id:
+			continue
+		if not tower["special_upgraded"] or _tower_types[tower["type_id"]]["special_upgrade"] != "second_archer" or tower["secondary_mode"] == mode:
+			return false
+		tower["secondary_mode"] = mode
+		return true
+	return false
+
+
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or (upgrade != "damage" and upgrade != "speed"):
+	if phase == Phase.FINISHED or not _valid_slot(slot) or upgrade not in ["damage", "speed", "special"]:
 		return false
 	for tower: Dictionary in towers[slot]:
 		if tower["id"] != tower_id:
 			continue
 		var flag: String = upgrade + "_upgraded"
 		var definition: Dictionary = _tower_types[tower["type_id"]]
-		var cost: int = tower_upgrade_cost(tower, definition)
+		if upgrade == "special" and (definition["special_upgrade"].is_empty() or not tower["damage_upgraded"] or not tower["speed_upgraded"]):
+			return false
+		var cost: int = int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition)
 		if tower[flag] or coins[slot] < cost:
 			return false
 		coins[slot] -= cost
@@ -168,10 +194,13 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 		tower["sell_value"] = _sell_value(tower["invested"])
 		if upgrade == "damage":
 			tower["damage"] += definition["damage_upgrade_bonus"]
-		else:
+		elif upgrade == "speed":
 			tower["interval"] *= definition["speed_upgrade_multiplier"]
 			# Accelerate the current reload, but never grant an immediate extra shot.
 			tower["cooldown"] *= definition["speed_upgrade_multiplier"]
+		elif definition["special_upgrade"] == "second_archer":
+			tower["interval"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
+			tower["cooldown"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
 		return true
 	return false
 
@@ -191,7 +220,7 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 
 # Level is derived from accepted upgrades, never a second mutable copy of tower state.
 static func tower_level(tower: Dictionary) -> int:
-	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"]))
+	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"])) + int(bool(tower.get("special_upgraded", false)))
 
 
 static func tower_upgrade_cost(tower: Dictionary, definition: Dictionary) -> int:
@@ -222,6 +251,8 @@ func grow_for_main_round() -> void:
 		for tower: Dictionary in board:
 			tower["cell"] += Vector2i.DOWN
 			tower["aim"] += Vector2.DOWN
+			tower["secondary_aim"] += Vector2.DOWN
+			tower["bounce_aim"] += Vector2.DOWN
 
 
 func send_enemy(slot: int, type_id: StringName) -> bool:
@@ -501,7 +532,16 @@ func _valid_mode(mode: int) -> bool:
 
 func _move_enemies(slot: int, delta: float) -> void:
 	for enemy: Dictionary in enemies[slot]:
-		enemy["progress"] += float(enemy["speed"]) * delta
+		var remaining: float = float(enemy.get("slow_remaining", 0.0))
+		if remaining > 0.0:
+			var slowed_time: float = minf(delta, remaining)
+			enemy["progress"] += float(enemy["speed"]) * slowed_time + float(enemy["base_speed"]) * (delta - slowed_time)
+			enemy["slow_remaining"] = maxf(0.0, remaining - delta)
+			if float(enemy["slow_remaining"]) <= 0.0:
+				enemy["slowed"] = false
+				enemy["speed"] = enemy["base_speed"]
+		else:
+			enemy["progress"] += float(enemy["speed"]) * delta
 		enemy["pos"] = _position(enemy["route"], enemy["progress"])
 
 
@@ -540,9 +580,11 @@ func _spawn_send(slot: int) -> void:
 func _spawn_enemy(slot: int, type_id: String, progress: float) -> void:
 	var hp: int = _enemy_health(type_id, wave)
 	var route: Array[Vector2i] = _assign_route(slot)
+	var speed: float = _enemy_speed(type_id, wave)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
-		"type_id": type_id, "speed": _enemy_speed(type_id, wave), "damage": _enemy_types[type_id]["base_damage"],
+		"type_id": type_id, "base_speed": speed, "speed": speed, "slowed": false, "slow_remaining": 0.0,
+		"damage": _enemy_types[type_id]["base_damage"],
 		"route": route, "progress": progress, "pos": _position(route, progress),
 	})
 	_next_enemy_id += 1
@@ -570,6 +612,8 @@ func _attack(slot: int, delta: float) -> void:
 		tower["aim"] = enemy["pos"]
 		tower["shot"] += 1
 		tower["cooldown"] = tower["interval"]
+		tower["bounce_active"] = false
+		tower["secondary_target_id"] = -1
 		if definition["area_attack"]:
 			# Reverse traversal permits removal in place without missing a victim.
 			for index: int in range(enemies[slot].size() - 1, -1, -1):
@@ -577,30 +621,73 @@ func _attack(slot: int, delta: float) -> void:
 					_hit(slot, tower, index)
 		else:
 			_hit(slot, tower, target_index)
+			if tower["special_upgraded"] and definition["special_upgrade"] == "second_archer":
+				var secondary_index: int = _target(slot, tower, definition["range"], tower["secondary_mode"], tower["target_id"])
+				if secondary_index >= 0:
+					tower["secondary_target_id"] = enemies[slot][secondary_index]["id"]
+					tower["secondary_aim"] = enemies[slot][secondary_index]["pos"]
+					tower["secondary_shot"] += 1
+					_hit(slot, tower, secondary_index)
+			elif tower["special_upgraded"] and definition["special_upgrade"] == "bounce":
+				var bounce_index: int = _bounce_target(slot, tower["aim"], tower["target_id"])
+				if bounce_index >= 0:
+					tower["bounce_active"] = true
+					tower["bounce_aim"] = enemies[slot][bounce_index]["pos"]
+					_hit(slot, tower, bounce_index, ceili(float(tower["damage"]) * TowerDefinition.BOUNCE_DAMAGE_MULTIPLIER))
 
 
-func _hit(slot: int, tower: Dictionary, enemy_index: int) -> void:
+func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> void:
 	var enemy: Dictionary = enemies[slot][enemy_index]
-	enemy["hp"] -= tower["damage"]
+	var hit_damage: int = int(tower["damage"]) if damage < 0 else damage
+	var actual_damage: int = mini(int(enemy["hp"]), hit_damage)
+	enemy["hp"] -= hit_damage
+	if _tower_types[tower["type_id"]]["special_upgrade"] == "freeze":
+		var enemy_id: int = enemy["id"]
+		if not _obelisk_damage.has(enemy_id):
+			_obelisk_damage[enemy_id] = {}
+		var credited: Dictionary = _obelisk_damage[enemy_id]
+		credited[tower["id"]] = int(credited.get(tower["id"], 0)) + actual_damage
+		if tower["special_upgraded"] and int(credited[tower["id"]]) >= ceili(float(enemy["max_hp"]) * TowerDefinition.FREEZE_DAMAGE_THRESHOLD):
+			enemy["slowed"] = true
+			enemy["slow_remaining"] = TowerDefinition.FREEZE_DURATION
+			enemy["speed"] = float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1
 		coins[slot] += _rules.kill_bounty
+		_obelisk_damage.erase(enemy["id"])
 		enemies[slot].remove_at(enemy_index)
 
 
+func _bounce_target(slot: int, origin: Vector2, excluded_id: int) -> int:
+	var best: int = -1
+	var best_distance: float = INF
+	var best_id: int = 0
+	for index: int in range(enemies[slot].size()):
+		var enemy: Dictionary = enemies[slot][index]
+		if enemy["id"] == excluded_id or int(enemy["hp"]) <= 0:
+			continue
+		var distance: float = origin.distance_squared_to(enemy["pos"])
+		var id: int = enemy["id"]
+		if best < 0 or distance < best_distance or (distance == best_distance and id < best_id):
+			best = index
+			best_distance = distance
+			best_id = id
+	return best
+
+
 # Scan in place rather than allocating or sorting candidates for each tower.
-func _target(slot: int, tower: Dictionary, range_cells: float) -> int:
+func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, excluded_id: int = -1) -> int:
 	var best: int = -1
 	var best_score: float = -INF
 	var best_id: int = 0
 	var center: Vector2 = Vector2(tower["cell"])
 	for index: int in range(enemies[slot].size()):
 		var enemy: Dictionary = enemies[slot][index]
-		if not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), range_cells):
+		if int(enemy["id"]) == excluded_id or not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), range_cells):
 			continue
 		var distance_squared: float = center.distance_squared_to(enemy["pos"])
 		var score: float
-		match tower["mode"]:
+		match int(tower["mode"]) if mode < 0 else mode:
 			TargetMode.CLOSEST:
 				score = -distance_squared
 			TargetMode.STRONGEST:
@@ -620,5 +707,6 @@ func _apply_leaks(slot: int) -> void:
 	while index >= 0:
 		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1:
 			base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
+			_obelisk_damage.erase(enemies[slot][index]["id"])
 			enemies[slot].remove_at(index)
 		index -= 1

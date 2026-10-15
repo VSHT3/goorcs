@@ -151,6 +151,10 @@ func set_targeting(slot: int, tower_id: int, mode: int) -> void:
 	_request_tower_command("target", slot, Vector2i.ZERO, tower_id, mode, "")
 
 
+func set_secondary_targeting(slot: int, tower_id: int, mode: int) -> void:
+	_request_tower_command("target_secondary", slot, Vector2i.ZERO, tower_id, mode, "")
+
+
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> void:
 	_request_tower_command("upgrade", slot, Vector2i.ZERO, tower_id, -1, upgrade)
 
@@ -315,6 +319,10 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	elif command == "target":
 		if not _host_combat.set_targeting(slot, tower_id, mode):
 			_reject(sender, "Choose an existing own tower and a different valid targeting mode.")
+			return
+	elif command == "target_secondary":
+		if not _host_combat.set_secondary_targeting(slot, tower_id, mode):
+			_reject(sender, "Choose an upgraded own Arrow tower and a different valid second-archer targeting mode.")
 			return
 	elif command == "upgrade":
 		if not _host_combat.upgrade_tower(slot, tower_id, argument):

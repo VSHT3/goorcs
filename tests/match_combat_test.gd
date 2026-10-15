@@ -27,6 +27,11 @@ func _init() -> void:
 	_test_shortest_branch_assignment()
 	_test_nested_branch_assignment()
 	_test_routing_validation()
+	_test_special_transactions()
+	_test_second_archer_targets_and_cadence()
+	_test_ballista_bounce()
+	_test_obelisk_freeze()
+	_test_special_snapshot_and_growth()
 	if failures == 0:
 		print("PASS: authoritative purchases/upgrades/sales, currency and reward atomicity, per-tower kills, tile range/AoE, scaling, resource stats, targeting, captured routes and frozen outcomes")
 	quit(1 if failures > 0 else 0)
@@ -355,6 +360,9 @@ func _type_snapshot(definition: TowerDefinition) -> Dictionary:
 		"damage_upgrade_bonus": definition.damage_upgrade_bonus,
 		"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
 		"area_attack": definition.area_attack,
+		"special_upgrade": definition.special_upgrade,
+		"special_upgrade_title": definition.special_upgrade_title,
+		"special_upgrade_cost": definition.special_upgrade_cost,
 	}
 
 
@@ -419,7 +427,7 @@ func _test_level_pricing_orders() -> void:
 			_check(MatchCombat.tower_upgrade_cost(tower, definition) == 2 * base_cost, "Level III quotes 200 percent of original price, not compounded 225 percent")
 			_check(tower["invested"] == invested and tower["sell_value"] == floori(invested * 0.6), "Both purchase orders preserve actual investment and refund")
 			frozen = combat.snapshot()
-			_check(not combat.upgrade_tower(0, tower["id"], second) and combat.snapshot() == frozen, "Fully upgraded tower cannot advance beyond level III")
+			_check(not combat.upgrade_tower(0, tower["id"], second) and combat.snapshot() == frozen, "Repeating either purchased stat cannot advance beyond level III")
 
 
 func _test_area_kills_and_bounties() -> void:
@@ -954,3 +962,329 @@ func _test_routing_validation() -> void:
 	for invalid: Dictionary in [cyclic, dead_end, longer, {"route": valid["route"], "next": {}}, {"route": [], "next": {}}]:
 		var routing: Array[Dictionary] = [valid, invalid]
 		_check(not combat.start_wave(routing) and combat.snapshot() == frozen, "Invalid second graph rejects atomically without consuming sends or wave state")
+
+
+func _special_rules(type_id: StringName, hp: int = 100, count: int = 3) -> CombatRules:
+	var rules := CombatRules.new()
+	rules.starting_coins = 10000
+	rules.enemy_health = hp
+	rules.enemy_speed = 0.0
+	rules.wave_weight = count
+	rules.wave_weight_growth = 0
+	rules.spawn_interval = 0.0
+	rules.spawn_jitter_ratio = 0.0
+	rules.spawn_interval_reduction_per_wave = 0.0
+	var definition: TowerDefinition = load("res://resources/combat/towers/%s.tres" % type_id).duplicate()
+	rules.tower_definitions = [definition]
+	return rules
+
+
+func _prepared_special(rules: CombatRules, type_id: StringName) -> MatchCombat:
+	var combat := MatchCombat.new(rules)
+	_check(combat.build(0, Vector2i(0, 1), type_id, MatchCombat.TargetMode.FURTHEST), "Special fixture builds a paid tower")
+	var tower: Dictionary = combat.towers[0][0]
+	_check(combat.upgrade_tower(0, tower["id"], "damage") and combat.upgrade_tower(0, tower["id"], "speed"), "Special fixture pays both prerequisite stats")
+	return combat
+
+
+func _test_special_transactions() -> void:
+	var ids: Array[StringName] = [&"arrow_tower", &"orc_ballista", &"rune_obelisk"]
+	var special_prices: Array[int] = [200, 300, 250]
+	for index: int in range(ids.size()):
+		for first: String in ["damage", "speed"]:
+			var rules := _special_rules(ids[index])
+			var combat := MatchCombat.new(rules)
+			combat.build(0, Vector2i(0, 1), ids[index], MatchCombat.TargetMode.CLOSEST)
+			var tower: Dictionary = combat.towers[0][0]
+			var id: int = tower["id"]
+			var frozen: Dictionary = combat.snapshot()
+			_check(not combat.upgrade_tower(0, id, "special") and not combat.set_secondary_targeting(0, id, 2) and combat.snapshot() == frozen, "Special and secondary policy are locked at level I for %s" % ids[index])
+			combat.upgrade_tower(0, id, first)
+			frozen = combat.snapshot()
+			_check(not combat.upgrade_tower(0, id, "special") and combat.snapshot() == frozen, "One prerequisite never unlocks special for either stat order")
+			combat.upgrade_tower(0, id, "speed" if first == "damage" else "damage")
+			var stat_investment: int = tower["invested"]
+			_check(MatchCombat.tower_level(tower) == 3 and not tower["special_upgraded"], "Both ordinary purchases reach III, not IV")
+			frozen = combat.snapshot()
+			_check(not combat.upgrade_tower(1, id, "special") and not combat.upgrade_tower(-1, id, "special") and not combat.upgrade_tower(2, id, "special") and not combat.upgrade_tower(0, id + 100, "special") and combat.snapshot() == frozen, "Wrong ownership, invalid slots and missing tower reject special atomically")
+			combat.coins[0] = special_prices[index] - 1
+			frozen = combat.snapshot()
+			_check(not combat.upgrade_tower(0, id, "special") and combat.snapshot() == frozen, "One Coin short of the fixed special price spends nothing")
+			combat.coins[0] += 1
+			_check(combat.upgrade_tower(0, id, "special") and combat.coins[0] == 0, "Exact fixed special price succeeds without level stacking for %s" % ids[index])
+			_check(MatchCombat.tower_level(tower) == 4 and tower["invested"] == stat_investment + special_prices[index] and tower["sell_value"] == floori(float(tower["invested"]) * 0.6), "Accepted special reaches IV and contributes its actual payment to refund")
+			combat.coins[0] = 10000
+			frozen = combat.snapshot()
+			_check(not combat.upgrade_tower(0, id, "special") and not combat.upgrade_tower(0, id, "damage") and not combat.upgrade_tower(0, id, "speed") and combat.snapshot() == frozen, "Repeated purchases cannot spend even when fully funded")
+			if ids[index] != &"arrow_tower":
+				_check(not combat.set_secondary_targeting(0, id, 2) and combat.snapshot() == frozen, "Non-archer specials cannot acquire a secondary targeting policy")
+			var refund: int = tower["sell_value"]
+			_check(combat.sell_tower(0, id) and combat.coins[0] == 10000 + refund, "Sale includes exactly sixty percent of all four paid levels")
+			frozen = combat.snapshot()
+			_check(not combat.sell_tower(0, id) and not combat.upgrade_tower(0, id, "special") and combat.snapshot() == frozen, "Stale special and repeat sale cannot mint a refund")
+		var terminal := _prepared_special(_special_rules(ids[index]), ids[index])
+		terminal.phase = MatchCombat.Phase.FINISHED
+		var frozen_terminal: Dictionary = terminal.snapshot()
+		_check(not terminal.upgrade_tower(0, terminal.towers[0][0]["id"], "special") and not terminal.set_secondary_targeting(0, terminal.towers[0][0]["id"], 2) and terminal.snapshot() == frozen_terminal, "Terminal special and secondary commands preserve the frozen outcome")
+	var ordinary := _prepared_special(_rules(), &"arrow_tower")
+	var no_special: Dictionary = ordinary.snapshot()
+	_check(not ordinary.upgrade_tower(0, ordinary.towers[0][0]["id"], "special") and ordinary.snapshot() == no_special, "Custom tower without a special cannot buy a no-effect level")
+
+
+func _test_second_archer_targets_and_cadence() -> void:
+	var combat := _prepared_special(_special_rules(&"arrow_tower"), &"arrow_tower")
+	var tower: Dictionary = combat.towers[0][0]
+	_check(tower["secondary_mode"] == tower["mode"], "Secondary policy starts as the build-time primary policy")
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.01)
+	var old_interval: float = tower["interval"]
+	var old_reload: float = tower["cooldown"]
+	_check(combat.upgrade_tower(0, tower["id"], "special") and is_equal_approx(tower["interval"], old_interval / 1.1) and is_equal_approx(tower["cooldown"], old_reload / 1.1), "Second archer raises attacks per second by ten percent and rescales the live reload proportionally")
+	_check(tower["shot"] == 1 and tower["secondary_shot"] == 0, "Buying a second archer does not grant a free immediate attack")
+	var primary_mode: int = tower["mode"]
+	var frozen: Dictionary = combat.snapshot()
+	_check(not combat.set_secondary_targeting(1, tower["id"], 2) and not combat.set_secondary_targeting(0, tower["id"], -1) and not combat.set_secondary_targeting(0, tower["id"], 3) and not combat.set_secondary_targeting(0, tower["id"], primary_mode) and combat.snapshot() == frozen, "Secondary policy validates owner, bounds and no-op atomically")
+	_check(combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.STRONGEST) and tower["mode"] == primary_mode, "Secondary policy changes without changing primary policy")
+	combat.enemies[0][0]["progress"] = 2.0
+	combat.enemies[0][1]["progress"] = 1.0
+	combat.enemies[0][2]["progress"] = 0.0
+	combat.enemies[0][0]["hp"] = 80
+	combat.enemies[0][1]["hp"] = 60
+	combat.enemies[0][2]["hp"] = 90
+	combat.advance(float(tower["cooldown"]) * 0.99)
+	_check(tower["shot"] == 1 and tower["secondary_shot"] == 0, "Neither archer attacks before the accelerated remaining reload")
+	combat.advance(float(tower["interval"]) * 0.02)
+	_check(tower["shot"] == 2 and tower["secondary_shot"] == 1 and combat.enemies[0][0]["hp"] == 77 and combat.enemies[0][1]["hp"] == 60 and combat.enemies[0][2]["hp"] == 87, "Independent furthest and strongest policies fire one full-damage arrow at distinct targets")
+	_check(tower["target_id"] == combat.enemies[0][0]["id"] and tower["secondary_target_id"] == combat.enemies[0][2]["id"] and tower["aim"] == Vector2(2, 0) and tower["secondary_aim"] == Vector2.ZERO, "Each arrow publishes its own accepted target and aim")
+	for volley: int in range(5):
+		var shots: int = tower["shot"]
+		combat.advance(float(tower["interval"]) * 0.99)
+		_check(tower["shot"] == shots, "True special cadence does not fire before its interval")
+		combat.advance(float(tower["interval"]) * 0.011)
+		_check(tower["shot"] == shots + 1, "True special cadence fires at the interval divided by 1.1")
+	# Both policies prefer the same enemy; exclusion still guarantees a second victim.
+	combat = _prepared_special(_special_rules(&"arrow_tower", 100, 2), &"arrow_tower")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes())
+	combat.advance(0.01)
+	_check(combat.enemies[0][0]["hp"] == 97 and combat.enemies[0][1]["hp"] == 97 and tower["target_id"] != tower["secondary_target_id"], "Identical policies cannot double-hit the primary target")
+	combat = _prepared_special(_special_rules(&"arrow_tower", 3, 2), &"arrow_tower")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes())
+	var before: int = combat.coins[0]
+	combat.advance(0.01)
+	_check(combat.enemies[0].is_empty() and tower["kills"] == 2 and tower["secondary_shot"] == 1 and tower["secondary_target_id"] != tower["target_id"] and combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]), "Primary kill and array removal do not skip or revisit the second victim; both kills pay bounty")
+	combat = _prepared_special(_special_rules(&"arrow_tower", 100, 1), &"arrow_tower")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes())
+	combat.advance(0.01)
+	_check(combat.enemies[0][0]["hp"] == 97 and tower["shot"] == 1 and tower["secondary_shot"] == 0 and tower["secondary_target_id"] == -1, "A sole living enemy never receives a second arrow")
+	combat = _prepared_special(_special_rules(&"arrow_tower", 3, 1), &"arrow_tower")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes())
+	combat.advance(0.01)
+	_check(combat.enemies[0].is_empty() and tower["secondary_shot"] == 0, "Killing the only enemy does not manufacture a second arrow event")
+	combat = _prepared_special(_special_rules(&"arrow_tower", 100, 3), &"arrow_tower")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.01)
+	combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.CLOSEST)
+	combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.STRONGEST)
+	_check(tower["secondary_mode"] == MatchCombat.TargetMode.CLOSEST, "Changing the primary policy leaves the secondary policy independent")
+	combat.enemies[0][0]["progress"] = 3.0
+	combat.enemies[0][0]["hp"] = 100
+	combat.enemies[0][1]["progress"] = 0.0
+	combat.enemies[0][1]["hp"] = 90
+	combat.enemies[0][2]["progress"] = 4.0
+	combat.enemies[0][2]["hp"] = 1000
+	combat.advance(float(tower["interval"]))
+	_check(combat.enemies[0][0]["hp"] == 97 and combat.enemies[0][1]["hp"] == 87 and combat.enemies[0][2]["hp"] == 1000, "Independent strongest primary and closest secondary both respect the original tower range")
+	var secondary_shots: int = tower["secondary_shot"]
+	combat.enemies[0][0]["progress"] = 0.0
+	combat.enemies[0][1]["progress"] = 5.0
+	combat.enemies[0][2]["progress"] = 6.0
+	combat.advance(float(tower["interval"]))
+	_check(combat.enemies[0][0]["hp"] == 94 and combat.enemies[0][1]["hp"] == 87 and combat.enemies[0][2]["hp"] == 1000 and tower["secondary_shot"] == secondary_shots and tower["secondary_target_id"] == -1, "Out-of-range enemies cannot supply a second target or create a phantom secondary event")
+
+
+func _test_ballista_bounce() -> void:
+	# Nine primary damage must round its half-damage bounce up to five.
+	var combat := _prepared_special(_special_rules(&"orc_ballista", 100, 4), &"orc_ballista")
+	var tower: Dictionary = combat.towers[0][0]
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.01)
+	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 100 and not tower["bounce_active"], "Unupgraded ballista remains single-target")
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.enemies[0][0]["progress"] = 4.0
+	combat.enemies[0][1]["progress"] = 5.0
+	combat.enemies[0][2]["progress"] = 8.0
+	combat.enemies[0][3]["progress"] = 10.0
+	combat.advance(float(tower["interval"]))
+	_check(combat.enemies[0][0]["hp"] == 82 and combat.enemies[0][1]["hp"] == 95 and combat.enemies[0][2]["hp"] == 100 and combat.enemies[0][3]["hp"] == 100, "Bounce hits only the nearest other enemy beyond tower range, once, for rounded-up half damage")
+	_check(tower["bounce_active"] and tower["aim"] == Vector2(4, 0) and tower["bounce_aim"] == Vector2(5, 0), "Primary event captures sequential primary-hit and bounce endpoints")
+	# Equal distances use stable IDs even after array reordering and primary removal.
+	combat = _prepared_special(_special_rules(&"orc_ballista", 100, 3), &"orc_ballista")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.01)
+	var primary: Dictionary = combat.enemies[0][0]
+	var lower_id: Dictionary = combat.enemies[0][1]
+	var higher_id: Dictionary = combat.enemies[0][2]
+	primary["progress"] = 4.0
+	primary["hp"] = 9
+	lower_id["progress"] = 5.0
+	lower_id["hp"] = 5
+	higher_id["progress"] = 3.0
+	higher_id["hp"] = 100
+	combat.enemies[0].reverse()
+	combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.FURTHEST)
+	# The progress-five victim is outside range; progress-four remains primary.
+	var before: int = combat.coins[0]
+	combat.advance(float(tower["interval"]))
+	_check(combat.enemies[0].size() == 1 and combat.enemies[0][0]["id"] == higher_id["id"] and combat.enemies[0][0]["hp"] == 100 and tower["kills"] == 2, "Bounce tie picks the smaller ID, survives primary removal, can kill and never chains to a third victim")
+	_check(combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]) and tower["aim"] == Vector2(4, 0) and tower["bounce_aim"] == Vector2(5, 0), "Both ballista kills retain tower attribution, bounties and immutable hit positions")
+	combat = _prepared_special(_special_rules(&"orc_ballista", 100, 1), &"orc_ballista")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes())
+	combat.advance(0.01)
+	_check(combat.enemies[0][0]["hp"] == 91 and not tower["bounce_active"], "Living primary cannot be its own bounce victim")
+	combat.enemies[0][0]["hp"] = 9
+	combat.advance(float(tower["interval"]))
+	_check(combat.enemies[0].is_empty() and tower["kills"] == 1 and not tower["bounce_active"], "Primary kill without another living victim publishes no bounce")
+
+
+func _test_obelisk_freeze() -> void:
+	var rules := _special_rules(&"rune_obelisk", 100, 2)
+	rules.enemy_speed = 1.0
+	var combat := _prepared_special(rules, &"rune_obelisk")
+	var tower: Dictionary = combat.towers[0][0]
+	combat.start_wave(_routes(100, 100))
+	# Freeze fixtures stay in the original tile while ten full AoE hits accumulate.
+	for hit: int in range(10):
+		combat.advance(0.01 if hit == 0 else float(tower["interval"]))
+		for enemy: Dictionary in combat.enemies[0]:
+			enemy["progress"] = 0.0
+	_check(combat.enemies[0][0]["hp"] == 80 and combat.enemies[0][1]["hp"] == 80 and not combat.enemies[0][0]["slowed"] and is_equal_approx(combat.enemies[0][0]["speed"], 1.0), "Twenty-percent prior per-obelisk damage does not slow before special purchase; original AoE remains intact")
+	combat.upgrade_tower(0, tower["id"], "special")
+	_check(not combat.enemies[0][0]["slowed"], "Special purchase alone never retroactively slows an enemy")
+	combat.advance(float(tower["interval"]))
+	_check(combat.enemies[0][0]["hp"] == 78 and combat.enemies[0][1]["hp"] == 78 and combat.enemies[0][0]["slowed"] and combat.enemies[0][1]["slowed"], "The upgraded qualifying hit uses that obelisk's prior cumulative actual damage for every AoE victim")
+	var enemy: Dictionary = combat.enemies[0][0]
+	var start: float = enemy["progress"]
+	combat.advance(0.1)
+	_check(is_equal_approx(enemy["speed"], 0.8) and is_equal_approx(float(enemy["progress"]) - start, 0.08), "Slowed enemies move at the accepted effective speed, twenty percent below their original speed")
+	combat.sell_tower(0, tower["id"])
+	start = enemy["progress"]
+	combat.advance(1.0)
+	_check(enemy["slowed"] and is_equal_approx(float(enemy["progress"]) - start, 0.8) and is_equal_approx(enemy["slow_remaining"], 0.9), "Slow remains active for its remaining duration after the source is sold")
+	start = enemy["progress"]
+	combat.advance(1.1)
+	_check(not enemy["slowed"] and is_equal_approx(enemy["speed"], 1.0) and enemy["slow_remaining"] == 0.0 and is_equal_approx(float(enemy["progress"]) - start, 0.92), "Expiry restores original speed and integrates a crossing tick at both slowed and normal rates")
+	start = enemy["progress"]
+	combat.advance(0.25)
+	_check(is_equal_approx(float(enemy["progress"]) - start, 0.25), "Movement stays at original speed after expiry")
+	# Two obelisks deal ten damage each: pooled twenty-percent damage must not qualify.
+	rules = _special_rules(&"rune_obelisk", 100, 1)
+	rules.enemy_speed = 1.0
+	combat = _prepared_special(rules, &"rune_obelisk")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.build(0, Vector2i(1, 1), &"rune_obelisk", 0)
+	var second: Dictionary = combat.towers[0][1]
+	combat.upgrade_tower(0, second["id"], "damage")
+	combat.upgrade_tower(0, second["id"], "speed")
+	combat.upgrade_tower(0, second["id"], "special")
+	combat.start_wave(_routes(100, 100))
+	for hit: int in range(5):
+		combat.advance(0.01 if hit == 0 else float(tower["interval"]))
+		combat.enemies[0][0]["progress"] = 0.0
+	enemy = combat.enemies[0][0]
+	_check(enemy["hp"] == 80 and not enemy["slowed"], "Different obelisks cannot pool their own below-threshold damage")
+	for hit: int in range(4):
+		combat.advance(float(tower["interval"]))
+		enemy["progress"] = 0.0
+	_check(enemy["hp"] == 64 and not enemy["slowed"], "Eighteen percent from each obelisk is still below each independent maximum-HP threshold")
+	combat.advance(float(tower["interval"]))
+	_check(enemy["hp"] == 60 and enemy["slowed"] and is_equal_approx(enemy["speed"], 0.8), "Exactly twenty percent from an individual obelisk qualifies, and simultaneous qualifying obelisks do not stack slows")
+	enemy["progress"] = 0.0
+	combat.advance(float(tower["interval"]))
+	_check(is_equal_approx(enemy["speed"], 0.8) and is_equal_approx(enemy["slow_remaining"], 2.0), "Subsequent qualifying hits refresh two seconds without compounding the slow")
+	# Unrelated tower damage neither lowers a max-HP threshold nor grants credit.
+	rules = _special_rules(&"rune_obelisk", 100, 1)
+	var arrow: TowerDefinition = _definition(&"other_source", 75, 3.0, 100.0)
+	rules.tower_definitions.append(arrow)
+	combat = _prepared_special(rules, &"rune_obelisk")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.build(0, Vector2i(1, 1), &"other_source", 0)
+	combat.start_wave(_routes())
+	combat.advance(0.01)
+	for hit: int in range(8):
+		combat.advance(float(tower["interval"]))
+	enemy = combat.enemies[0][0]
+	_check(enemy["hp"] == 7 and not enemy["slowed"], "Heavy unrelated damage does not count and threshold remains twenty percent of maximum, not current HP")
+	combat.advance(float(tower["interval"]))
+	_check(enemy["hp"] == 5 and enemy["slowed"], "Only this obelisk's tenth two-damage hit reaches its own maximum-HP threshold")
+	# A fractional threshold must round up, never down.
+	rules = _special_rules(&"rune_obelisk", 101, 1)
+	combat = _prepared_special(rules, &"rune_obelisk")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes())
+	for hit: int in range(10):
+		combat.advance(0.01 if hit == 0 else float(tower["interval"]))
+	_check(not combat.enemies[0][0]["slowed"], "Twenty actual damage is below twenty percent of 101 maximum HP")
+	combat.advance(float(tower["interval"]))
+	_check(combat.enemies[0][0]["slowed"], "Twenty-two actual damage crosses a nonintegral maximum-HP threshold")
+	# A second, below-threshold source cannot refresh another obelisk's slow.
+	rules = _special_rules(&"rune_obelisk", 100, 1)
+	rules.enemy_speed = 1.0
+	combat = _prepared_special(rules, &"rune_obelisk")
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes(100, 100))
+	for hit: int in range(10):
+		combat.advance(0.01 if hit == 0 else float(tower["interval"]))
+		combat.enemies[0][0]["progress"] = 0.0
+	enemy = combat.enemies[0][0]
+	combat.build(0, Vector2i(1, 1), &"rune_obelisk", 0)
+	second = combat.towers[0][1]
+	combat.upgrade_tower(0, second["id"], "damage")
+	combat.upgrade_tower(0, second["id"], "speed")
+	combat.upgrade_tower(0, second["id"], "special")
+	combat.advance(0.1)
+	_check(is_equal_approx(enemy["slow_remaining"], 1.9), "A hit from a separately upgraded obelisk below its own damage threshold cannot refresh the slow")
+	combat.advance(float(tower["cooldown"]))
+	_check(is_equal_approx(enemy["slow_remaining"], 2.0) and is_equal_approx(enemy["speed"], 0.8), "A hit from the already-qualified obelisk resets the full two-second timer")
+
+
+func _test_special_snapshot_and_growth() -> void:
+	var combat := _prepared_special(_special_rules(&"arrow_tower"), &"arrow_tower")
+	var tower: Dictionary = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "special")
+	combat.start_wave(_routes())
+	combat.advance(0.01)
+	var copy: Dictionary = combat.snapshot()
+	copy["towers"][0][0]["special_upgraded"] = false
+	copy["towers"][0][0]["secondary_mode"] = 2
+	copy["towers"][0][0]["secondary_shot"] = 999
+	copy["towers"][0][0]["secondary_aim"] = Vector2(99, 99)
+	copy["towers"][0][0]["bounce_active"] = true
+	copy["enemies"][0][0]["slowed"] = true
+	copy["tower_types"]["arrow_tower"]["special_upgrade_cost"] = 1
+	_check(tower["special_upgraded"] and tower["secondary_mode"] == 0 and tower["secondary_shot"] == 1 and tower["secondary_aim"] == Vector2.ZERO and not tower["bounce_active"] and not combat.enemies[0][0]["slowed"] and combat.snapshot()["tower_types"]["arrow_tower"]["special_upgrade_cost"] == 200, "Special metadata, attack events, policy and slow state are detached snapshot values")
+	combat.phase = MatchCombat.Phase.PLANNING
+	var old_aim: Vector2 = tower["aim"]
+	var old_secondary: Vector2 = tower["secondary_aim"]
+	var old_bounce: Vector2 = tower["bounce_aim"]
+	var primary_shots: int = tower["shot"]
+	var secondary_shots: int = tower["secondary_shot"]
+	combat.grow_for_main_round()
+	_check(tower["cell"] == Vector2i(0, 2) and tower["aim"] == old_aim + Vector2.DOWN and tower["secondary_aim"] == old_secondary + Vector2.DOWN and tower["bounce_aim"] == old_bounce + Vector2.DOWN and tower["shot"] == primary_shots and tower["secondary_shot"] == secondary_shots, "Board growth shifts every cosmetic endpoint exactly once without inventing a shot")

@@ -65,6 +65,7 @@ func _run() -> void:
 	await _check_workshop_materials_and_editing()
 	_check_drop_input(board)
 	await _check_ranges_and_attacks(board, viewport)
+	await _check_special_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
 	await _check_source_facing(board, viewport)
 	await _check_split_routes(board, viewport)
@@ -369,8 +370,95 @@ func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		board._process(PathBoard.SHOT_DURATION * 0.25)
 		attack = await _board_image(board, viewport)
 		var impact: Vector2 = board.cell_center(Vector2i(3, 3)) + Vector2(0, board._cell_size() * 0.15)
-		_check(_pixels_changed_near(baseline, attack, impact),
-			"Direct attacks visibly indicate the target hit, mirrored=%s" % mirrored)
+		var flight: Vector2 = board._projectile_origin(board._shot_traces[0]).lerp(impact, 0.25)
+		_check(_pixels_changed_near(baseline, attack, flight),
+			"Arrow attacks draw a small moving projectile along their captured aim, mirrored=%s" % mirrored)
+		_check(not _pixels_changed_near(baseline, attack, impact),
+			"Arrow attacks do not draw an immediate full-length tracer or premature impact, mirrored=%s" % mirrored)
+		board.combat_towers = []
+
+
+func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
+	board.combat_enemies = []
+	board.selected_tower_id = -1
+	board.tower_types = {
+		"arrow_tower": {"range": 3.0, "area_attack": false, "special_upgrade": "second_archer"},
+		"orc_ballista": {"range": 3.0, "area_attack": false, "special_upgrade": "bounce"},
+	}
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_towers = []
+		var tower: Dictionary = _tower(90, Vector2i(2, 3), "arrow_tower")
+		board.combat_towers = [tower]
+		var ordinary: Image = await _board_image(board, viewport)
+		tower = tower.duplicate(true)
+		tower["special_upgraded"] = true
+		board.combat_towers = [tower]
+		var baseline: Image = await _board_image(board, viewport)
+		var artwork: TowerReward = board._tower_art["arrow_tower"]
+		var foot: Vector2 = board.cell_center(tower["cell"]) + Vector2(0, board._cell_size() * 0.28)
+		var rect: Rect2 = board._sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
+		var art_scale: Vector2 = rect.size / artwork.icon_texture.get_size()
+		var second_rect := Rect2(rect.position + (PathBoard.ARCHER_CROP.position + PathBoard.SECOND_ARCHER_OFFSET) * art_scale,
+			PathBoard.ARCHER_CROP.size * art_scale)
+		_check(int(_changed_geometry(ordinary, baseline, Rect2i(second_rect.grow(1.0)))["pixels"]) > 20,
+			"Only the special Arrow tower gains a visibly separate cropped source archer, mirrored=%s" % mirrored)
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		tower["aim"] = Vector2(4, 1)
+		tower["secondary_shot"] = 1
+		tower["secondary_aim"] = Vector2(0, 1)
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 2, "Primary and secondary events retain separate queued arrows even without living targets")
+		board._process(PathBoard.SHOT_DURATION * 0.5)
+		var flight: Image = await _board_image(board, viewport)
+		for trace: Dictionary in board._shot_traces:
+			var destination: Vector2 = board._position_center(trace["aim"]) + Vector2(0, board._cell_size() * 0.15)
+			var midpoint: Vector2 = board._projectile_origin(trace).lerp(destination, 0.5)
+			_check(_pixels_changed_near(baseline, flight, midpoint),
+				"Both independently aimed arrow streams remain visible, mirrored=%s secondary=%s" % [mirrored, trace["secondary"]])
+		board.combat_towers = [tower.duplicate(true)]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 2, "Repeated snapshots do not duplicate either arrow stream")
+		tower = tower.duplicate(true)
+		tower["secondary_shot"] = 2
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 3 and bool(board._shot_traces[2]["secondary"]),
+			"A secondary-only counter advance cannot overwrite or replay the primary stream")
+		board._process(PathBoard.SHOT_DURATION)
+		_check(board._shot_traces.is_empty(), "Both arrow streams expire without waiting for another snapshot")
+		board.combat_towers = []
+		tower = _tower(91, Vector2i(2, 3), "orc_ballista")
+		tower["special_upgraded"] = true
+		board.combat_towers = [tower]
+		baseline = await _board_image(board, viewport)
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		tower["aim"] = Vector2(3, 1)
+		tower["bounce_active"] = true
+		tower["bounce_aim"] = Vector2(0, 1)
+		board.combat_towers = [tower]
+		board.set_process(false)
+		board._process(PathBoard.SHOT_DURATION * 0.5)
+		flight = await _board_image(board, viewport)
+		_check(board._shot_traces.size() == 1, "Ballista bounce uses exactly one queued projectile")
+		var primary: Vector2 = board._position_center(tower["aim"]) + Vector2(0, board._cell_size() * 0.15)
+		var bounce: Vector2 = board._position_center(tower["bounce_aim"]) + Vector2(0, board._cell_size() * 0.15)
+		var first_midpoint: Vector2 = board._projectile_origin(board._shot_traces[0]).lerp(primary, 0.5)
+		_check(_pixels_changed_near(baseline, flight, first_midpoint) and not _pixels_changed_near(baseline, flight, primary.lerp(bounce, 0.5)),
+			"Ballista flies toward its primary before drawing any bounce leg, mirrored=%s" % mirrored)
+		board._process(PathBoard.SHOT_DURATION)
+		flight = await _board_image(board, viewport)
+		_check(_pixels_changed_near(baseline, flight, primary.lerp(bounce, 0.5)) and not _pixels_changed_near(baseline, flight, first_midpoint),
+			"The same Ballista projectile subsequently travels primary-to-bounce, mirrored=%s" % mirrored)
+		board.combat_towers = []
+		_check(board._shot_traces.is_empty() and board._seen_shots.is_empty(),
+			"Clearing combat resets queued projectile lifetime and both seen counters")
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 1, "A fresh combat can reuse a tower ID and shot number without losing its projectile")
 		board.combat_towers = []
 
 
@@ -410,6 +498,21 @@ func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			var full_stronger: Image = await _board_image(board, viewport)
 			_check(int(_changed_geometry(full, full_stronger, region)["pixels"]) == 0,
 				"Full health adds no routine bar clutter regardless of actual maximum HP")
+			var slowed: Dictionary = stronger.duplicate(true)
+			slowed["slowed"] = true
+			board.combat_enemies = [slowed]
+			var chilled: Image = await _board_image(board, viewport)
+			var blue_shifted: int = 0
+			for y: int in range(region.position.y, region.end.y):
+				for x: int in range(region.position.x, region.end.x):
+					if chilled.get_pixel(x, y).b > full_stronger.get_pixel(x, y).b + 0.06:
+						blue_shifted += 1
+			_check(blue_shifted > 20,
+				"Accepted slow adds visible blue to enemy bodies rather than merely darkening their original hue, mirrored=%s type=%s" % [mirrored, enemy["type_id"]])
+			board.combat_enemies = [stronger.duplicate(true)]
+			var restored: Image = await _board_image(board, viewport)
+			_check(int(_changed_geometry(full_stronger, restored, region)["pixels"]) == 0,
+				"An absent slowed flag preserves the original artwork without tint leaking between snapshots")
 			stronger["hp"] = 8
 			board.combat_enemies = [stronger]
 			var damaged: Image = await _board_image(board, viewport)

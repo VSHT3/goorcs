@@ -94,12 +94,44 @@ func _run() -> void:
 	planning.stop_singleplayer()
 	_solo_sends(planning)
 	_solo_typed_sends(planning)
+	_solo_specials(planning)
 	planning.queue_free()
 	session.queue_free()
 	await process_frame
 	if failures == 0:
 		print("PASS: offline mirrored commands, enemy sends/income/delivery, ownership, transactions, waves, results, and fresh restart")
 	quit(1 if failures > 0 else 0)
+
+
+func _solo_specials(planning: MatchPlanning) -> void:
+	var rules := CombatRules.new()
+	rules.starting_coins = 2000
+	planning.combat_rules = rules
+	planning.start_singleplayer()
+	var x: int = 2
+	for type_id: StringName in [&"arrow_tower", &"orc_ballista", &"rune_obelisk"]:
+		planning.build_tower(0, Vector2i(x, 3), type_id, 0)
+		var id: int = planning.combat["towers"][0].back()["id"]
+		var before: Dictionary = planning.combat.duplicate(true)
+		planning.upgrade_tower(0, id, "special")
+		_check(planning.combat == before, "Solo special stays locked before both base upgrades")
+		planning.upgrade_tower(0, id, "speed")
+		before = planning.combat.duplicate(true)
+		planning.upgrade_tower(0, id, "special")
+		_check(planning.combat == before, "One purchased stat is not enough to unlock a solo special")
+		planning.upgrade_tower(0, id, "damage")
+		planning.upgrade_tower(0, id, "special")
+		for slot: int in range(2):
+			var tower: Dictionary = planning.combat["towers"][slot].back()
+			_check(tower["special_upgraded"] and MatchCombat.tower_level(tower) == 4, "Accepted specials mirror to level IV through the same validator")
+		_check(planning.combat["coins"][0] == planning.combat["coins"][1], "Mirrored special prices debit each owner equally")
+		if type_id == &"arrow_tower":
+			planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
+			for slot: int in range(2):
+				var tower: Dictionary = planning.combat["towers"][slot].back()
+				_check(tower["secondary_mode"] == MatchCombat.TargetMode.STRONGEST and tower["mode"] == MatchCombat.TargetMode.FURTHEST, "Second-archer policy mirrors independently of primary policy")
+		x += 2
+	planning.stop_singleplayer()
 
 
 func _solo_sends(planning: MatchPlanning) -> void:

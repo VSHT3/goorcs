@@ -155,6 +155,8 @@ func _test_strategy_growth_and_reset() -> void:
 	var tower_id: int = planning.combat["towers"][0][0]["id"]
 	planning.upgrade_tower(0, tower_id, "damage")
 	planning.upgrade_tower(0, tower_id, "speed")
+	planning.upgrade_tower(0, tower_id, "special")
+	planning.set_secondary_targeting(0, tower_id, MatchCombat.TargetMode.STRONGEST)
 	var original_towers: Array = planning.combat["towers"].duplicate(true)
 	var original_route: Array[Vector2i] = planning.layouts[0].route.duplicate()
 	for upcoming: int in range(1, 31):
@@ -171,6 +173,8 @@ func _test_strategy_growth_and_reset() -> void:
 			var expected_tower: Dictionary = original_towers[slot][0].duplicate(true)
 			expected_tower["cell"] += Vector2i(0, expansions)
 			expected_tower["aim"] += Vector2(0, expansions)
+			expected_tower["secondary_aim"] += Vector2(0, expansions)
+			expected_tower["bounce_aim"] += Vector2(0, expansions)
 			_check(planning.combat["towers"][slot][0] == expected_tower, "Expansion preserves tower IDs, targeting, upgrades, stats, reload, kills and actual investment")
 			_check(planning.layouts[slot].entrance == Vector2i(0, 4 + expansions) and planning.layouts[slot].base == Vector2i(13, 4 + expansions) and expected_tower["cell"] == original_towers[slot][0]["cell"] + Vector2i(0, expansions) and expected_tower["aim"] == original_towers[slot][0]["aim"] + Vector2(0, expansions), "Endpoints, tower cells and aim retain their old x coordinates and only reindex y")
 		if upcoming in [10, 20, 30]:

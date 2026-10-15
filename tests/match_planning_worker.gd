@@ -31,6 +31,8 @@ func _execute_command(command: Dictionary) -> void:
 			planning.build_tower(int(command["slot"]), Vector2i(int(command["x"]), int(command["y"])), StringName(command["type_id"]), int(command["mode"]))
 		"target":
 			planning.set_targeting(int(command["slot"]), int(command["tower_id"]), int(command["mode"]))
+		"target_secondary":
+			planning.set_secondary_targeting(int(command["slot"]), int(command["tower_id"]), int(command["mode"]))
 		"upgrade":
 			planning.upgrade_tower(int(command["slot"]), int(command["tower_id"]), String(command["upgrade"]))
 		"sell":

@@ -14,3 +14,6 @@ upgrade_base_cost = 45
 damage_upgrade_bonus = 1
 speed_upgrade_multiplier = 0.85
 area_attack = true
+special_upgrade = "freeze"
+special_upgrade_title = "Freezing Runes"
+special_upgrade_cost = 250

@@ -1,12 +1,12 @@
 extends "res://tests/match_planning_worker.gd"
 
-var _manual_sends: bool = false
+var _manual_simulation: bool = false
 
 
 func _new_session() -> void:
 	super._new_session()
 	planning.changed.connect(func() -> void:
-		if _manual_sends:
+		if _manual_simulation:
 			planning.set_physics_process(false)
 	)
 
@@ -34,6 +34,9 @@ func _planning_rules() -> CombatRules:
 		definition.damage_upgrade_bonus = source.damage_upgrade_bonus
 		definition.speed_upgrade_multiplier = source.speed_upgrade_multiplier
 		definition.area_attack = source.area_attack
+		definition.special_upgrade = source.special_upgrade
+		definition.special_upgrade_title = source.special_upgrade_title
+		definition.special_upgrade_cost = 1 if _lane == "guest" else source.special_upgrade_cost
 		definitions.append(definition)
 	rules.tower_definitions = definitions
 	var enemy_definitions: Array[EnemyDefinition] = []
@@ -57,6 +60,16 @@ func _planning_rules() -> CombatRules:
 
 func _execute_command(command: Dictionary) -> void:
 	var action: String = String(command.get("action", ""))
+	if action == "special_scenario":
+		var rules: CombatRules = _planning_rules()
+		rules.starting_coins = 2000 if _lane == "host" else 1
+		rules.base_health = 100
+		rules.enemy_health = 100
+		rules.enemy_speed = 0.0
+		_manual_simulation = true
+		planning.set_physics_process(false)
+		planning.combat_rules = rules
+		return
 	if action in ["send_scenario", "typed_send_scenario", "stream_scenario"]:
 		var rules: CombatRules = _planning_rules()
 		var typed: bool = action == "typed_send_scenario"
@@ -64,7 +77,7 @@ func _execute_command(command: Dictionary) -> void:
 		rules.starting_coins = (200 if typed else 45) if _lane == "host" else 999
 		rules.health_growth = 2
 		rules.enemy_speed = 2.0
-		_manual_sends = true
+		_manual_simulation = true
 		planning.set_physics_process(false)
 		rules.send_spawn_interval = (0.35 if typed else 0.25) if _lane == "host" else 99.0
 		if action == "stream_scenario":

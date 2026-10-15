@@ -29,6 +29,12 @@ const ENEMY_CORNER_BLEND: float = 0.25
 const ENDPOINT_FRAME_SIZE: int = 96
 const ENDPOINT_FRAME_COUNT: int = 16
 const ENDPOINT_FRAME_SECONDS: float = 0.2
+const ARROW_ART: TowerReward = preload("res://resources/collection/arrow_tower.tres")
+const ARCHER_CROP := Rect2(29, 0, 25, 31)
+const SECOND_ARCHER_OFFSET := Vector2(-20, 0)
+const ARCHER_BOW := Vector2(46, 19)
+const SLOWED_BLEND: float = 0.65
+static var _slowed_textures: Dictionary[Texture2D, Texture2D] = {}
 
 var layout: PathLayout
 var command_mode: bool = false
@@ -114,6 +120,7 @@ func _ready() -> void:
 	for definition: EnemyDefinition in CombatRules.DEFAULT_ENEMIES:
 		_enemy_art[String(definition.id)] = definition
 		_cache_texture_bounds(definition.texture)
+		_slowed_texture(definition.texture)
 	_portal_texture = _endpoint_texture(preload("res://assets/world/enemy_portal_idle.png"))
 	_crystal_texture = _endpoint_texture(preload("res://assets/world/health_crystal_idle.png"))
 	_cache_texture_bounds(_portal_texture)
@@ -176,27 +183,41 @@ func _capture_shots() -> void:
 		return
 	for tower: Dictionary in combat_towers:
 		var tower_id: int = int(tower["id"])
-		var shot: int = int(tower["shot"])
-		if shot > int(_seen_shots.get(tower_id, 0)):
-			var definition: Dictionary = tower_types[tower["type_id"]]
-			var area_attack: bool = bool(definition["area_attack"])
-			var duration: float = PULSE_DURATION if area_attack else SHOT_DURATION
-			var hits: Array[Vector2] = []
-			if area_attack:
-				for enemy: Dictionary in combat_enemies:
-					if MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), float(definition["range"])):
-						hits.append(enemy["pos"])
-			_shot_traces.append({
-				"cell": tower["cell"],
-				"aim": tower["aim"],
-				"life": duration,
-				"duration": duration,
-				"area_attack": area_attack,
-				"range": float(definition["range"]),
-				"hits": hits,
-			})
-			set_process(true)
-		_seen_shots[tower_id] = shot
+		var shot: int = int(tower.get("shot", 0))
+		var secondary_shot: int = int(tower.get("secondary_shot", 0))
+		var previous: Vector2i = _seen_shots.get(tower_id, Vector2i.ZERO)
+		var definition: Dictionary = tower_types.get(tower["type_id"], {})
+		if shot > previous.x:
+			_capture_attack(tower, definition, false)
+		if secondary_shot > previous.y and bool(tower.get("special_upgraded", false)):
+			_capture_attack(tower, definition, true)
+		_seen_shots[tower_id] = Vector2i(shot, secondary_shot)
+
+
+func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool) -> void:
+	var area_attack: bool = bool(definition.get("area_attack", false))
+	var bounce: bool = not secondary and bool(tower.get("bounce_active", false))
+	var duration: float = PULSE_DURATION if area_attack else SHOT_DURATION * (2.0 if bounce else 1.0)
+	var hits: Array[Vector2] = []
+	if area_attack:
+		for enemy: Dictionary in combat_enemies:
+			if MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), float(definition.get("range", 0.0))):
+				hits.append(enemy["pos"])
+	# Copy accepted positions, including lethal hits whose enemies already disappeared.
+	_shot_traces.append({
+		"cell": tower["cell"],
+		"type_id": tower["type_id"],
+		"aim": tower.get("secondary_aim" if secondary else "aim", Vector2(tower["cell"])),
+		"secondary": secondary,
+		"bounce_active": bounce,
+		"bounce_aim": tower.get("bounce_aim", tower.get("aim", Vector2(tower["cell"]))),
+		"life": duration,
+		"duration": duration,
+		"area_attack": area_attack,
+		"range": float(definition.get("range", 0.0)),
+		"hits": hits,
+	})
+	set_process(true)
 
 
 func _blend_enemies() -> void:
@@ -446,6 +467,7 @@ func _draw() -> void:
 	_draw_hover()
 	_draw_attacks()
 	_draw_combat()
+	_draw_projectiles()
 
 
 func _update_ground() -> void:
@@ -679,8 +701,14 @@ func _draw_combat() -> void:
 				var tower: Dictionary = item["data"]
 				var artwork: TowerReward = _tower_art.get(tower["type_id"])
 				if artwork != null and artwork.icon_texture != null:
-					draw_texture_rect(artwork.icon_texture,
-						_sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, item["foot"]), false)
+					var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, item["foot"])
+					draw_texture_rect(artwork.icon_texture, rect, false)
+					if tower["type_id"] == "arrow_tower" and bool(tower.get("special_upgraded", false)) and artwork.icon_texture == ARROW_ART.icon_texture:
+						# Reuse the original archer pixels locally; the source texture stays untouched.
+						var art_scale: Vector2 = rect.size / artwork.icon_texture.get_size()
+						var second_rect := Rect2(rect.position + (ARCHER_CROP.position + SECOND_ARCHER_OFFSET) * art_scale,
+							ARCHER_CROP.size * art_scale)
+						draw_texture_rect_region(artwork.icon_texture, second_rect, ARCHER_CROP)
 			2:
 				_draw_enemy(item)
 	# Bars are an information overlay; foreground bodies must not cover them.
@@ -691,6 +719,25 @@ func _draw_combat() -> void:
 			_draw_enemy_health(item)
 
 
+static func _slowed_texture(texture: Texture2D) -> Texture2D:
+	if _slowed_textures.has(texture):
+		return _slowed_textures[texture]
+	# Warm once per artwork, shared by every board; source pixels remain unchanged.
+	var image: Image = texture.get_image()
+	image.convert(Image.FORMAT_RGBA8)
+	for y: int in range(image.get_height()):
+		for x: int in range(image.get_width()):
+			var color: Color = image.get_pixel(x, y)
+			if color.a <= 0.0:
+				continue
+			var light: float = color.r * 0.35 + color.g * 0.50 + color.b * 0.15
+			var frost := Color(light * 0.60, light * 0.95, minf(1.0, light * 1.50), color.a)
+			image.set_pixel(x, y, color.lerp(frost, SLOWED_BLEND))
+	var tinted: Texture2D = ImageTexture.create_from_image(image)
+	_slowed_textures[texture] = tinted
+	return tinted
+
+
 func _draw_enemy(item: Dictionary) -> void:
 	var enemy: Dictionary = item["data"]
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
@@ -698,7 +745,8 @@ func _draw_enemy(item: Dictionary) -> void:
 	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, item["foot"], flip)
 	if flip:
 		rect.size.x = -rect.size.x
-	draw_texture_rect(artwork.texture, rect, false)
+	var texture: Texture2D = _slowed_texture(artwork.texture) if bool(enemy.get("slowed", false)) else artwork.texture
+	draw_texture_rect(texture, rect, false)
 
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
@@ -770,8 +818,52 @@ func _draw_attacks() -> void:
 				var foot: Vector2 = _position_center(hit) + Vector2(0, cell_size * 0.28)
 				draw_line(foot + Vector2(-cell_size * 0.10, 2), foot + Vector2(cell_size * 0.10, -4),
 					Color(0.73, 0.79, 0.96, remaining), 2.0)
-		else:
-			var end: Vector2 = _position_center(trace["aim"]) + Vector2(0, cell_size * 0.15)
-			draw_line(cell_center(trace["cell"]) + Vector2(0, -cell_size * 0.30), end,
-				Color(0.84, 0.80, 0.62, remaining * 0.75), 1.5)
-			draw_line(end + Vector2(-3, -3), end + Vector2(3, 3), Color(0.92, 0.87, 0.69, remaining), 1.5)
+
+
+func _projectile_origin(trace: Dictionary) -> Vector2:
+	var cell_size: float = _cell_size()
+	if trace["type_id"] == "arrow_tower":
+		var artwork: TowerReward = _tower_art.get("arrow_tower")
+		if artwork != null and artwork.icon_texture == ARROW_ART.icon_texture:
+			var foot: Vector2 = cell_center(trace["cell"]) + Vector2(0, cell_size * 0.28)
+			var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
+			var bow: Vector2 = ARCHER_BOW + (SECOND_ARCHER_OFFSET if bool(trace["secondary"]) else Vector2.ZERO)
+			return rect.position + bow * rect.size / artwork.icon_texture.get_size()
+	return cell_center(trace["cell"]) + Vector2(0, -cell_size * 0.30)
+
+
+func _projectile_position(trace: Dictionary) -> Vector2:
+	var elapsed: float = float(trace["duration"]) - float(trace["life"])
+	var primary: Vector2 = _position_center(trace["aim"]) + Vector2(0, _cell_size() * 0.15)
+	if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
+		var bounce: Vector2 = _position_center(trace["bounce_aim"]) + Vector2(0, _cell_size() * 0.15)
+		return primary.lerp(bounce, clampf((elapsed - SHOT_DURATION) / SHOT_DURATION, 0.0, 1.0))
+	return _projectile_origin(trace).lerp(primary, clampf(elapsed / SHOT_DURATION, 0.0, 1.0))
+
+
+func _draw_projectiles() -> void:
+	var cell_size: float = _cell_size()
+	for trace: Dictionary in _shot_traces:
+		if bool(trace["area_attack"]):
+			continue
+		var position: Vector2 = _projectile_position(trace)
+		var elapsed: float = float(trace["duration"]) - float(trace["life"])
+		var end: Vector2 = _position_center(trace["aim"]) + Vector2(0, cell_size * 0.15)
+		var start: Vector2 = _projectile_origin(trace)
+		if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
+			start = end
+			end = _position_center(trace["bounce_aim"]) + Vector2(0, cell_size * 0.15)
+		var direction: Vector2 = (end - start).normalized()
+		if direction == Vector2.ZERO:
+			direction = Vector2.RIGHT
+		var side := Vector2(-direction.y, direction.x)
+		var heavy: bool = trace["type_id"] == "orc_ballista"
+		var length: float = cell_size * (0.26 if heavy else 0.18)
+		var width: float = 2.0 if heavy else 1.3
+		var tail: Vector2 = position - direction * length * 0.5
+		var tip: Vector2 = position + direction * length * 0.5
+		draw_line(tail, tip, Color("b9a575"), width, true)
+		draw_line(tip, tip - direction * length * 0.32 + side * length * 0.22, Color("e8e3c9"), width, true)
+		draw_line(tip, tip - direction * length * 0.32 - side * length * 0.22, Color("e8e3c9"), width, true)
+		draw_line(tail, tail + direction * length * 0.25 + side * length * 0.18, Color("d3cbab"), width, true)
+		draw_line(tail, tail + direction * length * 0.25 - side * length * 0.18, Color("d3cbab"), width, true)

@@ -9,7 +9,7 @@ const TARGET_HELP: Array[String] = [
 	"Nearest to this tower.",
 	"Highest current HP.",
 ]
-const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III"]
+const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III", "IV"]
 
 var planning: MatchPlanning
 var selected_tower_id: int = -1
@@ -40,6 +40,9 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 @onready var _tower_title: Label = %TowerTitle
 @onready var damage_upgrade: Button = %DamageUpgrade
 @onready var speed_upgrade: Button = %SpeedUpgrade
+@onready var special_upgrade: Button = %SpecialUpgrade
+@onready var secondary_targeting: OptionButton = %SecondaryTargeting
+@onready var _secondary_target_row: HBoxContainer = %SecondaryTargetRow
 @onready var sell_button: Button = %SellTower
 @onready var close_button: Button = %CloseTower
 @onready var targeting_button: OptionButton = %Targeting
@@ -62,19 +65,22 @@ func _ready() -> void:
 		boards[slot].command_mode = true
 		if planning != null and planning.collection_store != null:
 			boards[slot].tower_catalog = planning.collection_store.catalog
-	targeting_button.add_item("Furthest", 0)
-	targeting_button.add_item("Closest", 1)
-	targeting_button.add_item("Strongest", 2)
-	for index: int in range(TARGET_HELP.size()):
-		targeting_button.set_item_tooltip(index, TARGET_HELP[index])
+	for selector: OptionButton in [targeting_button, secondary_targeting]:
+		selector.add_item("Furthest", 0)
+		selector.add_item("Closest", 1)
+		selector.add_item("Strongest", 2)
+		for index: int in range(TARGET_HELP.size()):
+			selector.set_item_tooltip(index, TARGET_HELP[index])
 	_create_palette()
 	_cancel_placement.pressed.connect(cancel_interaction)
 	close_button.pressed.connect(cancel_interaction)
 	_enemy_inspector.close_requested.connect(cancel_interaction)
 	damage_upgrade.pressed.connect(_upgrade.bind("damage"))
 	speed_upgrade.pressed.connect(_upgrade.bind("speed"))
+	special_upgrade.pressed.connect(_upgrade.bind("special"))
 	sell_button.pressed.connect(_sell)
 	targeting_button.item_selected.connect(_target_selected)
+	secondary_targeting.item_selected.connect(_secondary_target_selected)
 	clear_button.pressed.connect(_clear)
 	ready_button.pressed.connect(_toggle_ready)
 	send_button.pressed.connect(_send_enemy)
@@ -388,6 +394,12 @@ func _target_selected(index: int) -> void:
 	_refresh_targeting()
 
 
+func _secondary_target_selected(index: int) -> void:
+	if planning != null and not secondary_targeting.disabled and not _selected_tower().is_empty():
+		planning.set_secondary_targeting(planning.local_slot(), selected_tower_id, index)
+	_refresh_targeting()
+
+
 func _request_pacing(option: String) -> void:
 	if planning == null or not planning.active:
 		return
@@ -478,6 +490,15 @@ func _refresh_targeting() -> void:
 	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
 	_refresh_upgrade(damage_upgrade, tower, stats, "damage")
 	_refresh_upgrade(speed_upgrade, tower, stats, "speed")
+	var unlocked_special: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false)) and not String(stats.get("special_upgrade", "")).is_empty()
+	damage_upgrade.visible = not unlocked_special
+	speed_upgrade.visible = not unlocked_special
+	special_upgrade.visible = unlocked_special
+	_refresh_special_upgrade(tower, stats)
+	var second_archer: bool = bool(tower.get("special_upgraded", false)) and String(stats.get("special_upgrade", "")) == "second_archer"
+	_secondary_target_row.visible = second_archer
+	secondary_targeting.disabled = targeting_button.disabled or not second_archer
+	secondary_targeting.select(int(tower.get("secondary_mode", tower["mode"])))
 	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
 	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
 	sell_button.disabled = targeting_button.disabled
@@ -494,9 +515,29 @@ func _refresh_upgrade(button: Button, tower: Dictionary, stats: Dictionary, upgr
 		button.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
 
 
+func _refresh_special_upgrade(tower: Dictionary, stats: Dictionary) -> void:
+	var purchased: bool = bool(tower.get("special_upgraded", false))
+	var price: int = int(stats.get("special_upgrade_cost", 0))
+	var title: String = String(stats.get("special_upgrade_title", "Special upgrade"))
+	special_upgrade.text = "%s\nPurchased" % title if purchased else "%s\n%d" % [title, price]
+	special_upgrade.disabled = not special_upgrade.visible or purchased or targeting_button.disabled or _own_coins() < price
+	match String(stats.get("special_upgrade", "")):
+		"second_archer":
+			special_upgrade.tooltip_text = "Adds a second archer with independent targeting and 10% more attacks per second. Archers choose different enemies."
+		"bounce":
+			special_upgrade.tooltip_text = "Each bolt bounces once to the nearest other enemy for 50% damage, rounded up."
+		"freeze":
+			special_upgrade.tooltip_text = "After this obelisk has dealt 20% of an enemy's maximum HP, each hit applies a 20% slow for 2 simulation seconds and refreshes its duration. Does not stack."
+		_:
+			special_upgrade.tooltip_text = ""
+	special_upgrade.tooltip_text += "\nFixed price; unaffected by level pricing."
+	if not purchased and _own_coins() < price:
+		special_upgrade.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
+
+
 func _upgrade(upgrade: String) -> void:
-	var button: Button = damage_upgrade if upgrade == "damage" else speed_upgrade
-	if planning != null and not button.disabled and not _selected_tower().is_empty():
+	var button: Button = special_upgrade if upgrade == "special" else (damage_upgrade if upgrade == "damage" else speed_upgrade)
+	if planning != null and button.is_visible_in_tree() and not button.disabled and not _selected_tower().is_empty():
 		planning.upgrade_tower(planning.local_slot(), selected_tower_id, upgrade)
 
 

@@ -51,12 +51,27 @@ func _run() -> void:
 	_check(screen.selected_tower_id == id and screen.get_node("%TowerManagement").visible, "Owned inspection opens management")
 	_check(screen.targeting_button.selected == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
 	_check(screen.boards[0].selected_tower_id == id and screen.boards[1].selected_tower_id == -1, "Range selection stays local to owned board")
+	_check(not screen.special_upgrade.visible and screen.damage_upgrade.visible and screen.speed_upgrade.visible, "Special upgrade is hidden on a fresh tower")
 	var definition: Dictionary = main.planning.combat["tower_types"]["orc_ballista"]
-	_check(model.upgrade_tower(0, id, "damage") and model.upgrade_tower(0, id, "speed"), "Both real one-time model upgrades succeed")
+	_check(model.upgrade_tower(0, id, "damage"), "First real stat upgrade succeeds")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(not screen.special_upgrade.visible and screen.speed_upgrade.visible, "Special stays hidden until both stat upgrades are purchased")
+	_check(model.upgrade_tower(0, id, "speed"), "Second real stat upgrade succeeds")
 	model.towers[0][0]["kills"] = 7
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
 	_check(screen.damage_upgrade.disabled and screen.speed_upgrade.disabled, "Purchased upgrades cannot be bought twice in management")
+	_check(screen.special_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible and not screen.special_upgrade.disabled, "Both purchased stats are replaced by one affordable special action")
+	model.coins[0] = 299
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(screen.special_upgrade.disabled, "Special affordability uses its fixed 300-Coin price")
+	model.coins[0] = 300
+	_check(model.upgrade_tower(0, id, "special"), "Exact fixed price buys the special")
+	main.planning.combat = model.snapshot()
+	main.planning.changed.emit()
+	_check(screen.special_upgrade.visible and screen.special_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased special stays visible and cannot be bought twice")
 	screen.close_button.pressed.emit()
 	_check(screen.selected_tower_id == -1 and model.towers[0].size() == 1, "Close clears selection without selling")
 	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)

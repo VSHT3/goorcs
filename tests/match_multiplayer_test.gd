@@ -91,6 +91,7 @@ func _run() -> void:
 		_check(typed_guest.get("type_id") == type_id, "Host accepts the guest's chosen tower identity")
 	_check(_snapshot("host")["combat"]["tower_types"] == _snapshot("guest")["combat"]["tower_types"], "Both peers use detached host-owned per-type stats")
 	await _peer_economy()
+	await _peer_specials(code)
 	await _peer_sends(code)
 	await _peer_typed_sends(code)
 	await _finish()
@@ -216,6 +217,54 @@ func _peer_economy() -> void:
 	await _wait_combat("host", {"phase": 1, "coins": [41, 0]}, "Guest second upgrade spends exactly 45 Coins")
 	guest_arrow = await _wait_tower("host", 1, Vector2i(5, 2), 1)
 	_check(guest_arrow["damage"] == 100 and guest_arrow["invested"] == 120 and guest_arrow["sell_value"] == 72 and MatchCombat.tower_level(guest_arrow) == 3, "Remote second upgrade replicates level III, host-effective stats and actual investment")
+
+
+func _peer_specials(code: String) -> void:
+	await _command("guest", {"action": "leave"})
+	await _wait_for("host", {"active": false}, "Disconnect clears the preceding special-upgrade scenario")
+	for lane: String in ["host", "guest"]:
+		await _command(lane, {"action": "special_scenario"})
+	await _connect_guest("guest", "host", code)
+	await _wait_combat("guest", {"coins": [2000, 2000]}, "Special-upgrade match uses host funds")
+	var balances: Array[int] = [2000, 2000]
+	var prices: Dictionary = {"arrow_tower": 200, "orc_ballista": 300, "rune_obelisk": 250}
+	for slot: int in range(2):
+		var lane: String = "host" if slot == 0 else "guest"
+		var observer: String = "guest" if slot == 0 else "host"
+		var x: int = 2
+		for type_id: String in prices:
+			await _build(lane, slot, x, 3, 0, type_id)
+			var tower: Dictionary = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
+			var id: int = int(tower["id"])
+			var stats: Dictionary = _snapshot(observer)["combat"]["tower_types"][type_id]
+			balances[slot] -= int(stats["cost"])
+			await _wait_combat(observer, {"coins": balances}, "Placement pays host-defined type price")
+			var before: Dictionary = _snapshot("host")["combat"]
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
+			await create_timer(0.1).timeout
+			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Premature special request cannot bypass the two-upgrade prerequisite over the network")
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "damage"})
+			balances[slot] -= int(stats["upgrade_base_cost"])
+			await _wait_combat(observer, {"coins": balances}, "First stat upgrade pays base")
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "speed"})
+			balances[slot] -= ceili(float(stats["upgrade_base_cost"]) * 1.5)
+			await _wait_combat(observer, {"coins": balances}, "Second stat upgrade pays increased price")
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
+			balances[slot] -= int(prices[type_id])
+			await _wait_combat(observer, {"coins": balances}, "Special upgrade pays its fixed price without a level multiplier")
+			tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
+			_check(tower["special_upgraded"] and MatchCombat.tower_level(tower) == 4 and int(tower["sell_value"]) == floori(float(tower["invested"]) * 0.6), "Remote peer sees level IV, accepted special and actual refund")
+			before = _snapshot("host")["combat"]
+			await _command(observer, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
+			await create_timer(0.1).timeout
+			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Cross-owner and repeat special requests cannot spend or mutate accepted state")
+			if type_id == "arrow_tower":
+				await _command(lane, {"action": "target_secondary", "slot": slot, "tower_id": id, "mode": 2})
+				await create_timer(0.1).timeout
+				tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
+				_check(tower["secondary_mode"] == 2 and tower["mode"] == 0, "Independent second-archer targeting replicates without changing the primary policy")
+			x += 2
 
 
 func _peer_sends(code: String) -> void:
