@@ -1,0 +1,92 @@
+{
+  "status": "candidate-awaiting-art-approval; not installed in the game",
+  "authoring": "Deterministic edits of the original pixel clusters; Python 3 + Pillow; no external service or model.",
+  "frame_size": [
+    96,
+    96
+  ],
+  "frames": 16,
+  "frame_duration_ms": 200,
+  "loop_duration_ms": 3200,
+  "sheet_layout": "one horizontal row, left to right",
+  "alpha": "0/255 only; no smoothing, blur, rescaling, or new colors in sprite exports",
+  "playback": "5 fps, looping; cosmetic local real time, independent of match speed and authority",
+  "assets": [
+    {
+      "source": "assets/world/enemy_portal.png",
+      "source_sha256": "23b00e15a1f497559c0524965e67d1a53e622027e7e520accff611bc5a1b7488",
+      "sheet": "enemy_portal_idle.png",
+      "sheet_sha256": "e0bba60537758ff6669648e2793080cabedee460def5318a50d0369e3c0587aa",
+      "preview": "enemy_portal_idle.gif",
+      "preview_sha256": "bfcb62865c41def97758512ad1cd7462c78cb9cb804e9ffdbcffb8997538cf89",
+      "fixed_framing_bounds": [
+        15,
+        9,
+        87,
+        95
+      ],
+      "board_anchor": [
+        0.5,
+        0.97
+      ],
+      "board_height": 1.05,
+      "adjacent_changed_pixels_including_seam": [
+        163,
+        170,
+        154,
+        168,
+        163,
+        161,
+        186,
+        151,
+        150,
+        170,
+        160,
+        187,
+        160,
+        177,
+        196,
+        158
+      ],
+      "preserved": "All attached stone, pedestal, outline, rune, and non-magical body pixels are identical to source."
+    },
+    {
+      "source": "assets/world/health_crystal.png",
+      "source_sha256": "fb314b7bb26b886f287613418c49829d57e797590a2c749bfbf77c2d2ab6beac",
+      "sheet": "health_crystal_idle.png",
+      "sheet_sha256": "223a0c494a325f6d1dba9fcb301237d02a90e7d8bbaee792028fe171a8e15876",
+      "preview": "health_crystal_idle.gif",
+      "preview_sha256": "6af82db09fca0b4621d14af36332d410ee3aec68efa2603e60a2c7446636d984",
+      "fixed_framing_bounds": [
+        16,
+        9,
+        80,
+        95
+      ],
+      "board_anchor": [
+        0.5,
+        0.97
+      ],
+      "board_height": 1.05,
+      "adjacent_changed_pixels_including_seam": [
+        4,
+        24,
+        216,
+        44,
+        128,
+        225,
+        341,
+        417,
+        432,
+        406,
+        281,
+        131,
+        38,
+        215,
+        19,
+        14
+      ],
+      "preserved": "All attached stone, pedestal, outline, rune, and non-magical body pixels are identical to source."
+    }
+  ]
+}

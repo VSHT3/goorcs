@@ -12,19 +12,20 @@
 | `chests/prepared/` | Aligned open frame and padded closed reference | 2 |
 | `chests/source_sheets/` | Original 4×4 treasure-chest sheet | 1 |
 | `towers/ballista/source/` | Original PixelLab ballista sprite | 1 |
+| `world/idle/` | Review-only portal/crystal idle sheets and animated previews | 5 |
 
-Numbers such as `0001` identify variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared pair has recorded derivation links.
+Numbers such as `0001` identify downloaded variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared chest pair has derivation links in `assets.json`; the endpoint animation manifest records its own source links.
 
 ## Tags and provenance
 
-`assets.json` is the portable, searchable catalog. Every image records:
+`assets.json` is the portable, searchable catalog for the downloaded artwork. Each downloaded image records:
 
 - Relative archive path and original Downloads filename/path.
 - Subject, pose, asset role, material, dimensions, transparency, and processing tags.
 - Pixel dimensions, image mode, alpha bounds, and SHA-256.
 - Source information where known, prepared-frame derivation links, and byte-identical runtime matches.
 
-The same tags are attached to each PNG as the comma-separated `user.xdg.tags` extended attribute. File-manager indexing/support varies; copies, exports, and Git can discard these attributes. Use the JSON catalog as the source of truth.
+The same tags are attached to each downloaded PNG as the comma-separated `user.xdg.tags` extended attribute. File-manager indexing/support varies; copies, exports, and Git can discard these attributes. Use the JSON catalog as the source of truth.
 
 Example tag search, if `jq` is installed, from the project root:
 
@@ -35,6 +36,19 @@ jq -r '.assets[] | select(.tags | index("open")) | .path' archive_assets/assets.
 Useful tags include `chest`, `treasure`, `orc`, `closed`, `open`, `variant`, `prepared`, `reference`, `sprite-sheet`, `ballista`, `source-original`, and `runtime-exact-match`.
 
 Source URLs and license terms were not supplied and are explicitly unspecified, not assumed cleared for redistribution. PixelLab provenance is recorded only where filenames or the documented project workflow identify it.
+
+## Endpoint idle animation candidates
+
+[`world/idle/idle_comparison.gif`](world/idle/idle_comparison.gif) compares the original portal and crystal with their proposed idle loops. These are **review candidates, not installed game artwork**; approval is required before enabling them in matches or the workshop.
+
+- Both loops contain sixteen 96×96 frames at 5 fps: a 3.2-second repeating cycle. PNG sheets store one horizontal row; separate transparent GIFs are also included.
+- The portal preserves its stone ring, runes, silhouette, and pedestal while the red aperture distorts slightly, small wisps circulate, and existing embers drift. The crystal retains its shape and stone base while facets shimmer and existing sparks twinkle.
+- Sprite exports use only their respective source palettes and binary alpha, without blur or antialiasing. Fixed original framing bounds prevent particle changes from shifting sprite scale or anchors.
+- [`world/idle/manifest.json`](world/idle/manifest.json) records source/output hashes, timing, frame layout, anchors, and adjacent-frame changes including the loop seam. Sources remain `assets/world/enemy_portal.png` and `assets/world/health_crystal.png`, unchanged.
+
+Regenerate with `python3 archive_assets/world/idle/generate.py` from the project root; authoring was verified with Pillow 12.3.0. Pillow is development-only, not a game dependency. Generation validates source-palette membership, hard alpha, fixed non-magical body pixels, unique frames, and loop boundaries.
+
+A throwaway graphical main-scene preview played all frames in the workshop and Singleplayer, both match orientations, at 1280×720 and 1000×720. Captured frames were inspected and endpoint framing/path state stayed unchanged. Decoded transparent GIF frames matched the PNG sheets exactly. This was an in-memory preview, not a runtime cutover; the regular game still uses the original static sprites.
 
 ## Runtime separation
 
