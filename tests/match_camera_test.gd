@@ -95,7 +95,11 @@ func _check_growth() -> void:
 		board.layout.grow_vertical(6)
 	world.configure(Vector2i(14, 11), 0, -1)
 	await _settle()
-	_check(world.camera.position.is_equal_approx(panned) and world.camera.zoom.is_equal_approx(before_zoom), "Growth preserves local pan and zoom rather than refitting enlarged rows")
+	_check(world.camera.zoom.x < before_zoom.x, "Growth reveals the enlarged board instead of keeping new rows outside the viewport")
+	var growth_zoom: Vector2 = world.camera.zoom
+	for corner: Vector2i in [Vector2i.ZERO,Vector2i(13,0),Vector2i(0,10),Vector2i(13,10)]:
+		var point: Vector2 = world.cell_screen_position(0,corner)
+		_check(point.x >= 0 and point.x <= world.size.x and point.y >= MatchWorld.HUD_TOP and point.y <= world.size.y-MatchWorld.HUD_BOTTOM, "All newly added rows are immediately visible without manual camera input")
 	for slot: int in range(2):
 		for index: int in range(cells.size()):
 			var shifted: Vector2i = cells[index] + Vector2i.DOWN
@@ -112,10 +116,11 @@ func _check_growth() -> void:
 	world.camera.position = panned
 	world.camera.force_update_scroll()
 	world.configure(Vector2i(14, 11), 0, -1)
-	_check(world.camera.position.is_equal_approx(panned) and world.camera.zoom.is_equal_approx(before_zoom), "Repeated accepted board configuration preserves camera state")
+	_check(world.camera.position.is_equal_approx(panned) and world.camera.zoom.is_equal_approx(growth_zoom), "Repeated accepted board configuration preserves camera state")
 
 
 func _check_four_way_keys() -> void:
+	world.zoom_at(1.5, world.get_global_rect().get_center())
 	world.camera.position.y = (world.camera_vertical_bounds.x + world.camera_vertical_bounds.y) * 0.5
 	world.camera.force_update_scroll()
 	var start: Vector2 = world.camera.position
@@ -148,8 +153,9 @@ func _check_four_way_keys() -> void:
 func _check_zoom() -> void:
 	var point: Vector2 = world.cell_screen_position(0, Vector2i(6, 5))
 	var before: Vector2 = _world_point(point)
+	var previous_zoom: float = world.camera.zoom.x
 	await _wheel(point, MOUSE_BUTTON_WHEEL_UP)
-	_check(world.camera.zoom.x > initial_zoom, "Root wheel event zooms the actual world")
+	_check(world.camera.zoom.x > previous_zoom, "Root wheel event zooms the actual world")
 	_check(_world_point(point).distance_to(before) < 0.01, "Wheel zoom preserves the world point beneath the cursor away from clamps")
 	before = _world_point(point)
 	var zoom: float = world.camera.zoom.x
@@ -180,7 +186,11 @@ func _check_zoom() -> void:
 	for board: PathBoard in world.boards:
 		board.layout.grow_vertical(6)
 	world.configure(Vector2i(14, 13), 0, -2)
-	_check(world.camera.position.is_equal_approx(position) and world.camera.zoom.is_equal_approx(retained_zoom), "Later growth preserves user zoom and pan")
+	_check(world.camera.zoom.x < retained_zoom.x, "Later growth also frames the complete enlarged playable area")
+	var revealed: Vector2 = world.camera.position
+	var revealed_zoom: Vector2 = world.camera.zoom
+	world.configure(Vector2i(14,13),0,-2)
+	_check(world.camera.position.is_equal_approx(revealed) and world.camera.zoom.is_equal_approx(revealed_zoom), "Ordinary snapshots do not repeat growth framing")
 
 
 func _check_input_priority() -> void:

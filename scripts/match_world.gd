@@ -65,6 +65,7 @@ func configure(dimensions: Vector2i, own_slot: int, board_origin_y: int = 0) -> 
 	if dimensions == _dimensions and own_slot == _own_slot and board_origin_y == _board_origin_y:
 		return
 	var fresh_focus: bool = _dimensions == Vector2i.ZERO or own_slot != _own_slot
+	var grew: bool = _dimensions != Vector2i.ZERO and dimensions.y > _dimensions.y and board_origin_y < _board_origin_y
 	_cancel_motion()
 	_dimensions = dimensions
 	_own_slot = own_slot
@@ -77,6 +78,8 @@ func configure(dimensions: Vector2i, own_slot: int, board_origin_y: int = 0) -> 
 	_fit_camera()
 	if fresh_focus:
 		_reset_camera()
+	elif grew:
+		_frame_expanded_board()
 
 
 func set_active(value: bool) -> void:
@@ -171,7 +174,7 @@ func zoom_at(factor: float, screen_position: Vector2) -> bool:
 		return false
 	var viewport_position: Vector2 = local_position * Vector2(_world_viewport.size) / size
 	var canvas_before: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * viewport_position
-	var next_zoom: float = clampf(camera.zoom.x * factor, _fit_zoom * MIN_ZOOM_RATIO, _fit_zoom * MAX_ZOOM_RATIO)
+	var next_zoom: float = clampf(camera.zoom.x * factor, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
 	_cancel_strokes()
 	camera.zoom = Vector2.ONE * next_zoom
 	camera.force_update_scroll()
@@ -244,7 +247,7 @@ func _fit_camera() -> void:
 	_headroom = maxf(boards[0].visual_headroom(), boards[1].visual_headroom())
 	var gameplay_height: float = maxf(size.y - HUD_TOP - HUD_BOTTOM, 1.0)
 	_fit_zoom = minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / initial_size.x, gameplay_height / (initial_size.y + _headroom))
-	camera.zoom = Vector2.ONE * _fit_zoom * clampf(ratio, MIN_ZOOM_RATIO, MAX_ZOOM_RATIO)
+	camera.zoom = Vector2.ONE * clampf(_fit_zoom * ratio, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
 	_update_camera_bounds()
 	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
@@ -274,6 +277,27 @@ func _configure_terrain() -> void:
 	var terrain_start := Vector2(camera_bounds.x - half_view.x, camera_vertical_bounds.x - half_view.y) - Vector2.ONE * CELL_SIZE
 	var terrain_end := Vector2(camera_bounds.y + half_view.x, camera_vertical_bounds.y + half_view.y) + Vector2.ONE * CELL_SIZE
 	_terrain.configure(Vector2(_dimensions) * CELL_SIZE, BOARD_GAP, Rect2(terrain_start, terrain_end - terrain_start))
+
+
+func _expanded_fit_zoom() -> float:
+	var board_size := Vector2(_dimensions) * CELL_SIZE
+	return minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / board_size.x,
+		maxf(size.y - HUD_TOP - HUD_BOTTOM - 24.0, 1.0) / (board_size.y + _headroom))
+
+
+func _minimum_zoom() -> float:
+	return minf(_fit_zoom * MIN_ZOOM_RATIO, _expanded_fit_zoom())
+
+
+func _frame_expanded_board() -> void:
+	camera.zoom = Vector2.ONE * _expanded_fit_zoom()
+	_update_camera_bounds()
+	var board_size := Vector2(_dimensions) * CELL_SIZE
+	camera.position = Vector2(board_size.x * 0.5 + _own_slot * (board_size.x + BOARD_GAP),
+		_board_origin_y * CELL_SIZE + (board_size.y - _headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y)
+	camera.position = _clamped_position(camera.position)
+	camera.force_update_scroll()
+	_configure_terrain()
 
 
 func _reset_camera() -> void:

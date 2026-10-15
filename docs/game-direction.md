@@ -62,7 +62,7 @@ The presentation places the host board on the left and guest on the right in one
 
 The initial match grid remains 14×9 with equal 30-tile budgets. Before main round 20 and every main round after it, both boards gain a top and bottom row plus six path tiles. Match/workshop share portal/crystal artwork and ground materials, but workshop dimensions and rules remain local-only.
 
-Expansion preserves physical endpoint, tower, and existing path positions: logical y coordinates shift down one while the accepted world origin shifts up one cell. No route or investment is silently cleared. Camera framing is preserved rather than zooming out automatically. Final art remains provisional.
+Expansion preserves physical endpoint, tower, and existing path positions: logical y coordinates shift down one while the accepted world origin shifts up one cell. No route or investment is silently cleared. Each growth event frames the enlarged owned board and highlights the newly added strips during main planning, so players can see and use them immediately. Ordinary snapshots do not reset camera choices. Final art remains provisional.
 
 Enemies take shortest routes across connected path tiles, not placement order. When more than one next branch has the same remaining shortest distance, the host alternates assignments in stable round-robin order at that fork. Regular and sent enemies share a board's rotation, reset each wave; longer alternatives remain unused. Each enemy receives its complete captured route at spawn. Adjacent path sections can still create shortcuts. Towers and walls do not define routes by blocking otherwise walkable ground.
 
