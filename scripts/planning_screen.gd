@@ -20,10 +20,12 @@ var _pending_tower_cell := Vector2i(-1, -1)
 var _placement_id: StringName = &""
 var _selected_enemy_type: StringName = &"grunt"
 var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
+var _owns_tree_pause: bool = false
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
-@onready var leave_button: Button = %Leave
+@onready var menu_button: Button = %MenuButton
+@onready var pause_menu: MatchPauseMenu = $PauseMenu
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
 @onready var _ready_timer: Label = %ReadyTimer
@@ -87,7 +89,9 @@ func _ready() -> void:
 	enemy_selector.item_selected.connect(_enemy_type_selected)
 	speed_button.pressed.connect(_request_pacing.bind("speed"))
 	autoplay_button.pressed.connect(_request_pacing.bind("autoplay"))
-	leave_button.pressed.connect(leave_requested.emit)
+	menu_button.pressed.connect(open_pause_menu)
+	pause_menu.resume_requested.connect(_resume_match)
+	pause_menu.quit_requested.connect(_quit_match)
 	visibility_changed.connect(_visibility_changed)
 	_feedback_timer.timeout.connect(_clear_feedback)
 	if planning != null:
@@ -109,10 +113,52 @@ func cancel_strokes() -> void:
 		board.cancel_stroke()
 
 
+func open_pause_menu() -> void:
+	if planning == null or not planning.active or not is_visible_in_tree() or pause_menu.visible:
+		return
+	cancel_interaction()
+	cancel_strokes()
+	for selector: OptionButton in [targeting_button, secondary_targeting, enemy_selector]:
+		selector.get_popup().hide()
+	world.set_input_blocked(true)
+	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
+	pause_menu.open_menu(not planning.singleplayer)
+	_owns_tree_pause = planning.singleplayer
+	if _owns_tree_pause:
+		get_tree().paused = true
+
+
+func _resume_match() -> void:
+	_close_pause_menu()
+	if is_visible_in_tree():
+		menu_button.grab_focus()
+
+
+func _quit_match() -> void:
+	_close_pause_menu()
+	leave_requested.emit()
+
+
+func _close_pause_menu() -> void:
+	if _owns_tree_pause:
+		get_tree().paused = false
+		_owns_tree_pause = false
+	pause_menu.close_menu()
+	$HUD.process_mode = Node.PROCESS_MODE_INHERIT
+	world.set_input_blocked(false)
+
+
+func _exit_tree() -> void:
+	if _owns_tree_pause:
+		get_tree().paused = false
+		_owns_tree_pause = false
+
+
 func _visibility_changed() -> void:
 	if not is_node_ready():
 		return
 	if not is_visible_in_tree():
+		_close_pause_menu()
 		world.set_active(false)
 		cancel_strokes()
 		selected_enemy_id = -1
@@ -126,7 +172,7 @@ func _visibility_changed() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or (_placement_id == &"" and selected_enemy_id < 0):
+	if not is_visible_in_tree() or pause_menu.visible or (_placement_id == &"" and selected_enemy_id < 0):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		cancel_interaction()

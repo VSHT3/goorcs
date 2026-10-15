@@ -334,8 +334,10 @@ func _check_leave_and_reopen() -> void:
 	var fresh_zoom: float = world._fit_zoom
 	world.zoom_at(1.4, world.get_global_rect().get_center())
 	await _key(KEY_D, true)
-	await _click(_center(screen.leave_button))
-	_check(main.menu.visible and not screen.is_visible_in_tree() and not main.planning.active, "Real HUD Leave returns to navigation and deactivates the match")
+	await _click(_center(screen.menu_button))
+	_check(screen.pause_menu.visible and main.planning.active, "HUD cog opens the menu without leaving")
+	await _click(_center(screen.pause_menu.quit_button))
+	_check(main.menu.visible and not screen.is_visible_in_tree() and not main.planning.active, "Menu Quit returns to navigation and deactivates the match")
 	main.play_button.pressed.emit()
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
@@ -351,7 +353,7 @@ func _check_leave_and_reopen() -> void:
 
 
 func _hud_rects() -> Array[Rect2]:
-	var rectangles: Array[Rect2] = [screen.ready_button.get_global_rect(), screen.clear_button.get_global_rect(), screen.leave_button.get_global_rect(), screen.get_node("%Coins").get_global_rect(), screen.send_button.get_global_rect(), screen.enemy_selector.get_global_rect()]
+	var rectangles: Array[Rect2] = [screen.ready_button.get_global_rect(), screen.clear_button.get_global_rect(), screen.menu_button.get_global_rect(), screen.get_node("%Coins").get_global_rect(), screen.send_button.get_global_rect(), screen.enemy_selector.get_global_rect()]
 	for button: TowerShopButton in screen.shop_buttons.values():
 		rectangles.append(button.get_global_rect())
 	return rectangles

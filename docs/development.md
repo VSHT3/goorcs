@@ -101,6 +101,9 @@ godot --path . --script tests/enemy_inspection_test.gd
 # Run native Orc-O replay/lifecycle and mouse-to-keyboard menu focus transfer.
 godot --path . --script tests/menu_wordmark_test.gd
 
+# Run solo pause/resume, modal input, audio settings/persistence, and teardown regressions.
+godot --headless --path . --script tests/match_pause_test.gd
+
 # Run collection-driven tower-selection and resource-extension regressions.
 godot --headless --path . --script tests/tower_selection_test.gd
 ```
@@ -173,9 +176,19 @@ Graphical smoke used actual main-scene enemy clicks and inspected 1280×720 and 
 
 The rendered enemy-inspection regression also passed: same-type ID isolation, accepted per-instance HP/speed/damage changes, interpolation-following hit tests and highlight pixels, both board orientations, opponent read-only input, stable overlay anchoring, placement priority, Close/Escape, real kills/leaks, results, and leave/reopen with reused IDs. Native tower drag/drop and main-scene startup checks passed.
 
+### In-game menu and audio settings
+
+The match HUD cogwheel and Escape open `MatchPauseMenu` with Resume, Settings, and Quit. Escape retains selection/placement cancellation priority; in Settings it returns to the choices, and in the choices it resumes. Quit returns to the main menu through the existing session teardown. Connection-form Escape remains cancellation, and workshop navigation is unchanged.
+
+`MatchPlanningScreen` owns solo SceneTree pause and releases it on resume, quit, hiding, and teardown. The overlay always processes. It blocks underlying HUD/world input and clears held camera movement without resetting camera framing. Multiplayer never pauses the tree: the local menu cannot freeze the host simulation, readiness clock, or peer communication. An online notice makes that distinction visible; disconnect closes the overlay.
+
+`AudioSettings` owns independent 0–1 Music and Sound gains in `user://audio_settings.cfg`; `default_bus_layout.tres` routes both to unchanged Master. Music retains the player's −12 dB base gain and continues through solo pause so slider changes are audible. Slider changes apply immediately, zero explicitly mutes, and modified preferences save on leaving Settings or closing the menu. Invalid saved values use defaults; save failures are reported without trapping the player in pause. Sound has a working separate bus but no shipped effects. Future sound players must route to Sound rather than Master. These local settings never change authoritative match state.
+
+Verification: the pause regression passed live-wave freeze/resume, camera/HUD input blocking, native slider keys, independent mute/unmute, persistence/reload, failed-save recovery, compact layout, quit, and external teardown. A rendered main-scene walkthrough exercised actual cog/button/slider clicks at 1280×720 and 1000×720; HUD, pause, and settings captures were inspected. Separate rendered host/client processes both kept receiving combat updates with menus open, then host Quit cleared the guest overlay on disconnect. Navigation, world, camera, native drag/drop, rendered enemy inspection, import, and startup also passed. Failed-save tests intentionally emit warnings; rendered checks used Intel OpenGL after NVIDIA initialization warnings. Peer evidence is localhost only.
+
 ### Match soundtrack and presentation
 
-`assets/audio/orcish_drone.mp3` is the unchanged user-supplied `Orcish_Drone_FULL_SONG_musicgpt.mp3` (SHA-256 `fd8ce059f07bc3de311caa7cb8805b7076c5bc286dd888ea97d544cf107ca2df`, approximately 178.57 seconds, stereo 48kHz MP3). The main scene's local `MatchMusic` player loops at −12 dB during active match planning, combat, and wave breaks. Menus, connection setup, workshop, collection, results, and leaving are silent. Match snapshots do not restart playback. This is presentation only; no host audio clock or network messages were added.
+`assets/audio/orcish_drone.mp3` is the unchanged user-supplied `Orcish_Drone_FULL_SONG_musicgpt.mp3` (SHA-256 `fd8ce059f07bc3de311caa7cb8805b7076c5bc286dd888ea97d544cf107ca2df`, approximately 178.57 seconds, stereo 48kHz MP3). The main scene's local `MatchMusic` player loops at −12 dB on the Music bus during active match planning, combat, wave breaks, and the in-match pause/settings menu. Title menus, connection setup, workshop, collection, results, and leaving are silent. Match snapshots and volume changes do not restart playback. This is presentation only; no host audio clock or network messages were added.
 
 `TowerReward` and `EnemyDefinition` own `board_height` (opaque height in cells) and normalized `board_anchor` (base/feet within the texture). Tower heights remain Arrow 1.42, Ballista 1.40, Rune 1.50. Enemy heights are now Grunt 0.50, Runner 0.45, Brute 0.70; the ordinary enemy default is 0.50. PNGs/anchors and collection/chest artwork are unchanged. A shared visual foot combines the interpolated route position, cosmetic sideways offset, and existing 0.28-cell downward anchor. Shadows, depth, sprite, damaged-only bar, hit testing, and selected brackets follow that foot.
 

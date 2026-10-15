@@ -31,6 +31,7 @@ var _headroom: float = 0.0
 var _bounds_zoom := Vector2.ZERO
 var _own_slot: int = 0
 var _active: bool = false
+var _input_blocked: bool = false
 var _left_held: bool = false
 var _right_held: bool = false
 var _up_held: bool = false
@@ -90,7 +91,7 @@ func set_active(value: bool) -> void:
 	_active = value
 	_cancel_motion()
 	visible = value
-	_world_viewport.gui_disable_input = not value
+	_world_viewport.gui_disable_input = not value or _input_blocked
 	# Canvas visibility does not propagate into a SubViewport; pause its local effects explicitly.
 	_world_viewport.process_mode = Node.PROCESS_MODE_INHERIT if value else Node.PROCESS_MODE_DISABLED
 	_world_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if value else SubViewport.UPDATE_DISABLED
@@ -98,6 +99,13 @@ func set_active(value: bool) -> void:
 	_camera_input.set_process_input(value)
 	if value:
 		_reset_camera()
+
+
+func set_input_blocked(value: bool) -> void:
+	_input_blocked = value
+	_cancel_motion()
+	_cancel_strokes()
+	_world_viewport.gui_disable_input = value or not _active
 
 
 func cell_screen_position(slot: int, cell: Vector2i) -> Vector2:
@@ -132,7 +140,7 @@ func _process(delta: float) -> void:
 
 
 func _handle_camera_input(event: InputEvent) -> void:
-	if not _active or not is_visible_in_tree():
+	if not _active or not is_visible_in_tree() or _input_blocked:
 		_cancel_motion()
 		return
 	if event is InputEventMouseButton:
@@ -224,6 +232,8 @@ func _notification(what: int) -> void:
 
 
 func _movement_blocked() -> bool:
+	if _input_blocked:
+		return true
 	var root_focus: Control = get_viewport().gui_get_focus_owner()
 	var world_focus: Control = _world_viewport.gui_get_focus_owner()
 	if root_focus is LineEdit or root_focus is TextEdit or world_focus is LineEdit or world_focus is TextEdit:
@@ -237,7 +247,7 @@ func _movement_blocked() -> bool:
 func _propagate_input_event(event: InputEvent) -> bool:
 	# A native HUD drag belongs to the root viewport; forwarding its mouse
 	# events would let the embedded viewport replace the root drop target.
-	return _active and is_visible_in_tree() and not (event is InputEventMouse and get_viewport().gui_is_dragging())
+	return _active and not _input_blocked and is_visible_in_tree() and not (event is InputEventMouse and get_viewport().gui_is_dragging())
 
 
 func _fit_camera() -> void:

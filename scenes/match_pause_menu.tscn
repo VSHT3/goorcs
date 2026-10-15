@@ -1,0 +1,273 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://scripts/match_pause_menu.gd" id="1_menu"]
+[ext_resource type="Theme" path="res://resources/ui/menu_theme.tres" id="2_theme"]
+[ext_resource type="Script" path="res://scripts/menu_button.gd" id="3_button"]
+[ext_resource type="FontFile" path="res://assets/fonts/silkscreen/Silkscreen-Regular.ttf" id="4_numbers"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+content_margin_left = 28.0
+content_margin_top = 24.0
+content_margin_right = 28.0
+content_margin_bottom = 24.0
+bg_color = Color(0.065, 0.10, 0.085, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.35, 0.42, 0.32, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_track"]
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.025, 0.045, 0.035, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.35, 0.42, 0.32, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_level"]
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.48, 0.60, 0.34, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_level_active"]
+content_margin_top = 4.0
+content_margin_bottom = 4.0
+bg_color = Color(0.878, 0.737, 0.467, 1)
+
+[sub_resource type="StyleBoxFlat" id="Style_slider_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.878, 0.737, 0.467, 1)
+expand_margin_left = 4.0
+expand_margin_top = 2.0
+expand_margin_right = 4.0
+expand_margin_bottom = 2.0
+
+[sub_resource type="Gradient" id="Gradient_handle"]
+colors = PackedColorArray(0.90, 0.88, 0.81, 1, 0.90, 0.88, 0.81, 1)
+
+[sub_resource type="GradientTexture2D" id="Texture_handle"]
+gradient = SubResource("Gradient_handle")
+width = 12
+height = 20
+
+[node name="MatchPauseMenu" type="Control"]
+process_mode = 3
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_force_pass_scroll_events = false
+theme = ExtResource("2_theme")
+script = ExtResource("1_menu")
+
+[node name="Scrim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+mouse_force_pass_scroll_events = false
+color = Color(0.015, 0.025, 0.02, 0.78)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Center"]
+custom_minimum_size = Vector2(440, 0)
+layout_mode = 2
+mouse_filter = 0
+mouse_force_pass_scroll_events = false
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="Content" type="VBoxContainer" parent="Center/Panel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Heading" type="Label" parent="Center/Panel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Paused"
+horizontal_alignment = 1
+
+[node name="OnlineNote" type="Label" parent="Center/Panel/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.69, 0.73, 0.64, 1)
+text = "Match continues online"
+horizontal_alignment = 1
+
+[node name="Choices" type="VBoxContainer" parent="Center/Panel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Resume" type="Button" parent="Center/Panel/Content/Choices"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_type_variation = &"PrimaryButton"
+text = "Resume"
+script = ExtResource("3_button")
+
+[node name="Settings" type="Button" parent="Center/Panel/Content/Choices"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Settings"
+script = ExtResource("3_button")
+
+[node name="Quit" type="Button" parent="Center/Panel/Content/Choices"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_type_variation = &"QuietButton"
+text = "Quit"
+script = ExtResource("3_button")
+
+[node name="SettingsPage" type="VBoxContainer" parent="Center/Panel/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Music" type="VBoxContainer" parent="Center/Panel/Content/SettingsPage"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Caption" type="HBoxContainer" parent="Center/Panel/Content/SettingsPage/Music"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Center/Panel/Content/SettingsPage/Music/Caption"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Music"
+
+[node name="MusicValue" type="Label" parent="Center/Panel/Content/SettingsPage/Music/Caption"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(88, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_numbers")
+text = "100%"
+horizontal_alignment = 2
+
+[node name="MusicSlider" type="HSlider" parent="Center/Panel/Content/SettingsPage/Music"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+mouse_force_pass_scroll_events = false
+focus_mode = 2
+theme_override_icons/grabber = SubResource("Texture_handle")
+theme_override_icons/grabber_highlight = SubResource("Texture_handle")
+theme_override_styles/slider = SubResource("Style_track")
+theme_override_styles/grabber_area = SubResource("Style_level")
+theme_override_styles/grabber_area_highlight = SubResource("Style_level_active")
+theme_override_styles/focus = SubResource("Style_slider_focus")
+max_value = 100.0
+step = 1.0
+value = 100.0
+
+[node name="Endpoints" type="HBoxContainer" parent="Center/Panel/Content/SettingsPage/Music"]
+layout_mode = 2
+
+[node name="Mute" type="Label" parent="Center/Panel/Content/SettingsPage/Music/Endpoints"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.69, 0.73, 0.64, 1)
+text = "Mute"
+
+[node name="Full" type="Label" parent="Center/Panel/Content/SettingsPage/Music/Endpoints"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.69, 0.73, 0.64, 1)
+text = "Full"
+
+[node name="Sound" type="VBoxContainer" parent="Center/Panel/Content/SettingsPage"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Caption" type="HBoxContainer" parent="Center/Panel/Content/SettingsPage/Sound"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Center/Panel/Content/SettingsPage/Sound/Caption"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Sound"
+
+[node name="SoundValue" type="Label" parent="Center/Panel/Content/SettingsPage/Sound/Caption"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(88, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4_numbers")
+text = "100%"
+horizontal_alignment = 2
+
+[node name="SoundSlider" type="HSlider" parent="Center/Panel/Content/SettingsPage/Sound"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+mouse_force_pass_scroll_events = false
+focus_mode = 2
+theme_override_icons/grabber = SubResource("Texture_handle")
+theme_override_icons/grabber_highlight = SubResource("Texture_handle")
+theme_override_styles/slider = SubResource("Style_track")
+theme_override_styles/grabber_area = SubResource("Style_level")
+theme_override_styles/grabber_area_highlight = SubResource("Style_level_active")
+theme_override_styles/focus = SubResource("Style_slider_focus")
+max_value = 100.0
+step = 1.0
+value = 100.0
+
+[node name="Endpoints" type="HBoxContainer" parent="Center/Panel/Content/SettingsPage/Sound"]
+layout_mode = 2
+
+[node name="Mute" type="Label" parent="Center/Panel/Content/SettingsPage/Sound/Endpoints"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.69, 0.73, 0.64, 1)
+text = "Mute"
+
+[node name="Full" type="Label" parent="Center/Panel/Content/SettingsPage/Sound/Endpoints"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.69, 0.73, 0.64, 1)
+text = "Full"
+
+[node name="Back" type="Button" parent="Center/Panel/Content/SettingsPage"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Back"
+script = ExtResource("3_button")
+
+[node name="SaveError" type="Label" parent="Center/Panel/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.92, 0.66, 0.60, 1)
+autowrap_mode = 3

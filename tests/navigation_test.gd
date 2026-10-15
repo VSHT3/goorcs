@@ -106,11 +106,14 @@ func _check_match_music() -> void:
 			break
 	_check(main.planning.combat["phase"] == MatchCombat.Phase.FINISHED and not music.playing, "Match results stop the soundtrack")
 	await _key(KEY_ESCAPE)
+	main.play_screen.planning_screen.pause_menu.quit_button.pressed.emit()
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
 	await process_frame
 	_check(music.playing, "A fresh match starts the song again after results")
 	await _key(KEY_ESCAPE)
+	_check(main.play_screen.planning_screen.pause_menu.visible and main.planning.active, "Escape opens the menu without leaving the match")
+	main.play_screen.planning_screen.pause_menu.quit_button.pressed.emit()
 	_check(main.menu.visible and not music.playing, "Leaving an active match stops its soundtrack")
 	main.open_button.pressed.emit()
 	await process_frame

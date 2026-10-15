@@ -284,14 +284,16 @@ func _check_lifecycle() -> void:
 
 
 func _check_leave_and_reopen() -> void:
-	await _click(screen.leave_button.get_global_rect().get_center())
+	await _click(screen.menu_button.get_global_rect().get_center())
+	await _click(screen.pause_menu.quit_button.get_global_rect().get_center())
 	await _open_match()
 	await _start_wave()
 	var id: int = int(main.planning.combat["enemies"][0][0]["id"])
 	await _click_enemy(0, id)
 	_check_selected(0, id, "Fresh match enemy before Leave")
-	await _click(screen.leave_button.get_global_rect().get_center())
-	_check(main.menu.visible and not main.planning.active and not screen.is_visible_in_tree(), "Actual HUD Leave deactivates the inspected match")
+	await _click(screen.menu_button.get_global_rect().get_center())
+	await _click(screen.pause_menu.quit_button.get_global_rect().get_center())
+	_check(main.menu.visible and not main.planning.active and not screen.is_visible_in_tree(), "Menu Quit deactivates the inspected match")
 	_check_closed("Leaving inspected match")
 	await _open_match()
 	_check_closed("Reopening singleplayer")
@@ -440,7 +442,7 @@ func _close_control() -> Button:
 
 
 func _layout_rects() -> Array[Rect2]:
-	var rectangles: Array[Rect2] = [world.get_global_rect(), screen.leave_button.get_global_rect(), screen.send_button.get_global_rect(),
+	var rectangles: Array[Rect2] = [world.get_global_rect(), screen.menu_button.get_global_rect(), screen.send_button.get_global_rect(),
 		screen.enemy_selector.get_global_rect(), screen.get_node("HUD/Header").get_global_rect(), screen.get_node("%Coins").get_global_rect()]
 	for button: TowerShopButton in screen.shop_buttons.values():
 		rectangles.append(button.get_global_rect())

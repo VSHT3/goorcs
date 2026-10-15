@@ -245,7 +245,7 @@ func _focus_action() -> void:
 	if session == null:
 		back_button.grab_focus()
 	elif planning != null and planning.active:
-		planning_screen.leave_button.grab_focus()
+		planning_screen.menu_button.grab_focus()
 	elif session.state in [MultiplayerSession.State.HOSTING, MultiplayerSession.State.CONNECTED]:
 		if _invitation.visible:
 			copy_button.grab_focus()

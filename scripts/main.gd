@@ -140,12 +140,17 @@ func _quit() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# LineEdit consumes Escape while editing; Play's advertised exit works there too.
+	# Connection forms still cancel with Escape; active matches open their menu.
 	if play_screen.visible and event is InputEventKey:
 		var key := event as InputEventKey
 		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
 			var screen: MatchPlanningScreen = play_screen.planning_screen
-			if screen == null or not screen.is_visible_in_tree() or not screen.cancel_interaction():
+			if screen != null and screen.is_visible_in_tree():
+				if screen.pause_menu.visible:
+					screen.pause_menu.handle_escape()
+				elif not screen.cancel_interaction():
+					screen.open_pause_menu()
+			else:
 				_show_menu()
 			get_viewport().set_input_as_handled()
 
