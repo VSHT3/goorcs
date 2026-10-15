@@ -82,7 +82,6 @@ const CYCLE_SECONDS: float = 6.8
 const INTRO_DURATION: float = 1.86
 const ROAR_START: float = 0.50
 const ROAR_DURATION: float = 0.96
-const FACE_LIFT: float = 2.0
 const SUFFIX: Array[String] = ["R", "C", "S"]
 
 var _elapsed: float = 0.0
@@ -191,7 +190,8 @@ func _baseline() -> float:
 
 
 func _face_origin() -> Vector2:
-	return Vector2(floorf(_word_origin_x() + _g_width + 4.0), _baseline() - FACE_ROWS.size() * PIXEL - FACE_LIFT) + _face_offset
+	# Match the uppercase ink's bottom edge, one pixel below the font baseline.
+	return Vector2(floorf(_word_origin_x() + _g_width + 4.0), _baseline() + 1.0 - FACE_ROWS.size() * PIXEL) + _face_offset
 
 
 func _face_row(index: int) -> String:
