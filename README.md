@@ -16,7 +16,7 @@ Use the standard Godot edition and the [required engine release](docs/developmen
 
 For command-line launch and verification, see the [development commands](docs/development.md#setup).
 
-The centered main-menu wordmark uses a larger green pixel-orc O with pointed ears, heavy brows, a broad jaw, and upward tusks, aligned to the letters' bottom edge. On first load, the logo assembles in crisp pixel blocks, then the orc braces, squeezes its eyes shut, and opens its jaw for a short animated roar. The tusks descend with the jaw; the face recovers before the finishing light sweep. This is a silent animation, not a new sound effect. Buttons work throughout, and the entrance never replays on menu return; occasional blinking/tiny idle lift remain afterward. Hover/focus marks stay inside fixed button bounds.
+The centered main-menu wordmark uses a green pixel-orc O with pointed ears, heavy brows, a broad jaw, and upward tusks. Its neutral face matches the letters' top and bottom edges, with pixel-snapped rows and matching pointer hit detection. On first load, the logo assembles in crisp pixel blocks, then the orc braces, squeezes its eyes shut, and opens its jaw for a short animated roar. The tusks descend with the jaw; the face recovers before the finishing light sweep. This is a silent animation, not a new sound effect. Buttons work throughout, and the entrance never replays on menu return; occasional blinking/tiny idle lift remain afterward. Hover/focus marks stay inside fixed button bounds.
 
 Click the orc O to replay just his silent roar. Other letters do not trigger it; clicks during an active roar are ignored, and leaving the menu cancels it cleanly without replaying the full logo entrance.
 

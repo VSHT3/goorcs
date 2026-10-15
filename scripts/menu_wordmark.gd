@@ -32,6 +32,9 @@ const FACE_ROWS: Array[String] = [
 	"....LDDDDDDDDL....",
 	".....LLLLLLLL.....",
 ]
+# Pixelify's capitals are 62px tall at FONT_SIZE; keep all 17 face rows.
+# Snap row edges below so the shorter face retains crisp pixel boundaries.
+const FACE_ROW_HEIGHT: float = 62.0 / 17.0
 # Jaw frames share the original brow/nose; the tusks move with the lower jaw.
 const JAW_START_ROW: int = 10
 const CLOSED_EYE_ROWS: Array[String] = [
@@ -170,7 +173,8 @@ func _gui_input(event: InputEvent) -> void:
 
 
 func _has_point(point: Vector2) -> bool:
-	var pixel: Vector2i = Vector2i(((point - _face_origin()) / PIXEL).floor())
+	var relative: Vector2 = point - _face_origin()
+	var pixel := Vector2i(floori(relative.x / PIXEL), ceili((floorf(relative.y) + 1.0) / FACE_ROW_HEIGHT) - 1)
 	var jaw: Array = JAW_POSES[_face_pose]
 	var row_count: int = FACE_ROWS.size() if jaw.is_empty() else JAW_START_ROW + jaw.size()
 	if pixel.y < 0 or pixel.y >= row_count:
@@ -191,7 +195,7 @@ func _baseline() -> float:
 
 func _face_origin() -> Vector2:
 	# Match the uppercase ink's bottom edge, one pixel below the font baseline.
-	return Vector2(floorf(_word_origin_x() + _g_width + 4.0), _baseline() + 1.0 - FACE_ROWS.size() * PIXEL) + _face_offset
+	return Vector2(floorf(_word_origin_x() + _g_width + 4.0), _baseline() + 1.0 - FACE_ROWS.size() * FACE_ROW_HEIGHT) + _face_offset
 
 
 func _face_row(index: int) -> String:
@@ -235,6 +239,8 @@ func _draw_face(origin: Vector2, shadow: bool) -> void:
 	var row_count: int = FACE_ROWS.size() if jaw.is_empty() else JAW_START_ROW + jaw.size()
 	for row_index: int in range(row_count):
 		var row: String = _face_row(row_index)
+		var row_top: float = floorf(row_index * FACE_ROW_HEIGHT)
+		var row_height: float = floorf((row_index + 1) * FACE_ROW_HEIGHT) - row_top
 		for column in row.length():
 			var pixel: String = row.substr(column, 1)
 			if pixel == ".":
@@ -248,7 +254,7 @@ func _draw_face(origin: Vector2, shadow: bool) -> void:
 				"M": color = TONGUE
 			if shadow:
 				color = SHADOW
-			draw_rect(Rect2(origin + Vector2(column * PIXEL, row_index * PIXEL), Vector2(PIXEL, PIXEL)), color)
+			draw_rect(Rect2(origin + Vector2(column * PIXEL, row_top), Vector2(PIXEL, row_height)), color)
 
 
 func _on_visibility_changed() -> void:
