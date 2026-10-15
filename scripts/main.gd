@@ -30,7 +30,9 @@ var _last_activity: Control
 
 
 func _ready() -> void:
-	Input.set_custom_mouse_cursor(preload("res://assets/ui/cursor_arrow.png"), Input.CURSOR_ARROW, Vector2(4, 0))
+	var pointer_image: Image = preload("res://assets/ui/cursor_arrow.png").get_image()
+	pointer_image.resize(64, 64, Image.INTERPOLATE_NEAREST)
+	Input.set_custom_mouse_cursor(ImageTexture.create_from_image(pointer_image), Input.CURSOR_ARROW, Vector2(8, 0))
 	Input.set_custom_mouse_cursor(preload("res://assets/ui/cursor_hand.png"), Input.CURSOR_POINTING_HAND, Vector2(10, 2))
 	layout = PathLayout.new(board_dimensions, tile_budget, entrance_cell, base_cell)
 	board.layout = layout
