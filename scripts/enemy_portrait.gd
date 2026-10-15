@@ -6,6 +6,8 @@ extends Control
 	set(value):
 		definition = value
 		_preview_time = 0.0
+		_action = &""
+		_playing = false
 		_update_animation()
 		_sync_processing()
 		queue_redraw()
@@ -13,15 +15,22 @@ extends Control
 	set(value):
 		animate = value
 		_sync_processing()
-@export var specials_enabled: bool = true
 
 var preview_animation: StringName = &"walk"
 var preview_elapsed: float = 0.0
 var _preview_time: float = 0.0
+var _action: StringName = &""
+var _playing: bool = false
+var _action_duration: float = 0.0
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	focus_mode = Control.FOCUS_ALL
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	tooltip_text = "Click or press Enter / Space to replay this enemy's animation."
+	focus_entered.connect(queue_redraw)
+	focus_exited.connect(queue_redraw)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	custom_minimum_size = Vector2(160, 180)
 	resized.connect(queue_redraw)
@@ -47,8 +56,40 @@ func set_preview_time(seconds: float) -> void:
 	queue_redraw()
 
 
+## Repeated activation deliberately restarts the action from its first frame.
+func replay_action() -> void:
+	if not is_visible_in_tree() or definition == null:
+		return
+	_action = &""
+	_playing = true
+	if definition.animation_frames != null:
+		if definition.animation_frames.has_animation(&"heal"):
+			_action = &"heal"
+		elif definition.animation_frames.has_animation(&"cast"):
+			_action = &"cast"
+	_action_duration = 0.55 if _action == &"heal" else 1.15
+	if _action == &"":
+		_action_duration = 0.0
+		if definition.animation_frames != null:
+			var frames: SpriteFrames = definition.animation_frames
+			for index: int in range(frames.get_frame_count(&"walk")):
+				_action_duration += frames.get_frame_duration(&"walk", index) / frames.get_animation_speed(&"walk")
+	set_preview_time(0.0)
+	_sync_processing()
+
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		grab_focus()
+		replay_action()
+		accept_event()
+	elif event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER or event.keycode == KEY_SPACE):
+		replay_action()
+		accept_event()
+
+
 func _sync_processing() -> void:
-	set_process(animate and is_visible_in_tree() and definition != null)
+	set_process(animate and _playing and is_visible_in_tree() and definition != null)
 
 
 func _process(delta: float) -> void:
@@ -57,28 +98,21 @@ func _process(delta: float) -> void:
 
 func _update_animation() -> void:
 	preview_animation = &"walk"
-	preview_elapsed = _preview_time
-	if definition == null or definition.animation_frames == null or not specials_enabled:
+	preview_elapsed = 0.0
+	if definition == null or definition.animation_frames == null or not _playing:
 		return
-	var special: StringName = &""
-	var duration: float = 0.0
-	if definition.animation_frames.has_animation(&"heal"):
-		special = &"heal"
-		duration = 0.55
-	elif definition.animation_frames.has_animation(&"cast"):
-		special = &"cast"
-		duration = 1.15
-	if special == &"":
-		return
-	var phase: float = fposmod(_preview_time, 3.0 + duration)
-	if phase >= 3.0:
-		preview_animation = special
-		preview_elapsed = phase - 3.0
+	if _preview_time < _action_duration:
+		preview_animation = _action if _action != &"" else &"walk"
+		preview_elapsed = _preview_time
 	else:
-		preview_elapsed = phase
+		_action = &""
+		_playing = false
+		_sync_processing()
 
 
 func _draw() -> void:
+	if has_focus():
+		draw_style_box(get_theme_stylebox("focus", "Button"), Rect2(Vector2.ZERO, size).grow(-4.0))
 	if definition == null:
 		return
 	var texture: Texture2D = EnemyVisuals.frame_texture(definition, preview_animation, preview_elapsed)

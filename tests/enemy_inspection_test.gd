@@ -292,6 +292,7 @@ func _check_lifecycle() -> void:
 
 func _check_leave_and_reopen() -> void:
 	await _click(screen.menu_button.get_global_rect().get_center())
+	await _settle()
 	await _click(screen.pause_menu.quit_button.get_global_rect().get_center())
 	await _open_match()
 	await _start_wave()
@@ -299,6 +300,7 @@ func _check_leave_and_reopen() -> void:
 	await _click_enemy(0, id)
 	_check_selected(0, id, "Fresh match enemy before Leave")
 	await _click(screen.menu_button.get_global_rect().get_center())
+	await _settle()
 	await _click(screen.pause_menu.quit_button.get_global_rect().get_center())
 	_check(main.menu.visible and not main.planning.active and not screen.is_visible_in_tree(), "Menu Quit deactivates the inspected match")
 	_check_closed("Leaving inspected match")

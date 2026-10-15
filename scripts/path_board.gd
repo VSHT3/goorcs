@@ -32,6 +32,8 @@ const ENDPOINT_FRAME_COUNT: int = 16
 const ENDPOINT_FRAME_SECONDS: float = 0.2
 const ONYX_PULSE_DURATION: float = 0.30
 const BOULDER_ORBIT_SPEED: float = 1.8
+const CORPSE_LIFETIME: float = 1.8
+const BLOOD_DROPS := [Vector2(-3, 0), Vector2(-1, 1), Vector2(0, 0), Vector2(1, -1), Vector2(2, 1), Vector2(4, 0), Vector2(-2, -2)]
 static var _rune_stone_shape := PackedVector2Array([
 	Vector2(-0.85, -0.45), Vector2(-0.25, -0.95), Vector2(0.60, -0.75),
 	Vector2(1.0, 0.15), Vector2(0.35, 0.85), Vector2(-0.65, 0.70),
@@ -120,6 +122,12 @@ var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
 var _slowed_enemy_textures: Dictionary[Texture2D, Texture2D] = {}
+var _corpse_traces: Array[Dictionary] = []
+var _death_match_id: String = ""
+var _death_generation: int = -1
+var _last_death_id: int = 0
+var _corpse_speed: float = 1.0
+var _corpse_paused: bool = false
 var _portal_texture: AtlasTexture
 var _crystal_texture: AtlasTexture
 var _endpoint_frame: int = 0
@@ -177,7 +185,7 @@ func _advance_endpoints() -> void:
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or not combat_enemies.is_empty() or not _shot_traces.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty()))
 
 
 func _process(delta: float) -> void:
@@ -190,8 +198,51 @@ func _process(delta: float) -> void:
 		_shot_traces[index]["life"] -= delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
 			_shot_traces.remove_at(index)
+	var expired: bool = false
+	if not _corpse_paused:
+		for index: int in range(_corpse_traces.size() - 1, -1, -1):
+			_corpse_traces[index]["age"] += delta * _corpse_speed
+			if float(_corpse_traces[index]["age"]) >= CORPSE_LIFETIME:
+				_corpse_traces.remove_at(index)
+				expired = true
+	if expired:
+		_rebuild_draw_order()
 	queue_redraw()
 	_sync_combat_animation()
+
+func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool = false) -> void:
+	var match_id: String = state.get("statistics_id", "")
+	var generation: int = int(state.get("death_generation", 0))
+	if match_id != _death_match_id or generation != _death_generation:
+		_corpse_traces.clear()
+		_last_death_id = 0
+		_death_match_id = match_id
+		_death_generation = generation
+	_corpse_speed = maxf(0.0, speed)
+	_corpse_paused = paused
+	var clock: float = float(state.get("death_time", 0.0))
+	for index: int in range(_corpse_traces.size() - 1, -1, -1):
+		var trace: Dictionary = _corpse_traces[index]
+		trace["age"] = maxf(float(trace["age"]), clock - float(trace["time"]))
+		if float(trace["age"]) >= CORPSE_LIFETIME:
+			_corpse_traces.remove_at(index)
+	var deaths: Array = state.get("deaths", [[], []])
+	if slot >= 0 and slot < deaths.size():
+		for event: Dictionary in deaths[slot]:
+			var id: int = int(event["id"])
+			if id <= _last_death_id:
+				continue
+			_last_death_id = id
+			var age: float = maxf(0.0, clock - float(event["time"]))
+			if age >= CORPSE_LIFETIME or not _enemy_art.has(event["type_id"]):
+				continue
+			var trace: Dictionary = event.duplicate()
+			trace["age"] = age
+			_corpse_traces.append(trace)
+	_rebuild_draw_order()
+	_sync_combat_animation()
+	queue_redraw()
+
 
 
 func _capture_shots() -> void:
@@ -684,6 +735,8 @@ func _rebuild_draw_order() -> void:
 		_draw_order.append({"kind": 1, "data": tower, "foot": Vector2.ZERO})
 	for enemy: Dictionary in combat_enemies:
 		_draw_order.append({"kind": 2, "data": enemy, "foot": Vector2.ZERO, "progress": 0.0})
+	for trace: Dictionary in _corpse_traces:
+		_draw_order.append({"kind": 3, "data": trace, "foot": Vector2.ZERO})
 
 
 func _depth_before(a: Dictionary, b: Dictionary) -> bool:
@@ -692,7 +745,10 @@ func _depth_before(a: Dictionary, b: Dictionary) -> bool:
 	if a["foot"].x != b["foot"].x:
 		return a["foot"].x < b["foot"].x
 	if int(a["kind"]) != int(b["kind"]):
-		return int(a["kind"]) < int(b["kind"])
+		# A fallen body belongs behind a live unit at the same feet position.
+		var a_kind: int = -1 if int(a["kind"]) == 3 else int(a["kind"])
+		var b_kind: int = -1 if int(b["kind"]) == 3 else int(b["kind"])
+		return a_kind < b_kind
 	# Deterministic ties prevent overlapping enemies flickering between snapshots.
 	return int(a["data"]["id"]) < int(b["data"]["id"]) if int(a["kind"]) != 0 else false
 
@@ -712,6 +768,8 @@ func _update_draw_order() -> void:
 				var progress: float = _enemy_route_progress(enemy)
 				item["progress"] = progress
 				center = _position_center(_enemy_visual_position(enemy))
+			3:
+				center = _position_center(item["data"]["pos"])
 		item["foot"] = center + Vector2(0, cell_size * 0.28)
 	_draw_order.sort_custom(_depth_before)
 
@@ -719,14 +777,17 @@ func _update_draw_order() -> void:
 func _draw_combat() -> void:
 	_update_draw_order()
 	var cell_size: float = _cell_size()
+	for trace: Dictionary in _corpse_traces:
+		_draw_death_blood(trace, _position_center(trace["pos"]) + Vector2(0, cell_size * 0.28))
 	# All contact shadows belong to the ground, not in front of foreground units.
 	for item: Dictionary in _draw_order:
 		var width: float = cell_size * 0.35
-		if int(item["kind"]) == 2:
+		if int(item["kind"]) == 2 or int(item["kind"]) == 3:
 			var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
 			width = cell_size * artwork.board_height * 0.26
 		draw_set_transform(item["foot"], 0.0, Vector2(1.0, 0.30))
-		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, 0.35))
+		var alpha: float = 0.35 * (_corpse_alpha(float(item["data"]["age"])) if int(item["kind"]) == 3 else 1.0)
+		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, alpha))
 	draw_set_transform(Vector2.ZERO)
 	for item: Dictionary in _draw_order:
 		if int(item["kind"]) != 1 or item["data"].get("evolution", "") != "boulders":
@@ -765,6 +826,8 @@ func _draw_combat() -> void:
 						_draw_rune_stone(item["foot"] + Vector2(0, -cell_size * 0.54), cell_size * 0.13, 0.0, true)
 			2:
 				_draw_enemy(item)
+			3:
+				_draw_enemy_death(item)
 	# Bars are an information overlay; foreground bodies must not cover them.
 	for item: Dictionary in _draw_order:
 		if int(item["kind"]) == 2:
@@ -799,6 +862,37 @@ func _draw_rune_stone(position: Vector2, radius: float, rotation: float, onyx: b
 	draw_line(_rune_stone_shape[1], Vector2(0.10, 0.05), Color(rune, alpha), 0.10, true)
 	draw_line(Vector2(0.10, 0.05), _rune_stone_shape[4], Color(rune, alpha), 0.10, true)
 	draw_set_transform(Vector2.ZERO)
+
+
+func _corpse_alpha(age: float) -> float:
+	return clampf((CORPSE_LIFETIME - age) / 0.5, 0.0, 1.0)
+
+
+func _draw_death_blood(trace: Dictionary, foot: Vector2) -> void:
+	var artwork: EnemyDefinition = _enemy_art[trace["type_id"]]
+	if artwork.blood_color.a <= 0.0:
+		return
+	var age: float = trace["age"]
+	var color := Color(artwork.blood_color, artwork.blood_color.a * _corpse_alpha(age) * 0.85)
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
+	var spread: float = clampf(age / 0.13, 0.0, 1.0)
+	var sign_x: float = -1.0 if int(trace["enemy_id"]) % 2 else 1.0
+	for offset: Vector2 in BLOOD_DROPS:
+		var position: Vector2 = foot + Vector2(offset.x * sign_x, offset.y * 0.65) * pixel * spread
+		draw_rect(Rect2(position.floor(), Vector2(pixel * 2.0, pixel)), color)
+
+
+func _draw_enemy_death(item: Dictionary) -> void:
+	var trace: Dictionary = item["data"]
+	var artwork: EnemyDefinition = _enemy_art[trace["type_id"]]
+	var frame: Texture2D = EnemyVisuals.frame_texture(artwork, &"death", float(trace["age"]))
+	if frame == null:
+		return
+	var flip: bool = (bool(trace["faces_left"]) != mirror_horizontal) != artwork.source_faces_left
+	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, item["foot"], flip)
+	if flip:
+		rect.size.x = -rect.size.x
+	draw_texture_rect(frame, rect, false, Color(1.0, 1.0, 1.0, _corpse_alpha(float(trace["age"]))))
 
 
 func _draw_enemy(item: Dictionary) -> void:

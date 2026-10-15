@@ -10,6 +10,7 @@ var rules: CombatRules
 var store: EnemyStatisticsStore
 var selected_index: int = 0
 var enemy_buttons: Array[Button] = []
+var entries: Array[EnemyDefinition] = []
 var portrait: EnemyPortrait
 var _stat_values: Dictionary[StringName, Label] = {}
 var _button_group := ButtonGroup.new()
@@ -47,7 +48,6 @@ func _ready() -> void:
 	portrait.name = "EnemyPortrait"
 	portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	portrait.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	%Preview.add_child(portrait)
 	portrait.custom_minimum_size = Vector2(300.0, 220.0)
 	for entry: Array in [[&"health", "Health"], [&"speed", "Speed"], [&"damage", "Base damage"], [&"bounty", "Kill bounty"], [&"cost", "Send cost"], [&"income", "Added income"]]:
@@ -110,10 +110,39 @@ func _build_catalog() -> void:
 		enemy_list.remove_child(button)
 		button.queue_free()
 	enemy_buttons.clear()
+	entries.clear()
 	if catalog == null:
 		return
-	for index: int in range(catalog.enemies.size()):
-		var definition: EnemyDefinition = catalog.enemies[index]
+	entries.assign(catalog.enemies)
+	var availability: Dictionary[StringName, int] = {}
+	for definition: EnemyDefinition in entries:
+		availability[definition.id] = mini(definition.first_wave if definition.regular_spawn_enabled else 2147483647, definition.send_first_wave if definition.send_enabled else 2147483647)
+	# Propagate through summon chains; unreachable cycles retain the last-place sentinel.
+	for pass_index: int in range(entries.size()):
+		var changed: bool = false
+		for source: EnemyDefinition in entries:
+			if source.summon_interval <= 0.0 or not availability.has(source.summon_type):
+				continue
+			if availability[source.id] < availability[source.summon_type]:
+				availability[source.summon_type] = availability[source.id]
+				changed = true
+		if not changed:
+			break
+	entries.sort_custom(func(a: EnemyDefinition, b: EnemyDefinition) -> bool:
+		if availability[a.id] != availability[b.id]:
+			return availability[a.id] < availability[b.id]
+		var a_send: int = a.send_first_wave if a.send_enabled else 2147483647
+		var b_send: int = b.send_first_wave if b.send_enabled else 2147483647
+		if a_send != b_send:
+			return a_send < b_send
+		var a_regular: int = a.first_wave if a.regular_spawn_enabled else 2147483647
+		var b_regular: int = b.first_wave if b.regular_spawn_enabled else 2147483647
+		if a_regular != b_regular:
+			return a_regular < b_regular
+		return String(a.id) < String(b.id)
+	)
+	for index: int in range(entries.size()):
+		var definition: EnemyDefinition = entries[index]
 		var button := Button.new()
 		button.name = String(definition.id)
 		button.text = definition.title
@@ -144,12 +173,14 @@ func _refresh_focus_chain() -> void:
 		var button: Button = enemy_buttons[index]
 		button.focus_neighbor_top = button.get_path_to(enemy_buttons[posmod(index - 1, enemy_buttons.size())])
 		button.focus_neighbor_bottom = button.get_path_to(enemy_buttons[(index + 1) % enemy_buttons.size()])
-		button.focus_next = button.get_path_to(error_label if error_label.visible else back_button)
+		button.focus_next = button.get_path_to(portrait)
 		button.focus_previous = button.get_path_to(back_button)
 	back_button.focus_next = back_button.get_path_to(enemy_buttons[selected_index])
-	back_button.focus_previous = back_button.get_path_to(error_label if error_label.visible else enemy_buttons[selected_index])
+	back_button.focus_previous = back_button.get_path_to(error_label if error_label.visible else portrait)
+	portrait.focus_previous = portrait.get_path_to(enemy_buttons[selected_index])
+	portrait.focus_next = portrait.get_path_to(error_label if error_label.visible else back_button)
 	error_label.focus_next = error_label.get_path_to(back_button)
-	error_label.focus_previous = error_label.get_path_to(enemy_buttons[selected_index])
+	error_label.focus_previous = error_label.get_path_to(portrait)
 
 
 func _list_input(event: InputEvent, index: int) -> void:
@@ -166,19 +197,21 @@ func _list_input(event: InputEvent, index: int) -> void:
 
 
 func _activate(index: int) -> void:
-	if enemy_buttons[index].has_focus() or not is_visible_in_tree():
-		_select(index)
-	else:
+	var already_selected: bool = selected_index == index
+	if not enemy_buttons[index].has_focus() and is_visible_in_tree():
 		enemy_buttons[index].grab_focus()
-
+	else:
+		_select(index)
+	if already_selected:
+		portrait.replay_action()
 
 func _select(index: int) -> void:
-	if catalog == null or rules == null or catalog.enemies.is_empty():
+	if catalog == null or rules == null or entries.is_empty():
 		title_label.text = "Orcieary unavailable"
 		_refresh_counts()
 		return
-	selected_index = clampi(index, 0, catalog.enemies.size() - 1)
-	var definition: EnemyDefinition = catalog.enemies[selected_index]
+	selected_index = clampi(index, 0, entries.size() - 1)
+	var definition: EnemyDefinition = entries[selected_index]
 	for button_index: int in range(enemy_buttons.size()):
 		enemy_buttons[button_index].set_pressed_no_signal(button_index == selected_index)
 	title_label.text = definition.title
@@ -243,8 +276,8 @@ func _refresh_counts() -> void:
 	elif not store.error_message.is_empty():
 		failure = store.error_message
 	var values: Dictionary = {"kills": 0, "sent": 0}
-	if store != null and catalog != null and selected_index < catalog.enemies.size():
-		values = store.counts(catalog.enemies[selected_index].id)
+	if store != null and selected_index < entries.size():
+		values = store.counts(entries[selected_index].id)
 	kills_value.text = str(values["kills"])
 	sent_value.text = str(values["sent"])
 	error_label.text = failure

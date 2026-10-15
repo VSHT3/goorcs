@@ -1,79 +1,209 @@
 {
-  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "authoring": "Original local pixel geometry; seven individually authored heads/anatomies; every pose redrawn from articulated joints. No source-image sampling or model generation.",
+  "identity": "Stocky adult veteran; projecting square jaw, broken nose, diagonal cheek scar and leather baldric.",
   "generator": "tools/author_enemy_sprites.py",
+  "generator_sha256": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
   "frame_size": [
     80,
     80
   ],
   "sheet_size": [
-    640,
+    1920,
     80
   ],
-  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
-  "lighting": "upper left; dark fantasy outline",
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing, smoothing, dithering, masks or raster-image rotation",
+  "lighting": "upper-left broad material planes; dark selective outlines and warm leather/bone shadows",
+  "camera": "elevated three-quarter view facing left; foreground left shoulder/foot overlap far right limbs",
   "base_anchor": [
     0.5,
     0.875
   ],
-  "sheet_sha256": "1ad40a674230929935a5911486c2a1d2db8a843c2ccadb83beb1645bf80e15db",
+  "source_faces_left": true,
+  "sheet_sha256": "f1791c4aabf1e1d076cf04ae83bfdde454fda3c0725ff34e8e48759ff01e6776",
+  "still": "assets/enemies/animations/grunt_still.png",
+  "still_sha256": "d2d5ea8fd3b8d0090704615783e8fea0c37e70b9c0ab118061bf1c4c607dc637",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "death": {
+    "duration_seconds": 0.8,
+    "last_frame": "settled corpse; bone pile for SkeleOrc",
+    "articulation": "individually authored recoil, knee/trip, impact and settled joint tableaux",
+    "blood_in_sprite": false,
+    "dropped_equipment": "Chief crown / NecOrcmancer skullstaff"
+  },
+  "historical_reference": "assets/enemies/grunt.png",
+  "historical_reference_dimensions": [
+    64,
+    64
+  ],
+  "historical_reference_sha256": "7005092f2216a6d57556010196978f57213f5a8e98a359cad9055959bb0927ca",
+  "historical_reference_status": "Pre-existing source preserved byte-for-byte; not used as cutout or runtime frame",
+  "historical_reference_origin": "Prior accepted Klein reference edit",
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
   "animations": [
     {
       "name": "walk",
-      "fps": 10,
+      "fps": 12,
+      "duration_seconds": 1.0,
+      "frame_count": 12,
       "loop": true,
       "alpha_bounds": [
         [
-          18,
-          18,
-          63,
-          70
-        ],
-        [
-          19,
-          18,
-          61,
-          70
-        ],
-        [
-          19,
-          18,
-          61,
-          69
-        ],
-        [
-          19,
-          18,
-          61,
-          70
-        ],
-        [
-          18,
-          18,
-          63,
+          16,
+          13,
+          62,
           70
         ],
         [
           16,
+          12,
+          61,
+          68
+        ],
+        [
+          16,
+          12,
+          59,
+          68
+        ],
+        [
           18,
-          65,
+          12,
+          57,
+          68
+        ],
+        [
+          19,
+          12,
+          56,
+          68
+        ],
+        [
+          19,
+          12,
+          54,
+          68
+        ],
+        [
+          19,
+          13,
+          54,
           70
         ],
         [
-          15,
+          19,
+          12,
+          54,
+          70
+        ],
+        [
+          19,
+          12,
+          55,
+          70
+        ],
+        [
           18,
-          66,
+          12,
+          57,
           70
         ],
         [
           16,
-          18,
-          65,
+          12,
+          59,
+          70
+        ],
+        [
+          16,
+          12,
+          62,
           70
         ]
       ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "duration_seconds": 0.8,
+      "frame_count": 12,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          16,
+          13,
+          62,
+          70
+        ],
+        [
+          18,
+          13,
+          60,
+          71
+        ],
+        [
+          18,
+          14,
+          61,
+          71
+        ],
+        [
+          18,
+          16,
+          60,
+          70
+        ],
+        [
+          17,
+          22,
+          57,
+          70
+        ],
+        [
+          10,
+          29,
+          56,
+          71
+        ],
+        [
+          8,
+          33,
+          64,
+          71
+        ],
+        [
+          8,
+          36,
+          67,
+          72
+        ],
+        [
+          8,
+          38,
+          69,
+          73
+        ],
+        [
+          7,
+          40,
+          70,
+          74
+        ],
+        [
+          7,
+          40,
+          70,
+          74
+        ],
+        [
+          7,
+          40,
+          70,
+          74
+        ]
+      ]
     }
-  ],
-  "source": "assets/enemies/grunt.png",
-  "source_sha256": "7005092f2216a6d57556010196978f57213f5a8e98a359cad9055959bb0927ca",
-  "source_origin": "Accepted pre-existing PixelLab still; unchanged"
+  ]
 }

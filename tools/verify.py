@@ -21,6 +21,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE_VERSION = "4.7.2.stable.official.ed1daf0bf"
 RENDERED_TESTS = {
+    "enemy_death_presentation_test.gd",
     "enemy_inspection_test.gd",
     "horde_presentation_test.gd",
     "menu_wordmark_test.gd",

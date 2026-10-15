@@ -1,77 +1,209 @@
 {
-  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "authoring": "Original local pixel geometry; seven individually authored heads/anatomies; every pose redrawn from articulated joints. No source-image sampling or model generation.",
+  "identity": "Bare hollow cranium, broken asymmetric jaw, missing tooth, open ribs and exposed paired leg bones.",
   "generator": "tools/author_enemy_sprites.py",
+  "generator_sha256": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
   "frame_size": [
     80,
     80
   ],
   "sheet_size": [
-    640,
+    1920,
     80
   ],
-  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
-  "lighting": "upper left; dark fantasy outline",
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing, smoothing, dithering, masks or raster-image rotation",
+  "lighting": "upper-left broad material planes; dark selective outlines and warm leather/bone shadows",
+  "camera": "elevated three-quarter view facing left; foreground left shoulder/foot overlap far right limbs",
   "base_anchor": [
     0.5,
     0.875
   ],
-  "sheet_sha256": "38082430865fd691538f23f3a0b2f43fa43377f54c6cfb897b2ac1d7434d9001",
+  "source_faces_left": true,
+  "sheet_sha256": "f6682e0597424aee9b07d7f087b9aff0f1608878c6cfd6dcfed5f3ce4aaabbe0",
+  "still": "assets/enemies/animations/skeleorc_still.png",
+  "still_sha256": "317546a61d6ef7a049492a52019870508600c36d0c9239f58d71803bbef01de3",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "death": {
+    "duration_seconds": 0.8,
+    "last_frame": "settled corpse; bone pile for SkeleOrc",
+    "articulation": "individually authored recoil, knee/trip, impact and settled joint tableaux",
+    "blood_in_sprite": false,
+    "dropped_equipment": "Chief crown / NecOrcmancer skullstaff"
+  },
+  "historical_reference": "assets/enemies/skeleorc.png",
+  "historical_reference_dimensions": [
+    80,
+    80
+  ],
+  "historical_reference_sha256": "e2c2e3ea04078d0d12f834abbfd060aa6ff36c1aebfd824a7e775225dc6670f7",
+  "historical_reference_status": "Pre-existing source preserved byte-for-byte; not used as cutout or runtime frame",
+  "historical_reference_origin": "Prior locally authored Pillow sprite",
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
   "animations": [
     {
       "name": "walk",
-      "fps": 14,
+      "fps": 17,
+      "duration_seconds": 0.7058823529411765,
+      "frame_count": 12,
       "loop": true,
       "alpha_bounds": [
         [
-          26,
-          22,
-          55,
+          20,
+          20,
+          59,
           70
         ],
         [
-          26,
-          22,
+          20,
+          19,
+          58,
+          68
+        ],
+        [
+          21,
+          19,
           55,
+          68
+        ],
+        [
+          23,
+          19,
+          52,
+          68
+        ],
+        [
+          24,
+          19,
+          51,
+          68
+        ],
+        [
+          22,
+          19,
+          50,
+          68
+        ],
+        [
+          21,
+          20,
+          51,
           70
         ],
         [
-          26,
           22,
-          55,
-          70
-        ],
-        [
-          26,
-          22,
-          55,
-          70
-        ],
-        [
-          26,
-          22,
-          55,
-          70
-        ],
-        [
-          25,
-          22,
-          55,
+          19,
+          50,
           70
         ],
         [
           24,
+          19,
+          51,
+          70
+        ],
+        [
+          24,
+          19,
+          54,
+          70
+        ],
+        [
           22,
+          19,
           56,
           70
         ],
         [
-          25,
-          22,
-          55,
+          21,
+          19,
+          59,
           70
         ]
       ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "duration_seconds": 0.8,
+      "frame_count": 12,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          20,
+          20,
+          59,
+          70
+        ],
+        [
+          21,
+          24,
+          56,
+          70
+        ],
+        [
+          19,
+          26,
+          57,
+          71
+        ],
+        [
+          16,
+          28,
+          59,
+          71
+        ],
+        [
+          14,
+          31,
+          61,
+          71
+        ],
+        [
+          12,
+          35,
+          64,
+          72
+        ],
+        [
+          11,
+          39,
+          67,
+          72
+        ],
+        [
+          11,
+          43,
+          69,
+          73
+        ],
+        [
+          14,
+          51,
+          68,
+          76
+        ],
+        [
+          14,
+          52,
+          68,
+          76
+        ],
+        [
+          14,
+          52,
+          68,
+          76
+        ],
+        [
+          14,
+          52,
+          68,
+          76
+        ]
+      ]
     }
-  ],
-  "source_origin": "Original locally hand-plotted character in generator; no external generation service"
+  ]
 }

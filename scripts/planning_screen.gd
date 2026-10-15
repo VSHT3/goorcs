@@ -811,6 +811,7 @@ func _refresh() -> void:
 		board.tower_types = state.get("tower_types", {})
 		board.combat_towers = all_towers[slot]
 		board.combat_enemies = all_enemies[slot]
+		board.apply_deaths(state, slot, float(state.get("speed_multiplier", 1.0)))
 		board.queue_redraw()
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
 		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")

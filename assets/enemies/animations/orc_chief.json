@@ -1,132 +1,290 @@
 {
-  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "authoring": "Original local pixel geometry; seven individually authored heads/anatomies; every pose redrawn from articulated joints. No source-image sampling or model generation.",
+  "identity": "Older barrel-chested leader; long weathered muzzle, asymmetric ivory tusks, gold circlet and grey sideburn.",
   "generator": "tools/author_enemy_sprites.py",
+  "generator_sha256": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
   "frame_size": [
     80,
     80
   ],
   "sheet_size": [
-    1280,
+    2880,
     80
   ],
-  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
-  "lighting": "upper left; dark fantasy outline",
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing, smoothing, dithering, masks or raster-image rotation",
+  "lighting": "upper-left broad material planes; dark selective outlines and warm leather/bone shadows",
+  "camera": "elevated three-quarter view facing left; foreground left shoulder/foot overlap far right limbs",
   "base_anchor": [
     0.5,
     0.875
   ],
-  "sheet_sha256": "06cda1eed2899e2ccef3d3ce898bd1849e0b884480ab244b9a7c8e8d4ffac6d0",
+  "source_faces_left": true,
+  "sheet_sha256": "f0a2fee27175627cb9ccf7d013ba7fdf1a6341d90daab6eb909bd511913bb7cd",
+  "still": "assets/enemies/animations/orc_chief_still.png",
+  "still_sha256": "c60e5c99a669468dd14f5ad9eda7c23a7fb7f6988b4a7f09eecc177f212cf6fb",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "death": {
+    "duration_seconds": 0.8,
+    "last_frame": "settled corpse; bone pile for SkeleOrc",
+    "articulation": "individually authored recoil, knee/trip, impact and settled joint tableaux",
+    "blood_in_sprite": false,
+    "dropped_equipment": "Chief crown / NecOrcmancer skullstaff"
+  },
+  "historical_reference": "assets/enemies/orc_chief.png",
+  "historical_reference_dimensions": [
+    80,
+    80
+  ],
+  "historical_reference_sha256": "ec5be8d8d02ee4e251349c1d52bff21f051aa378249358fd6f7696de0bde506c",
+  "historical_reference_status": "Pre-existing source preserved byte-for-byte; not used as cutout or runtime frame",
+  "historical_reference_origin": "Prior locally authored Pillow sprite",
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
   "animations": [
     {
       "name": "walk",
-      "fps": 8,
+      "fps": 9,
+      "duration_seconds": 1.3333333333333333,
+      "frame_count": 12,
       "loop": true,
       "alpha_bounds": [
         [
-          14,
+          9,
           7,
-          64,
+          69,
           70
         ],
         [
-          15,
-          7,
-          64,
-          70
+          9,
+          6,
+          68,
+          68
         ],
         [
-          16,
+          9,
+          6,
+          65,
+          68
+        ],
+        [
+          11,
+          6,
+          65,
+          68
+        ],
+        [
+          12,
+          6,
+          65,
+          68
+        ],
+        [
+          12,
+          6,
+          63,
+          68
+        ],
+        [
+          12,
           7,
           63,
           70
         ],
         [
-          15,
-          7,
-          64,
-          70
-        ],
-        [
-          14,
-          7,
-          64,
+          12,
+          6,
+          63,
           70
         ],
         [
           13,
-          7,
-          65,
+          6,
+          63,
           70
         ],
         [
-          12,
-          7,
+          11,
+          6,
+          63,
+          70
+        ],
+        [
+          10,
+          6,
           66,
           70
         ],
         [
-          13,
-          7,
-          65,
+          10,
+          6,
+          68,
           70
         ]
       ]
     },
     {
       "name": "heal",
-      "fps": 14.5,
+      "fps": 21.818181818181817,
+      "duration_seconds": 0.55,
+      "frame_count": 12,
       "loop": false,
       "alpha_bounds": [
         [
-          14,
+          8,
+          7,
+          65,
+          70
+        ],
+        [
+          8,
+          8,
+          65,
+          70
+        ],
+        [
+          8,
+          8,
+          65,
+          70
+        ],
+        [
+          8,
+          8,
+          65,
+          70
+        ],
+        [
+          8,
+          7,
+          65,
+          70
+        ],
+        [
+          8,
           7,
           64,
           70
         ],
         [
-          14,
+          8,
           7,
           64,
           70
         ],
         [
-          14,
+          8,
           7,
           64,
           70
         ],
         [
-          14,
+          8,
+          7,
+          64,
+          70
+        ],
+        [
+          8,
+          7,
+          64,
+          70
+        ],
+        [
+          8,
           7,
           65,
           70
         ],
         [
-          14,
+          8,
           7,
-          65,
-          70
-        ],
-        [
-          14,
-          7,
-          65,
-          70
-        ],
-        [
-          14,
-          7,
-          65,
-          70
-        ],
-        [
-          14,
-          7,
-          65,
+          68,
           70
         ]
       ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "duration_seconds": 0.8,
+      "frame_count": 12,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          9,
+          7,
+          69,
+          70
+        ],
+        [
+          15,
+          4,
+          64,
+          71
+        ],
+        [
+          16,
+          6,
+          63,
+          71
+        ],
+        [
+          14,
+          10,
+          61,
+          72
+        ],
+        [
+          10,
+          15,
+          61,
+          73
+        ],
+        [
+          7,
+          20,
+          63,
+          73
+        ],
+        [
+          5,
+          24,
+          65,
+          73
+        ],
+        [
+          4,
+          29,
+          67,
+          74
+        ],
+        [
+          5,
+          33,
+          69,
+          74
+        ],
+        [
+          5,
+          36,
+          70,
+          77
+        ],
+        [
+          5,
+          36,
+          70,
+          77
+        ],
+        [
+          5,
+          36,
+          70,
+          77
+        ]
+      ]
     }
-  ],
-  "source_origin": "Original locally hand-plotted character in generator; no external generation service"
+  ]
 }

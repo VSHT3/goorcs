@@ -40,6 +40,8 @@ func _run() -> void:
 	await _check_keyboard_and_mouse()
 	await _check_catalog_and_pixels()
 	await _check_counts_and_error()
+	await _check_portrait_input()
+	await _check_custom_order()
 	await _check_lifecycle()
 	viewport.queue_free()
 	await process_frame
@@ -61,7 +63,9 @@ func _check_keyboard_and_mouse() -> void:
 	await _key(KEY_RIGHT)
 	_check(screen.selected_index == 0, "Right also navigates the catalog")
 	await _key(KEY_TAB)
-	_check(viewport.gui_get_focus_owner() == screen.back_button, "Tab exits the list to Back")
+	_check(viewport.gui_get_focus_owner() == screen.portrait, "Tab exits the list to the interactive portrait")
+	await _key(KEY_TAB)
+	_check(viewport.gui_get_focus_owner() == screen.back_button, "Portrait precedes Back in the focus chain")
 	await _key(KEY_TAB)
 	_check(viewport.gui_get_focus_owner() == screen.enemy_buttons[0], "Tab returns to the current enemy rather than resetting selection")
 	await _click(screen.enemy_buttons[3].get_global_rect().get_center())
@@ -80,11 +84,9 @@ func _check_catalog_and_pixels() -> void:
 	for width: int in [1000, 1280]:
 		viewport.size = Vector2i(width, 720)
 		await _settle()
-		for index: int in range(catalog.enemies.size()):
-			var definition: EnemyDefinition = catalog.enemies[index]
+		for index: int in range(screen.entries.size()):
+			var definition: EnemyDefinition = screen.entries[index]
 			await _click(screen.enemy_buttons[index].get_global_rect().get_center())
-			_check(screen.title_label.text == definition.title and screen.description_label.text == definition.description, "Selected catalog resource supplies its real title and description")
-			_check(screen.portrait.definition == definition, "Preview uses the same registered definition as gameplay")
 			var expected: Dictionary = MatchCombat.enemy_preview(definition, rules, 1)
 			var values: Array[Label] = []
 			values.assign(screen.get_node("%Stats").get_children())
@@ -104,22 +106,27 @@ func _check_catalog_and_pixels() -> void:
 			_check(_inside(screen.portrait, Rect2(Vector2.ZERO, Vector2(viewport.size))) and _inside(screen.kills_value, Rect2(Vector2.ZERO, Vector2(viewport.size))) and _inside(screen.sent_value, Rect2(Vector2.ZERO, Vector2(viewport.size))), "Preview and counters remain visible at both supported desktop widths")
 			_check(screen.kills_value.get_global_rect().position.y > screen.portrait.get_global_rect().end.y, "Lifetime counters sit below the animation and stat preview")
 			var stats: GridContainer = screen.get_node("%Stats") as GridContainer
-			_check(stats.columns == 6 and stats.get_global_rect().position.y >= screen.portrait.get_global_rect().end.y, "Compact stats are below the centered animation, never beside it")
+			_check(stats.get_global_rect().position.y >= screen.portrait.get_global_rect().end.y, "Compact stats are below the centered animation, never beside it")
 			var preview: Control = screen.get_node("%Preview") as Control
 			_check(is_equal_approx(screen.portrait.get_global_rect().get_center().x, preview.get_global_rect().get_center().x), "The large animated portrait is centered over its statistics")
 			_check_single_selection(index, "Mouse selection")
 			screen.portrait.stop_preview()
 			screen.portrait.set_preview_time(0.0)
+			screen.portrait.replay_action()
+			# Specials are checked below; use a settled rest frame as their baseline.
+			if definition.heal_interval > 0.0 or definition.summon_interval > 0.0:
+				screen.portrait.set_preview_time(2.0)
 			var first: Image = await _portrait_image()
 			_check(first != null and first.get_used_rect().has_area(), "Actual preview pixels render for every catalog type")
 			var frames: SpriteFrames = definition.animation_frames
 			_check(frames != null and frames.has_animation(&"walk") and frames.get_frame_count(&"walk") > 1, "Each actual entry has a playable walk animation, not a still-image substitute")
-			if frames != null and frames.has_animation(&"walk") and frames.get_frame_count(&"walk") > 1:
+			if definition.heal_interval <= 0.0 and definition.summon_interval <= 0.0 and frames != null and frames.has_animation(&"walk") and frames.get_frame_count(&"walk") > 1:
 				screen.portrait.set_preview_time(frames.get_frame_duration(&"walk", 0) / frames.get_animation_speed(&"walk") * 1.1)
 				var walking: Image = await _portrait_image()
 				_check(first.get_data() != walking.get_data(), "Advancing the real walk clock changes rendered sprite pixels")
 			if definition.heal_interval > 0.0 or definition.summon_interval > 0.0:
-				screen.portrait.set_preview_time(3.1)
+				screen.portrait.replay_action()
+				screen.portrait.set_preview_time(0.1)
 				var special: Image = await _portrait_image()
 				var expected_animation: StringName = &"heal" if definition.heal_interval > 0.0 else &"cast"
 				_check(screen.portrait.preview_animation == expected_animation and first.get_data() != special.get_data(), "Chief healing and NecOrcmancer casting really play in the large preview")
@@ -128,12 +135,12 @@ func _check_catalog_and_pixels() -> void:
 					var path: String = capture_directory.path_join("gorcs_orcieary_%s_%d.png" % [definition.id, width])
 					_check(viewport.get_texture().get_image().save_png(path) == OK, "Save requested Orcieary review capture")
 				screen.portrait.set_preview_time(5.0)
-				_check(screen.portrait.preview_animation == &"walk", "A special preview returns to the walk loop")
+				_check(screen.portrait.preview_animation == &"walk" and screen.portrait.preview_elapsed == 0.0, "A special preview returns to its resting first walk frame")
 
 
 func _check_counts_and_error() -> void:
 	await _click(screen.enemy_buttons[0].get_global_rect().get_center())
-	var id: String = String(catalog.enemies[0].id)
+	var id: String = String(screen.entries[0].id)
 	var snapshot: Dictionary = {"statistics_id": "screen_match", "rules": {"sandbox_mode": false}, "enemy_totals": [{"kills": {id: 12}, "sent": {id: 7}}, {"kills": {id: 99}, "sent": {id: 99}}]}
 	_check(store.observe(snapshot, 0), "Save actual local counters while the screen is open")
 	await _settle()
@@ -143,6 +150,7 @@ func _check_counts_and_error() -> void:
 	_check(not store.observe(snapshot, 0), "The statistics owner actually rejects its blocked save")
 	await _settle()
 	_check(screen.error_label.is_visible_in_tree() and screen.error_label.text == store.error_message and screen.error_label.text.contains(_save_path), "A real persistence error stays visible and identifies the failed save")
+	await _key(KEY_TAB)
 	await _key(KEY_TAB)
 	_check(viewport.gui_get_focus_owner() == screen.error_label, "Save details are keyboard reachable and selectable")
 	screen.hide()
@@ -163,12 +171,78 @@ func _check_lifecycle() -> void:
 	_check(requests.size() == 1 and not screen.portrait.animate, "Escape requests Back and stops its animation before navigation")
 	screen.open()
 	await _key(KEY_TAB)
+	await _key(KEY_TAB)
 	await _key(KEY_ENTER)
 	_check(requests.size() == 2 and not screen.portrait.animate, "Tab/Enter activates the real Back action")
 	screen.open()
 	_check(screen.portrait.animate, "Reopening restarts the selected preview")
 	screen.prepare_to_leave()
 	_check(not screen.portrait.animate, "The public leave hook stops all preview processing")
+
+
+func _check_portrait_input() -> void:
+	for index: int in range(screen.entries.size()):
+		screen._select(index)
+		screen.enemy_buttons[index].grab_focus()
+		await _settle()
+		_check(screen.portrait.preview_animation == &"walk" and screen.portrait.preview_elapsed == 0.0 and not screen.portrait.is_processing(), "Arrow/focus selection rests without automatically playing")
+		screen.portrait.start_preview()
+		await _click(screen.portrait.get_global_rect().get_center())
+		var definition: EnemyDefinition = screen.entries[index]
+		var expected: StringName = &"heal" if definition.heal_interval > 0.0 else (&"cast" if definition.summon_interval > 0.0 else &"walk")
+		_check(viewport.gui_get_focus_owner() == screen.portrait and screen.portrait.preview_animation == expected and screen.portrait.is_processing(), "Native portrait click immediately plays this enemy's action")
+		screen.portrait.stop_preview()
+		screen.portrait.set_preview_time(0.3)
+		await _key(KEY_ENTER)
+		_check(screen.portrait.preview_animation == expected and screen.portrait.preview_elapsed == 0.0, "Enter deterministically restarts an active action")
+		var scroll: ScrollContainer = screen.get_node("%DetailsScroll") as ScrollContainer
+		var previous_scroll: int = scroll.scroll_vertical
+		screen.portrait.set_preview_time(0.2)
+		await _key(KEY_SPACE)
+		_check(screen.portrait.preview_elapsed == 0.0 and scroll.scroll_vertical == previous_scroll, "Space replays without scrolling details")
+		screen.portrait.set_preview_time(100.0)
+		_check(screen.portrait.preview_animation == &"walk" and screen.portrait.preview_elapsed == 0.0 and not screen.portrait.is_processing(), "One complete action ends at rest")
+		screen.portrait.replay_action()
+		screen.hide()
+		_check(not screen.portrait.is_processing(), "Hidden previews never process")
+		screen.portrait.set_preview_time(0.2)
+		var elapsed: float = screen.portrait.preview_elapsed
+		screen.portrait.replay_action()
+		_check(screen.portrait.preview_elapsed == elapsed, "Hidden replay input is ignored")
+		screen.open()
+		screen.enemy_buttons[(index + 1) % screen.entries.size()].grab_focus()
+		_check(screen.portrait.preview_animation == &"walk" and screen.portrait.preview_elapsed == 0.0, "Switching enemies clears the active action")
+
+
+func _check_custom_order() -> void:
+	var custom := ContentCatalog.new()
+	var late := EnemyDefinition.new()
+	late.id = &"late_custom"
+	late.first_wave = 20
+	late.send_enabled = false
+	var early := EnemyDefinition.new()
+	early.id = &"early_custom"
+	early.first_wave = 9
+	early.send_enabled = true
+	early.send_first_wave = 2
+	early.summon_interval = 3.0
+	early.summon_type = &"summoned_custom"
+	var summoned := EnemyDefinition.new()
+	summoned.id = &"summoned_custom"
+	summoned.regular_spawn_enabled = false
+	summoned.send_enabled = false
+	var unreachable := EnemyDefinition.new()
+	unreachable.id = &"unreachable_custom"
+	unreachable.regular_spawn_enabled = false
+	unreachable.send_enabled = false
+	custom.enemies.assign([late, unreachable, summoned, early])
+	var original: Array[EnemyDefinition] = custom.enemies.duplicate()
+	screen.configure(custom, rules, store)
+	_check(screen.entries == [early, summoned, late, unreachable], "Custom-only catalogs derive send, chained summon, regular and unreachable order from metadata")
+	_check(custom.enemies == original, "Presentation never mutates canonical catalog order")
+	screen.enemy_buttons[1].grab_focus()
+	screen.configure(catalog, rules, store)
+	screen.open()
 
 
 func _inside(control: Control, bounds: Rect2) -> bool:

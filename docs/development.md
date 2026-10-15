@@ -343,7 +343,7 @@ Each event must fit remaining integer weight, introduction wave, count cap, and 
 
 #### Artwork provenance
 
-The original `assets/enemies/runner.png` and `brute.png` are locally authored hard-alpha 48×48 images. The unchanged `grunt.png` is the previously accepted Klein-generated 64×64 west-facing Orc, SHA-256 `7005092f2216a6d57556010196978f57213f5a8e98a359cad9055959bb0927ca`. The new animation sheets preserve those stills and articulate separate limbs; the four new identities and special poses were authored locally without external generation services or costs. `tools/author_enemy_sprites.py` and per-enemy JSON provenance files reproduce/describe the sheets.
+The original `assets/enemies/runner.png` and `brute.png` are locally authored hard-alpha 48×48 images. The unchanged historical `grunt.png` is the previously accepted Klein-generated 64×64 west-facing Orc, SHA-256 `7005092f2216a6d57556010196978f57213f5a8e98a359cad9055959bb0927ca`. All seven current runtime sheets and matching stills are newly authored as a consistent twelve-frame style with separate anatomy/faces, rather than masking/rotating those historical images. `tools/author_enemy_sprites.py` reproduces the walk, action, and death exports and checks stance/recovery direction for both facings. Per-enemy JSON provenance records generator/output hashes and frame bounds. No external generation service or cost was used for this replacement pass.
 
 Facing derives from `source_faces_left` and the captured route. `EnemyVisuals` supplies the same current-frame texture to drawing, slow tint, alpha picking, and Orcieary previews, retaining stable foot anchors across raised-staff/heal poses. Read the roster guide's verification checklist before calling new content balanced.
 

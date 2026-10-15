@@ -63,6 +63,24 @@ func _run() -> void:
 			_check(enemy["summoner_id"] == caster["id"] and enemy["route"] == caster["route"] and float(enemy["progress"]) >= caster_progress and float(enemy["progress"]) < 1.0, "Each real child retains caster route/progress and never restarts at portal or jumps to base")
 	_check(children in [2, 3, 4] and int(caster.get("summon_count", 0)) == 1, "Exactly one host ritual creates a bounded randomized child group")
 	_check(accepted["statistics_id"] == initial["statistics_id"] and not accepted["rules"]["sandbox_mode"], "Accepted statistics identity survives rounds and real match remains non-sandbox")
+	var tower_cell := Vector2i(1, 1 - int(accepted["board_origin_y"]))
+	await _build("guest", 1, tower_cell.x, tower_cell.y, MatchCombat.TargetMode.FURTHEST, "rune_obelisk")
+	var tower: Dictionary = await _wait_tower("host", 1, tower_cell, MatchCombat.TargetMode.FURTHEST)
+	for upgrade: String in ["damage", "speed", "boulders"]:
+		await _command("guest", {"action": "upgrade", "slot": 1, "tower_id": int(tower["id"]), "upgrade": upgrade})
+	await _wait_combat("host", {"coins": [748, 567]}, "Real guest construction and evolution are accepted before death simulation")
+	var death_state: Dictionary = {}
+	for tick: int in range(80):
+		await _command("host", {"action": "step", "delta": 0.1})
+		death_state = await _agree("Confirmed death events replicate with actual damage")
+		if not death_state["deaths"][1].is_empty():
+			break
+	_check(not death_state["deaths"][1].is_empty(), "A real tower kill reaches both peers as one accepted corpse event")
+	if not death_state["deaths"][1].is_empty():
+		var event: Dictionary = death_state["deaths"][1][0]
+		_check(death_state["enemy_totals"][1]["kills"].has(event["type_id"]), "Replicated death identity matches the authoritative kill totals")
+		for enemy: Dictionary in death_state["enemies"][1]:
+			_check(enemy["id"] != event["enemy_id"], "Replicated corpses never remain live targetable enemies")
 	await _finish()
 
 

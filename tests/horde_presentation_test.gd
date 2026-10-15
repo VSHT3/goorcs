@@ -260,8 +260,8 @@ func _check_animation_frames() -> void:
 	for definition: EnemyDefinition in catalog.enemies:
 		portrait.configure(definition)
 		portrait.set_preview_time(0.2)
-		_check(EnemyVisuals.frame_texture(definition, portrait.preview_animation, portrait.preview_elapsed) == EnemyVisuals.frame_texture(definition, &"walk", 0.2),
-			"Portrait and board reuse the same authored frame selection: %s" % definition.id)
+		_check(EnemyVisuals.frame_texture(definition, portrait.preview_animation, portrait.preview_elapsed) == EnemyVisuals.frame_texture(definition, &"walk", 0.0),
+			"Resting portrait reuses the board's first authored walk frame: %s" % definition.id)
 		portrait.queue_redraw()
 		await process_frame
 		await RenderingServer.frame_post_draw
@@ -271,8 +271,9 @@ func _check_animation_frames() -> void:
 			and used.end.x < preview_viewport.size.x and used.end.y < preview_viewport.size.y,
 			"Large preview has no edge-clipped sheet pixels: %s" % definition.id)
 		if definition.animation_frames.has_animation(&"heal") or definition.animation_frames.has_animation(&"cast"):
-			portrait.set_preview_time(3.4)
-			_check(portrait.preview_animation != &"walk", "Preview explicitly loops the enemy's own special pose")
+			portrait.replay_action()
+			portrait.set_preview_time(0.4)
+			_check(portrait.preview_animation != &"walk", "Preview explicitly plays the enemy's own special pose on demand")
 			await process_frame
 			await RenderingServer.frame_post_draw
 			var acting: Image = preview_viewport.get_texture().get_image()

@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
-[ext_resource type="Texture2D" path="res://assets/enemies/skeleorc.png" id="2_sprite"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/skeleorc_still.png" id="2_sprite"]
 [ext_resource type="SpriteFrames" path="res://assets/enemies/animations/skeleorc.tres" id="3_animation"]
 
 [resource]
@@ -18,4 +18,6 @@ kill_bounty = 0
 board_height = 0.35
 texture = ExtResource("2_sprite")
 animation_frames = ExtResource("3_animation")
+source_faces_left = true
 board_anchor = Vector2(0.5, 0.875)
+blood_color = Color(0, 0, 0, 0)

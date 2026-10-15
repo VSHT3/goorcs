@@ -1,79 +1,209 @@
 {
-  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "authoring": "Original local pixel geometry; seven individually authored heads/anatomies; every pose redrawn from articulated joints. No source-image sampling or model generation.",
+  "identity": "Lanky forward-leaning scout; long pinched face, single squint, rust headscarf and trailing ties.",
   "generator": "tools/author_enemy_sprites.py",
+  "generator_sha256": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
   "frame_size": [
     80,
     80
   ],
   "sheet_size": [
-    640,
+    1920,
     80
   ],
-  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
-  "lighting": "upper left; dark fantasy outline",
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing, smoothing, dithering, masks or raster-image rotation",
+  "lighting": "upper-left broad material planes; dark selective outlines and warm leather/bone shadows",
+  "camera": "elevated three-quarter view facing left; foreground left shoulder/foot overlap far right limbs",
   "base_anchor": [
     0.5,
     0.875
   ],
-  "sheet_sha256": "70c1bfb71c71b402f343cf9b73bad8d564314c974d9ed28f06212f9aaf7c0cd8",
+  "source_faces_left": true,
+  "sheet_sha256": "cf0c6855038328666a33f5fb26eead46fdd67eaf43e891a1e1bdb54eb4ddcbbb",
+  "still": "assets/enemies/animations/runner_still.png",
+  "still_sha256": "0a9b2c81401e5ea1f0b3f6476a9728ebc4d0050bc1663c1d7b51b03292a23e36",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "death": {
+    "duration_seconds": 0.8,
+    "last_frame": "settled corpse; bone pile for SkeleOrc",
+    "articulation": "individually authored recoil, knee/trip, impact and settled joint tableaux",
+    "blood_in_sprite": false,
+    "dropped_equipment": "Chief crown / NecOrcmancer skullstaff"
+  },
+  "historical_reference": "assets/enemies/runner.png",
+  "historical_reference_dimensions": [
+    48,
+    48
+  ],
+  "historical_reference_sha256": "d12be7b4067e10b475896409572cab1b563ad5c6e4a65a828ca4e8a2fdb3f545",
+  "historical_reference_status": "Pre-existing source preserved byte-for-byte; not used as cutout or runtime frame",
+  "historical_reference_origin": "Prior locally authored Pillow sprite",
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
   "animations": [
     {
       "name": "walk",
-      "fps": 14,
+      "fps": 20,
+      "duration_seconds": 0.6,
+      "frame_count": 12,
       "loop": true,
       "alpha_bounds": [
         [
-          23,
-          31,
-          59,
+          19,
+          13,
+          60,
+          70
+        ],
+        [
+          20,
+          12,
+          60,
+          68
+        ],
+        [
+          21,
+          12,
+          61,
+          68
+        ],
+        [
+          21,
+          12,
+          62,
+          68
+        ],
+        [
+          21,
+          12,
+          63,
+          68
+        ],
+        [
+          20,
+          12,
+          62,
+          68
+        ],
+        [
+          18,
+          13,
+          60,
+          70
+        ],
+        [
+          20,
+          12,
+          58,
           70
         ],
         [
           21,
-          31,
-          59,
-          69
+          12,
+          57,
+          70
+        ],
+        [
+          21,
+          12,
+          56,
+          70
+        ],
+        [
+          20,
+          12,
+          56,
+          70
         ],
         [
           19,
-          31,
+          12,
           59,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "duration_seconds": 0.8,
+      "frame_count": 12,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          19,
+          13,
+          60,
+          70
+        ],
+        [
+          17,
+          14,
+          55,
           69
         ],
         [
-          21,
-          31,
-          59,
+          13,
+          15,
+          56,
           69
         ],
         [
-          23,
-          31,
+          9,
+          19,
+          56,
+          68
+        ],
+        [
+          7,
+          25,
+          56,
+          67
+        ],
+        [
+          6,
+          30,
           59,
           70
         ],
         [
-          23,
-          31,
-          60,
-          71
+          5,
+          35,
+          67,
+          72
         ],
         [
-          23,
-          31,
-          60,
-          71
+          5,
+          40,
+          68,
+          72
         ],
         [
-          23,
-          31,
-          60,
-          71
+          5,
+          44,
+          69,
+          72
+        ],
+        [
+          5,
+          47,
+          70,
+          73
+        ],
+        [
+          5,
+          47,
+          70,
+          73
+        ],
+        [
+          5,
+          47,
+          70,
+          73
         ]
       ]
     }
-  ],
-  "source": "assets/enemies/runner.png",
-  "source_sha256": "d12be7b4067e10b475896409572cab1b563ad5c6e4a65a828ca4e8a2fdb3f545",
-  "source_origin": "Accepted pre-existing PixelLab still; unchanged"
+  ]
 }

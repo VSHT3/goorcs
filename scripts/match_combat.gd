@@ -4,6 +4,8 @@ extends RefCounted
 enum Phase { PLANNING, WAVE, FINISHED }
 enum TargetMode { FURTHEST, CLOSEST, STRONGEST }
 
+const DEATH_EVENT_LIFETIME: float = 2.0
+
 var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
@@ -23,6 +25,11 @@ var spawn_times: Array[float] = []
 var wave_groups: Array[Dictionary] = []
 var statistics_id: String = Crypto.new().generate_random_bytes(16).hex_encode()
 var enemy_totals: Array[Dictionary] = [{"kills": {}, "sent": {}}, {"kills": {}, "sent": {}}]
+var _death_events: Array[Array] = [[], []]
+var _death_heads: Array[int] = [0, 0]
+var _death_time: float = 0.0
+var _death_generation: int = 0
+var _next_death_id: int = 1
 var _sandbox_mode: bool = false
 # Parallel to the individual FIFO: only the last member waits ordinary cooldown.
 var _send_group_ends: Array[Array] = [[], []]
@@ -292,6 +299,7 @@ func has_tower(slot: int, cell: Vector2i) -> bool:
 
 func grow_for_main_round() -> void:
 	assert(phase == Phase.PLANNING)
+	_reset_death_events()
 	for board: Array in towers:
 		for tower: Dictionary in board:
 			tower["cell"] += Vector2i.DOWN
@@ -344,6 +352,7 @@ func debug_set_round(round_number: int) -> bool:
 	winner = -1
 	coin_flip = false
 	enemies = [[], []]
+	_reset_death_events()
 	wave_roster.clear()
 	wave_groups.clear()
 	_special_stream = false
@@ -572,6 +581,7 @@ func advance(delta: float) -> bool:
 		var step: float = _next_event_step(remaining) if _special_stream else remaining
 		_step_start_time = _elapsed
 		_elapsed += step
+		_death_time += step
 		for slot: int in range(2):
 			_move_enemies(slot, step)
 			_spawn_enemies(slot)
@@ -580,6 +590,18 @@ func advance(delta: float) -> bool:
 			_enemy_abilities(slot)
 			_apply_leaks(slot)
 		remaining -= step
+	for slot: int in range(2):
+		var events: Array = _death_events[slot]
+		var first: int = _death_heads[slot]
+		while first < events.size() and _death_time - float(events[first]["time"]) >= DEATH_EVENT_LIFETIME - 0.000000001:
+			first += 1
+		_death_heads[slot] = first
+		if first == events.size():
+			events.clear()
+			_death_heads[slot] = 0
+		elif first >= 64 and first * 2 >= events.size():
+			_death_events[slot] = events.slice(first)
+			_death_heads[slot] = 0
 	# Resolve only after BOTH boards have applied this tick's damage.
 	if base_health[0] == 0 or base_health[1] == 0:
 		phase = Phase.FINISHED
@@ -672,6 +694,8 @@ func snapshot() -> Dictionary:
 		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
 		"enemy_types": _enemy_types_snapshot(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
+		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
+		"death_generation": _death_generation,
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
 		"wave_roster": wave_roster.duplicate(), "wave_weight": _wave_weight(maxi(1, wave)),
 		"spawn_times": spawn_times.duplicate(),
@@ -1088,6 +1112,46 @@ func _exposure_span(cell: Vector2i, range_cells: float, enemy: Dictionary, start
 	return distance / speed
 
 
+func _death_snapshot(slot: int) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	for index: int in range(_death_heads[slot], _death_events[slot].size()):
+		events.append(_death_events[slot][index].duplicate())
+	return events
+
+
+func _reset_death_events() -> void:
+	if _death_heads[0] < _death_events[0].size() or _death_heads[1] < _death_events[1].size():
+		_death_generation += 1
+	_death_heads = [0, 0]
+	_death_events = [[], []]
+
+
+func _record_death(slot: int, enemy: Dictionary) -> void:
+	var route: Array = enemy["route"]
+	var progress: float = enemy["progress"]
+	var faces_left: bool = false
+	var horizontal_found: bool = false
+	if route.size() > 1:
+		var segment: int = clampi(floori(progress), 0, route.size() - 2)
+		for index: int in range(segment, -1, -1):
+			var direction: Vector2i = route[index + 1] - route[index]
+			if direction.x != 0:
+				faces_left = direction.x < 0
+				horizontal_found = true
+				break
+		if not horizontal_found:
+			for index: int in range(segment + 1, route.size() - 1):
+				var direction: Vector2i = route[index + 1] - route[index]
+				if direction.x != 0:
+					faces_left = direction.x < 0
+					break
+	_death_events[slot].append({
+		"id": _next_death_id, "enemy_id": enemy["id"], "type_id": enemy["type_id"],
+		"pos": enemy["pos"], "faces_left": faces_left, "time": _death_time,
+	})
+	_next_death_id += 1
+
+
 func _retire_enemy(enemy_id: int) -> void:
 	_enemy_spawn_times.erase(enemy_id)
 	_slow_motion.erase(enemy_id)
@@ -1116,6 +1180,7 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> v
 		var bounty: int = _enemy_types[enemy["type_id"]]["kill_bounty"]
 		coins[slot] += _rules.kill_bounty if bounty < 0 else bounty
 		_add_total(slot, "kills", enemy["type_id"])
+		_record_death(slot, enemy)
 		_retire_enemy(enemy["id"])
 		enemies[slot].remove_at(enemy_index)
 

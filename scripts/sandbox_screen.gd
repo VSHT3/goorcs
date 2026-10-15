@@ -468,6 +468,7 @@ func _refresh() -> void:
 	board.tower_types = state["tower_types"]
 	board.combat_towers = state["towers"][0]
 	board.combat_enemies = state["enemies"][0]
+	board.apply_deaths(state, 0, controller.speed, controller.paused and running)
 	board.queue_redraw()
 	for type_id: StringName in shop_buttons:
 		shop_buttons[type_id].set_pressed_no_signal(type_id == placement_id)

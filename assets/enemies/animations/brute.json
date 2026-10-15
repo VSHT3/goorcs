@@ -1,79 +1,209 @@
 {
-  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "authoring": "Original local pixel geometry; seven individually authored heads/anatomies; every pose redrawn from articulated joints. No source-image sampling or model generation.",
+  "identity": "Hunched iron juggernaut; broad bowl helmet, narrow recessed face, massive plated shoulders.",
   "generator": "tools/author_enemy_sprites.py",
+  "generator_sha256": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
   "frame_size": [
     80,
     80
   ],
   "sheet_size": [
-    640,
+    1920,
     80
   ],
-  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
-  "lighting": "upper left; dark fantasy outline",
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing, smoothing, dithering, masks or raster-image rotation",
+  "lighting": "upper-left broad material planes; dark selective outlines and warm leather/bone shadows",
+  "camera": "elevated three-quarter view facing left; foreground left shoulder/foot overlap far right limbs",
   "base_anchor": [
     0.5,
     0.875
   ],
-  "sheet_sha256": "fd93cf2dc534505b39b029af84a2bfba2ec10160497b3a6623131ed8a21de011",
+  "source_faces_left": true,
+  "sheet_sha256": "268558145099e7fc4e0259f75fd3bbab9b725c8bd14b35df212dbee1a7611aa3",
+  "still": "assets/enemies/animations/brute_still.png",
+  "still_sha256": "1a6dbf433c5af2cc67db228d529ebae161c18dcfb27d7b9bce29faf263a4db0d",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "death": {
+    "duration_seconds": 0.8,
+    "last_frame": "settled corpse; bone pile for SkeleOrc",
+    "articulation": "individually authored recoil, knee/trip, impact and settled joint tableaux",
+    "blood_in_sprite": false,
+    "dropped_equipment": "Chief crown / NecOrcmancer skullstaff"
+  },
+  "historical_reference": "assets/enemies/brute.png",
+  "historical_reference_dimensions": [
+    48,
+    48
+  ],
+  "historical_reference_sha256": "b2b2e7a4ffd6f0752783ff08c6a239dd1ac5537d703c02bbb32c34612ce42095",
+  "historical_reference_status": "Pre-existing source preserved byte-for-byte; not used as cutout or runtime frame",
+  "historical_reference_origin": "Prior locally authored Pillow sprite",
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
   "animations": [
     {
       "name": "walk",
-      "fps": 8,
+      "fps": 9,
+      "duration_seconds": 1.3333333333333333,
+      "frame_count": 12,
       "loop": true,
       "alpha_bounds": [
         [
-          21,
-          28,
-          60,
+          6,
+          10,
+          72,
           70
         ],
         [
-          21,
-          28,
-          60,
+          6,
+          9,
+          71,
+          68
+        ],
+        [
+          6,
+          9,
+          69,
+          68
+        ],
+        [
+          8,
+          9,
+          68,
+          68
+        ],
+        [
+          8,
+          9,
+          68,
+          68
+        ],
+        [
+          7,
+          9,
+          67,
+          68
+        ],
+        [
+          7,
+          10,
+          66,
           70
         ],
         [
-          21,
-          28,
-          61,
+          7,
+          9,
+          66,
           70
         ],
         [
-          21,
-          28,
-          60,
+          8,
+          9,
+          67,
           70
         ],
         [
-          21,
-          28,
-          60,
+          8,
+          9,
+          67,
           70
         ],
         [
-          20,
-          28,
-          61,
+          7,
+          9,
+          69,
+          70
+        ],
+        [
+          7,
+          9,
+          71,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "duration_seconds": 0.8,
+      "frame_count": 12,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          6,
+          10,
+          72,
+          70
+        ],
+        [
+          11,
+          9,
+          67,
           71
         ],
         [
-          19,
-          28,
-          61,
+          11,
+          10,
+          67,
           72
         ],
         [
-          20,
+          12,
+          12,
+          65,
+          72
+        ],
+        [
+          9,
+          14,
+          63,
+          73
+        ],
+        [
+          6,
+          16,
+          65,
+          73
+        ],
+        [
+          4,
+          19,
+          67,
+          73
+        ],
+        [
+          3,
+          22,
+          69,
+          73
+        ],
+        [
+          4,
+          25,
+          72,
+          74
+        ],
+        [
+          4,
           28,
-          61,
-          71
+          73,
+          74
+        ],
+        [
+          4,
+          28,
+          73,
+          74
+        ],
+        [
+          4,
+          28,
+          73,
+          74
         ]
       ]
     }
-  ],
-  "source": "assets/enemies/brute.png",
-  "source_sha256": "b2b2e7a4ffd6f0752783ff08c6a239dd1ac5537d703c02bbb32c34612ce42095",
-  "source_origin": "Accepted pre-existing PixelLab still; unchanged"
+  ]
 }
