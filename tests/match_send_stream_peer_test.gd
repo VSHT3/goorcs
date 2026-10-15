@@ -74,6 +74,21 @@ func _run() -> void:
 	await _wait_combat("guest", {"phase": 1, "wave": 1}, "Fresh manual Ready admits the reset stream")
 	state = await _send_agreement("Reset stream starts at zero")
 	_check(_stream_types(state, 1) == ["grunt"] and state["send_queues"] == [[], ["runner"]], "Reset clocks deliver exactly one new FIFO head at zero without inheriting the prior combat deadline")
+	await _send_step(2.0)
+	await _wait_combat("guest", {"phase": 0, "wave": 1}, "Both streams clear before progressing cadence")
+	var next_round: Dictionary = await _send_agreement("Next-round interval preview")
+	_check(is_equal_approx(next_round["rules"]["send_spawn_interval"], 0.995), "Planning publishes round-two host cadence despite divergent client progression")
+	for type_id: String in ["grunt", "runner"]:
+		await _command("host", {"action": "send", "slot": 0, "type_id": type_id})
+	await _both_ready()
+	await _wait_combat("guest", {"phase": 1, "wave": 2, "send_queues": [[], ["runner"]]}, "Round two starts with the same paid FIFO semantics")
+	await _send_step(0.994)
+	state = await _send_agreement("Before scaled boundary")
+	_check(_matches(state, {"spawned": [1, 1], "queued_sends": [0, 1]}), "Neither independent stream releases before the host's reduced interval")
+	await _send_step(0.002)
+	state = await _send_agreement("After scaled boundary")
+	_check(_matches(state, {"spawned": [2, 2], "queued_sends": [0, 0]}) and is_equal_approx(state["spawn_times"][1], 0.995), "Regular and sent streams both use the reduced host interval, not the client's faster reduction")
+	_check(_stream_types(state, 1) == ["grunt", "runner"] and is_equal_approx(float(state["enemies"][1][1]["progress"]), 0.001 * 26.0 * 1.7), "Real client receives fractional typed progress from the round-scaled paid slot")
 	await _finish()
 
 

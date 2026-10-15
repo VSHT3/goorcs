@@ -14,6 +14,9 @@ const DEFAULT_ENEMIES: Array[EnemyDefinition] = [
 @export var wave_weight: int = 6
 @export var spawn_interval: float = 0.75
 @export_range(0.0, 0.499, 0.001) var spawn_jitter_ratio: float = 0.4
+# Fractions of the original interval, shared by regular and paid-send streams.
+@export_range(0.0, 1.0, 0.001) var spawn_interval_reduction_per_wave: float = 0.005
+@export_range(0.0, 0.999, 0.001) var max_spawn_interval_reduction: float = 0.5
 @export var enemy_definitions: Array[EnemyDefinition] = DEFAULT_ENEMIES
 @export var tower_definitions: Array[TowerDefinition] = [
 	preload("res://resources/combat/towers/arrow_tower.tres"),

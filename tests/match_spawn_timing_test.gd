@@ -7,6 +7,7 @@ func _init() -> void:
 	_test_schedule()
 	_test_edges_and_validation()
 	_test_stream_and_isolation()
+	_test_round_cadence()
 	if failures == 0:
 		print("PASS: bounded shared regular timing, actual mixed spawns, snapshots, sends and independent RNG streams")
 	quit(1 if failures > 0 else 0)
@@ -31,6 +32,8 @@ func _rules() -> CombatRules:
 	rules.enemy_speed = 0.1
 	rules.speed_growth = 0.0
 	rules.starting_coins = 1000
+	rules.spawn_jitter_ratio = 0.4
+	rules.spawn_interval_reduction_per_wave = 0.0
 	return rules
 
 
@@ -51,7 +54,6 @@ func _combat(rules: CombatRules, timing_seed: int = 71) -> MatchCombat:
 
 func _test_schedule() -> void:
 	var rules := _rules()
-	_check(rules.spawn_jitter_ratio == 0.4, "Default exercises shipped nonzero jitter")
 	var first := _combat(rules)
 	_check(first.snapshot()["spawn_times"].is_empty(), "Initial N0 snapshot has an empty timetable")
 	_check(first.start_wave(_routing()), "Valid timing starts wave")
@@ -140,3 +142,70 @@ func _test_stream_and_isolation() -> void:
 	var regular := _combat(regular_rules)
 	regular.start_wave(_routing())
 	_check(regular.wave_roster == combat.wave_roster and regular._wave_random.state == wave_state and regular._random.state == tie_state, "Changing jitter cannot perturb composition or terminal tie RNG")
+
+
+func _test_round_cadence() -> void:
+	for stage: Array in [[1, 1.0], [2, 0.995], [51, 0.75], [100, 0.505], [101, 0.5], [102, 0.5], [1000, 0.5]]:
+		var round_number: int = int(stage[0])
+		var factor: float = float(stage[1])
+		var rules := _rules()
+		rules.wave_weight = 3
+		rules.enemy_definitions = [rules.enemy_definitions[0]]
+		rules.health_growth = 0
+		rules.spawn_jitter_ratio = 0.0
+		rules.spawn_interval_reduction_per_wave = 0.005
+		rules.max_spawn_interval_reduction = 0.5
+		var combat := _combat(rules)
+		combat.wave = round_number - 1
+		var regular_interval: float = 0.75 * factor
+		var send_interval: float = 0.35 * factor
+		_check(is_equal_approx(combat.snapshot()["rules"]["send_spawn_interval"], send_interval), "Planning previews the next round's effective send interval")
+		combat.send_enemy(0, &"grunt")
+		combat.send_enemy(0, &"grunt")
+		_check(combat.start_wave(_routing()), "Round %d accepts scaled clocks" % round_number)
+		_check(is_equal_approx(combat.spawn_times[1], regular_interval) and is_equal_approx(combat.spawn_times[2], 2.0 * regular_interval), "Regular intervals follow linear reduction and stop at the round-101 floor")
+		_check(is_equal_approx(combat.snapshot()["rules"]["send_spawn_interval"], send_interval), "Both cadence owners and the host snapshot use the same round factor")
+		# Neither source-resource edits nor phase previews may retime admitted combat.
+		rules.spawn_interval = 99.0
+		rules.send_spawn_interval = 99.0
+		rules.spawn_interval_reduction_per_wave = NAN
+		rules.max_spawn_interval_reduction = NAN
+		combat.advance(send_interval - 0.000001)
+		_check(combat.queued_sends == [0, 1] and combat.snapshot()["spawned"] == [1, 1] and combat.enemies[1].size() == 2, "Scaled send slot is not released before its boundary")
+		combat.advance(0.000002)
+		_check(combat.queued_sends == [0, 0] and combat.enemies[1].size() == 3 and is_equal_approx(combat.enemies[1].back()["progress"], 0.000001 * 0.1), "Scaled paid delivery occurs in this round with fractional travel only since its due time")
+		combat.advance(regular_interval - send_interval - 0.000002)
+		_check(combat.snapshot()["spawned"] == [1, 1], "Regular timetable retains its independent scaled boundary")
+		combat.advance(0.000002)
+		_check(combat.snapshot()["spawned"] == [2, 2] and is_equal_approx(combat.enemies[0].back()["progress"], 0.000001 * 0.1), "Both boards deliver regular enemies at the scaled boundary")
+		for enemy: Dictionary in combat.enemies[1]:
+			_check(enemy["max_hp"] == 8 and is_equal_approx(enemy["speed"], 0.1), "Cadence progression does not rewrite enemy HP or movement speed")
+		_check(is_equal_approx(combat.snapshot()["rules"]["send_spawn_interval"], send_interval), "Admitted active cadence is immune to source-resource mutations")
+	# Relative irregular spacing and RNG consumption stay unchanged at the cap.
+	var early_rules := _rules()
+	early_rules.spawn_interval_reduction_per_wave = 0.005
+	var late_rules := _rules()
+	late_rules.spawn_interval_reduction_per_wave = 0.005
+	early_rules.enemy_definitions = [early_rules.enemy_definitions[0]]
+	late_rules.enemy_definitions = [late_rules.enemy_definitions[0]]
+	var early := _combat(early_rules)
+	var late := _combat(late_rules)
+	early.wave = 0
+	late.wave = 100
+	early.start_wave(_routing())
+	late.start_wave(_routing())
+	for index: int in range(early.spawn_times.size()):
+		_check(is_equal_approx(late.spawn_times[index], early.spawn_times[index] * 0.5), "The entire jittered timetable scales uniformly rather than reducing only its average interval")
+	_check(early._timing_random.state == late._timing_random.state and early.wave_roster == late.wave_roster, "Cadence progression adds no timing randomness or roster changes")
+	for invalid: Array in [[-0.005, 0.5], [INF, 0.5], [NAN, 0.5], [0.005, -0.1], [0.005, 1.0], [0.005, INF], [0.005, NAN]]:
+		var rules := _rules()
+		rules.spawn_interval_reduction_per_wave = float(invalid[0])
+		rules.max_spawn_interval_reduction = float(invalid[1])
+		var combat := _combat(rules)
+		var before: Dictionary = combat.snapshot()
+		before["rules"].erase("send_spawn_interval")
+		var random_state: int = combat._timing_random.state
+		_check(not combat.send_enemy(0, &"grunt") and not combat.start_wave(_routing()), "Invalid progression cannot charge for sends or start a wave with collapsed/nonfinite intervals")
+		var after: Dictionary = combat.snapshot()
+		after["rules"].erase("send_spawn_interval")
+		_check(before == after and combat._timing_random.state == random_state, "Rejected interval progression preserves all mutable state and timing RNG")

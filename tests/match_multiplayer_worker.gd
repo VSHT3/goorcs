@@ -21,6 +21,7 @@ func _planning_rules() -> CombatRules:
 	rules.wave_weight = 1
 	rules.enemy_speed = 6.5
 	rules.spawn_interval = 0.05
+	rules.spawn_interval_reduction_per_wave = 0.0
 	var definitions: Array[TowerDefinition] = []
 	for source: TowerDefinition in rules.tower_definitions:
 		var definition := TowerDefinition.new()
@@ -75,6 +76,8 @@ func _execute_command(command: Dictionary) -> void:
 			rules.spawn_interval = 1.0
 			rules.spawn_jitter_ratio = 0.0
 			rules.send_spawn_interval = 1.0 if _lane == "host" else 99.0
+			rules.spawn_interval_reduction_per_wave = 0.005 if _lane == "host" else 0.25
+			rules.max_spawn_interval_reduction = 0.5 if _lane == "host" else 0.9
 		planning.combat_rules = rules
 	elif action == "step":
 		if _lane == "host":

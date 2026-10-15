@@ -47,6 +47,7 @@ func _rules() -> CombatRules:
 	rules.spawn_interval = 0.5
 	# These combat/economy fixtures intentionally isolate regular cadence from timing variation.
 	rules.spawn_jitter_ratio = 0.0
+	rules.spawn_interval_reduction_per_wave = 0.0
 	rules.tower_definitions = [_definition(&"arrow_tower", 2, 20.0, 0.5)]
 	rules.health_growth = 2
 	rules.speed_growth = 0.0
@@ -380,8 +381,8 @@ func _test_economy_and_upgrades() -> void:
 	_check(combat.sell_tower(0, id) and combat.coins[0] == 42 and combat.towers[0].is_empty(), "Live sale refunds 60 percent of actual investment and removes the tower")
 	frozen = combat.snapshot()
 	_check(not combat.sell_tower(0, id) and not combat.upgrade_tower(0, id, "damage") and combat.snapshot() == frozen, "Repeated sale and stale upgrade cannot grant money or affect removed towers")
-	_check(combat.build(0, Vector2i(1, 1), &"arrow_tower", 0) and combat.towers[0][0]["id"] == id + 1, "Failed purchases do not consume IDs; rebuying gets the next identity")
 	combat.coins[0] = 54
+	_check(combat.build(0, Vector2i(1, 1), &"arrow_tower", 0) and combat.towers[0][0]["id"] == id + 1, "Failed purchases do not consume IDs; rebuying gets the next identity")
 	var replacement: Dictionary = combat.towers[0][0]
 	_check(not replacement["damage_upgraded"] and not replacement["speed_upgraded"] and replacement["kills"] == 0 and replacement["damage"] == 2, "Rebuy has no inherited kills or upgrades")
 	frozen = combat.snapshot()
@@ -394,7 +395,6 @@ func _test_economy_and_upgrades() -> void:
 	_check(combat.towers[0][0]["sell_value"] == 27 and combat.sell_tower(0, 1) and combat.coins[0] == 181, "Sale floors fractional refund Coins")
 
 
-func _test_area_kills_and_bounties() -> void:
 func _test_level_pricing_orders() -> void:
 	for first: String in ["damage", "speed"]:
 		var rules := _rules()
@@ -419,6 +419,7 @@ func _test_level_pricing_orders() -> void:
 		_check(not combat.upgrade_tower(0, tower["id"], second) and combat.snapshot() == frozen, "Fully upgraded tower cannot advance beyond level III")
 
 
+func _test_area_kills_and_bounties() -> void:
 	var rules := _rules()
 	rules.enemy_speed = 0.0
 	rules.enemy_health = 2
@@ -497,8 +498,8 @@ func _test_builtin_upgrade_values() -> void:
 		combat.start_wave(_routes())
 		combat.advance(0.01)
 		var tower: Dictionary = combat.towers[0][0]
-		_check(tower["damage"] == effective_damage[index] and combat.enemies[0][0]["hp"] == 100 - effective_damage[index] and is_equal_approx(tower["cooldown"], type_stats["interval"] * multipliers[index]), "Tower %s attacks using purchased effective damage and interval" % ids[index])
 		var type_stats: Dictionary = combat.snapshot()["tower_types"][String(ids[index])]
+		_check(tower["damage"] == effective_damage[index] and combat.enemies[0][0]["hp"] == 100 - effective_damage[index] and is_equal_approx(tower["cooldown"], type_stats["interval"] * multipliers[index]), "Tower %s attacks using purchased effective damage and interval" % ids[index])
 		_check(combat.coins[0] == 200 - costs[index] - 25 and tower["invested"] == costs[index] + 25, "Tower %s pays shared level-based prices regardless of type" % ids[index])
 
 
@@ -674,7 +675,7 @@ func _test_weighted_wave_constraints_and_streams() -> void:
 	for seed_value: int in range(16):
 		var rules := CombatRules.new()
 		rules.base_health = 10000
-		# Roster/stat regression deliberately fixes delivery cadence; jitter has its own actual-spawn suite.
+		# Roster/stat fixture fixes jitter; interval progression has its own boundary suite.
 		rules.spawn_jitter_ratio = 0.0
 		var tie_random: RandomNumberGenerator = _wave_rng(999)
 		var frozen_tie_state: int = tie_random.state
@@ -695,7 +696,7 @@ func _test_weighted_wave_constraints_and_streams() -> void:
 			_check(combat.wave_roster == roster and combat.snapshot()["enemy_types"]["brute"]["base_damage"] == 3, "Roster and resource-rule snapshots are detached from authority")
 			# Observe every scheduled spawn on both boards before any can leak.
 			for index: int in range(roster.size()):
-				combat.advance(0.01 if index == 0 else rules.spawn_interval)
+				combat.advance(0.01 if index == 0 else combat.spawn_times[index] - combat.spawn_times[index - 1])
 				for slot: int in range(2):
 					_check(combat.enemies[slot].size() == index + 1, "Actual regular spawn stream follows roster cadence")
 					var enemy: Dictionary = combat.enemies[slot][index]

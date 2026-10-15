@@ -31,6 +31,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - Base health carries between rounds. Losing a base is not merely losing one round or spending a run life.
 - A crystal represents the base and its health. The current match sprite is a blue faceted crystal on a stone pedestal; final art is not settled.
 - A **wave** is a group of regular enemies. Opponent-sent enemies arrive concurrently through an independent, paced FIFO stream throughout combat, outside the regular budget/caps. Planning purchases wait for combat. Both boards must finish regular spawns, pending sends, and living enemies before the planning break; there is no minimum combat timer. Continuous funded sending can prolong combat.
+- Regular and sent-enemy spawn intervals tighten by 0.5% of their original interval per round after round 1, capped at a 50% reduction from round 101. Their streams stay independent; this changes delivery frequency, not enemy movement speed or the existing HP/count scaling.
 - The desired format combines a standalone competitive match with development across multiple encounters.
 - **Confirmed simultaneous defeat:** if both bases reach zero in the same host simulation tick, one host-owned random coin flip chooses the run winner. The result is shared and terminal; clients do not roll independently.
 

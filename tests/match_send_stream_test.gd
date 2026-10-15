@@ -35,6 +35,7 @@ func _rules() -> CombatRules:
 	rules.speed_growth = 0.0
 	rules.spawn_interval = 0.5
 	rules.spawn_jitter_ratio = 0.0
+	rules.spawn_interval_reduction_per_wave = 0.0
 	return rules
 
 

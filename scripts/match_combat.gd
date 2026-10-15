@@ -30,6 +30,9 @@ var _send_queues: Array[Array] = [[], []]
 var _send_heads: Array[int] = [0, 0]
 var _next_send_times: Array[float] = [0.0, 0.0]
 var _send_spawn_interval: float
+var _active_send_spawn_interval: float = 0.0
+var _spawn_interval_reduction_per_wave: float
+var _max_spawn_interval_reduction: float
 var _random: RandomNumberGenerator
 var _wave_random: RandomNumberGenerator
 var _timing_random: RandomNumberGenerator
@@ -46,6 +49,8 @@ var _next_enemy_id: int = 1
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
 	_rules = rules
 	_send_spawn_interval = rules.send_spawn_interval
+	_spawn_interval_reduction_per_wave = rules.spawn_interval_reduction_per_wave
+	_max_spawn_interval_reduction = rules.max_spawn_interval_reduction
 	_random = random
 	if _random == null:
 		_random = RandomNumberGenerator.new()
@@ -185,11 +190,6 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 	return false
 
 
-static func _sell_value(invested: int) -> int:
-	return floori(float(invested) * 0.6)
-
-
-static func cell_in_range(origin: Vector2i, cell: Vector2i, range_cells: float) -> bool:
 # Level is derived from accepted upgrades, never a second mutable copy of tower state.
 static func tower_level(tower: Dictionary) -> int:
 	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"]))
@@ -199,6 +199,11 @@ static func tower_upgrade_cost(tower: Dictionary, definition: Dictionary) -> int
 	return int(definition["upgrade_base_cost"]) + (tower_level(tower) - 1) * int(definition["upgrade_cost_step"])
 
 
+static func _sell_value(invested: int) -> int:
+	return floori(float(invested) * 0.6)
+
+
+static func cell_in_range(origin: Vector2i, cell: Vector2i, range_cells: float) -> bool:
 	return maxi(absi(cell.x - origin.x), absi(cell.y - origin.y)) <= range_cells
 
 
@@ -240,7 +245,7 @@ func send_enemy(slot: int, type_id: StringName) -> bool:
 
 
 func _valid_send_timing() -> bool:
-	return is_finite(_send_spawn_interval) and _send_spawn_interval > 0.0
+	return is_finite(_send_spawn_interval) and _send_spawn_interval > 0.0 and _valid_interval_scaling()
 
 
 func _pending_sends(slot: int) -> int:
@@ -256,8 +261,10 @@ func start_wave(routing: Array[Dictionary]) -> bool:
 	var roster: Array[String] = _generate_wave_roster(wave + 1)
 	if roster.is_empty():
 		return false
+	var interval_multiplier: float = _spawn_interval_multiplier(wave + 1)
 	wave_roster = roster
-	spawn_times = _generate_spawn_times(roster.size())
+	spawn_times = _generate_spawn_times(roster.size(), _rules.spawn_interval * interval_multiplier)
+	_active_send_spawn_interval = _send_spawn_interval * interval_multiplier
 	_routes = [routing[0]["route"].duplicate(), routing[1]["route"].duplicate()]
 	_routing_next = [routing[0]["next"].duplicate(true), routing[1]["next"].duplicate(true)]
 	_fork_cursors = [{}, {}]
@@ -273,16 +280,25 @@ func start_wave(routing: Array[Dictionary]) -> bool:
 
 
 func _valid_spawn_timing() -> bool:
-	return is_finite(_rules.spawn_interval) and _rules.spawn_interval >= 0.0 and is_finite(_rules.spawn_jitter_ratio) and _rules.spawn_jitter_ratio >= 0.0 and _rules.spawn_jitter_ratio < 0.5
+	return is_finite(_rules.spawn_interval) and _rules.spawn_interval >= 0.0 and is_finite(_rules.spawn_jitter_ratio) and _rules.spawn_jitter_ratio >= 0.0 and _rules.spawn_jitter_ratio < 0.5 and _valid_interval_scaling()
 
 
-func _generate_spawn_times(count: int) -> Array[float]:
+func _valid_interval_scaling() -> bool:
+	return is_finite(_spawn_interval_reduction_per_wave) and _spawn_interval_reduction_per_wave >= 0.0 and is_finite(_max_spawn_interval_reduction) and _max_spawn_interval_reduction >= 0.0 and _max_spawn_interval_reduction < 1.0
+
+
+func _spawn_interval_multiplier(wave_number: int) -> float:
+	return 1.0 - minf(maxi(0, wave_number - 1) * _spawn_interval_reduction_per_wave, _max_spawn_interval_reduction)
+
+
+
+func _generate_spawn_times(count: int, interval: float) -> Array[float]:
 	var times: Array[float] = []
 	times.resize(count)
 	for index: int in range(count):
-		var time: float = index * _rules.spawn_interval
-		if index > 0 and index < count - 1 and _rules.spawn_interval > 0.0 and _rules.spawn_jitter_ratio > 0.0:
-			time += _timing_random.randf_range(-_rules.spawn_jitter_ratio, _rules.spawn_jitter_ratio) * _rules.spawn_interval
+		var time: float = index * interval
+		if index > 0 and index < count - 1 and interval > 0.0 and _rules.spawn_jitter_ratio > 0.0:
+			time += _timing_random.randf_range(-_rules.spawn_jitter_ratio, _rules.spawn_jitter_ratio) * interval
 		times[index] = time
 	return times
 
@@ -398,7 +414,7 @@ func snapshot() -> Dictionary:
 			"starting_coins": _rules.starting_coins, "kill_bounty": _rules.kill_bounty,
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
-			"send_spawn_interval": _send_spawn_interval,
+			"send_spawn_interval": _send_spawn_interval * _spawn_interval_multiplier(wave + 1) if phase == Phase.PLANNING else _active_send_spawn_interval,
 			"main_round_interval": _rules.main_round_interval,
 			"ready_window_seconds": _rules.ready_window_seconds,
 			"tiles_per_expansion": _rules.tiles_per_expansion,
@@ -511,7 +527,7 @@ func _spawn_send(slot: int) -> void:
 	var type_id: String = _send_queues[slot][_send_heads[slot]]
 	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave)
 	_spawn_enemy(slot, type_id, progress)
-	_next_send_times[slot] += _send_spawn_interval
+	_next_send_times[slot] += _active_send_spawn_interval
 	_send_heads[slot] += 1
 	if _send_heads[slot] == _send_queues[slot].size():
 		_send_queues[slot].clear()

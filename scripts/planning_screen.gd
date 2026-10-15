@@ -321,7 +321,7 @@ func _refresh_sends() -> void:
 	elif _own_coins() < cost:
 		delivery += "\nNeed %d more Coins." % (cost - _own_coins())
 	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
-	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nSend cadence: one enemy every %.2f simulation seconds, independently of regular spawns. No combat cutoff." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules["send_spawn_interval"])]
+	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nSend cadence: one enemy every %.3f simulation seconds, independently of regular spawns. No combat cutoff." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules["send_spawn_interval"])]
 	enemy_selector.tooltip_text = send_button.tooltip_text
 	for index: int in range(enemy_selector.item_count):
 		var type_stats: Dictionary = types[String(enemy_selector.get_item_metadata(index))]
