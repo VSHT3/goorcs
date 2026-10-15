@@ -10,6 +10,10 @@ The UI pairs bundled **Pixelify Sans** labels with crisper **Silkscreen** pixel 
 
 The supplied **Orcish Drone** track loops during match planning, combat, wave breaks, and the in-match pause/settings menu. It stops on results or leaving the match; title menus, connection setup, workshop, and collection stay silent. Playback is local and does not restart on host snapshots or volume changes.
 
+## Adding game content
+
+Towers and enemies are authored as Godot resources and registered in one explicit content catalog. Follow the [content pipeline](docs/content-pipeline.md) for resource fields, registration, existing attack behaviors, and verification. New identities, stats, and artwork should not require adding ID branches to gameplay code; genuinely new mechanics still require implementation.
+
 ## Run
 
 Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.
@@ -107,6 +111,8 @@ resources/combat/  Provisional defense-loop configuration
 assets/            Imported chest/tower sprites and locally authored enemy/crystal/portal PNGs
 archive_assets/    Archived pixel-art variants and sources, with per-image catalog and tags
 tests/             Path, navigation, collection, chest, real peer-session, planning, match-world, combat rules and peer combat
+tools/             Single-command project verification
+.github/workflows/ Automated verification using the same local commands
 docs/              Project documentation
 ```
 

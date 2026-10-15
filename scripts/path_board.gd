@@ -30,10 +30,6 @@ const ENEMY_CORNER_BLEND: float = 0.25
 const ENDPOINT_FRAME_SIZE: int = 96
 const ENDPOINT_FRAME_COUNT: int = 16
 const ENDPOINT_FRAME_SECONDS: float = 0.2
-const ARROW_ART: TowerReward = preload("res://resources/collection/arrow_tower.tres")
-const ARCHER_CROP := Rect2(29, 0, 25, 31)
-const SECOND_ARCHER_OFFSET := Vector2(-20, 0)
-const ARCHER_BOW := Vector2(46, 19)
 const ONYX_PULSE_DURATION: float = 0.30
 const BOULDER_ORBIT_SPEED: float = 1.8
 static var _rune_stone_shape := PackedVector2Array([
@@ -78,13 +74,19 @@ var placement_id: StringName = &"":
 	set(value):
 		placement_id = value
 		queue_redraw()
-var tower_catalog: Array[TowerReward] = CollectionStore.DEFAULT_CATALOG:
+var content_catalog: ContentCatalog = preload("res://resources/content_catalog.tres"):
 	set(value):
-		tower_catalog = value
+		content_catalog = value
 		_tower_art.clear()
-		for reward: TowerReward in value:
+		_enemy_art.clear()
+		for definition: TowerDefinition in value.towers:
+			var reward: TowerReward = definition.reward
 			_tower_art[String(reward.id)] = reward
 			_cache_texture_bounds(reward.icon_texture)
+		for definition: EnemyDefinition in value.enemies:
+			_enemy_art[String(definition.id)] = definition
+			_cache_texture_bounds(definition.texture)
+			_cache_slow_texture(definition.texture)
 		queue_redraw()
 var placement_enabled: bool = true:
 	set(value):
@@ -125,11 +127,7 @@ var _ground_style: int = -1
 
 
 func _ready() -> void:
-	tower_catalog = tower_catalog
-	for definition: EnemyDefinition in CombatRules.DEFAULT_ENEMIES:
-		_enemy_art[String(definition.id)] = definition
-		_cache_texture_bounds(definition.texture)
-		_cache_slow_texture(definition.texture)
+	content_catalog = content_catalog
 	_portal_texture = _endpoint_texture(preload("res://assets/world/enemy_portal_idle.png"))
 	_crystal_texture = _endpoint_texture(preload("res://assets/world/health_crystal_idle.png"))
 	_cache_texture_bounds(_portal_texture)
@@ -670,7 +668,7 @@ func visual_headroom() -> float:
 	# Camera fitting uses the same opaque-height/anchor geometry as drawing.
 	var foot := Vector2(0.0, _cell_size() * 0.78)
 	var headroom: float = 0.0
-	for reward: TowerReward in tower_catalog:
+	for reward: TowerReward in _tower_art.values():
 		if reward.icon_texture == null:
 			continue
 		var rect: Rect2 = _sprite_rect(reward.icon_texture, reward.board_height, reward.board_anchor, foot)
@@ -759,12 +757,13 @@ func _draw_combat() -> void:
 				if artwork != null and artwork.icon_texture != null:
 					var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, item["foot"])
 					draw_texture_rect(artwork.icon_texture, rect, false)
-					if tower["type_id"] == "arrow_tower" and bool(tower.get("special_upgraded", false)) and artwork.icon_texture == ARROW_ART.icon_texture:
-						# Reuse the original archer pixels locally; the source texture stays untouched.
+					if bool(tower.get("special_upgraded", false)) and tower_types.get(tower["type_id"], {}).get("special_upgrade", "") == "second_archer" and artwork.secondary_sprite_region.has_area():
+						# Reuse authored texture pixels; the source texture stays untouched.
 						var art_scale: Vector2 = rect.size / artwork.icon_texture.get_size()
-						var second_rect := Rect2(rect.position + (ARCHER_CROP.position + SECOND_ARCHER_OFFSET) * art_scale,
-							ARCHER_CROP.size * art_scale)
-						draw_texture_rect_region(artwork.icon_texture, second_rect, ARCHER_CROP)
+						var crop: Rect2 = artwork.secondary_sprite_region
+						var second_rect := Rect2(rect.position + (crop.position + artwork.secondary_sprite_offset) * art_scale,
+							crop.size * art_scale)
+						draw_texture_rect_region(artwork.icon_texture, second_rect, crop)
 				match String(tower.get("evolution", "")):
 					"boulders":
 						_draw_boulders(tower, item["foot"], true)
@@ -910,13 +909,12 @@ func _draw_onyx_pulse(trace: Dictionary, remaining: float) -> void:
 
 func _projectile_origin(trace: Dictionary) -> Vector2:
 	var cell_size: float = _cell_size()
-	if trace["type_id"] == "arrow_tower":
-		var artwork: TowerReward = _tower_art.get("arrow_tower")
-		if artwork != null and artwork.icon_texture == ARROW_ART.icon_texture:
-			var foot: Vector2 = cell_center(trace["cell"]) + Vector2(0, cell_size * 0.28)
-			var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
-			var bow: Vector2 = ARCHER_BOW + (SECOND_ARCHER_OFFSET if bool(trace["secondary"]) else Vector2.ZERO)
-			return rect.position + bow * rect.size / artwork.icon_texture.get_size()
+	var artwork: TowerReward = _tower_art.get(trace["type_id"])
+	if artwork != null and artwork.icon_texture != null and artwork.projectile_origin.x >= 0.0 and artwork.projectile_origin.y >= 0.0:
+		var foot: Vector2 = cell_center(trace["cell"]) + Vector2(0, cell_size * 0.28)
+		var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
+		var muzzle: Vector2 = artwork.projectile_origin + (artwork.secondary_sprite_offset if bool(trace["secondary"]) else Vector2.ZERO)
+		return rect.position + muzzle * rect.size / artwork.icon_texture.get_size()
 	return cell_center(trace["cell"]) + Vector2(0, -cell_size * 0.30)
 
 
@@ -954,9 +952,9 @@ func _draw_projectiles() -> void:
 		if direction == Vector2.ZERO:
 			direction = Vector2.RIGHT
 		var side := Vector2(-direction.y, direction.x)
-		var heavy: bool = trace["type_id"] == "orc_ballista"
-		var length: float = cell_size * (0.26 if heavy else 0.18)
-		var width: float = 2.0 if heavy else 1.3
+		var artwork: TowerReward = _tower_art.get(trace["type_id"])
+		var length: float = cell_size * (artwork.projectile_length if artwork != null else 0.18)
+		var width: float = artwork.projectile_width if artwork != null else 1.3
 		var tail: Vector2 = position - direction * length * 0.5
 		var tip: Vector2 = position + direction * length * 0.5
 		draw_line(tail, tip, Color("b9a575"), width, true)

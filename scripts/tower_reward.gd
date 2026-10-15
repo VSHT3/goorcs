@@ -10,3 +10,11 @@ extends Resource
 # Local board presentation: opaque height in cells and base in normalized texture coordinates.
 @export var board_height: float = 1.45
 @export var board_anchor: Vector2 = Vector2(0.5, 0.94)
+
+# Texture-local pixels for an authored muzzle and optional second-archer overlay.
+# A negative muzzle coordinate uses the ordinary centered projectile origin.
+@export var projectile_origin: Vector2 = Vector2(-1, -1)
+@export var projectile_length: float = 0.18
+@export var projectile_width: float = 1.3
+@export var secondary_sprite_region: Rect2
+@export var secondary_sprite_offset: Vector2

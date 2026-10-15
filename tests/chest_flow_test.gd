@@ -20,7 +20,7 @@ func _run() -> void:
 	var random := RandomNumberGenerator.new()
 	random.seed = 42
 	main = load("res://scenes/main.tscn").instantiate()
-	main.collection_store = CollectionStore.new(SAVE_PATH, [], random)
+	main.collection_store = CollectionStore.new(SAVE_PATH, preload("res://resources/content_catalog.tres"), random)
 	root.add_child(main)
 	await process_frame
 	await process_frame

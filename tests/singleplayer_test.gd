@@ -180,7 +180,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	var grunt := preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
 	grunt.send_cost = 20
 	grunt.send_income = 2
-	rules.enemy_definitions = [grunt]
+	rules.catalog.enemies = [grunt]
 	rules.send_spawn_interval = 0.35
 	planning.combat_rules = rules
 	planning.start_singleplayer()
@@ -254,9 +254,9 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	rules.spawn_interval = 0.05
 	rules.send_spawn_interval = 0.35
 	var definitions: Array[EnemyDefinition] = []
-	for source: EnemyDefinition in rules.enemy_definitions:
+	for source: EnemyDefinition in rules.catalog.enemies:
 		definitions.append(source.duplicate() as EnemyDefinition)
-	rules.enemy_definitions = definitions
+	rules.catalog.enemies = definitions
 	planning.combat_rules = rules
 	planning.start_singleplayer()
 	var before: Dictionary = planning.combat.duplicate(true)

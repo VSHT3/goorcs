@@ -22,12 +22,12 @@ func _planning_rules() -> CombatRules:
 	rules.spawn_interval = 0.02
 	rules.send_spawn_interval = 0.6
 	var definitions: Array[EnemyDefinition] = []
-	for source: EnemyDefinition in rules.enemy_definitions:
+	for source: EnemyDefinition in rules.catalog.enemies:
 		var definition := source.duplicate() as EnemyDefinition
 		# Every roster is eligible immediately in this isolated networking scenario.
 		definition.first_wave = 1
 		definitions.append(definition)
-	rules.enemy_definitions = definitions
+	rules.catalog.enemies = definitions
 	if _lane == "guest":
 		# The client cannot substitute its own roster, budget, or movement rules.
 		rules.wave_weight = 1
@@ -48,7 +48,7 @@ func _execute_command(command: Dictionary) -> void:
 			var rules: CombatRules = _planning_rules()
 			rules.base_health = 1
 			rules.wave_weight = 1
-			rules.enemy_definitions = [rules.enemy_definitions[0]]
+			rules.catalog.enemies = [rules.catalog.enemies[0]]
 			planning.combat_rules = rules
 		_:
 			super._execute_command(command)

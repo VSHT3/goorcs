@@ -16,3 +16,5 @@ icon_texture = SubResource("AtlasBallista")
 accent = Color(0.55, 0.69, 0.43, 1)
 board_height = 1.40
 board_anchor = Vector2(0.5, 0.94)
+projectile_length = 0.26
+projectile_width = 2.0

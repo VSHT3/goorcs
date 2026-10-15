@@ -25,7 +25,10 @@ func _run() -> void:
 	board.input_enabled = false
 	viewport.add_child(board)
 	await process_frame
+	# Offscreen captures must work even when native-window drawing is suppressed.
+	RenderingServer.set_render_loop_enabled(false)
 	await _check_endpoint_idle(board, viewport)
+	RenderingServer.set_render_loop_enabled(true)
 	board.combat_enemies = [_enemy(1, 1.8, Vector2(1.8, 1), route)]
 	board.set_process(false)
 	board.combat_enemies = [_enemy(1, 2.2, Vector2(2, 1.2), route)]
@@ -527,8 +530,8 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		var foot: Vector2 = board.cell_center(tower["cell"]) + Vector2(0, board._cell_size() * 0.28)
 		var rect: Rect2 = board._sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
 		var art_scale: Vector2 = rect.size / artwork.icon_texture.get_size()
-		var second_rect := Rect2(rect.position + (PathBoard.ARCHER_CROP.position + PathBoard.SECOND_ARCHER_OFFSET) * art_scale,
-			PathBoard.ARCHER_CROP.size * art_scale)
+		var second_rect := Rect2(rect.position + (artwork.secondary_sprite_region.position + artwork.secondary_sprite_offset) * art_scale,
+			artwork.secondary_sprite_region.size * art_scale)
 		_check(int(_changed_geometry(ordinary, baseline, Rect2i(second_rect.grow(1.0)))["pixels"]) > 20,
 			"Only the special Arrow tower gains a visibly separate cropped source archer, mirrored=%s" % mirrored)
 		tower = tower.duplicate(true)
@@ -1048,6 +1051,10 @@ func _board_image(board: PathBoard, viewport: SubViewport, freeze_idle: bool = t
 		board._endpoint_timer.paused = true
 	board.queue_redraw()
 	await process_frame
+	# Native frame_post_draw can stop indefinitely while the macOS window is
+	# minimized/occluded. Flush queued canvas updates, then draw the offscreen
+	# UPDATE_ALWAYS viewport explicitly without presenting a native window.
+	RenderingServer.call_deferred("force_draw", false)
 	await RenderingServer.frame_post_draw
 	return viewport.get_texture().get_image()
 

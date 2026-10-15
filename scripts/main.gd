@@ -44,7 +44,7 @@ func _ready() -> void:
 	$Menu/Center/Panel/Collection.pressed.connect(_open_collection)
 	play_button.pressed.connect(_open_play)
 	if collection_store == null:
-		collection_store = CollectionStore.new()
+		collection_store = CollectionStore.new("user://collection.json", combat_rules.catalog)
 	session = MultiplayerSession.new()
 	session.name = "Session"
 	add_child(session)

@@ -36,13 +36,13 @@ func _new_model(with_route: bool = true) -> MatchPlanning:
 	rules.base_health = 1000
 	rules.wave_weight = 6
 	rules.wave_weight_growth = 0
-	rules.enemy_definitions = [rules.enemy_definitions[0]]
+	rules.catalog.enemies = [rules.catalog.enemies[0]]
 	rules.enemy_speed = 1.0
 	rules.speed_growth = 0.0
 	rules.health_growth = 0
-	var tower := rules.tower_definitions[0].duplicate() as TowerDefinition
+	var tower := rules.catalog.towers[0].duplicate() as TowerDefinition
 	tower.range_cells = 0.1
-	rules.tower_definitions = [tower]
+	rules.catalog.towers = [tower]
 	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.start_singleplayer()

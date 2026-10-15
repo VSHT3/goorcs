@@ -18,7 +18,7 @@ var selected_enemy_slot: int = -1
 var _default_targeting: int = 0
 var _pending_tower_cell := Vector2i(-1, -1)
 var _placement_id: StringName = &""
-var _selected_enemy_type: StringName = &"grunt"
+var _selected_enemy_type: StringName = &""
 var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 var _owns_tree_pause: bool = false
 var _special_upgrade_command: String = ""
@@ -73,8 +73,8 @@ func _ready() -> void:
 		boards[slot].tower_dropped.connect(_tower_dropped.bind(slot))
 		boards[slot].enemy_clicked.connect(_enemy_clicked.bind(slot))
 		boards[slot].command_mode = true
-		if planning != null and planning.collection_store != null:
-			boards[slot].tower_catalog = planning.collection_store.catalog
+		if planning != null:
+			boards[slot].content_catalog = planning.combat_rules.catalog
 	for selector: OptionButton in [targeting_button, secondary_targeting]:
 		selector.add_item("Furthest", 0)
 		selector.add_item("Closest", 1)
@@ -316,9 +316,7 @@ func _placement_type() -> StringName:
 
 
 func _create_palette() -> void:
-	var catalog: Array[TowerReward] = CollectionStore.DEFAULT_CATALOG
-	if planning != null and planning.collection_store != null:
-		catalog = planning.collection_store.catalog
+	var catalog: Array[TowerReward] = planning.combat_rules.catalog.tower_rewards() if planning != null else []
 	for reward: TowerReward in catalog:
 		var button := TowerShopButton.new()
 		button.name = String(reward.id)
@@ -449,7 +447,7 @@ func _refresh_enemy_selector(types: Dictionary) -> void:
 	if ids.is_empty():
 		return
 	if not ids.has(String(_selected_enemy_type)):
-		_selected_enemy_type = &"grunt" if ids.has("grunt") else StringName(ids[0])
+		_selected_enemy_type = StringName(ids[0])
 	for index: int in range(ids.size()):
 		enemy_selector.set_item_text(index, String(types[ids[index]].get("title", ids[index])))
 		if ids[index] == String(_selected_enemy_type) and enemy_selector.selected != index:

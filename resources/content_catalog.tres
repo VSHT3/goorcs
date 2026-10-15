@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ContentCatalog" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/content_catalog.gd" id="1_catalog"]
+[ext_resource type="Script" path="res://scripts/tower_definition.gd" id="2_tower"]
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="3_enemy"]
+[ext_resource type="Resource" path="res://resources/combat/towers/arrow_tower.tres" id="4_arrow"]
+[ext_resource type="Resource" path="res://resources/combat/towers/orc_ballista.tres" id="5_ballista"]
+[ext_resource type="Resource" path="res://resources/combat/towers/rune_obelisk.tres" id="6_rune"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/grunt.tres" id="7_grunt"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/runner.tres" id="8_runner"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/brute.tres" id="9_brute"]
+
+[resource]
+script = ExtResource("1_catalog")
+towers = Array[ExtResource("2_tower")]([ExtResource("4_arrow"), ExtResource("5_ballista"), ExtResource("6_rune")])
+enemies = Array[ExtResource("3_enemy")]([ExtResource("7_grunt"), ExtResource("8_runner"), ExtResource("9_brute")])

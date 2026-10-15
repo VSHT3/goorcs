@@ -17,14 +17,14 @@ func _planning_rules() -> CombatRules:
 	rules.starting_coins = 2000
 	rules.wave_weight = 1
 	rules.wave_weight_growth = 0
-	rules.enemy_definitions = [rules.enemy_definitions[0]]
+	rules.catalog.enemies = [rules.catalog.enemies[0]]
 	rules.enemy_speed = 26.0
 	rules.speed_growth = 0.0
 	rules.health_growth = 0
 	rules.spawn_interval = 0.0
-	var tower := rules.tower_definitions[0].duplicate() as TowerDefinition
+	var tower := rules.catalog.towers[0].duplicate() as TowerDefinition
 	tower.range_cells = 0.1
-	rules.tower_definitions = [tower]
+	rules.catalog.towers = [tower]
 	if _lane == "guest":
 		# Neither local tuning nor elapsed-time calls may decide host outcomes.
 		rules.main_round_interval = 3

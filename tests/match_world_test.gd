@@ -75,7 +75,7 @@ func _check_top_row_visibility(own_slot: int) -> void:
 		await _settle()
 		var board: PathBoard = world.boards[own_slot]
 		var header: Control = screen.get_node("HUD/Header")
-		for artwork: TowerReward in board.tower_catalog:
+		for artwork: TowerReward in board.content_catalog.tower_rewards():
 			var rect: Rect2 = board._sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor,
 				board.cell_center(Vector2i(6, 0)) + Vector2(0, board._cell_size() * 0.28))
 			var bounds: Rect2 = board._texture_bounds[artwork.icon_texture]

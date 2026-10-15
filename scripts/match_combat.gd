@@ -78,20 +78,17 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		_roster_configuration_valid = false
 	base_health = [rules.base_health, rules.base_health]
 	coins = [rules.starting_coins, rules.starting_coins]
-	for definition: EnemyDefinition in rules.enemy_definitions:
-		if definition == null:
-			push_error("Combat enemy_definitions contains a null entry")
-			_roster_configuration_valid = false
-			continue
+	if rules.catalog == null:
+		push_error("Combat requires a content catalog")
+		_roster_configuration_valid = false
+		return
+	var catalog_errors: PackedStringArray = rules.catalog.validation_errors()
+	if not catalog_errors.is_empty():
+		push_error("Invalid content catalog: " + " ".join(catalog_errors))
+		_roster_configuration_valid = false
+		return
+	for definition: EnemyDefinition in rules.catalog.enemies:
 		var type_id: String = String(definition.id)
-		if type_id.is_empty() or definition.title.is_empty() or not is_finite(definition.health_multiplier) or definition.health_multiplier <= 0.0 or not is_finite(definition.speed_multiplier) or definition.speed_multiplier <= 0.0 or definition.send_cost <= 0 or definition.send_income < 0 or definition.base_damage <= 0 or definition.spawn_weight <= 0 or definition.first_wave < 1 or definition.max_per_wave < 0 or definition.count_cap_growth < 0 or definition.count_cap_growth_interval < 1 or not is_finite(definition.max_weight_share) or definition.max_weight_share < 0.0 or definition.max_weight_share > 1.0:
-			push_error("Invalid combat enemy definition '%s': require positive multipliers/price/damage/weight/unlock/growth interval, nonnegative income/count cap/growth, and finite share in [0, 1]" % type_id)
-			_roster_configuration_valid = false
-			continue
-		if _enemy_types.has(type_id):
-			push_error("Duplicate combat enemy definition '%s'" % type_id)
-			_roster_configuration_valid = false
-			continue
 		_enemy_types[type_id] = {
 			"title": definition.title, "health_multiplier": definition.health_multiplier,
 			"description": definition.description,
@@ -103,26 +100,15 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"count_cap_growth_interval": definition.count_cap_growth_interval,
 			"max_weight_share": definition.max_weight_share,
 		}
-	if not _enemy_types.has("grunt") or int(_enemy_types["grunt"]["spawn_weight"]) != 1 or int(_enemy_types["grunt"]["first_wave"]) != 1 or int(_enemy_types["grunt"]["max_per_wave"]) != 0 or float(_enemy_types["grunt"]["max_weight_share"]) != 1.0:
-		push_error("Combat regular waves require an always-unlocked weight-one Grunt with unlimited count and full weight share")
+	var has_remainder_enemy: bool = false
+	for definition: EnemyDefinition in rules.catalog.enemies:
+		if definition.spawn_weight == 1 and definition.first_wave == 1 and definition.max_per_wave == 0 and definition.max_weight_share == 1.0:
+			has_remainder_enemy = true
+	if not has_remainder_enemy:
+		push_error("Combat regular waves require an always-unlocked weight-one enemy with unlimited count and full weight share")
 		_roster_configuration_valid = false
-	for definition: TowerDefinition in rules.tower_definitions:
-		if definition == null:
-			push_error("Combat tower_definitions contains a null entry")
-			continue
-		if definition.reward == null:
-			push_error("Combat tower definition '%s' has no reward" % definition.resource_path)
-			continue
+	for definition: TowerDefinition in rules.catalog.towers:
 		var type_id: String = String(definition.reward.id)
-		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0 or definition.cost <= 0 or definition.upgrade_base_cost <= 0 or definition.damage_upgrade_bonus <= 0 or not is_finite(definition.speed_upgrade_multiplier) or definition.speed_upgrade_multiplier <= 0.0 or definition.speed_upgrade_multiplier >= 1.0:
-			push_error("Invalid combat tower definition '%s' (%s): positive stats/prices and speed multiplier between zero and one are required" % [type_id, definition.resource_path])
-			continue
-		if definition.special_upgrade not in ["", "second_archer"] or (not definition.special_upgrade.is_empty() and (definition.special_upgrade_title.is_empty() or definition.special_upgrade_cost <= 0)) or not _valid_evolutions(definition):
-			push_error("Invalid combat special upgrade for tower '%s'" % type_id)
-			continue
-		if _tower_types.has(type_id):
-			push_error("Duplicate combat tower definition '%s': keeping the first valid definition" % type_id)
-			continue
 		_tower_types[type_id] = {
 			"title": definition.reward.title, "damage": definition.damage,
 			"range": definition.range_cells, "interval": definition.interval,
@@ -137,40 +123,6 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		}
 
 
-static func _valid_evolutions(definition: TowerDefinition) -> bool:
-	if not definition.evolutions.is_empty() and not definition.special_upgrade.is_empty():
-		return false
-	for branch: Variant in definition.evolutions:
-		if not branch is String or branch not in ["boulders", "onyx_ring", "pierce", "bounce"] or not definition.evolutions[branch] is Dictionary:
-			return false
-		var config: Dictionary = definition.evolutions[branch]
-		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
-			return false
-		if branch in ["pierce", "bounce"]:
-			if definition.area_attack or config.size() != 2:
-				return false
-			for other_branch: Variant in definition.evolutions:
-				if other_branch not in ["pierce", "bounce"]:
-					return false
-			continue
-		if not config.get("damage") is int or int(config["damage"]) <= 0 or not config.get("continuous") is bool:
-			return false
-		if typeof(config.get("interval")) not in [TYPE_FLOAT, TYPE_INT]:
-			return false
-		var interval: float = float(config["interval"])
-		if not is_finite(interval) or (bool(config["continuous"]) and interval != 0.0) or (not bool(config["continuous"]) and interval <= 0.0):
-			return false
-		if bool(config["continuous"]) != (branch == "boulders") or not definition.area_attack:
-			return false
-		if branch == "boulders" and not config.has("followup"):
-			return false
-		if config.has("followup"):
-			if branch != "boulders" or not config["followup"] is Dictionary:
-				return false
-			var followup: Dictionary = config["followup"]
-			if followup.get("id") != "freeze_runes" or not followup.get("title") is String or String(followup["title"]).is_empty() or not followup.get("cost") is int or int(followup["cost"]) <= 0:
-				return false
-	return true
 
 
 func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
@@ -619,7 +571,7 @@ func _generate_wave_roster(wave_number: int) -> Array[String]:
 			var share_cap: int = floori(float(budget) * float(definition["max_weight_share"]))
 			if wave_number >= int(definition["first_wave"]) and weight <= remaining and (count_cap == 0 or count < count_cap) and (count + 1) * weight <= share_cap:
 				eligible.append(type_id)
-		# The validated weight-one Grunt invariant guarantees exact fill.
+		# A validated weight-one remainder enemy guarantees exact fill.
 		if eligible.is_empty():
 			push_error("Combat wave %d cannot fill its remaining weight %d" % [wave_number, remaining])
 			return []

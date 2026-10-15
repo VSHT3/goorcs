@@ -30,14 +30,14 @@ func _rules() -> CombatRules:
 	rules.starting_coins = 2000
 	rules.wave_weight = 1
 	rules.wave_weight_growth = 0
-	rules.enemy_definitions = [rules.enemy_definitions[0]]
+	rules.catalog.enemies = [rules.catalog.enemies[0]]
 	rules.enemy_speed = 26.0
 	rules.speed_growth = 0.0
 	rules.health_growth = 0
 	rules.spawn_interval = 0.0
-	var tower := rules.tower_definitions[0].duplicate() as TowerDefinition
+	var tower := rules.catalog.towers[0].duplicate() as TowerDefinition
 	tower.range_cells = 0.1
-	rules.tower_definitions = [tower]
+	rules.catalog.towers = [tower]
 	return rules
 
 
@@ -175,6 +175,7 @@ func _test_strategy_growth_and_reset() -> void:
 			expected_tower["aim"] += Vector2(0, expansions)
 			expected_tower["secondary_aim"] += Vector2(0, expansions)
 			expected_tower["bounce_aim"] += Vector2(0, expansions)
+			expected_tower["pierce_aim"] += Vector2(0, expansions)
 			_check(planning.combat["towers"][slot][0] == expected_tower, "Expansion preserves tower IDs, targeting, upgrades, stats, reload, kills and actual investment")
 			_check(planning.layouts[slot].entrance == Vector2i(0, 4 + expansions) and planning.layouts[slot].base == Vector2i(13, 4 + expansions) and expected_tower["cell"] == original_towers[slot][0]["cell"] + Vector2i(0, expansions) and expected_tower["aim"] == original_towers[slot][0]["aim"] + Vector2(0, expansions), "Endpoints, tower cells and aim retain their old x coordinates and only reindex y")
 		if upcoming in [10, 20, 30]:

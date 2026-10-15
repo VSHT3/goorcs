@@ -15,7 +15,7 @@ func _run() -> void:
 	var archive_sides: Array[int] = []
 	for area: Vector2i in [Vector2i(52, 90), Vector2i(174, 90), Vector2i(240, 120), Vector2i(32, 45)]:
 		var sides: Array[int] = []
-		for reward: TowerReward in CollectionStore.DEFAULT_CATALOG:
+		for reward: TowerReward in preload("res://resources/content_catalog.tres").tower_rewards():
 			var viewport := SubViewport.new()
 			viewport.size = area
 			viewport.transparent_bg = true
@@ -43,7 +43,7 @@ func _run() -> void:
 			archive_sides.assign(sides)
 		elif area.x >= 52 and area.y >= 90:
 			for index: int in range(sides.size()):
-				_check(absi(sides[index] - archive_sides[index]) <= 2, "Expanding a reward card cannot enlarge %s beyond its archive size" % CollectionStore.DEFAULT_CATALOG[index].title)
+				_check(absi(sides[index] - archive_sides[index]) <= 2, "Expanding a reward card cannot enlarge %s beyond its archive size" % preload("res://resources/content_catalog.tres").towers[index].reward.title)
 	if failures == 0:
 		print("PASS: rendered tower icons have consistent centered visual size in archive, expanded reward, and compact areas")
 	quit(1 if failures > 0 else 0)

@@ -236,7 +236,7 @@ func _test_sent_kills_and_clearance() -> void:
 	tower.range_cells = 100.0
 	tower.interval = 0.01
 	tower.area_attack = true
-	rules.tower_definitions = [tower]
+	rules.catalog.towers = [tower]
 	var combat := _combat(rules)
 	combat.build(0, Vector2i(0, 1), reward.id, MatchCombat.TargetMode.STRONGEST)
 	combat.build(1, Vector2i(0, 1), reward.id, MatchCombat.TargetMode.STRONGEST)

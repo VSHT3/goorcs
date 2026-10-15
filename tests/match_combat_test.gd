@@ -66,7 +66,7 @@ func _rules() -> CombatRules:
 	# These combat/economy fixtures intentionally isolate regular cadence from timing variation.
 	rules.spawn_jitter_ratio = 0.0
 	rules.spawn_interval_reduction_per_wave = 0.0
-	rules.tower_definitions = [_definition(&"arrow_tower", 2, 20.0, 0.5)]
+	rules.catalog.towers = [_definition(&"arrow_tower", 2, 20.0, 0.5)]
 	rules.health_growth = 2
 	rules.speed_growth = 0.0
 	rules.wave_weight_growth = 0
@@ -146,7 +146,7 @@ func _test_commands_and_snapshots() -> void:
 	copy["towers"][0][0]["type_id"] = "changed_type"
 	var fresh: Dictionary = combat.snapshot()
 	_check(fresh["health"][0] == 10 and fresh["towers"][0][0]["mode"] == 1 and fresh["enemies"][0][0]["hp"] == 6 and fresh["spawned"][0] == 1 and fresh["towers"][0][0]["type_id"] == "arrow_tower", "Snapshot nested arrays/dictionaries are detached from authoritative state")
-	_check(fresh["tower_types"]["arrow_tower"] == _type_snapshot(_rules().tower_definitions[0]), "Tower type titles and all authoritative stats are detached from snapshots")
+	_check(fresh["tower_types"]["arrow_tower"] == _type_snapshot(_rules().catalog.towers[0]), "Tower type titles and all authoritative stats are detached from snapshots")
 	_check(fresh["coins"] == [155, 155] and fresh["towers"][0][0]["damage"] == 2 and fresh["towers"][0][0]["invested"] == 45 and fresh["towers"][0][0]["kills"] == 0, "Snapshot currency and effective tower stats cannot alter host state")
 	_check(not fresh["rules"].has("damage") and not fresh["rules"].has("range") and not fresh["rules"].has("interval"), "Rules snapshot has no obsolete global tower stats")
 	_check(not combat.advance(0.0) and not combat.advance(-1.0), "Nonpositive ticks cannot mutate combat")
@@ -178,7 +178,7 @@ func _test_range_and_ties() -> void:
 	var rules := _rules()
 	rules.enemy_speed = 0.0
 	rules.wave_weight = 1
-	rules.tower_definitions[0].range_cells = 3.0
+	rules.catalog.towers[0].range_cells = 3.0
 	var combat := MatchCombat.new(rules)
 	combat.build(0, Vector2i(0, 3), &"arrow_tower", 0)
 	combat.build(0, Vector2i(3, 3), &"arrow_tower", 0)
@@ -239,8 +239,8 @@ func _test_kills_and_persistence() -> void:
 	rules.wave_weight = 2
 	rules.enemy_health = 2
 	rules.health_growth = 2
-	rules.tower_definitions[0].damage = 20
-	rules.tower_definitions[0].interval = 0.1
+	rules.catalog.towers[0].damage = 20
+	rules.catalog.towers[0].interval = 0.1
 	var combat := MatchCombat.new(rules)
 	combat.build(0, Vector2i(1, 1), &"arrow_tower", 0)
 	combat.start_wave(_routes(2, 2))
@@ -270,7 +270,7 @@ func _test_tower_type_stats() -> void:
 	var boundary_shots: Array[int] = [1, 2, 0]
 	for index: int in range(type_ids.size()):
 		var rules := CombatRules.new()
-		var interval: float = rules.tower_definitions[index].interval
+		var interval: float = rules.catalog.towers[index].interval
 		rules.enemy_health = 100
 		rules.enemy_speed = 0.0
 		rules.wave_weight = 2
@@ -297,10 +297,10 @@ func _test_custom_tower_definition() -> void:
 	rules.enemy_speed = 0.0
 	rules.wave_weight = 1
 	# Detach the default array before adding a local definition; never mutate shared resources.
-	rules.tower_definitions = rules.tower_definitions.duplicate()
+	rules.catalog.towers = rules.catalog.towers.duplicate()
 	var custom := _definition(&"test_fourth_tower", 9, 6.0, 0.2)
 	custom.reward.title = "Test fourth tower"
-	rules.tower_definitions.append(custom)
+	rules.catalog.towers.append(custom)
 	var combat := MatchCombat.new(rules)
 	_check(combat.build(0, Vector2i(0, 5), &"test_fourth_tower", MatchCombat.TargetMode.STRONGEST), "A fourth resource-defined ID builds without any code branch")
 	var types: Dictionary = combat.snapshot()["tower_types"]
@@ -405,7 +405,7 @@ func _test_economy_and_upgrades() -> void:
 	_check(not combat.upgrade_tower(0, replacement["id"], "damage") and not combat.upgrade_tower(0, replacement["id"], "speed") and combat.snapshot() == frozen, "Unaffordable upgrades leave Coins, readiness-independent stats, and investment untouched")
 	_check(combat.sell_tower(0, replacement["id"]) and combat.coins[0] == 54, "Sale/rebuy loses money rather than manufacturing it")
 	var rounding_rules := _rules()
-	rounding_rules.tower_definitions[0].cost = 46
+	rounding_rules.catalog.towers[0].cost = 46
 	combat = MatchCombat.new(rounding_rules)
 	combat.build(0, Vector2i(1, 1), &"arrow_tower", 0)
 	_check(combat.towers[0][0]["sell_value"] == 27 and combat.sell_tower(0, 1) and combat.coins[0] == 181, "Sale floors fractional refund Coins")
@@ -415,7 +415,7 @@ func _test_level_pricing_orders() -> void:
 	for base_cost: int in [30, 55]:
 		for first: String in ["damage", "speed"]:
 			var rules := _rules()
-			rules.tower_definitions[0].upgrade_base_cost = base_cost
+			rules.catalog.towers[0].upgrade_base_cost = base_cost
 			var second_cost: int = ceili(base_cost * 1.5)
 			var invested: int = 45 + base_cost + second_cost
 			rules.starting_coins = invested
@@ -447,7 +447,7 @@ func _test_area_kills_and_bounties() -> void:
 	rules.spawn_interval = 0.0
 	var area := _definition(&"test_area", 2, 1.0, 0.5)
 	area.area_attack = true
-	rules.tower_definitions = [area]
+	rules.catalog.towers = [area]
 	var combat := MatchCombat.new(rules)
 	combat.start_wave(_routes())
 	combat.advance(0.1)
@@ -562,8 +562,8 @@ func _test_enemy_sends() -> void:
 	_check(combat.coins == [83, 99] and combat.base_health == [7, 6], "The same income bonus pays again on a later clear without another send")
 	# Sent enemies use ordinary attack, kill attribution and bounty rules.
 	rules.starting_coins = 200
-	rules.tower_definitions[0].damage = 100
-	rules.tower_definitions[0].interval = 0.01
+	rules.catalog.towers[0].damage = 100
+	rules.catalog.towers[0].interval = 0.01
 	combat = MatchCombat.new(rules)
 	combat.send_enemy(0, &"grunt")
 	combat.build(1, Vector2i(0, 1), &"arrow_tower", 0)
@@ -618,9 +618,9 @@ func _test_typed_enemy_sends() -> void:
 	combat.start_wave(_routes(4, 4))
 	_check(combat.enemies == [[], []], "Delivered mixed orders are absent from the following wave")
 	# Resource edits after admission cannot rewrite captured type rules.
-	var detached: EnemyDefinition = rules.enemy_definitions[1].duplicate()
-	rules.enemy_definitions = rules.enemy_definitions.duplicate()
-	rules.enemy_definitions[1] = detached
+	var detached: EnemyDefinition = rules.catalog.enemies[1].duplicate()
+	rules.catalog.enemies = rules.catalog.enemies.duplicate()
+	rules.catalog.enemies[1] = detached
 	combat = MatchCombat.new(rules)
 	detached.send_cost = 1
 	detached.send_income = 99
@@ -641,8 +641,8 @@ func _test_typed_enemy_defense() -> void:
 	rules.wave_weight = 1
 	rules.spawn_interval = 0.0
 	rules.enemy_speed = 0.0
-	rules.tower_definitions[0].damage = 5
-	rules.tower_definitions[0].interval = 0.1
+	rules.catalog.towers[0].damage = 5
+	rules.catalog.towers[0].interval = 0.1
 	var combat := MatchCombat.new(rules)
 	combat.send_enemy(0, &"runner")
 	combat.send_enemy(0, &"brute")
@@ -656,7 +656,7 @@ func _test_typed_enemy_defense() -> void:
 	_check(combat.enemies[1].size() == 2 and combat.towers[1][0]["kills"] == 1 and combat.coins[1] == 158, "A killed Runner pays the normal bounty once and is removed before leaks")
 	var area := _definition(&"test_area", 5, 1.0, 0.1)
 	area.area_attack = true
-	rules.tower_definitions = [area]
+	rules.catalog.towers = [area]
 	combat = MatchCombat.new(rules)
 	combat.send_enemy(0, &"runner")
 	combat.send_enemy(0, &"brute")
@@ -742,7 +742,7 @@ func _test_growing_count_caps() -> void:
 	var rules := CombatRules.new()
 	rules.wave_weight = 100
 	rules.wave_weight_growth = 0
-	rules.enemy_definitions = rules.enemy_definitions.duplicate()
+	rules.catalog.enemies = rules.catalog.enemies.duplicate()
 	var growing := EnemyDefinition.new()
 	growing.id = &"test_growing_enemy"
 	growing.title = "Growing"
@@ -752,7 +752,7 @@ func _test_growing_count_caps() -> void:
 	growing.count_cap_growth = 2
 	growing.count_cap_growth_interval = 3
 	growing.max_weight_share = 1.0
-	rules.enemy_definitions = [rules.enemy_definitions[0], growing]
+	rules.catalog.enemies = [rules.catalog.enemies[0], growing]
 	for example: Vector2i in [Vector2i(3, 0), Vector2i(4, 2), Vector2i(6, 2), Vector2i(7, 4), Vector2i(9, 4), Vector2i(10, 6)]:
 		var combat := MatchCombat.new(rules, null, _wave_rng(17))
 		combat.wave = example.x - 1
@@ -784,7 +784,7 @@ func _test_growing_count_caps() -> void:
 func _test_weighted_wave_randomness_and_extension() -> void:
 	var variants: Dictionary = {}
 	var rules := CombatRules.new()
-	rules.enemy_definitions = rules.enemy_definitions.duplicate()
+	rules.catalog.enemies = rules.catalog.enemies.duplicate()
 	var fourth := EnemyDefinition.new()
 	fourth.id = &"test_fourth_enemy"
 	fourth.title = "Fourth"
@@ -795,7 +795,7 @@ func _test_weighted_wave_randomness_and_extension() -> void:
 	fourth.base_damage = 2
 	fourth.health_multiplier = 1.25
 	fourth.speed_multiplier = 0.9
-	rules.enemy_definitions.append(fourth)
+	rules.catalog.enemies.append(fourth)
 	var saw_fourth: bool = false
 	for seed_value: int in range(32):
 		var first := MatchCombat.new(rules, null, _wave_rng(seed_value))
@@ -985,7 +985,7 @@ func _special_rules(type_id: StringName, hp: int = 100, count: int = 3) -> Comba
 	rules.spawn_jitter_ratio = 0.0
 	rules.spawn_interval_reduction_per_wave = 0.0
 	var definition: TowerDefinition = load("res://resources/combat/towers/%s.tres" % type_id).duplicate(true)
-	rules.tower_definitions = [definition]
+	rules.catalog.towers = [definition]
 	return rules
 
 
@@ -1189,24 +1189,24 @@ func _test_ballista_bounce() -> void:
 func _test_ballista_configuration() -> void:
 	for branch: String in ["pierce", "bounce"]:
 		var rules := _special_rules(&"orc_ballista")
-		var definition: TowerDefinition = rules.tower_definitions[0]
+		var definition: TowerDefinition = rules.catalog.towers[0]
 		definition.evolutions[branch]["cost"] = 137
 		definition.evolutions[branch]["title"] = "Custom branch"
 		var expected: Dictionary = definition.evolutions.duplicate(true)
-		_check(MatchCombat._valid_evolutions(definition), "Ballista accepts title/price-only branch configurations")
+		_check(TowerDefinition.valid_evolutions(definition), "Ballista accepts title/price-only branch configurations")
 		for invalid: Variant in [null, {}, {"title": "", "cost": 137}, {"title": 12, "cost": 137}, {"title": "Branch", "cost": 0}, {"title": "Branch", "cost": 1.5}, {"title": "Branch", "cost": 137, "damage": 9}, {"title": "Branch", "cost": 137, "interval": 1.0}, {"title": "Branch", "cost": 137, "continuous": false}, {"title": "Branch", "cost": 137, "followup": {}}]:
 			var candidate: TowerDefinition = definition.duplicate(true)
 			candidate.evolutions[branch] = invalid
-			_check(not MatchCombat._valid_evolutions(candidate), "Ballista rejects malformed metadata and Rune-only attack/followup fields")
+			_check(not TowerDefinition.valid_evolutions(candidate), "Ballista rejects malformed metadata and Rune-only attack/followup fields")
 		var candidate: TowerDefinition = definition.duplicate(true)
 		candidate.area_attack = true
-		_check(not MatchCombat._valid_evolutions(candidate), "Ballista branches cannot enter the area attack path")
+		_check(not TowerDefinition.valid_evolutions(candidate), "Ballista branches cannot enter the area attack path")
 		candidate = definition.duplicate(true)
 		candidate.evolutions["unknown"] = {"title": "Unknown", "cost": 137}
-		_check(not MatchCombat._valid_evolutions(candidate), "Unknown Ballista branches are rejected")
+		_check(not TowerDefinition.valid_evolutions(candidate), "Unknown Ballista branches are rejected")
 		candidate = definition.duplicate(true)
 		candidate.evolutions["boulders"] = {"title": "Mixed", "cost": 137, "damage": 6, "interval": 0.0, "continuous": true}
-		_check(not MatchCombat._valid_evolutions(candidate), "Ballista and Rune schemas cannot mix")
+		_check(not TowerDefinition.valid_evolutions(candidate), "Ballista and Rune schemas cannot mix")
 		var combat := _prepared_special(rules, &"orc_ballista")
 		var tower: Dictionary = combat.towers[0][0]
 		definition.evolutions[branch]["cost"] = 1
@@ -1341,7 +1341,7 @@ func _prepared_evolution(branch: String, rules: CombatRules) -> MatchCombat:
 
 func _test_evolution_configuration() -> void:
 	var rules := _special_rules(&"rune_obelisk")
-	var definition: TowerDefinition = rules.tower_definitions[0]
+	var definition: TowerDefinition = rules.catalog.towers[0]
 	definition.evolutions["boulders"]["followup"]["cost"] = 137
 	var expected: Dictionary = definition.evolutions.duplicate(true)
 	var invalid_configs: Array[Dictionary] = [
@@ -1361,32 +1361,32 @@ func _test_evolution_configuration() -> void:
 	for invalid: Dictionary in invalid_configs:
 		var candidate: TowerDefinition = definition.duplicate(true)
 		candidate.evolutions["boulders"][invalid["field"]] = invalid["value"]
-		_check(not MatchCombat._valid_evolutions(candidate), "Malformed evolution %s is rejected before capture or payment" % invalid["field"])
+		_check(not TowerDefinition.valid_evolutions(candidate), "Malformed evolution %s is rejected before capture or payment" % invalid["field"])
 	var candidate: TowerDefinition = definition.duplicate(true)
 	candidate.evolutions["onyx_ring"]["interval"] = 0.0
-	_check(not MatchCombat._valid_evolutions(candidate), "A discrete branch cannot have a zero interval")
+	_check(not TowerDefinition.valid_evolutions(candidate), "A discrete branch cannot have a zero interval")
 	candidate = definition.duplicate(true)
 	candidate.evolutions["unknown"] = candidate.evolutions["boulders"]
-	_check(not MatchCombat._valid_evolutions(candidate), "Unknown evolution names cannot enter the command contract")
+	_check(not TowerDefinition.valid_evolutions(candidate), "Unknown evolution names cannot enter the command contract")
 	candidate = definition.duplicate(true)
 	candidate.evolutions["boulders"] = 6
-	_check(not MatchCombat._valid_evolutions(candidate), "An evolution must contain a configuration dictionary")
+	_check(not TowerDefinition.valid_evolutions(candidate), "An evolution must contain a configuration dictionary")
 	candidate = definition.duplicate(true)
 	candidate.area_attack = false
-	_check(not MatchCombat._valid_evolutions(candidate), "Neighborhood evolutions require an area-attack definition")
+	_check(not TowerDefinition.valid_evolutions(candidate), "Neighborhood evolutions require an area-attack definition")
 	candidate = definition.duplicate(true)
 	candidate.special_upgrade = "second_archer"
-	_check(not MatchCombat._valid_evolutions(candidate), "Generic special and mutually exclusive evolutions cannot coexist")
+	_check(not TowerDefinition.valid_evolutions(candidate), "Generic special and mutually exclusive evolutions cannot coexist")
 	for invalid: Variant in [null, {}, {"id": "unknown", "title": "Freeze Runes", "cost": 250}, {"id": "freeze_runes", "title": "", "cost": 250}, {"id": "freeze_runes", "title": "Freeze Runes", "cost": 0}, {"id": "freeze_runes", "title": "Freeze Runes", "cost": 250.0}]:
 		candidate = definition.duplicate(true)
 		candidate.evolutions["boulders"]["followup"] = invalid
-		_check(not MatchCombat._valid_evolutions(candidate), "Malformed Freeze followup cannot enter captured configuration")
+		_check(not TowerDefinition.valid_evolutions(candidate), "Malformed Freeze followup cannot enter captured configuration")
 	candidate = definition.duplicate(true)
 	candidate.evolutions["boulders"].erase("followup")
-	_check(not MatchCombat._valid_evolutions(candidate), "Boulders requires its explicit followup metadata")
+	_check(not TowerDefinition.valid_evolutions(candidate), "Boulders requires its explicit followup metadata")
 	candidate = definition.duplicate(true)
 	candidate.evolutions["onyx_ring"]["followup"] = candidate.evolutions["boulders"]["followup"]
-	_check(not MatchCombat._valid_evolutions(candidate), "Onyx cannot advertise the exclusive Boulders followup")
+	_check(not TowerDefinition.valid_evolutions(candidate), "Onyx cannot advertise the exclusive Boulders followup")
 	var combat := _prepared_special(rules, &"rune_obelisk")
 	var captured: Dictionary = combat.snapshot()["tower_types"]["rune_obelisk"]["evolutions"]
 	definition.evolutions["boulders"]["damage"] = 999

@@ -11,107 +11,51 @@ No Node.js, .NET SDK, external packages, export templates, or MCP servers are re
 The commands below assume the Godot binary is available as `godot`; substitute its absolute path if necessary.
 
 ```sh
-# Confirm the installed version matches the required release above.
-godot --version
-
-# Open the editor.
-godot --editor --path .
-
-# Run the project.
-godot --path .
-
-# Import resources without opening a graphical editor.
-godot --headless --path . --import
-
-# Smoke-run the current main scene, then quit.
-godot --headless --path . --quit-after 10
-
-# Run path-rule regressions.
-godot --headless --path . --script tests/path_layout_test.gd
-
-# Run navigation and drawing-state regressions.
-godot --headless --path . --script tests/navigation_test.gd
-
-# Run workshop feedback-layout and compact navigation regressions.
-godot --headless --path . --script tests/workshop_ui_test.gd
-
-# Run continuous match-world camera, input, and fixed-HUD regressions.
-godot --headless --path . --script tests/match_world_test.gd
-
-# Run four-way camera, growth-origin, cursor zoom, and HUD-priority regressions.
-godot --headless --path . --script tests/match_camera_test.gd
-
-# Run host/solo round and money debug transactions and retained-growth regressions.
-godot --headless --path . --script tests/match_debug_test.gd
-
-# Run collection grant and save-failure regressions.
-godot --headless --path . --script tests/collection_store_test.gd
-
-# Run chest presentation lifecycle and layout regressions.
-godot --headless --path . --script tests/chest_reveal_test.gd
-
-# Run collection-screen navigation and grant regressions.
-godot --headless --path . --script tests/chest_flow_test.gd
-
-# Run real multi-process connection/authentication regressions.
-godot --headless --path . --script tests/multiplayer_session_test.gd
-
-# Run real two-process shared-planning regressions.
-godot --headless --path . --script tests/match_planning_test.gd
-
-# Run main-round/Ready/expansion rules and separate real-peer progression.
-godot --headless --path . --script tests/match_progression_test.gd
-godot --headless --path . --script tests/match_progression_peer_test.gd
-
-# Run offline mirrored-opponent regressions.
-godot --headless --path . --script tests/singleplayer_test.gd
-
-# Run actual GUI tower-drag/drop regressions in an isolated viewport.
-godot --headless --path . --script tests/match_drag_test.gd
-
-# Run deterministic combat-rule regressions.
-godot --headless --path . --script tests/match_combat_test.gd
-
-# Run independent paid-send FIFO, clearance, and actual host/client delivery regressions.
-godot --headless --path . --script tests/match_send_stream_test.gd
-godot --headless --path . --script tests/match_send_stream_peer_test.gd
-
-# Run bounded portal timetable rules and separate host/client spawn agreement.
-godot --headless --path . --script tests/match_spawn_timing_test.gd
-godot --headless --path . --script tests/match_spawn_timing_peer_test.gd
-
-# Run real two-process combat/result regressions.
-godot --headless --path . --script tests/match_multiplayer_test.gd
-
-# Run solo clocks/autoplay and real peer pacing/weighted-roster regressions.
-godot --headless --path . --script tests/match_pacing_test.gd
-
-# Run real host/client shortest-branch routing regressions.
-godot --headless --path . --script tests/match_branch_test.gd
-
-# Run rendered tower-size regressions (requires a graphical renderer).
-godot --path . --script tests/tower_icon_test.gd
-
-# Run movement interpolation and rendered path-junction regressions.
-godot --path . --script tests/path_board_test.gd
-
-# Run small mixed-body, cosmetic spread, overlap picking, and corner regressions.
-godot --path . --script tests/horde_presentation_test.gd
-
-# Run rendered enemy-inspection and live-instance UI regressions.
-godot --path . --script tests/enemy_inspection_test.gd
-
-# Run native Orc-O replay/lifecycle and mouse-to-keyboard menu focus transfer.
-godot --path . --script tests/menu_wordmark_test.gd
-
-# Run solo pause/resume, modal input, audio settings/persistence, and teardown regressions.
-godot --headless --path . --script tests/match_pause_test.gd
-
-# Run collection-driven tower-selection and resource-extension regressions.
-godot --headless --path . --script tests/tower_selection_test.gd
+godot --editor --path .  # Open the editor.
+godot --path .           # Run the actual game, using your normal saves.
 ```
 
-A headless pass verifies that the project loads and runs, not that the visuals or interactions are correct. Inspect runtime errors as well as the exit status.
+### Single-command verification
+
+Install **Python 3.10 or newer** for development verification; its standard library is sufficient. Python is not a game/runtime dependency. The runner supports macOS and Linux and requires the exact official standard-engine build `4.7.2.stable.official.ed1daf0bf`; `godot --version` reports that string. A different release or custom build fails the version gate rather than silently changing test behavior.
+
+From the repository root:
+
+```sh
+python3 tools/verify.py headless  # Import, save-isolation/startup gates, and every headless test.
+python3 tools/verify.py rendered  # Import, save-isolation/startup gates, and every rendered test.
+python3 tools/verify.py all       # Both modes in one isolated project.
+
+# Override the executable with either --godot or GODOT_BIN.
+python3 tools/verify.py all --godot /Applications/Godot.app/Contents/MacOS/Godot
+GODOT_BIN=/path/to/godot python3 tools/verify.py headless
+```
+
+Each invocation copies the project into a disposable temporary directory without `.godot`, so it exercises fresh resource imports and never changes the working project's editor/import cache. Only that copy receives a unique application/save-directory identity, including the Windows/macOS setting variants; inherited `HOME`, XDG directories, and temporary directories point into the disposable workspace. Before startup or tests, an engine probe must report an actual `user://` directory inside that workspace. Separate host/client workers inherit the copied project and environment. Your normal collection and audio saves are neither copied nor overwritten. Do not replace this isolation with an unverified `--user-data-dir` flag, and do not run individual scripts directly against your personal project when preserving saves matters.
+
+Discovery recursively includes every `tests/**/*_test.gd`. Tests default to **headless**; the explicit `RENDERED_TESTS` set in `tools/verify.py` classifies the pixel/renderer-dependent board, tower-icon, horde, enemy-inspection, and menu-wordmark suites. Add future rendered suites to that set. Scripts named `*_worker.gd` run only through their owning real-peer tests, never standalone. Any other `.gd` under `tests/` is an error until classified/renamed; removed rendered entries also fail discovery. The console and `inventory.json` list every selected test, other-mode test, and worker, so a mode never silently claims the other mode's coverage.
+
+Checks run sequentially. Every invocation first gates the engine version, import (300-second limit), and actual save isolation (30 seconds); each requested mode gates main-scene startup (30 seconds) before its tests. Tests have a 180-second limit each; use `--timeout SECONDS` and `--import-timeout SECONDS` for slower machines. A failed gate stops dependent checks; failed tests do not prevent later tests in that mode from running. Nonzero exits, timeouts, Godot error diagnostics even with exit zero, and missing `PASS:` markers fail verification. Intentionally error-emitting negative tests must declare exact expected diagnostic bodies and counts in `EXPECTED_ERRORS`, keyed by test path; unexpected or missing diagnostics still fail. Do not exempt an entire suite or all `push_error` output.
+
+For a clean import only, the disposable copy temporarily omits the project GUI's `theme/custom_font` setting: Godot otherwise tries to load its imported font data before that first import has created it. The font asset is still imported normally. The exact copied configuration is restored immediately afterward (also on failure/interruption), before the save probe, startup, and all tests; those checks exercise the configured font without diagnostic exemptions.
+
+Logs are retained under ignored `.verify-logs/<UTC timestamp>-<mode>-<unique suffix>/`, including per-check commands, combined stdout/stderr, engine logs, test inventory, `summary.json`, and surviving worker logs after a failure/timeout. Choose a new custom location with `--log-dir PATH` (the directory must not already exist). Temporary project/import/save data is removed on completion or interruption; durable logs remain for inspection. Timeout, Ctrl-C, and SIGTERM cleanup terminates all discovered spawned process groups, including detached Godot host/client sessions. The runner tracks descendants and its unique workspace marker because Godot's Unix `OS.create_process()` starts a new session. Uncatchable termination (SIGKILL, a power loss, or forced OS shutdown) cannot run cleanup.
+
+Process discovery restricts ownership to the current user, excludes zombie/dead processes, and ignores nonpositive/special process-group IDs. Before each cleanup phase, tracked groups are intersected with a fresh snapshot of live owned groups; a permission error triggers another snapshot so an already-exited group is not mistaken for failed cleanup. If signaling a still-live group fails, cleanup continues through every other group and the final kill phase, then reports the group ID and signal failure.
+
+**Rendered mode needs a real graphical display and Compatibility/OpenGL renderer.** On a macOS desktop it opens test windows; a locked/headless login or missing OpenGL support may fail. Headless success proves neither pixel output nor native desktop interactions. On Linux, install Xvfb, Xauth, and Mesa software OpenGL to run without a physical display:
+
+```sh
+LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+  xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+  python3 tools/verify.py all
+```
+
+The [verification workflow](../.github/workflows/verify.yml) uses Ubuntu, the same headless/rendered commands, Xvfb, and Mesa llvmpipe. It downloads the [official Linux x86-64 release](https://github.com/godotengine/godot-builds/releases/tag/4.7.2-stable), verifies the release asset's pinned SHA-256, grants only repository read permission, and uploads failure logs for 14 days. Software-rendered pixels are automated regressions, not proof of native GPU/driver behavior, desktop input/focus feel, sound output, performance, or internet reachability. Continue real-game inspection and separate-machine/network playtests where those claims matter. Native Windows runner/process-tree cleanup is not implemented; use Linux/WSL for automation and separately playtest the native game.
+
+Offscreen board captures explicitly request a deferred `RenderingServer.force_draw(false)` rather than relying on native-window presentation to emit `frame_post_draw`. The endpoint-idle regression disables automatic rendering while capturing and restores it afterward; this covers hidden/occluded-window draw suppression without retries or longer timeouts. Static horde pixel comparisons stop the unrelated endpoint animation timer so a portal frame change cannot masquerade as enemy movement.
+
+The initial runner verification passed all 36 checks (31 suites and five gates), including separate localhost host/client processes and rendered suites on macOS. An actual-Godot fault smoke also proved that an exit-zero error diagnostic fails verification and that a timed-out run removes its detached Godot child. Workflow YAML was parsed locally; the GitHub-hosted Linux job still requires a push/workflow run and is not covered by the macOS result.
 
 ## Repository editing rules
 
@@ -366,7 +310,7 @@ Tower-management verification passed combat rules, separate-peer planning/combat
 
 `MatchCombat.send_enemy(slot, type_id)` owns its atomic purchase/delivery/income rule. `MatchPlanning` first validates admitted sender, allowed payer, and planning commitment, then calls that owner; host-player and guest commands share this path. Unknown IDs or rejected/readied sends spend nothing and create no orders. Clients cannot grant currency, enemies, or authoritative speed.
 
-`CombatRules.enemy_definitions` registers `EnemyDefinition` resources from `resources/combat/enemies/`, owning identity, description, damage, health/speed multipliers, regular-wave composition constraints, send price/income, and artwork. `prototype.tres` owns regular-wave values and the baseline `send_spawn_interval` (0.35 simulation seconds). `MatchCombat` captures that positive finite baseline and interval-progression settings on admission; invalid cadence rejects purchase/start without mutation. Each target board has one FIFO with its own next-delivery time. Planning reserves orders without route access; starting combat delivers only its first order at time zero. Live purchases append to the same FIFO, delivering immediately only when that destination's cooldown permits. An idle stream restarts at the current host time, never backdated or burst-releasing idle slots.
+`CombatRules.catalog.enemies` registers `EnemyDefinition` resources through `resources/content_catalog.tres`, owning identity, description, damage, health/speed multipliers, regular-wave composition constraints, send price/income, and artwork. `prototype.tres` owns regular-wave values and the baseline `send_spawn_interval` (0.35 simulation seconds). `MatchCombat` captures that positive finite baseline and interval-progression settings on admission; invalid cadence rejects purchase/start without mutation. Each target board has one FIFO with its own next-delivery time. Planning reserves orders without route access; starting combat delivers only its first order at time zero. Live purchases append to the same FIFO, delivering immediately only when that destination's cooldown permits. An idle stream restarts at the current host time, never backdated or burst-releasing idle slots.
 
 Regular and sent streams consume separate clocks. Due events merge chronologically per board so coarse ticks retain actual portal order and shortest-branch rotation; regular events win equal-time ties during advancement. Each newly delivered enemy gets fractional travel from its scheduled time and its own speed. Sends never consume regular roster budget, unlock/count/share limits, timetable slots, spawn counters, or RNG draws. Both streams use ordinary enemy routes, targeting, bounties, and leak damage. Both pending send FIFOs and living enemies must empty before a surviving both-board clear pays the regular reward plus each sender's recurring income once. Income grows at purchase, not immediate currency payout; terminal defeat pays no clear reward. Reset removes queues, cooldowns, income, and enemies.
 
@@ -418,7 +362,7 @@ Timing regressions passed offset/gap/order/window bounds, singleton/pair/zero in
 | Runner | 2 | 3 | 4 + floor((n−3)/3) | 30% | 1 |
 | Brute | 5 | 6 | 2 + floor((n−6)/4) | 35% | 3 |
 
-At each accepted wave start, `MatchCombat` rolls one ordered roster using a host-only wave RNG, independent of terminal tie-breaking. Each draw must fit remaining weight, `first_wave`, the wave-specific count cap, and `floor(budget × max_weight_share)` for that type's total weight. A finite count cap is `max_per_wave + floor(max(0, n−first_wave) / count_cap_growth_interval) × count_cap_growth`; `max_per_wave = 0` stays unlimited, and zero growth keeps a fixed finite cap. Growth must be nonnegative and its interval positive. Caps are maxima, not guaranteed spawn counts; the weight-share ceiling still takes precedence if tighter. The always-unlocked, unlimited weight-one Grunt guarantees exact remainder fill. Invalid rules reject a wave start with errors instead of hanging or silently substituting a type. Both boards replay the same scheduled order with independent enemy IDs; actual per-type speed determines fractional-tick travel. `wave_roster`, `wave_weight`, and actual `total` are detached snapshot fields. Clearance waits for all actual roster entries and both boards, including sends.
+At each accepted wave start, `MatchCombat` rolls one ordered roster using a host-only wave RNG, independent of terminal tie-breaking. Each draw must fit remaining weight, `first_wave`, the wave-specific count cap, and `floor(budget × max_weight_share)` for that type's total weight. A finite count cap is `max_per_wave + floor(max(0, n−first_wave) / count_cap_growth_interval) × count_cap_growth`; `max_per_wave = 0` stays unlimited, and zero growth keeps a fixed finite cap. Growth must be nonnegative and its interval positive. Caps are maxima, not guaranteed spawn counts; the weight-share ceiling still takes precedence if tighter. At least one always-unlocked, unlimited weight-one enemy with full budget share guarantees exact remainder fill; its ID is unrestricted. Invalid rules reject a wave start instead of hanging or silently substituting a type. Both boards replay the same scheduled order with independent enemy IDs; actual per-type speed determines fractional-tick travel. `wave_roster`, `wave_weight`, and actual `total` are detached snapshot fields. Clearance waits for all actual roster entries and both boards, including sends.
 
 The budget replaces `enemies_per_wave`/`count_growth`; current configuration uses `CombatRules.wave_weight` and `wave_weight_growth`, without compatibility aliases. Larger weights account for Runner leak pressure and Brute durability/three-point leaks. Unlocks introduce threats gradually; count/share caps retain mixed defenses and prevent heavy-only waves. This is a conservative playtest configuration, not a claim of measured balance. Tune weights and scaling together after real 1v1 play.
 
@@ -433,7 +377,7 @@ The installed Grunt image is a byte-identical copy of `~/Pictures/Gorcs-PixelArt
 
 Installation verification passed resource import, graphical board regressions, combat rules, mirrored Singleplayer, and main-scene startup. A rendered main-scene smoke loaded the installed Grunt resource directly, with no temporary texture override, and exercised ordinary waves alongside Runner/Brute and towers. Both board orientations and 1280×720/1000×720 captures were inspected for actual orc silhouettes, correct facing, relative size, and clear health bars. Source/runtime checksums match. The smoke used an isolated collection save and Intel OpenGL after NVIDIA initialization warnings; its temporary harness was removed.
 
-To add an enemy, create an `EnemyDefinition` resource with stable ID, real description/artwork, positive `base_damage`/`spawn_weight`, HP/speed multipliers, send price/income, and explicit `first_wave`, starting `max_per_wave`, `count_cap_growth`, `count_cap_growth_interval`, and `max_weight_share`. Choose weight against threat from durability, speed, leak damage, and counters—not sprite size. Choose an introduction wave, then cap early count and budget share and set how the count cap grows after unlock; a 20% cap is `max_weight_share = 0.2` and can exclude the type until its weight fits the floored allowance. Keep the baseline Grunt invariant. Register the resource in `CombatRules.DEFAULT_ENEMIES`; no new generation branch, selector branch, or RPC is needed. Custom matches may override definitions but both peers need the same art/IDs. Run combat and pacing/peer regressions, verify the new type's unlock/count-growth/share/exact-fill boundaries, and playtest its pressure before calling it balanced. New mechanics require real simulation and behavior coverage.
+To add an enemy, create an `EnemyDefinition` resource and append it to `enemies` in `resources/content_catalog.tres`. The [content pipeline](content-pipeline.md) documents every field and the exact-fill invariant. No generation branch, selector branch, artwork registry, or RPC edit is needed. Both peers need the same content release. Verify unlock/count-growth/share boundaries and playtest pressure before calling it balanced; genuinely new mechanics require simulation code and behavior coverage.
 
 Typed-roster verification passed deterministic combat, mirrored Singleplayer, separate-process ENet combat/planning, camera/HUD/popup priority, native tower drag/drop, tower selection, navigation, import, and main-scene startup. The graphical board regression checks mixed silhouettes, correct centered mirroring, clear half-health bars, and facing through route corners. A separate rendered main-scene smoke exercised actual selector click plus keyboard navigation, Runner/Brute purchases, mixed queue order, immediate and next-wave delivery, real independent movement/leaks and recurring payouts, selection persistence, both camera orientations, compact placement, terminal disablement, and exact-funds Brute sending. Standard 1280×720 and compact 1000×720 captures were inspected. It ran on Intel OpenGL after NVIDIA initialization warnings, with an isolated collection save and throwaway harness.
 
@@ -448,10 +392,9 @@ Verification passed weighted/combat regressions (exact budgets, caps/unlocks, de
 ### Adding a tower
 
 1. Create `resources/collection/<id>.tres` using `TowerReward`, with a unique stable `id`, title, description, artwork, and accent. Follow an existing atlas/icon resource. Never rename IDs already stored in saves.
-2. Register that reward in `CollectionStore.DEFAULT_CATALOG` in `scripts/collection_store.gd`. The collection, chests, saved-unlock validation, and match artwork use this catalog.
-3. Create `resources/combat/towers/<id>.tres` using `TowerDefinition`, referencing the reward and supplying price, positive damage/range/interval, damage/speed upgrade costs and gains, and the area-attack flag where applicable.
-4. Register the definition in `CombatRules.tower_definitions` in `scripts/combat_rules.gd`. The shipped `prototype.tres` inherits that roster; if a custom combat resource explicitly overrides the array, add the definition to that resource too.
-5. Run import, selection, combat, real-peer combat, and rendered checks from Setup. Open a chest in an isolated collection save, select the new tower, build it, inspect its stats/art/range, and observe its attack in separate peers. Commit the resource/script UID sidecars generated by Godot.
+2. Create `resources/combat/towers/<id>.tres` using `TowerDefinition`, referencing that reward and supplying prices, positive damage/range/interval, upgrade gains, and existing attack behavior.
+3. Append the definition to `towers` in `resources/content_catalog.tres`. Collection, chests, unlock validation, shop, combat, and artwork derive from that single registration. See the [content pipeline](content-pipeline.md) for projectile and second-archer presentation metadata.
+4. Run the verification commands from Setup. Open a chest in an isolated collection save, select the new tower, build it, inspect its stats/art/range, and observe its attack in separate peers. Commit resource/script UID sidecars generated by Godot.
 
 No menu, build RPC, rendering switch, or targeting branch is needed for another current-style direct-hit tower. Build commands carry stable type IDs; the host captures its configured definitions into a type lookup and publishes detached `tower_types` stats. Definitions with missing rewards/IDs, invalid stats, or duplicate IDs emit explicit errors. New mechanics such as splash or slowing require real gameplay-rule implementation and behavior regressions, not just a description in the reward.
 

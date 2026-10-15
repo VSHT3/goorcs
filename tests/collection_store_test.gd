@@ -39,13 +39,16 @@ func _path(name: String) -> String:
 	return path
 
 
-func _catalog(size: int) -> Array[TowerReward]:
-	var rewards: Array[TowerReward] = []
+func _catalog(size: int) -> ContentCatalog:
+	var catalog := ContentCatalog.new()
 	for index: int in range(size):
 		var reward := TowerReward.new()
 		reward.id = StringName("test_tower_%d" % index)
-		rewards.append(reward)
-	return rewards
+		reward.title = "Test tower %d" % index
+		var tower := TowerDefinition.new()
+		tower.reward = reward
+		catalog.towers.append(tower)
+	return catalog
 
 
 func _rng_for_roll(expected_roll: int) -> RandomNumberGenerator:
@@ -94,7 +97,7 @@ func _test_roll_boundaries() -> void:
 
 func _test_persistence_and_exhaustion() -> void:
 	var path: String = _path("persistence.json")
-	var catalog: Array[TowerReward] = _catalog(7)
+	var catalog: ContentCatalog = _catalog(7)
 	var random: RandomNumberGenerator = _rng_for_roll(0)
 	if random == null:
 		return
@@ -109,7 +112,7 @@ func _test_persistence_and_exhaustion() -> void:
 	_check(reconstructed.error_message.is_empty(), "Reconstruction accepts the written save")
 	_check(reconstructed.unlocked_count() == 1 and reconstructed.is_unlocked(first.rewards[0].id), "Granted tower persists before any presentation")
 	var seen: Dictionary[StringName, bool] = {first.rewards[0].id: true}
-	for opening: int in range(catalog.size()):
+	for opening: int in range(catalog.towers.size()):
 		if not reconstructed.can_open():
 			break
 		var result: ChestResult = reconstructed.open_chest()
@@ -117,14 +120,14 @@ func _test_persistence_and_exhaustion() -> void:
 		for reward: TowerReward in result.rewards:
 			_check(not seen.has(reward.id), "Later openings only grant previously locked towers")
 			seen[reward.id] = true
-	_check(seen.size() == catalog.size(), "All catalog identities can be unlocked")
+	_check(seen.size() == catalog.towers.size(), "All catalog identities can be unlocked")
 	_check(reconstructed.remaining_count() == 0 and not reconstructed.can_open(), "Exhaustion disables openings")
 	var saved: String = FileAccess.get_file_as_string(path)
 	var exhausted_result: ChestResult = reconstructed.open_chest()
 	_check(exhausted_result.rewards.is_empty() and not exhausted_result.error_message.is_empty(), "Direct exhausted opening grants nothing")
 	_check(FileAccess.get_file_as_string(path) == saved, "Exhausted opening does not rewrite the save")
 	var final_store := CollectionStore.new(path, catalog)
-	_check(final_store.unlocked_count() == catalog.size() and not final_store.can_open(), "Exhaustion survives reconstruction")
+	_check(final_store.unlocked_count() == catalog.towers.size() and not final_store.can_open(), "Exhaustion survives reconstruction")
 
 
 func _test_expanded_catalog_and_capping() -> void:
@@ -152,27 +155,27 @@ func _test_expanded_catalog_and_capping() -> void:
 
 func _test_reset_progress() -> void:
 	var path: String = _path("reset.json")
-	var catalog: Array[TowerReward] = _catalog(3)
+	var catalog: ContentCatalog = _catalog(3)
 	var store := CollectionStore.new(path, catalog, _rng_for_roll(95))
 	_check_grant(store.open_chest(), 3, "Complete collection before reset")
 	_check(not store.can_open(), "Completed collection rejects more chests")
 	_check(store.reset_progress(), "Completed collection can be reset")
 	_check(store.unlocked_count() == 0 and store.can_open(), "Reset enables openings with no unlocks")
 	var restored := CollectionStore.new(path, catalog, _rng_for_roll(0))
-	for reward: TowerReward in catalog:
+	for reward: TowerReward in catalog.tower_rewards():
 		_check(not restored.is_unlocked(reward.id), "Reset removes every saved unlock")
 	_check_grant(restored.open_chest(), 1, "A reset collection can grant new rewards")
 
 
 func _test_reset_failure() -> void:
 	var path: String = _path("blocked_reset.json")
-	var catalog: Array[TowerReward] = _catalog(3)
+	var catalog: ContentCatalog = _catalog(3)
 	var store := CollectionStore.new(path, catalog, _rng_for_roll(95))
 	_check_grant(store.open_chest(), 3, "Pre-failure reset collection")
 	var previous_save: String = FileAccess.get_file_as_string(path)
 	_check(DirAccess.make_dir_absolute(path + ".tmp") == OK, "Block reset temporary save")
 	_check(not store.reset_progress(), "Failed reset reports failure")
-	for reward: TowerReward in catalog:
+	for reward: TowerReward in catalog.tower_rewards():
 		_check(store.is_unlocked(reward.id), "Failed reset retains in-memory unlocks")
 	_check(FileAccess.get_file_as_string(path) == previous_save, "Failed reset preserves saved bytes")
 
@@ -182,7 +185,7 @@ func _test_write_failure() -> void:
 	var random: RandomNumberGenerator = _rng_for_roll(0)
 	if random == null:
 		return
-	var catalog: Array[TowerReward] = _catalog(6)
+	var catalog: ContentCatalog = _catalog(6)
 	var store := CollectionStore.new(path, catalog, random)
 	var first: ChestResult = store.open_chest()
 	_check_grant(first, 1, "Pre-failure opening")
@@ -248,8 +251,8 @@ func _test_unreadable_save() -> void:
 
 
 func _test_invalid_catalog() -> void:
-	var catalog: Array[TowerReward] = _catalog(2)
-	catalog[1].id = catalog[0].id
+	var catalog: ContentCatalog = _catalog(2)
+	catalog.towers[1].reward.id = catalog.towers[0].reward.id
 	var path: String = _path("invalid_catalog.json")
 	var store := CollectionStore.new(path, catalog)
 	_check(not store.can_open() and not store.error_message.is_empty(), "Duplicate catalog IDs are rejected before granting")

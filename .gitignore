@@ -1,5 +1,7 @@
 # Godot-generated cache and editor state.
 .godot/
+.verify-logs/
+__pycache__/
 
 # Exported builds and credentials.
 builds/

@@ -25,7 +25,7 @@ func _run() -> void:
 	for count: int in [1, 3, 5]:
 		var rewards: Array[TowerReward] = []
 		for index: int in range(count):
-			rewards.append(CollectionStore.DEFAULT_CATALOG[index % CollectionStore.DEFAULT_CATALOG.size()])
+			rewards.append(preload("res://resources/content_catalog.tres").tower_rewards()[index % preload("res://resources/content_catalog.tres").towers.size()])
 		reveal.present(rewards)
 		reveal.skip()
 		reveal.skip()
@@ -94,9 +94,9 @@ func _check_restored_bounds(actual: Array[Rect2], expected: Array[Rect2]) -> voi
 
 func _check_wrapped_title_reuse(reveal: ChestReveal) -> void:
 	# Duplicate a configured resource so this fixture cannot mutate the shared catalog.
-	var reward: TowerReward = CollectionStore.DEFAULT_CATALOG[0].duplicate() as TowerReward
+	var reward: TowerReward = preload("res://resources/content_catalog.tres").towers[0].reward.duplicate() as TowerReward
 	reward.title = "Moonstone Archer"
-	var rewards: Array[TowerReward] = [reward, CollectionStore.DEFAULT_CATALOG[1], CollectionStore.DEFAULT_CATALOG[2]]
+	var rewards: Array[TowerReward] = [reward, preload("res://resources/content_catalog.tres").towers[1].reward, preload("res://resources/content_catalog.tres").towers[2].reward]
 	var previous_completions: int = completions
 	reveal.present(rewards)
 	reveal.skip()
@@ -131,7 +131,7 @@ func _check_wrapped_title_reuse(reveal: ChestReveal) -> void:
 		_check(title.get_line_count() == compact_lines, "Restoring compact width restores complete title wrapping")
 	_check(completions == previous_completions + 1, "Resize transitions do not finish or restart the presentation")
 
-	var single_reward: Array[TowerReward] = [CollectionStore.DEFAULT_CATALOG[0]]
+	var single_reward: Array[TowerReward] = [preload("res://resources/content_catalog.tres").towers[0].reward]
 	reveal.present(single_reward)
 	reveal.skip()
 	await _settle_layout()

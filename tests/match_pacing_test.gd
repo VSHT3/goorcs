@@ -26,7 +26,7 @@ func _model_rules() -> CombatRules:
 	rules.speed_growth = 0.0
 	rules.enemy_speed = 26.0
 	rules.spawn_interval = 0.05
-	rules.enemy_definitions = [rules.enemy_definitions[0]]
+	rules.catalog.enemies = [rules.catalog.enemies[0]]
 	return rules
 
 
@@ -115,11 +115,11 @@ func _test_simulation_clock() -> void:
 	rules.enemy_speed = 2.0
 	rules.enemy_health = 1000
 	rules.send_spawn_interval = 0.4
-	var tower := rules.tower_definitions[0].duplicate() as TowerDefinition
+	var tower := rules.catalog.towers[0].duplicate() as TowerDefinition
 	tower.damage = 1
 	tower.interval = 1.0
 	tower.range_cells = 50.0
-	rules.tower_definitions = [tower]
+	rules.catalog.towers = [tower]
 	var normal: MatchPlanning = _new_solo(rules)
 	var fast: MatchPlanning = _new_solo(rules)
 	for planning: MatchPlanning in [normal, fast]:

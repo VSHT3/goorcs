@@ -2,13 +2,9 @@ class_name CollectionStore
 extends RefCounted
 
 const SAVE_VERSION: int = 1
-const DEFAULT_CATALOG: Array[TowerReward] = [
-	preload("res://resources/collection/arrow_tower.tres"),
-	preload("res://resources/collection/orc_ballista.tres"),
-	preload("res://resources/collection/rune_obelisk.tres"),
-]
 
 var catalog: Array[TowerReward] = []
+var content_catalog: ContentCatalog
 var error_message: String = ""
 var _save_path: String
 var _random: RandomNumberGenerator
@@ -16,18 +12,23 @@ var _unlocked: Dictionary[StringName, bool] = {}
 
 
 func _init(save_path: String = "user://collection.json",
-		catalog_override: Array[TowerReward] = [], random: RandomNumberGenerator = null) -> void:
+		catalog_override: ContentCatalog = preload("res://resources/content_catalog.tres"), random: RandomNumberGenerator = null) -> void:
 	_save_path = save_path
-	catalog.assign(DEFAULT_CATALOG if catalog_override.is_empty() else catalog_override)
+	content_catalog = catalog_override
+	if content_catalog == null:
+		error_message = "Collection requires a content catalog."
+		return
+	var errors: PackedStringArray = content_catalog.validation_errors()
+	if not errors.is_empty():
+		error_message = "Invalid content catalog: " + " ".join(errors)
+		return
+	catalog = content_catalog.tower_rewards()
 	_random = random
 	if _random == null:
 		_random = RandomNumberGenerator.new()
 		_random.randomize()
 	var known_ids: Dictionary[StringName, bool] = {}
 	for reward: TowerReward in catalog:
-		if reward == null or reward.id == &"" or known_ids.has(reward.id):
-			error_message = "Collection catalog contains a missing or duplicate tower ID. Fix the catalog before opening chests."
-			return
 		known_ids[reward.id] = true
 	_load(known_ids)
 

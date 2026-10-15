@@ -26,6 +26,8 @@ func _run() -> void:
 	board.enemy_inspection_enabled = true
 	viewport.add_child(board)
 	await process_frame
+	# Pixel differences must isolate enemies, not real-time portal/crystal frames.
+	board._endpoint_timer.stop()
 	await _check_spread()
 	viewport.queue_free()
 	if failures == 0:

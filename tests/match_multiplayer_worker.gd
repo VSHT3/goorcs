@@ -23,7 +23,7 @@ func _planning_rules() -> CombatRules:
 	rules.spawn_interval = 0.05
 	rules.spawn_interval_reduction_per_wave = 0.0
 	var definitions: Array[TowerDefinition] = []
-	for source: TowerDefinition in rules.tower_definitions:
+	for source: TowerDefinition in rules.catalog.towers:
 		var definition := TowerDefinition.new()
 		definition.reward = source.reward
 		definition.damage = 1 if _lane == "guest" else 99
@@ -46,9 +46,9 @@ func _planning_rules() -> CombatRules:
 				if branch.has("followup"):
 					branch["followup"]["cost"] = 1
 		definitions.append(definition)
-	rules.tower_definitions = definitions
+	rules.catalog.towers = definitions
 	var enemy_definitions: Array[EnemyDefinition] = []
-	for source: EnemyDefinition in rules.enemy_definitions:
+	for source: EnemyDefinition in rules.catalog.enemies:
 		var definition := source.duplicate() as EnemyDefinition
 		if _lane == "guest":
 			definition.health_multiplier = 9.0
@@ -56,7 +56,7 @@ func _planning_rules() -> CombatRules:
 			definition.send_cost = 1
 			definition.send_income = 99
 		enemy_definitions.append(definition)
-	rules.enemy_definitions = enemy_definitions
+	rules.catalog.enemies = enemy_definitions
 	if _lane == "guest":
 		rules.base_health = 7
 		rules.starting_coins = 999

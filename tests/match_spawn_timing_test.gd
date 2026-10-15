@@ -150,7 +150,7 @@ func _test_round_cadence() -> void:
 		var factor: float = float(stage[1])
 		var rules := _rules()
 		rules.wave_weight = 3
-		rules.enemy_definitions = [rules.enemy_definitions[0]]
+		rules.catalog.enemies = [rules.catalog.enemies[0]]
 		rules.health_growth = 0
 		rules.spawn_jitter_ratio = 0.0
 		rules.spawn_interval_reduction_per_wave = 0.005
@@ -186,8 +186,8 @@ func _test_round_cadence() -> void:
 	early_rules.spawn_interval_reduction_per_wave = 0.005
 	var late_rules := _rules()
 	late_rules.spawn_interval_reduction_per_wave = 0.005
-	early_rules.enemy_definitions = [early_rules.enemy_definitions[0]]
-	late_rules.enemy_definitions = [late_rules.enemy_definitions[0]]
+	early_rules.catalog.enemies = [early_rules.catalog.enemies[0]]
+	late_rules.catalog.enemies = [late_rules.catalog.enemies[0]]
 	var early := _combat(early_rules)
 	var late := _combat(late_rules)
 	early.wave = 0
