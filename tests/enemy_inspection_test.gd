@@ -95,9 +95,8 @@ func _check_identity_and_stats() -> void:
 	var cells: Array[Vector2i] = []
 	var collect_cell := func(cell: Vector2i, _button: MouseButton) -> void: cells.append(cell)
 	world.boards[0].cell_clicked.connect(collect_cell)
-	world.pan(0.05, 1.0)
-	world.camera.zoom *= 0.9
-	world.camera.force_update_scroll()
+	world.pan(0.05, Vector2.RIGHT)
+	world.zoom_at(0.9, world.get_global_rect().get_center())
 	await _settle()
 	await _click_enemy(0, first_id)
 	_check_selected(0, first_id, "Mirrored owned sprite body click")
@@ -165,10 +164,9 @@ func _check_opponent_and_layout() -> void:
 	await _key(KEY_ESCAPE)
 	_check_closed("Escape")
 	_check(screen.is_visible_in_tree() and main.planning.active and not main.menu.visible, "Escape closes inspection before leaving the actual match")
-	world.pan(100.0, 1.0)
-	world.pan(0.08, -1.0)
-	world.camera.zoom *= 0.85
-	world.camera.force_update_scroll()
+	world.pan(100.0, Vector2.RIGHT)
+	world.pan(0.08, Vector2.LEFT)
+	world.zoom_at(0.85, world.get_global_rect().get_center())
 	await _settle()
 	var opponent: Dictionary = main.planning.combat["enemies"][1][0]
 	var id: int = int(opponent["id"])
@@ -195,7 +193,7 @@ func _check_opponent_and_layout() -> void:
 	var right_gap: float = hud.get_global_rect().end.x - panel_before.end.x
 	_check(right_gap >= 0.0 and right_gap < 32.0 and panel_before.position.y >= screen.get_node("HUD/Header").get_global_rect().end.y,
 		"Visible inspector sits on the right below the fixed header")
-	world.pan(0.04, 1.0)
+	world.pan(0.04, Vector2.RIGHT)
 	await _settle()
 	_check(_same_rect(panel_before, panel.get_global_rect()), "Inspector stays screen-anchored while the inspected opponent moves with camera pan")
 	var old_size: Vector2i = root.size
@@ -231,7 +229,7 @@ func _check_opponent_and_layout() -> void:
 
 
 func _check_lifecycle() -> void:
-	world.pan(100.0, 1.0)
+	world.pan(100.0, Vector2.RIGHT)
 	await _settle()
 	var victim_id: int = int(main.planning.combat["enemies"][1][0]["id"])
 	await _click_enemy(1, victim_id)
@@ -269,7 +267,7 @@ func _check_lifecycle() -> void:
 	_publish()
 	await _settle()
 	_check_closed("Accepted snapshot removal")
-	world.pan(100.0, -1.0)
+	world.pan(100.0, Vector2.LEFT)
 	for board: PathBoard in world.boards:
 		board._process(PathBoard.ENEMY_BLEND_DURATION)
 	await _settle()

@@ -7,6 +7,9 @@ const PAN_SPEED: float = 560.0
 const HUD_TOP: float = 72.0
 const HUD_BOTTOM: float = 100.0
 const SIDE_MARGIN: float = 24.0
+const MIN_ZOOM_RATIO: float = 0.55
+const MAX_ZOOM_RATIO: float = 2.5
+const WHEEL_ZOOM_STEP: float = 1.12
 
 
 class CameraInput extends Node:
@@ -20,11 +23,18 @@ class CameraInput extends Node:
 
 
 var camera_bounds := Vector2.ZERO
+var camera_vertical_bounds := Vector2.ZERO
 var _dimensions := Vector2i.ZERO
+var _board_origin_y: int = 0
+var _fit_zoom: float = 0.0
+var _headroom: float = 0.0
+var _bounds_zoom := Vector2.ZERO
 var _own_slot: int = 0
 var _active: bool = false
 var _left_held: bool = false
 var _right_held: bool = false
+var _up_held: bool = false
+var _down_held: bool = false
 var _hud_popups: Array[PopupMenu] = []
 var _camera_input: CameraInput
 
@@ -50,20 +60,22 @@ func _ready() -> void:
 	set_process(false)
 
 
-func configure(dimensions: Vector2i, own_slot: int) -> void:
-	if dimensions == _dimensions and own_slot == _own_slot:
+func configure(dimensions: Vector2i, own_slot: int, board_origin_y: int = 0) -> void:
+	if dimensions == _dimensions and own_slot == _own_slot and board_origin_y == _board_origin_y:
 		return
+	var fresh_focus: bool = _dimensions == Vector2i.ZERO or own_slot != _own_slot
 	_cancel_motion()
 	_dimensions = dimensions
 	_own_slot = own_slot
+	_board_origin_y = board_origin_y
 	var board_size := Vector2(dimensions) * CELL_SIZE
 	for slot: int in range(boards.size()):
 		boards[slot].size = board_size
-		boards[slot].position = Vector2(slot * (board_size.x + BOARD_GAP), 0.0)
+		boards[slot].position = Vector2(slot * (board_size.x + BOARD_GAP), board_origin_y * CELL_SIZE)
 		boards[slot].mirror_horizontal = slot == 0
-	camera_bounds = Vector2(board_size.x * 0.5, board_size.x * 1.5 + BOARD_GAP)
 	_fit_camera()
-	_focus_own_board()
+	if fresh_focus:
+		_reset_camera()
 
 
 func set_active(value: bool) -> void:
@@ -77,8 +89,7 @@ func set_active(value: bool) -> void:
 	set_process(value)
 	_camera_input.set_process_input(value)
 	if value:
-		_fit_camera()
-		_focus_own_board()
+		_reset_camera()
 
 
 func cell_screen_position(slot: int, cell: Vector2i) -> Vector2:
@@ -88,15 +99,20 @@ func cell_screen_position(slot: int, cell: Vector2i) -> Vector2:
 	return get_global_transform_with_canvas() * container_position
 
 
-func pan(delta: float, direction: float) -> void:
+func pan(delta: float, direction: Vector2) -> void:
 	if not _active or not is_visible_in_tree() or _movement_blocked():
 		_cancel_motion()
 		return
-	var next_x: float = clampf(camera.position.x + PAN_SPEED * maxf(delta, 0.0) * clampf(direction, -1.0, 1.0), camera_bounds.x, camera_bounds.y)
-	if is_equal_approx(next_x, camera.position.x):
+	if direction == Vector2.ZERO:
+		return
+	if not camera.zoom.is_equal_approx(_bounds_zoom):
+		_update_camera_bounds()
+	var next_position: Vector2 = camera.position + direction.limit_length() * PAN_SPEED * maxf(delta, 0.0)
+	next_position = _clamped_position(next_position)
+	if next_position.is_equal_approx(camera.position):
 		return
 	_cancel_strokes()
-	camera.position.x = next_x
+	camera.position = next_position
 	camera.force_update_scroll()
 
 
@@ -104,32 +120,85 @@ func _process(delta: float) -> void:
 	if not is_visible_in_tree() or _movement_blocked():
 		_cancel_motion()
 		return
-	pan(delta, float(_right_held) - float(_left_held))
+	pan(delta, Vector2(float(_right_held) - float(_left_held), float(_down_held) - float(_up_held)))
 
 
 func _handle_camera_input(event: InputEvent) -> void:
+	if not _active or not is_visible_in_tree():
+		_cancel_motion()
+		return
+	if event is InputEventMouseButton:
+		var mouse := event as InputEventMouseButton
+		if mouse.pressed and (mouse.button_index == MOUSE_BUTTON_WHEEL_UP or mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN):
+			var exponent: float = mouse.factor if mouse.factor > 0.0 else 1.0
+			if mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				exponent = -exponent
+			if zoom_at(pow(WHEEL_ZOOM_STEP, exponent), mouse.position):
+				get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMagnifyGesture:
+		var gesture := event as InputEventMagnifyGesture
+		if zoom_at(gesture.factor, gesture.position):
+			get_viewport().set_input_as_handled()
+		return
 	if not event is InputEventKey:
 		return
 	var key := event as InputEventKey
 	var code: Key = key.physical_keycode if key.physical_keycode != KEY_NONE else key.keycode
-	if code != KEY_A and code != KEY_D:
+	if code != KEY_A and code != KEY_D and code != KEY_W and code != KEY_S:
 		return
-	if not _active or not is_visible_in_tree():
-		_cancel_motion()
+	if key.pressed and (key.echo or key.alt_pressed or key.ctrl_pressed or key.meta_pressed or _movement_blocked()):
 		return
-	if not key.pressed:
-		if code == KEY_A:
-			_left_held = false
-		else:
-			_right_held = false
-		return
-	if key.echo or key.alt_pressed or key.ctrl_pressed or key.meta_pressed or _movement_blocked():
-		return
-	if code == KEY_A:
-		_left_held = true
-	else:
-		_right_held = true
-	get_viewport().set_input_as_handled()
+	match code:
+		KEY_A: _left_held = key.pressed
+		KEY_D: _right_held = key.pressed
+		KEY_W: _up_held = key.pressed
+		KEY_S: _down_held = key.pressed
+	if key.pressed:
+		get_viewport().set_input_as_handled()
+
+
+func zoom_at(factor: float, screen_position: Vector2) -> bool:
+	if not _active or not is_visible_in_tree() or factor <= 0.0 or not is_finite(factor) or _fit_zoom <= 0.0:
+		return false
+	if _movement_blocked() or get_viewport().gui_is_dragging() or _hud_at_point(get_parent(), screen_position):
+		return false
+	var local_position: Vector2 = get_global_transform_with_canvas().affine_inverse() * screen_position
+	if not Rect2(Vector2.ZERO, size).has_point(local_position):
+		return false
+	var viewport_position: Vector2 = local_position * Vector2(_world_viewport.size) / size
+	var canvas_before: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * viewport_position
+	var next_zoom: float = clampf(camera.zoom.x * factor, _fit_zoom * MIN_ZOOM_RATIO, _fit_zoom * MAX_ZOOM_RATIO)
+	_cancel_strokes()
+	camera.zoom = Vector2.ONE * next_zoom
+	camera.force_update_scroll()
+	var canvas_after: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * viewport_position
+	camera.position += canvas_before - canvas_after
+	_update_camera_bounds()
+	camera.position = _clamped_position(camera.position)
+	camera.force_update_scroll()
+	_configure_terrain()
+	return true
+
+
+func _hud_at_point(node: Node, point: Vector2) -> bool:
+	# Root _input precedes GUI dispatch, so use this event's position rather
+	# than the previous event's hovered control. Never consume panel scrolling.
+	if node == self:
+		return false
+	if node is Control:
+		var control := node as Control
+		if not control.is_visible_in_tree():
+			return false
+		var local_point: Vector2 = control.get_global_transform_with_canvas().affine_inverse() * point
+		if control.mouse_filter != Control.MOUSE_FILTER_IGNORE and Rect2(Vector2.ZERO, control.size).has_point(local_point):
+			return true
+		if control.clip_contents and not Rect2(Vector2.ZERO, control.size).has_point(local_point):
+			return false
+	for child: Node in node.get_children():
+		if _hud_at_point(child, point):
+			return true
+	return false
 
 
 func _notification(what: int) -> void:
@@ -167,24 +236,53 @@ func _fit_camera() -> void:
 	if not is_node_ready() or _dimensions == Vector2i.ZERO or size.x <= 0.0 or size.y <= 0.0:
 		return
 	_cancel_strokes()
-	var board_size := Vector2(_dimensions) * CELL_SIZE
-	var headroom: float = maxf(boards[0].visual_headroom(), boards[1].visual_headroom())
+	var ratio: float = camera.zoom.x / _fit_zoom if _fit_zoom > 0.0 else 1.0
+	var initial_size := Vector2(_dimensions.x, maxi(_dimensions.y + 2 * _board_origin_y, 1)) * CELL_SIZE
+	_headroom = maxf(boards[0].visual_headroom(), boards[1].visual_headroom())
 	var gameplay_height: float = maxf(size.y - HUD_TOP - HUD_BOTTOM, 1.0)
-	var zoom_factor: float = minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / board_size.x, gameplay_height / (board_size.y + headroom))
-	camera.zoom = Vector2.ONE * zoom_factor
-	camera.position.y = (board_size.y - headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / zoom_factor
-	camera.position.x = clampf(camera.position.x, camera_bounds.x, camera_bounds.y)
+	_fit_zoom = minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / initial_size.x, gameplay_height / (initial_size.y + _headroom))
+	camera.zoom = Vector2.ONE * _fit_zoom * clampf(ratio, MIN_ZOOM_RATIO, MAX_ZOOM_RATIO)
+	_update_camera_bounds()
+	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
+	_configure_terrain()
+
+
+func _update_camera_bounds() -> void:
+	var board_size := Vector2(_dimensions) * CELL_SIZE
+	var half_width: float = minf(board_size.x * 0.5, maxf(size.x - SIDE_MARGIN * 2.0, 1.0) * 0.5 / camera.zoom.x)
+	camera_bounds = Vector2(half_width, board_size.x * 2.0 + BOARD_GAP - half_width)
+	_bounds_zoom = camera.zoom
+	var half_height: float = maxf(size.y - HUD_TOP - HUD_BOTTOM, 1.0) * 0.5 / camera.zoom.y
+	var hud_offset: float = (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y
+	var top: float = _board_origin_y * CELL_SIZE - _headroom
+	var bottom: float = _board_origin_y * CELL_SIZE + board_size.y
+	camera_vertical_bounds = Vector2(top + half_height + hud_offset, bottom - half_height + hud_offset)
+	if camera_vertical_bounds.x > camera_vertical_bounds.y:
+		camera_vertical_bounds = Vector2.ONE * ((top + bottom) * 0.5 + hud_offset)
+
+
+func _clamped_position(value: Vector2) -> Vector2:
+	return Vector2(clampf(value.x, camera_bounds.x, camera_bounds.y), clampf(value.y, camera_vertical_bounds.x, camera_vertical_bounds.y))
+
+
+func _configure_terrain() -> void:
 	var half_view: Vector2 = size / camera.zoom * 0.5
-	var terrain_start := Vector2(camera_bounds.x - half_view.x, camera.position.y - half_view.y) - Vector2.ONE * CELL_SIZE
-	var terrain_end := Vector2(camera_bounds.y + half_view.x, camera.position.y + half_view.y) + Vector2.ONE * CELL_SIZE
-	_terrain.configure(board_size, BOARD_GAP, Rect2(terrain_start, terrain_end - terrain_start))
+	var terrain_start := Vector2(camera_bounds.x - half_view.x, camera_vertical_bounds.x - half_view.y) - Vector2.ONE * CELL_SIZE
+	var terrain_end := Vector2(camera_bounds.y + half_view.x, camera_vertical_bounds.y + half_view.y) + Vector2.ONE * CELL_SIZE
+	_terrain.configure(Vector2(_dimensions) * CELL_SIZE, BOARD_GAP, Rect2(terrain_start, terrain_end - terrain_start))
 
 
-func _focus_own_board() -> void:
+func _reset_camera() -> void:
 	if _dimensions == Vector2i.ZERO:
 		return
-	camera.position.x = camera_bounds.x if _own_slot == 0 else camera_bounds.y
+	_fit_zoom = 0.0
+	_fit_camera()
+	var board_size := Vector2(_dimensions) * CELL_SIZE
+	var headroom: float = _headroom
+	camera.position = Vector2(board_size.x * 0.5 + _own_slot * (board_size.x + BOARD_GAP),
+		_board_origin_y * CELL_SIZE + (board_size.y - headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y)
+	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
 
 
@@ -196,6 +294,8 @@ func _cancel_strokes() -> void:
 func _cancel_motion() -> void:
 	_left_held = false
 	_right_held = false
+	_up_held = false
+	_down_held = false
 	_cancel_strokes()
 
 

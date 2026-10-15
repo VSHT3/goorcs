@@ -106,24 +106,24 @@ func _check_camera_and_input(own_slot: int) -> void:
 	var presentation: Dictionary = main.planning.combat.duplicate(true)
 	var direction: float = 1.0 if own_slot == 0 else -1.0
 	var destination: float = world.camera_bounds.y if direction > 0.0 else world.camera_bounds.x
-	world.pan(0.025, direction)
+	world.pan(0.025, Vector2(direction, 0.0))
 	var first: float = world.camera.position.x
-	world.pan(0.025, direction)
+	world.pan(0.025, Vector2(direction, 0.0))
 	var second: float = world.camera.position.x
 	_check((first - start.x) * direction > 0.0 and (destination - first) * direction > 0.0, "A short pan moves through an intermediate position, slot=%d" % own_slot)
 	_check((second - first) * direction > 0.0 and (destination - second) * direction > 0.0, "Successive pan steps keep moving rather than switching boards, slot=%d" % own_slot)
-	world.pan(100.0, direction)
+	world.pan(100.0, Vector2(direction, 0.0))
 	_check(is_equal_approx(world.camera.position.x, destination), "Pan clamps at the far world extent, slot=%d" % own_slot)
-	world.pan(1.0, direction)
+	world.pan(1.0, Vector2(direction, 0.0))
 	_check(is_equal_approx(world.camera.position.x, destination), "Holding pan beyond an extent cannot escape the world")
-	world.pan(0.025, -direction)
+	world.pan(0.025, Vector2(-direction, 0.0))
 	_check((world.camera.position.x - destination) * direction < 0.0, "Pan can smoothly reverse away from a clamped extent")
-	world.pan(100.0, -direction)
+	world.pan(100.0, Vector2(-direction, 0.0))
 	var near_extent: float = world.camera_bounds.x if direction > 0.0 else world.camera_bounds.y
 	_check(is_equal_approx(world.camera.position.x, near_extent), "Reverse pan clamps at the opposite extent")
 	_check(main.planning._snapshot() == accepted and main.planning.combat == presentation, "Camera traversal cannot mutate authoritative or accepted combat state")
 
-	world.pan(0.08, direction)
+	world.pan(0.08, Vector2(direction, 0.0))
 	var panned: Vector2 = world.camera.position
 	main.planning._mirror_snapshot(accepted.duplicate(true))
 	main.planning.changed.emit()
@@ -137,9 +137,16 @@ func _check_camera_and_input(own_slot: int) -> void:
 	world.boards[own_slot].cell_clicked.connect(collect_own)
 	world.boards[opponent].cell_clicked.connect(collect_opponent)
 	var original_zoom: Vector2 = world.camera.zoom
-	world.camera.zoom = original_zoom * 0.85
-	world.camera.force_update_scroll()
+	world.zoom_at(0.85, world.cell_screen_position(own_slot, TOWER_CELL))
 	await _settle()
+	var scaled_position: Vector2 = world.camera.position
+	var scaled_zoom: Vector2 = world.camera.zoom
+	main.planning._mirror_snapshot(accepted.duplicate(true))
+	main.planning.changed.emit()
+	await _settle()
+	world.set_process(false)
+	_check(world.camera.position.is_equal_approx(scaled_position) and world.camera.zoom.is_equal_approx(scaled_zoom),
+		"Real accepted snapshot refresh retains both local zoom and cursor-anchored pan")
 	var id: int = int(main.planning.combat["towers"][own_slot][0]["id"])
 	var hud_before: Array[Rect2] = _hud_rects()
 	var world_rect: Rect2 = world.get_global_rect()
@@ -166,8 +173,7 @@ func _check_camera_and_input(own_slot: int) -> void:
 	await _settle()
 	_check(not world.size.is_equal_approx(world_rect.size), "Resize actually changes the gameplay viewport")
 	_check(world.boards[0].size == board_sizes[0] and world.boards[1].size == board_sizes[1], "Resize preserves fixed world board dimensions")
-	world.camera.zoom *= 0.85
-	world.camera.force_update_scroll()
+	world.zoom_at(0.85, world.cell_screen_position(own_slot, TOWER_CELL))
 	await _settle()
 	clicks.clear()
 	await _click(world.cell_screen_position(own_slot, TOWER_CELL))
@@ -178,7 +184,7 @@ func _check_camera_and_input(own_slot: int) -> void:
 		await _check_owned_drop()
 		accepted = main.planning._snapshot().duplicate(true)
 		presentation = main.planning.combat.duplicate(true)
-	world.pan(100.0, direction)
+	world.pan(100.0, Vector2(direction, 0.0))
 	world.camera.force_update_scroll()
 	await _settle()
 	await _click(world.cell_screen_position(opponent, TOWER_CELL))
@@ -190,7 +196,7 @@ func _check_camera_and_input(own_slot: int) -> void:
 	_check(main.planning._snapshot() == accepted and main.planning.combat == presentation, "Opponent clicks and native drops cannot mutate the accepted match")
 	root.content_scale_size = old_scale
 	root.size = old_size
-	world.camera.zoom = original_zoom
+	world.zoom_at(original_zoom.x / world.camera.zoom.x, world.get_global_rect().get_center())
 	await _settle()
 	world.set_active(false)
 	world.set_active(true)
@@ -249,7 +255,7 @@ func _check_stroke_cancellation() -> void:
 	await _stroke_press(world.cell_screen_position(0, start_cell))
 	_check(main.planning.layouts[0].has_path(start_cell), "Real owned path press reaches authoritative planning")
 	var accepted: Dictionary = main.planning._snapshot().duplicate(true)
-	world.pan(0.05, 1.0)
+	world.pan(0.05, Vector2.RIGHT)
 	await _motion(world.cell_screen_position(0, next_cell), MOUSE_BUTTON_MASK_LEFT)
 	await _stroke_release(world.cell_screen_position(0, next_cell))
 	_check(main.planning._snapshot() == accepted, "Moving the camera cancels a held stroke instead of painting under the cursor")
@@ -277,7 +283,7 @@ func _check_stroke_cancellation() -> void:
 
 
 func _check_focus_and_visibility() -> void:
-	world.pan(0.08, 1.0)
+	world.pan(0.08, Vector2.RIGHT)
 	var before_key: Vector2 = world.camera.position
 	await _key(KEY_D, true)
 	world._process(0.1)
@@ -294,7 +300,7 @@ func _check_focus_and_visibility() -> void:
 	await _settle()
 	var hidden_position: Vector2 = world.camera.position
 	world._process(0.5)
-	world.pan(0.5, -1.0)
+	world.pan(0.5, Vector2.LEFT)
 	_check(world.camera.position.is_equal_approx(hidden_position), "Hidden world ignores held keys and direct pan input")
 	screen.show()
 	await _settle()
@@ -308,7 +314,9 @@ func _check_focus_and_visibility() -> void:
 
 
 func _check_leave_and_reopen() -> void:
-	world.pan(0.15, 1.0)
+	world.pan(0.15, Vector2.RIGHT)
+	var fresh_zoom: float = world._fit_zoom
+	world.zoom_at(1.4, world.get_global_rect().get_center())
 	await _key(KEY_D, true)
 	await _click(_center(screen.leave_button))
 	_check(main.menu.visible and not screen.is_visible_in_tree() and not main.planning.active, "Real HUD Leave returns to navigation and deactivates the match")
@@ -319,6 +327,7 @@ func _check_leave_and_reopen() -> void:
 	world.set_process(false)
 	var own_center: Vector2 = world.boards[0].get_global_transform() * (world.boards[0].size * 0.5)
 	_check(absf(world.camera.position.x - own_center.x) < 1.0, "Leaving and reopening starts at the owned board instead of the previous pan")
+	_check(is_equal_approx(world.camera.zoom.x, fresh_zoom), "Real Leave and new match restore initial fit instead of previous user zoom")
 	var reopened: Vector2 = world.camera.position
 	world._process(0.5)
 	_check(world.camera.position.is_equal_approx(reopened), "A held key from the previous match cannot move the reopened match")

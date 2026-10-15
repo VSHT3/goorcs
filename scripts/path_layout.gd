@@ -64,6 +64,19 @@ func clear() -> void:
 	_recalculate()
 
 
+func grow_vertical(extra_tiles: int) -> void:
+	assert(extra_tiles >= 0)
+	var shifted: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _tiles:
+		shifted[cell + Vector2i.DOWN] = true
+	dimensions.y += 2
+	entrance += Vector2i.DOWN
+	base += Vector2i.DOWN
+	budget += extra_tiles
+	_tiles = shifted
+	_recalculate()
+
+
 func capture_routing() -> Dictionary:
 	var next_cells: Dictionary[Vector2i, Array] = {}
 	if not is_ready():

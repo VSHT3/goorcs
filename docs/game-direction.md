@@ -4,7 +4,7 @@
 
 This document records the direction agreed with the creators. **Confirmed** means a design requirement, not implemented behavior. **Working preference** is provisional. **Open** decisions must not be silently filled in as requirements.
 
-The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Matches now place both boards in one continuous world with smooth local A/D camera scouting and a fixed HUD. Match Coins, paid towers, kill/wave rewards, upgrades, selling, and enemy sends with recurring income are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Loadouts, permanent stat growth, map expansion, and final art are not implemented. The full first playable milestone below is not complete.
+The project contains a playable local path workshop, persistent collection chests, and a host-authoritative two-player defense loop: shared maze planning, regular waves, unlocked Arrow/Ballista/Rune placement and targeting, persistent base health, and synchronized results. Matches place both boards in a continuous world with local WASD scouting, bounded wheel/pinch zoom, and a fixed HUD. Match Coins, paid towers, kill/wave rewards, upgrades, selling, and enemy sends with recurring income are implemented. Singleplayer reuses that loop locally with a mirrored testing opponent. Loadouts, permanent stat growth, map expansion, and final art are not implemented. The full first playable milestone below is not complete.
 
 ## The game in one paragraph
 
@@ -17,7 +17,7 @@ BTD Battles is a reference for opposing boards, scouting, and the send-to-grow-i
 - **Private play:** for the creators and a small group of friends, not a public-service game.
 - **Desktop first:** downloadable game; exact desktop operating systems are still open.
 - **1v1:** both players defend against regular waves and opponent-sent enemies while trying to defeat each other.
-- **Two boards, one continuous world:** players start with their own side filling the gameplay view and hold A/D to move smoothly across to inspect the opponent. The camera is local, clamps at the outer map edges, and moves the world independently of the fixed HUD. Camera movement does not imply a playable character walking across the map or permission to edit the opponent's board.
+- **Two boards, one continuous world:** players initially view their owned side, use WASD to pan in four directions, and scroll/pinch to zoom. Local camera motion clamps at map bounds and leaves the HUD fixed. It grants neither a walking character nor permission to edit the opponent's board.
 - **Player-authored routes:** each player lays out a connected path from the entrance to the base using an equal budget of path tiles on a square grid. Towers are not the mechanism that defines the route.
 - **Longer runs:** favor substantial build development over a quick duel. Exact duration is open.
 - **Persistent progression:** unlock more options and some lasting stat changes. Equal starting power is not a requirement.
@@ -58,7 +58,7 @@ This is the conceptual sequence, not a fixed wave schedule or finalized reward c
 
 Players lay walkable path tiles on a square grid. Both players start with the same path-tile budget, and the tiles must connect the entrance to the base. **30 tiles was an example, not a chosen balance value.** Whether the full budget must be used is still open.
 
-The implemented presentation places the host board on the left and the guest board on the right in one continuous world, with both enemy streams entering from the middle toward outer bases. The left board mirrors rendering and input, not authoritative route coordinates. Each player initially views their own board; holding A/D pans continuously across the map, rather than switching between two screen-visible panels. A separate world viewport keeps the HUD fixed, including when tower management or notices appear. Camera scouting is available in multiplayer and mirrored Singleplayer, but input remains restricted to the owned board. Regular waves and opponent-sent enemies join each board's own stream. This visual arrangement does not require identical player-built paths, map mechanics, or commanders.
+The presentation places the host board on the left and guest on the right in one continuous world, with both streams entering from the middle toward outer bases. The left board mirrors rendering/input, not authoritative coordinates. Each player initially views their own side; WASD pans continuously and wheel/pinch zoom stays bounded and cursor-anchored. A separate world viewport keeps the HUD fixed. Camera control is available in multiplayer and mirrored Singleplayer; gameplay commands remain restricted to the owned board. Both enemy sources join each board's stream, without requiring identical mazes, commanders, or defenses.
 
 Current matches retain the fixed grid dimensions and equal path-tile budget; camera travel exposes the opposing board, not new buildable territory. Match and workshop bases use the blue crystal and entrances use the red stone-ring portal, with shared terrain/stonework. Workshop rules remain local-only; its notices no longer reflow the board. These assets are locally authored without external generation costs.
 
@@ -91,7 +91,7 @@ There are no waves in the workshop. Free editing here does not decide combat rou
 - Final route-preview presentation; the workshop retains a stable representative route, while match enemies alternate among equal shortest branches.
 - Whether paths can be redrawn freely between waves and whether unused tiles are retained.
 - Placement relative to path tiles, initial board dimensions, terrain, and the placement of the fixed entrance and crystal.
-- How much of each board is visible at future zoom levels or after map growth; the current view starts on the owned side and supports smooth A/D scouting.
+- Final zoom limits and large-map readability/performance targets; current WASD and bounded wheel/pinch controls preserve local framing through snapshots and growth.
 - Sale refunds, purchase/roll costs, and restrictions needed to prevent unlimited trait rerolls through sale/rebuy.
 
 ### Commanders and board identity

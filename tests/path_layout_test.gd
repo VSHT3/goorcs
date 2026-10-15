@@ -8,6 +8,7 @@ func _init() -> void:
 	_test_shortcuts_and_islands()
 	_test_diagonals_and_ties()
 	_test_captured_shortest_successors()
+	_test_vertical_growth()
 	if failures == 0:
 		print("PASS: path budget, immutable endpoints, shortcuts, islands, diagonals, and route ties")
 	quit(1 if failures > 0 else 0)
@@ -77,3 +78,20 @@ func _test_captured_shortest_successors() -> void:
 	captured["next"][layout.entrance].clear()
 	captured["route"].clear()
 	_check(not layout.capture_routing()["next"][layout.entrance].is_empty() and not layout.route.is_empty(), "Captured dictionaries and route arrays cannot mutate the layout")
+
+
+func _test_vertical_growth() -> void:
+	var layout := PathLayout.new(Vector2i(5, 5), 12, Vector2i(0, 2), Vector2i(4, 2))
+	for x: int in range(1, 4):
+		layout.place(Vector2i(x, 2))
+	var original_route: Array[Vector2i] = layout.route.duplicate()
+	for event: int in range(1, 4):
+		layout.grow_vertical(6)
+		_check(layout.dimensions == Vector2i(5, 5 + event * 2) and layout.budget == 12 + event * 6, "Each expansion adds two rows and its explicit tile allowance")
+		_check(layout.used_tiles() == 3 and layout.is_ready() and layout.route.size() == original_route.size(), "Expansion preserves placed tiles, connectivity and route length")
+		for index: int in range(original_route.size()):
+			_check(layout.route[index] - Vector2i(0, event) == original_route[index], "Moving the world origin up cancels logical coordinate shifts")
+		_check(layout.place(Vector2i(0, 0)) and layout.place(Vector2i(4, layout.dimensions.y - 1)), "New top and bottom rows are genuinely buildable")
+		layout.erase(Vector2i(0, 0))
+		layout.erase(Vector2i(4, layout.dimensions.y - 1))
+		_check(not layout.erase(layout.entrance) and not layout.erase(layout.base), "Grown endpoints retain protection")

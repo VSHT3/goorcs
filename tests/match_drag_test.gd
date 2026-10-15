@@ -82,9 +82,8 @@ func _run() -> void:
 	await _settle()
 	var original_position: Vector2 = world.camera.position
 	var original_zoom: Vector2 = world.camera.zoom
-	world.pan(0.08, 1.0)
-	world.camera.zoom = original_zoom * 0.85
-	world.camera.force_update_scroll()
+	world.pan(0.08, Vector2.RIGHT)
+	world.zoom_at(0.85, world.cell_screen_position(0, transformed_cell))
 	await _settle()
 	_check(world.camera.position.x > original_position.x and not world.camera.zoom.is_equal_approx(original_zoom), "Second native drop uses an actually translated and scaled camera")
 	await _purchase(transformed_cell, "Native HUD drag purchases the exact owned cell after pan and zoom")
@@ -98,7 +97,7 @@ func _run() -> void:
 	await _rejected(world.cell_screen_position(0, path_cell), "Native drop onto an owned path is rejected without changing accepted state")
 	await _rejected(world.cell_screen_position(0, Vector2i(-1, transformed_cell.y)), "Native drop outside board bounds is rejected without changing accepted state")
 
-	world.pan(100.0, 1.0)
+	world.pan(100.0, Vector2.RIGHT)
 	world.camera.force_update_scroll()
 	await _settle()
 	var opponent_ground: bool = main.planning.layouts[1].contains(opponent_cell) and not main.planning.layouts[1].has_path(opponent_cell)
