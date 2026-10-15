@@ -1,4 +1,4 @@
-"""Author review-only endpoint loops from the unchanged runtime PNGs.
+"""Rebuild the approved endpoint loops from the preserved static source PNGs.
 
 Run with Python 3 and Pillow. Outputs stay inside this Godot-ignored archive.
 No model, external artwork, runtime dependency, or source-image overwrite.
@@ -201,7 +201,7 @@ def main():
     assert portal_frame(FRAME_COUNT).tobytes() == portal_frames[0].tobytes()
     assert crystal_frame(FRAME_COUNT).tobytes() == crystal_frames[0].tobytes()
     manifest = {
-        "status": "candidate-awaiting-art-approval; not installed in the game",
+        "status": "approved; enabled by PathBoard in matches and the workshop",
         "authoring": "Deterministic edits of the original pixel clusters; Python 3 + Pillow; no external service or model.",
         "frame_size": [SIZE, SIZE], "frames": FRAME_COUNT, "frame_duration_ms": FRAME_MS,
         "loop_duration_ms": FRAME_COUNT * FRAME_MS, "sheet_layout": "one horizontal row, left to right",
@@ -224,6 +224,7 @@ def main():
             "source": str(source_path.relative_to(ROOT)),
             "source_sha256": sha256(source_path.read_bytes()).hexdigest(),
             "sheet": sheet_path.name, "sheet_sha256": sha256(sheet_path.read_bytes()).hexdigest(),
+            "runtime_sheet": f"assets/world/{name}.png",
             "preview": gif_path.name, "preview_sha256": sha256(gif_path.read_bytes()).hexdigest(),
             "fixed_framing_bounds": list(source.getbbox()), "board_anchor": [0.5, 0.97],
             "board_height": 1.05, "adjacent_changed_pixels_including_seam": changed,
@@ -244,7 +245,7 @@ def main():
             draw.ellipse((x + 34, 217, x + 168, 237), fill="#283429")
             zoom = sprite.resize((192, 192), Image.Resampling.NEAREST)
             image.paste(zoom, (x, 48), zoom)
-        draw.text((16, 258), "16 PIXEL FRAMES / 5 FPS / ORIGINAL STONEWORK / REVIEW CANDIDATE", font=font, fill="#a5b09a")
+        draw.text((16, 258), "16 PIXEL FRAMES / 5 FPS / ORIGINAL STONEWORK / APPROVED IDLE LOOPS", font=font, fill="#a5b09a")
         previews.append(image)
     palette = Image.new("RGB", (848, 288 * FRAME_COUNT))
     for index, image in enumerate(previews):
@@ -255,7 +256,7 @@ def main():
                      duration=FRAME_MS, loop=0, disposal=2, optimize=False)
     (HERE / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print("PASS: both 16-frame loops; hard alpha; source-only palettes; fixed stonework and silhouettes; bounded loop seams.")
-    print("Review candidates only; runtime PNGs and rendering are unchanged.")
+    print("Approved archive regenerated; runtime sheets and original source PNGs are not overwritten.")
 
 
 if __name__ == "__main__":

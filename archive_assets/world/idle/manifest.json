@@ -1,5 +1,5 @@
 {
-  "status": "candidate-awaiting-art-approval; not installed in the game",
+  "status": "approved; enabled by PathBoard in matches and the workshop",
   "authoring": "Deterministic edits of the original pixel clusters; Python 3 + Pillow; no external service or model.",
   "frame_size": [
     96,
@@ -17,6 +17,7 @@
       "source_sha256": "23b00e15a1f497559c0524965e67d1a53e622027e7e520accff611bc5a1b7488",
       "sheet": "enemy_portal_idle.png",
       "sheet_sha256": "e0bba60537758ff6669648e2793080cabedee460def5318a50d0369e3c0587aa",
+      "runtime_sheet": "assets/world/enemy_portal_idle.png",
       "preview": "enemy_portal_idle.gif",
       "preview_sha256": "bfcb62865c41def97758512ad1cd7462c78cb9cb804e9ffdbcffb8997538cf89",
       "fixed_framing_bounds": [
@@ -55,6 +56,7 @@
       "source_sha256": "fb314b7bb26b886f287613418c49829d57e797590a2c749bfbf77c2d2ab6beac",
       "sheet": "health_crystal_idle.png",
       "sheet_sha256": "223a0c494a325f6d1dba9fcb301237d02a90e7d8bbaee792028fe171a8e15876",
+      "runtime_sheet": "assets/world/health_crystal_idle.png",
       "preview": "health_crystal_idle.gif",
       "preview_sha256": "6af82db09fca0b4621d14af36332d410ee3aec68efa2603e60a2c7446636d984",
       "fixed_framing_bounds": [

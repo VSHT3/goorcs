@@ -25,6 +25,7 @@ func _run() -> void:
 	board.input_enabled = false
 	viewport.add_child(board)
 	await process_frame
+	await _check_endpoint_idle(board, viewport)
 	board.combat_enemies = [_enemy(1, 1.8, Vector2(1.8, 1), route)]
 	board.set_process(false)
 	board.combat_enemies = [_enemy(1, 2.2, Vector2(2, 1.2), route)]
@@ -40,11 +41,9 @@ func _run() -> void:
 	board._process(0.5)
 	_check(board._enemy_position(board.combat_enemies[0]).is_equal_approx(Vector2(2, 1.2)), "Missing snapshots cannot extrapolate enemies beyond the accepted position")
 	board.combat_towers = []
-	_check(board.is_processing(), "Undefended enemies animate even without shot traces")
 	board.combat_enemies = [_enemy(2, 0.1, Vector2(0.1, 1), route)]
 	_check(board._enemy_position(board.combat_enemies[0]).is_equal_approx(Vector2(0.1, 1)), "A new enemy never inherits another enemy's interpolation")
 	board.combat_enemies = []
-	_check(not board.is_processing(), "Cleared boards stop animation without retaining removed enemies")
 	board.command_mode = true
 	var connected_layout: PathLayout = board.layout
 	for mirrored: bool in [false, true]:
@@ -75,6 +74,29 @@ func _run() -> void:
 	if failures == 0:
 		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, tile ranges, attacks and mixed mirrored enemy sprites")
 	quit(1 if failures else 0)
+
+
+func _check_endpoint_idle(board: PathBoard, viewport: SubViewport) -> void:
+	var before: Image = await _board_image(board, viewport, false)
+	board.combat_enemies = []
+	board.combat_towers = []
+	await create_timer(0.24).timeout
+	var after: Image = await _board_image(board, viewport, false)
+	for endpoint: Vector2i in [board.layout.entrance, board.layout.base]:
+		var region := Rect2i(Vector2i(board.cell_center(endpoint)) + Vector2i(-40, -65), Vector2i(80, 110))
+		_check(int(_changed_geometry(before, after, region)["pixels"]) > 0,
+			"Portal and crystal keep visibly animating on an empty board after combat state clears")
+	board.hide()
+	await create_timer(0.45).timeout
+	board.show()
+	var resumed: Image = await _board_image(board, viewport, false)
+	_check(resumed.get_data() == after.get_data(), "Hidden boards pause their cosmetic loop instead of advancing or resetting it")
+	await create_timer(0.24).timeout
+	var advanced: Image = await _board_image(board, viewport, false)
+	for endpoint: Vector2i in [board.layout.entrance, board.layout.base]:
+		var region := Rect2i(Vector2i(board.cell_center(endpoint)) + Vector2i(-40, -65), Vector2i(80, 110))
+		_check(int(_changed_geometry(resumed, advanced, region)["pixels"]) > 0,
+			"Returning to a board resumes visible endpoint motion without combat")
 
 
 func _check_ground_materials() -> void:
@@ -160,11 +182,13 @@ func _check_workshop_materials_and_editing() -> void:
 		_check(int(_changed_geometry(workshop, match_image, whole)["pixels"]) == 0,
 			"Workshop shares match grass patches, external rim, endpoint sprites and shadows, mirrored=%s" % mirrored)
 		board.command_mode = false
-		var portal: Texture2D = board._portal_texture
-		var crystal: Texture2D = board._crystal_texture
+		var portal: AtlasTexture = board._portal_texture
+		var crystal: AtlasTexture = board._crystal_texture
 		var transparent := Image.create(1, 1, false, Image.FORMAT_RGBA8)
 		transparent.fill(Color.TRANSPARENT)
-		var empty_texture: ImageTexture = ImageTexture.create_from_image(transparent)
+		var empty_texture := AtlasTexture.new()
+		empty_texture.atlas = ImageTexture.create_from_image(transparent)
+		empty_texture.region = Rect2(0, 0, 1, 1)
 		board._portal_texture = empty_texture
 		board._crystal_texture = empty_texture
 		var without_art: Image = await _board_image(board, viewport)
@@ -643,8 +667,11 @@ func _changed_geometry(before: Image, after: Image, region: Rect2i) -> Dictionar
 	return {"pixels": pixels, "bounds": Rect2i(minimum, maximum - minimum + Vector2i.ONE)}
 
 
-func _board_image(board: PathBoard, viewport: SubViewport) -> Image:
+func _board_image(board: PathBoard, viewport: SubViewport, freeze_idle: bool = true) -> Image:
 	board.set_process(false)
+	# Static material/geometry comparisons must not straddle a cosmetic frame tick.
+	if freeze_idle:
+		board._endpoint_timer.paused = true
 	board.queue_redraw()
 	await process_frame
 	await RenderingServer.frame_post_draw

@@ -26,6 +26,9 @@ const SHOT_DURATION: float = 0.18
 const PULSE_DURATION: float = 0.14
 const ENEMY_LATERAL_SPREAD: float = 0.10
 const ENEMY_CORNER_BLEND: float = 0.25
+const ENDPOINT_FRAME_SIZE: int = 96
+const ENDPOINT_FRAME_COUNT: int = 16
+const ENDPOINT_FRAME_SECONDS: float = 0.2
 
 var layout: PathLayout
 var command_mode: bool = false
@@ -95,8 +98,10 @@ var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
 var _enemy_hit_images: Dictionary[Texture2D, Image] = {}
-var _portal_texture: Texture2D
-var _crystal_texture: Texture2D
+var _portal_texture: AtlasTexture
+var _crystal_texture: AtlasTexture
+var _endpoint_frame: int = 0
+var _endpoint_timer: Timer
 var _ground_canvas: Node2D
 var _ground_mask := PackedByteArray()
 var _ground_rect := Rect2()
@@ -109,10 +114,17 @@ func _ready() -> void:
 	for definition: EnemyDefinition in CombatRules.DEFAULT_ENEMIES:
 		_enemy_art[String(definition.id)] = definition
 		_cache_texture_bounds(definition.texture)
-	_portal_texture = preload("res://assets/world/enemy_portal.png")
-	_crystal_texture = preload("res://assets/world/health_crystal.png")
+	_portal_texture = _endpoint_texture(preload("res://assets/world/enemy_portal_idle.png"))
+	_crystal_texture = _endpoint_texture(preload("res://assets/world/health_crystal_idle.png"))
 	_cache_texture_bounds(_portal_texture)
 	_cache_texture_bounds(_crystal_texture)
+	_endpoint_timer = Timer.new()
+	_endpoint_timer.wait_time = ENDPOINT_FRAME_SECONDS
+	_endpoint_timer.ignore_time_scale = true
+	_endpoint_timer.timeout.connect(_advance_endpoints)
+	add_child(_endpoint_timer)
+	visibility_changed.connect(_sync_endpoint_animation)
+	_sync_endpoint_animation()
 	_rebuild_draw_order()
 	_ground_canvas = Node2D.new()
 	_ground_canvas.show_behind_parent = true
@@ -121,6 +133,28 @@ func _ready() -> void:
 	mouse_exited.connect(_on_mouse_exited)
 	resized.connect(queue_redraw)
 	set_process(not combat_enemies.is_empty() or not _shot_traces.is_empty())
+
+
+func _endpoint_texture(sheet: Texture2D) -> AtlasTexture:
+	var texture := AtlasTexture.new()
+	texture.atlas = sheet
+	texture.region = Rect2(0, 0, ENDPOINT_FRAME_SIZE, ENDPOINT_FRAME_SIZE)
+	return texture
+
+
+func _sync_endpoint_animation() -> void:
+	if is_visible_in_tree():
+		_endpoint_timer.start()
+	else:
+		_endpoint_timer.stop()
+
+
+func _advance_endpoints() -> void:
+	_endpoint_frame = (_endpoint_frame + 1) % ENDPOINT_FRAME_COUNT
+	# Mutate only the atlas regions; cached framing stays fixed for the whole loop.
+	_portal_texture.region.position.x = _endpoint_frame * ENDPOINT_FRAME_SIZE
+	_crystal_texture.region.position.x = _endpoint_frame * ENDPOINT_FRAME_SIZE
+	queue_redraw()
 
 
 func _process(delta: float) -> void:

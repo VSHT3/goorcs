@@ -298,6 +298,16 @@ func _check_focus_and_visibility() -> void:
 	_check(world.camera.position.x < after_focus.x, "A fresh A press moves back after focus cancellation")
 	screen.hide()
 	await _settle()
+	var parked_endpoints: Array[Rect2] = []
+	for board: PathBoard in world.boards:
+		parked_endpoints.append(board._portal_texture.region)
+		parked_endpoints.append(board._crystal_texture.region)
+	await create_timer(0.24).timeout
+	for slot: int in range(world.boards.size()):
+		var board: PathBoard = world.boards[slot]
+		_check(board._portal_texture.region == parked_endpoints[slot * 2]
+			and board._crystal_texture.region == parked_endpoints[slot * 2 + 1],
+			"Hiding the match pauses both endpoint loops across the world SubViewport boundary")
 	var hidden_position: Vector2 = world.camera.position
 	world._process(0.5)
 	world.pan(0.5, Vector2.LEFT)
@@ -305,6 +315,12 @@ func _check_focus_and_visibility() -> void:
 	screen.show()
 	await _settle()
 	world.set_process(false)
+	await create_timer(0.24).timeout
+	for slot: int in range(world.boards.size()):
+		var board: PathBoard = world.boards[slot]
+		_check(board._portal_texture.region != parked_endpoints[slot * 2]
+			and board._crystal_texture.region != parked_endpoints[slot * 2 + 1],
+			"Showing the match resumes both endpoint loops on each board")
 	var own_center: Vector2 = world.boards[0].get_global_transform() * (world.boards[0].size * 0.5)
 	_check(absf(world.camera.position.x - own_center.x) < 1.0, "New screen activation restores owned-board startup focus")
 	var reopened: Vector2 = world.camera.position

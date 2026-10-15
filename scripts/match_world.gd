@@ -46,6 +46,7 @@ var _camera_input: CameraInput
 
 func _ready() -> void:
 	_world_viewport.world_2d = World2D.new()
+	_world_viewport.process_mode = Node.PROCESS_MODE_DISABLED
 	resized.connect(_fit_camera)
 	for path: String in ["%Targeting", "%EnemyType"]:
 		var selector := get_parent().get_node_or_null(path) as OptionButton
@@ -85,6 +86,8 @@ func set_active(value: bool) -> void:
 	_cancel_motion()
 	visible = value
 	_world_viewport.gui_disable_input = not value
+	# Canvas visibility does not propagate into a SubViewport; pause its local effects explicitly.
+	_world_viewport.process_mode = Node.PROCESS_MODE_INHERIT if value else Node.PROCESS_MODE_DISABLED
 	_world_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if value else SubViewport.UPDATE_DISABLED
 	set_process(value)
 	_camera_input.set_process_input(value)
