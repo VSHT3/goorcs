@@ -23,6 +23,7 @@ const STONE_LIGHT := Color("6c705a")
 const STONE_DARK := Color("676b55")
 const ENEMY_BLEND_DURATION: float = 0.1
 const SHOT_DURATION: float = 0.18
+const PIERCE_SHOT_DURATION: float = SHOT_DURATION * 2.0
 const PULSE_DURATION: float = 0.14
 const ENEMY_LATERAL_SPREAD: float = 0.10
 const ENEMY_CORNER_BLEND: float = 0.25
@@ -214,9 +215,12 @@ func _capture_shots() -> void:
 
 func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool) -> void:
 	var area_attack: bool = bool(definition.get("area_attack", false))
-	var bounce: bool = not secondary and bool(tower.get("bounce_active", false))
+	var pierce: bool = not secondary and bool(tower.get("pierce_active", false))
+	var bounce: bool = not secondary and not pierce and bool(tower.get("bounce_active", false))
 	var evolution: String = tower.get("evolution", "")
 	var duration: float = (ONYX_PULSE_DURATION if evolution == "onyx_ring" else PULSE_DURATION) if area_attack else SHOT_DURATION * (2.0 if bounce else 1.0)
+	if pierce:
+		duration = PIERCE_SHOT_DURATION
 	var hits: Array[Vector2] = []
 	if area_attack:
 		for enemy: Dictionary in combat_enemies:
@@ -229,6 +233,8 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool)
 		"evolution": evolution,
 		"aim": tower.get("secondary_aim" if secondary else "aim", Vector2(tower["cell"])),
 		"secondary": secondary,
+		"pierce_active": pierce,
+		"pierce_aim": tower.get("pierce_aim", tower.get("aim", Vector2(tower["cell"]))),
 		"bounce_active": bounce,
 		"bounce_aim": tower.get("bounce_aim", tower.get("aim", Vector2(tower["cell"]))),
 		"life": duration,
@@ -914,9 +920,18 @@ func _projectile_origin(trace: Dictionary) -> Vector2:
 	return cell_center(trace["cell"]) + Vector2(0, -cell_size * 0.30)
 
 
+func _projectile_destination(trace: Dictionary) -> Vector2:
+	if bool(trace["pierce_active"]):
+		# Keep the muzzle height for the whole accepted ray, without a bend at aim.
+		return _projectile_origin(trace) + _position_center(trace["pierce_aim"]) - cell_center(trace["cell"])
+	return _position_center(trace["aim"]) + Vector2(0, _cell_size() * 0.15)
+
+
 func _projectile_position(trace: Dictionary) -> Vector2:
 	var elapsed: float = float(trace["duration"]) - float(trace["life"])
-	var primary: Vector2 = _position_center(trace["aim"]) + Vector2(0, _cell_size() * 0.15)
+	var primary: Vector2 = _projectile_destination(trace)
+	if bool(trace["pierce_active"]):
+		return _projectile_origin(trace).lerp(primary, clampf(elapsed / float(trace["duration"]), 0.0, 1.0))
 	if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
 		var bounce: Vector2 = _position_center(trace["bounce_aim"]) + Vector2(0, _cell_size() * 0.15)
 		return primary.lerp(bounce, clampf((elapsed - SHOT_DURATION) / SHOT_DURATION, 0.0, 1.0))
@@ -930,7 +945,7 @@ func _draw_projectiles() -> void:
 			continue
 		var position: Vector2 = _projectile_position(trace)
 		var elapsed: float = float(trace["duration"]) - float(trace["life"])
-		var end: Vector2 = _position_center(trace["aim"]) + Vector2(0, cell_size * 0.15)
+		var end: Vector2 = _projectile_destination(trace)
 		var start: Vector2 = _projectile_origin(trace)
 		if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
 			start = end

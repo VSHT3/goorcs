@@ -105,13 +105,14 @@ func _run() -> void:
 
 func _solo_specials(planning: MatchPlanning) -> void:
 	var rules := CombatRules.new()
-	rules.starting_coins = 2000
+	rules.starting_coins = 3000
 	planning.combat_rules = rules
 	planning.start_singleplayer()
 	var x: int = 2
 	for choice: Dictionary in [
 		{"type": &"arrow_tower", "upgrade": "special"},
-		{"type": &"orc_ballista", "upgrade": "special"},
+		{"type": &"orc_ballista", "upgrade": "pierce"},
+		{"type": &"orc_ballista", "upgrade": "bounce"},
 		{"type": &"rune_obelisk", "upgrade": "boulders"},
 		{"type": &"rune_obelisk", "upgrade": "onyx_ring"},
 	]:
@@ -138,6 +139,13 @@ func _solo_specials(planning: MatchPlanning) -> void:
 			before = planning.combat.duplicate(true)
 			planning.upgrade_tower(0, id, "onyx_ring" if upgrade == "boulders" else "boulders")
 			_check(planning.combat == before, "Mirrored Rune evolution cannot switch branches or spend again")
+		if type_id == &"orc_ballista":
+			before = planning.combat.duplicate(true)
+			planning.upgrade_tower(0, id, "bounce" if upgrade == "pierce" else "pierce")
+			planning.upgrade_tower(0, id, "special")
+			_check(planning.combat == before, "Mirrored Ballista choice cannot switch branches or use the obsolete generic special")
+			for slot: int in range(2):
+				_check(planning.combat["towers"][slot].back()["evolution"] == upgrade, "Ballista branch choice mirrors through host validation")
 		if upgrade == "boulders":
 			planning.upgrade_tower(0, id, "freeze_runes")
 			for slot: int in range(2):

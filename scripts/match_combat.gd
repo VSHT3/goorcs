@@ -117,7 +117,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		if type_id.is_empty() or definition.damage <= 0 or not is_finite(definition.range_cells) or definition.range_cells <= 0.0 or not is_finite(definition.interval) or definition.interval <= 0.0 or definition.cost <= 0 or definition.upgrade_base_cost <= 0 or definition.damage_upgrade_bonus <= 0 or not is_finite(definition.speed_upgrade_multiplier) or definition.speed_upgrade_multiplier <= 0.0 or definition.speed_upgrade_multiplier >= 1.0:
 			push_error("Invalid combat tower definition '%s' (%s): positive stats/prices and speed multiplier between zero and one are required" % [type_id, definition.resource_path])
 			continue
-		if definition.special_upgrade not in ["", "second_archer", "bounce"] or (not definition.special_upgrade.is_empty() and (definition.special_upgrade_title.is_empty() or definition.special_upgrade_cost <= 0)) or not _valid_evolutions(definition):
+		if definition.special_upgrade not in ["", "second_archer"] or (not definition.special_upgrade.is_empty() and (definition.special_upgrade_title.is_empty() or definition.special_upgrade_cost <= 0)) or not _valid_evolutions(definition):
 			push_error("Invalid combat special upgrade for tower '%s'" % type_id)
 			continue
 		if _tower_types.has(type_id):
@@ -141,10 +141,19 @@ static func _valid_evolutions(definition: TowerDefinition) -> bool:
 	if not definition.evolutions.is_empty() and not definition.special_upgrade.is_empty():
 		return false
 	for branch: Variant in definition.evolutions:
-		if not branch is String or branch not in ["boulders", "onyx_ring"] or not definition.evolutions[branch] is Dictionary:
+		if not branch is String or branch not in ["boulders", "onyx_ring", "pierce", "bounce"] or not definition.evolutions[branch] is Dictionary:
 			return false
 		var config: Dictionary = definition.evolutions[branch]
-		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0 or not config.get("damage") is int or int(config["damage"]) <= 0 or not config.get("continuous") is bool:
+		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
+			return false
+		if branch in ["pierce", "bounce"]:
+			if definition.area_attack or config.size() != 2:
+				return false
+			for other_branch: Variant in definition.evolutions:
+				if other_branch not in ["pierce", "bounce"]:
+					return false
+			continue
+		if not config.get("damage") is int or int(config["damage"]) <= 0 or not config.get("continuous") is bool:
 			return false
 		if typeof(config.get("interval")) not in [TYPE_FLOAT, TYPE_INT]:
 			return false
@@ -178,6 +187,7 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 		"special_upgraded": false, "freeze_upgraded": false, "evolution": "", "secondary_mode": mode,
 		"secondary_shot": 0, "secondary_aim": Vector2(cell), "secondary_target_id": -1,
 		"bounce_active": false, "bounce_aim": Vector2(cell),
+		"pierce_active": false, "pierce_aim": Vector2(cell),
 		"damage": definition["damage"], "interval": definition["interval"],
 		"invested": cost, "sell_value": _sell_value(cost),
 	})
@@ -239,11 +249,12 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 		if evolution:
 			var config: Dictionary = definition["evolutions"][upgrade]
 			tower["evolution"] = upgrade
-			tower["damage"] = config["damage"]
-			tower["interval"] = config["interval"]
-			# A new pulse requires a full reload; continuous damage starts accruing
-			# only in future simulation time, without an immediate hit or old credit.
-			tower["cooldown"] = config["interval"]
+			if upgrade in ["boulders", "onyx_ring"]:
+				tower["damage"] = config["damage"]
+				tower["interval"] = config["interval"]
+				# A new pulse requires a full reload; continuous damage starts accruing
+				# only in future simulation time, without an immediate hit or old credit.
+				tower["cooldown"] = config["interval"]
 		elif upgrade == "damage":
 			tower["damage"] += definition["damage_upgrade_bonus"]
 		elif upgrade == "speed":
@@ -307,6 +318,7 @@ func grow_for_main_round() -> void:
 			tower["aim"] += Vector2.DOWN
 			tower["secondary_aim"] += Vector2.DOWN
 			tower["bounce_aim"] += Vector2.DOWN
+			tower["pierce_aim"] += Vector2.DOWN
 
 
 func send_enemy(slot: int, type_id: StringName) -> bool:
@@ -374,6 +386,8 @@ func debug_set_round(round_number: int) -> bool:
 			tower["secondary_aim"] = Vector2(tower["cell"])
 			tower["bounce_aim"] = Vector2(tower["cell"])
 			tower["bounce_active"] = false
+			tower["pierce_aim"] = Vector2(tower["cell"])
+			tower["pierce_active"] = false
 	return true
 
 func start_wave(routing: Array[Dictionary]) -> bool:
@@ -707,7 +721,7 @@ func _position(route: Array, progress: float) -> Vector2:
 func _attack(slot: int, delta: float) -> void:
 	for tower: Dictionary in towers[slot]:
 		var definition: Dictionary = _tower_types[tower["type_id"]]
-		if tower["evolution"] != "":
+		if tower["evolution"] == "boulders" or tower["evolution"] == "onyx_ring":
 			if definition["evolutions"][tower["evolution"]]["continuous"]:
 				_attack_continuous(slot, tower, definition["range"], delta)
 			else:
@@ -725,8 +739,11 @@ func _attack(slot: int, delta: float) -> void:
 		tower["shot"] += 1
 		tower["cooldown"] = tower["interval"]
 		tower["bounce_active"] = false
+		tower["pierce_active"] = false
 		tower["secondary_target_id"] = -1
-		if definition["area_attack"]:
+		if tower["evolution"] == "pierce":
+			_attack_pierce(slot, tower, definition["range"], target_index)
+		elif definition["area_attack"]:
 			# Reverse traversal permits removal in place without missing a victim.
 			for index: int in range(enemies[slot].size() - 1, -1, -1):
 				if cell_in_range(tower["cell"], Vector2i(enemies[slot][index]["pos"].round()), definition["range"]):
@@ -740,12 +757,60 @@ func _attack(slot: int, delta: float) -> void:
 					tower["secondary_aim"] = enemies[slot][secondary_index]["pos"]
 					tower["secondary_shot"] += 1
 					_hit(slot, tower, secondary_index)
-			elif tower["special_upgraded"] and definition["special_upgrade"] == "bounce":
+			elif tower["evolution"] == "bounce":
 				var bounce_index: int = _bounce_target(slot, tower["aim"], tower["target_id"])
 				if bounce_index >= 0:
 					tower["bounce_active"] = true
 					tower["bounce_aim"] = enemies[slot][bounce_index]["pos"]
 					_hit(slot, tower, bounce_index, ceili(float(tower["damage"]) * TowerDefinition.BOUNCE_DAMAGE_MULTIPLIER))
+
+
+func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_index: int) -> void:
+	var center := Vector2(tower["cell"])
+	var direction: Vector2 = Vector2(tower["aim"]) - center
+	tower["pierce_active"] = true
+	tower["pierce_aim"] = tower["aim"]
+	if direction == Vector2.ZERO:
+		_hit(slot, tower, primary_index)
+		return
+	direction = direction.normalized()
+	# Stay just inside the half-cell boundary so the endpoint rounds to a valid tile.
+	var radius: float = floorf(range_cells) + 0.5 - 0.000001
+	tower["pierce_aim"] = center + direction * (radius / maxf(absf(direction.x), absf(direction.y)))
+	var first: int = -1
+	var second: int = -1
+	var first_distance: float = INF
+	var second_distance: float = INF
+	var first_id: int = 0
+	var second_id: int = 0
+	# Capture both indices before damage can remove a victim. No candidate allocation/sort.
+	for index: int in range(enemies[slot].size()):
+		var enemy: Dictionary = enemies[slot][index]
+		if int(enemy["hp"]) <= 0 or not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), range_cells):
+			continue
+		var offset: Vector2 = Vector2(enemy["pos"]) - center
+		var distance: float = offset.dot(direction)
+		if distance <= 0.0 or absf(offset.cross(direction)) > 0.25:
+			continue
+		var id: int = enemy["id"]
+		if first < 0 or distance < first_distance or (distance == first_distance and id < first_id):
+			second = first
+			second_distance = first_distance
+			second_id = first_id
+			first = index
+			first_distance = distance
+			first_id = id
+		elif second < 0 or distance < second_distance or (distance == second_distance and id < second_id):
+			second = index
+			second_distance = distance
+			second_id = id
+	if first >= 0:
+		var previous_size: int = enemies[slot].size()
+		_hit(slot, tower, first)
+		if second > first and enemies[slot].size() < previous_size:
+			second -= 1
+		if second >= 0:
+			_hit(slot, tower, second)
 
 
 func _attack_pulses(slot: int, tower: Dictionary, range_cells: float, delta: float) -> void:
@@ -765,6 +830,7 @@ func _attack_pulses(slot: int, tower: Dictionary, range_cells: float, delta: flo
 			if not hit_any:
 				tower["target_id"] = enemy["id"]
 				tower["aim"] = position
+				tower["pierce_active"] = false
 				hit_any = true
 			_hit(slot, tower, index)
 		if hit_any:

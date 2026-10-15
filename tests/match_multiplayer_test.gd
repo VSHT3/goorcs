@@ -234,6 +234,8 @@ func _peer_specials(code: String) -> void:
 		var x: int = 2
 		for type_id: String in prices:
 			var upgrade: String = ("boulders" if slot == 0 else "onyx_ring") if type_id == "rune_obelisk" else "special"
+			if type_id == "orc_ballista":
+				upgrade = "pierce" if slot == 0 else "bounce"
 			await _build(lane, slot, x, 3, 0, type_id)
 			var tower: Dictionary = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
 			var id: int = int(tower["id"])
@@ -251,17 +253,20 @@ func _peer_specials(code: String) -> void:
 			balances[slot] -= ceili(float(stats["upgrade_base_cost"]) * 1.5)
 			await _wait_combat(observer, {"coins": balances}, "Second stat upgrade pays increased price")
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
-			balances[slot] -= int(prices[type_id])
+			balances[slot] -= int(stats["evolutions"][upgrade]["cost"]) if not stats["evolutions"].is_empty() else int(stats["special_upgrade_cost"])
 			await _wait_combat(observer, {"coins": balances}, "Special upgrade pays its fixed price without a level multiplier")
 			tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
 			_check(tower["special_upgraded"] and MatchCombat.tower_level(tower) == 4 and int(tower["sell_value"]) == floori(float(tower["invested"]) * 0.6), "Remote peer sees level IV, accepted special and actual refund")
-			if type_id == "rune_obelisk":
-				_check(tower["evolution"] == upgrade and stats["evolutions"][upgrade]["cost"] == 250, "Both peers use the host's chosen Rune branch and price rather than guest resources")
+			if type_id in ["rune_obelisk", "orc_ballista"]:
+				_check(tower["evolution"] == upgrade and stats["evolutions"][upgrade]["cost"] == prices[type_id], "Both peers use the host's chosen branch and captured price rather than guest resources")
 			before = _snapshot("host")["combat"]
 			await _command(observer, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
 			if type_id == "rune_obelisk":
 				await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "onyx_ring" if upgrade == "boulders" else "boulders"})
+			elif type_id == "orc_ballista":
+				await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "bounce" if upgrade == "pierce" else "pierce"})
+				await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
 			await create_timer(0.1).timeout
 			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Cross-owner and repeat special requests cannot spend or mutate accepted state")
 			if type_id == "arrow_tower":
@@ -314,6 +319,27 @@ func _peer_specials(code: String) -> void:
 	var host_debug: Dictionary = _snapshot("host")
 	for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
 		_check(_snapshot("guest")[field] == host_debug[field], "Both peers agree on debug-jumped match field: %s" % field)
+	# Replace the spawn-side Runes to observe only Ballista damage on two co-located enemies.
+	for slot: int in range(2):
+		var lane: String = "host" if slot == 0 else "guest"
+		var observer: String = "guest" if slot == 0 else "host"
+		var old_rune: Dictionary = await _wait_tower(observer, slot, Vector2i(0, 5), 0)
+		var expected_balances: Array = _snapshot(observer)["combat"]["coins"].duplicate()
+		expected_balances[slot] += int(old_rune["sell_value"]) - int(_snapshot(observer)["combat"]["tower_types"]["orc_ballista"]["cost"])
+		await _command(lane, {"action": "sell", "slot": slot, "tower_id": int(old_rune["id"])})
+		await _build(lane, slot, 0, 5, 0, "orc_ballista")
+		await _wait_combat(observer, {"coins": expected_balances}, "Selling the Rune and buying its replacement replicates before reading the new tower ID")
+		var ballista: Dictionary = await _wait_tower(observer, slot, Vector2i(0, 5), 0)
+		for upgrade: String in ["damage", "speed", "pierce" if slot == 0 else "bounce"]:
+			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": int(ballista["id"]), "upgrade": upgrade})
+		await _command(lane, {"action": "send", "slot": slot, "type_id": "grunt"})
+	await _both_ready()
+	await _command("host", {"action": "step", "delta": 0.01})
+	await create_timer(0.15).timeout
+	var ballista_state: Dictionary = _snapshot("host")["combat"]
+	_check(_snapshot("guest")["combat"] == ballista_state, "Both real peers replicate identical Ballista branch hits and bolt endpoints")
+	_check(ballista_state["enemies"][0].is_empty() and int(ballista_state["towers"][0].back()["kills"]) == 2 and ballista_state["towers"][0].back()["pierce_active"], "Pierce deals full host-defined damage to both aligned enemies, including lethal first-hit removal")
+	_check(ballista_state["enemies"][1].size() == 1 and int(ballista_state["enemies"][1][0]["hp"]) == 49 and int(ballista_state["towers"][1].back()["kills"]) == 1 and ballista_state["towers"][1].back()["bounce_active"], "Bounce kills its primary and applies one rounded half-damage secondary hit")
 
 
 

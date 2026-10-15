@@ -41,7 +41,8 @@ func _planning_rules() -> CombatRules:
 		if _lane == "guest":
 			for branch: Dictionary in definition.evolutions.values():
 				branch["cost"] = 1
-				branch["damage"] = 99
+				if branch.has("damage"):
+					branch["damage"] = 99
 				if branch.has("followup"):
 					branch["followup"]["cost"] = 1
 		definitions.append(definition)

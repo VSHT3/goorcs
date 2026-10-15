@@ -30,6 +30,10 @@ func _init() -> void:
 	_test_special_transactions()
 	_test_second_archer_targets_and_cadence()
 	_test_ballista_bounce()
+	_test_ballista_configuration()
+	_test_ballista_pierce_geometry()
+	_test_ballista_pierce_deaths_and_policies()
+	_test_ballista_pierce_snapshot_lifecycle()
 	_test_evolution_configuration()
 	_test_rune_continuous_damage()
 	_test_rune_fraction_isolation_and_cleanup()
@@ -994,8 +998,8 @@ func _prepared_special(rules: CombatRules, type_id: StringName) -> MatchCombat:
 
 
 func _test_special_transactions() -> void:
-	var ids: Array[StringName] = [&"arrow_tower", &"orc_ballista", &"rune_obelisk", &"rune_obelisk"]
-	var upgrades: Array[String] = ["special", "special", "boulders", "onyx_ring"]
+	var ids: Array[StringName] = [&"arrow_tower", &"orc_ballista", &"orc_ballista", &"rune_obelisk", &"rune_obelisk"]
+	var upgrades: Array[String] = ["special", "pierce", "bounce", "boulders", "onyx_ring"]
 	for index: int in range(ids.size()):
 		var upgrade: String = upgrades[index]
 		for first: String in ["damage", "speed"]:
@@ -1013,11 +1017,15 @@ func _test_special_transactions() -> void:
 			_check(not combat.upgrade_tower(0, id, upgrade) and combat.snapshot() == frozen, "One prerequisite never unlocks a final upgrade for either stat order")
 			combat.upgrade_tower(0, id, "speed" if first == "damage" else "damage")
 			var stat_investment: int = tower["invested"]
+			var stat_damage: int = tower["damage"]
+			var stat_interval: float = tower["interval"]
+			tower["cooldown"] = stat_interval * 0.6
+			var stat_reload: float = tower["cooldown"]
 			_check(MatchCombat.tower_level(tower) == 3 and not tower["special_upgraded"], "Both ordinary purchases reach III, not IV")
 			frozen = combat.snapshot()
 			_check(not combat.upgrade_tower(1, id, upgrade) and not combat.upgrade_tower(-1, id, upgrade) and not combat.upgrade_tower(2, id, upgrade) and not combat.upgrade_tower(0, id + 100, upgrade) and combat.snapshot() == frozen, "Wrong ownership, invalid slots and missing tower reject final upgrades atomically")
-			if ids[index] == &"rune_obelisk":
-				_check(not combat.upgrade_tower(0, id, "special") and combat.snapshot() == frozen, "Rune has no obsolete generic special command")
+			if ids[index] != &"arrow_tower":
+				_check(not combat.upgrade_tower(0, id, "special") and combat.snapshot() == frozen, "Evolution types have no obsolete generic special command")
 			else:
 				_check(not combat.upgrade_tower(0, id, "boulders") and not combat.upgrade_tower(0, id, "onyx_ring") and combat.snapshot() == frozen, "Non-Rune types cannot purchase Rune branches")
 			combat.coins[0] = price - 1
@@ -1026,12 +1034,14 @@ func _test_special_transactions() -> void:
 			combat.coins[0] += 1
 			_check(combat.upgrade_tower(0, id, upgrade) and combat.coins[0] == 0, "Exact fixed final-upgrade price succeeds for %s" % upgrade)
 			_check(MatchCombat.tower_level(tower) == 4 and tower["invested"] == stat_investment + price and tower["sell_value"] == floori(float(tower["invested"]) * 0.6), "Accepted final upgrade reaches IV and contributes actual payment to refund")
-			if upgrade != "special":
+			if ids[index] == &"rune_obelisk":
 				var config: Dictionary = type_stats["evolutions"][upgrade]
-				_check(tower["evolution"] == upgrade and tower["damage"] == config["damage"] and is_equal_approx(tower["interval"], config["interval"]), "Chosen evolution replaces effective damage and interval with its captured branch stats")
+				_check(tower["evolution"] == upgrade and tower["damage"] == config["damage"] and is_equal_approx(tower["interval"], config["interval"]), "Rune evolution replaces effective damage and interval with its captured branch stats")
+			elif ids[index] == &"orc_ballista":
+				_check(tower["evolution"] == upgrade and tower["damage"] == stat_damage and tower["interval"] == stat_interval and tower["cooldown"] == stat_reload, "Ballista branch preserves upgraded damage, cadence and live cooldown")
 			combat.coins[0] = 10000
 			frozen = combat.snapshot()
-			_check(not combat.upgrade_tower(0, id, upgrade) and not combat.upgrade_tower(0, id, "damage") and not combat.upgrade_tower(0, id, "speed") and not combat.upgrade_tower(0, id, "boulders") and not combat.upgrade_tower(0, id, "onyx_ring") and combat.snapshot() == frozen, "Final choice excludes both branches and all repeat purchases even when funded")
+			_check(not combat.upgrade_tower(0, id, upgrade) and not combat.upgrade_tower(0, id, "damage") and not combat.upgrade_tower(0, id, "speed") and not combat.upgrade_tower(0, id, "boulders") and not combat.upgrade_tower(0, id, "onyx_ring") and not combat.upgrade_tower(0, id, "pierce") and not combat.upgrade_tower(0, id, "bounce") and combat.snapshot() == frozen, "Final choice excludes both branches and all repeat purchases even when funded")
 			if ids[index] != &"arrow_tower":
 				_check(not combat.set_secondary_targeting(0, id, 2) and combat.snapshot() == frozen, "Non-archer upgrades cannot acquire a secondary targeting policy")
 			var refund: int = tower["sell_value"]
@@ -1135,7 +1145,7 @@ func _test_ballista_bounce() -> void:
 	combat.start_wave(_routes(100, 100))
 	combat.advance(0.01)
 	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 100 and not tower["bounce_active"], "Unupgraded ballista remains single-target")
-	combat.upgrade_tower(0, tower["id"], "special")
+	combat.upgrade_tower(0, tower["id"], "bounce")
 	combat.enemies[0][0]["progress"] = 4.0
 	combat.enemies[0][1]["progress"] = 5.0
 	combat.enemies[0][2]["progress"] = 8.0
@@ -1146,7 +1156,7 @@ func _test_ballista_bounce() -> void:
 	# Equal distances use stable IDs even after array reordering and primary removal.
 	combat = _prepared_special(_special_rules(&"orc_ballista", 100, 3), &"orc_ballista")
 	tower = combat.towers[0][0]
-	combat.upgrade_tower(0, tower["id"], "special")
+	combat.upgrade_tower(0, tower["id"], "bounce")
 	combat.start_wave(_routes(100, 100))
 	combat.advance(0.01)
 	var primary: Dictionary = combat.enemies[0][0]
@@ -1167,13 +1177,160 @@ func _test_ballista_bounce() -> void:
 	_check(combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]) and tower["aim"] == Vector2(4, 0) and tower["bounce_aim"] == Vector2(5, 0), "Both ballista kills retain tower attribution, bounties and immutable hit positions")
 	combat = _prepared_special(_special_rules(&"orc_ballista", 100, 1), &"orc_ballista")
 	tower = combat.towers[0][0]
-	combat.upgrade_tower(0, tower["id"], "special")
+	combat.upgrade_tower(0, tower["id"], "bounce")
 	combat.start_wave(_routes())
 	combat.advance(0.01)
 	_check(combat.enemies[0][0]["hp"] == 91 and not tower["bounce_active"], "Living primary cannot be its own bounce victim")
 	combat.enemies[0][0]["hp"] = 9
 	combat.advance(float(tower["interval"]))
 	_check(combat.enemies[0].is_empty() and tower["kills"] == 1 and not tower["bounce_active"], "Primary kill without another living victim publishes no bounce")
+
+
+func _test_ballista_configuration() -> void:
+	for branch: String in ["pierce", "bounce"]:
+		var rules := _special_rules(&"orc_ballista")
+		var definition: TowerDefinition = rules.tower_definitions[0]
+		definition.evolutions[branch]["cost"] = 137
+		definition.evolutions[branch]["title"] = "Custom branch"
+		var expected: Dictionary = definition.evolutions.duplicate(true)
+		_check(MatchCombat._valid_evolutions(definition), "Ballista accepts title/price-only branch configurations")
+		for invalid: Variant in [null, {}, {"title": "", "cost": 137}, {"title": 12, "cost": 137}, {"title": "Branch", "cost": 0}, {"title": "Branch", "cost": 1.5}, {"title": "Branch", "cost": 137, "damage": 9}, {"title": "Branch", "cost": 137, "interval": 1.0}, {"title": "Branch", "cost": 137, "continuous": false}, {"title": "Branch", "cost": 137, "followup": {}}]:
+			var candidate: TowerDefinition = definition.duplicate(true)
+			candidate.evolutions[branch] = invalid
+			_check(not MatchCombat._valid_evolutions(candidate), "Ballista rejects malformed metadata and Rune-only attack/followup fields")
+		var candidate: TowerDefinition = definition.duplicate(true)
+		candidate.area_attack = true
+		_check(not MatchCombat._valid_evolutions(candidate), "Ballista branches cannot enter the area attack path")
+		candidate = definition.duplicate(true)
+		candidate.evolutions["unknown"] = {"title": "Unknown", "cost": 137}
+		_check(not MatchCombat._valid_evolutions(candidate), "Unknown Ballista branches are rejected")
+		candidate = definition.duplicate(true)
+		candidate.evolutions["boulders"] = {"title": "Mixed", "cost": 137, "damage": 6, "interval": 0.0, "continuous": true}
+		_check(not MatchCombat._valid_evolutions(candidate), "Ballista and Rune schemas cannot mix")
+		var combat := _prepared_special(rules, &"orc_ballista")
+		var tower: Dictionary = combat.towers[0][0]
+		definition.evolutions[branch]["cost"] = 1
+		definition.evolutions[branch]["title"] = "Resource changed"
+		var copy: Dictionary = combat.snapshot()
+		copy["tower_types"]["orc_ballista"]["evolutions"][branch]["cost"] = 2
+		copy["tower_types"]["orc_ballista"]["evolutions"][branch]["title"] = "Snapshot changed"
+		_check(combat.snapshot()["tower_types"]["orc_ballista"]["evolutions"] == expected, "Ballista title and custom price are deep-captured against resource and snapshot mutation")
+		combat.coins[0] = 136
+		var frozen: Dictionary = combat.snapshot()
+		_check(not combat.upgrade_tower(0, tower["id"], branch) and combat.snapshot() == frozen, "Captured custom branch price rejects insufficient funds atomically")
+		combat.coins[0] = 137
+		_check(combat.upgrade_tower(0, tower["id"], branch) and combat.coins[0] == 0 and tower["evolution"] == branch, "Ballista purchase charges exactly the captured custom price")
+
+
+func _ballista_field(positions: Array[Vector2], branch: String = "pierce") -> MatchCombat:
+	var combat := _prepared_special(_special_rules(&"orc_ballista", 100, positions.size()), &"orc_ballista")
+	var tower: Dictionary = combat.towers[0][0]
+	_check(combat.upgrade_tower(0, tower["id"], branch), "Ballista field fixture buys an explicit branch")
+	# Spawn real host enemies without firing, then isolate the host attack geometry.
+	tower["cooldown"] = 100.0
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.01)
+	for index: int in range(positions.size()):
+		combat.enemies[0][index]["pos"] = positions[index]
+		combat.enemies[0][index]["progress"] = float(index)
+	tower["cooldown"] = 0.0
+	return combat
+
+
+func _test_ballista_pierce_geometry() -> void:
+	var combat := _ballista_field([Vector2(1, 1), Vector2(2, 1), Vector2(4, 1)])
+	var tower: Dictionary = combat.towers[0][0]
+	var primary: Dictionary = combat.enemies[0][2]
+	combat._attack(0, 0.01)
+	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 91 and primary["hp"] == 100, "Two intervening enemies intercept Pierce before the aimed primary; only two total take full upgraded damage")
+	_check(tower["target_id"] == primary["id"] and tower["aim"] == Vector2(4, 1) and tower["pierce_active"] and not tower["bounce_active"] and tower["shot"] == 1, "Pierce retains the host-selected primary and aim without publishing a bounce")
+	var endpoint: Vector2 = tower["pierce_aim"]
+	_check(is_equal_approx(endpoint.x, 4.5) and is_equal_approx(endpoint.y, 1.0) and MatchCombat.cell_in_range(tower["cell"], Vector2i(endpoint.round()), 4.0), "Accepted straight bolt endpoint reaches the valid square range boundary")
+	combat = _ballista_field([Vector2(-1, 1), Vector2(1, 1.251), Vector2(5, 1), Vector2(0, 1.2), Vector2(2, 1.25), Vector2(4, 1)])
+	tower = combat.towers[0][0]
+	combat._attack(0, 0.01)
+	_check(combat.enemies[0][0]["hp"] == 100 and combat.enemies[0][1]["hp"] == 100 and combat.enemies[0][2]["hp"] == 100 and combat.enemies[0][3]["hp"] == 100 and combat.enemies[0][4]["hp"] == 91 and combat.enemies[0][5]["hp"] == 91, "Pierce rejects behind, off-corridor, out-of-tile-range and zero-projection enemies but includes the quarter-cell boundary")
+	combat = _ballista_field([Vector2(1, 2), Vector2(2, 3), Vector2(3, 4), Vector2(4, 5)])
+	tower = combat.towers[0][0]
+	combat._attack(0, 0.01)
+	endpoint = tower["pierce_aim"]
+	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 91 and combat.enemies[0][2]["hp"] == 100 and combat.enemies[0][3]["hp"] == 100 and is_equal_approx(endpoint.x, 4.5) and is_equal_approx(endpoint.y, 5.5) and MatchCombat.cell_in_range(tower["cell"], Vector2i(endpoint.round()), 4.0), "Diagonal Pierce uses the straight ray and square Chebyshev edge, not a circular range")
+	combat = _ballista_field([Vector2(1, 1), Vector2(1, 1), Vector2(1, 1), Vector2(4, 1)])
+	var lowest: Dictionary = combat.enemies[0][0]
+	var middle: Dictionary = combat.enemies[0][1]
+	var highest: Dictionary = combat.enemies[0][2]
+	combat.enemies[0].reverse()
+	combat._attack(0, 0.01)
+	_check(lowest["hp"] == 91 and middle["hp"] == 91 and highest["hp"] == 100, "Equal ray distances select the two smallest stable enemy IDs independent of array order")
+	combat = _ballista_field([Vector2(3, 1)])
+	tower = combat.towers[0][0]
+	combat._attack(0, 0.01)
+	_check(combat.enemies[0][0]["hp"] == 91 and tower["pierce_active"], "One living enemy receives one full Pierce hit, never a repeat")
+	combat = _ballista_field([Vector2(1, 1), Vector2(0, 1)])
+	tower = combat.towers[0][0]
+	combat._attack(0, 0.01)
+	_check(combat.enemies[0][0]["hp"] == 100 and combat.enemies[0][1]["hp"] == 91 and tower["pierce_aim"] == Vector2(tower["cell"]), "Zero-length primary direction hits only the primary and publishes its degenerate endpoint")
+
+
+func _test_ballista_pierce_deaths_and_policies() -> void:
+	for reverse_order: bool in [false, true]:
+		var combat := _ballista_field([Vector2(1, 1), Vector2(2, 1), Vector2(3, 1)])
+		var tower: Dictionary = combat.towers[0][0]
+		var primary: Dictionary = combat.enemies[0][0]
+		var second: Dictionary = combat.enemies[0][1]
+		var third: Dictionary = combat.enemies[0][2]
+		primary["hp"] = 9
+		second["hp"] = 9
+		combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.CLOSEST)
+		if reverse_order:
+			combat.enemies[0].reverse()
+		var before: int = combat.coins[0]
+		combat._attack(0, 0.01)
+		_check(combat.enemies[0].size() == 1 and combat.enemies[0][0]["id"] == third["id"] and third["hp"] == 100 and tower["kills"] == 2 and tower["target_id"] == primary["id"], "Pierce captures both victims before primary death and removal in either array order, without hitting a third")
+		_check(combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]), "Both authoritative Pierce kills retain tower attribution and pay one bounty each")
+	for mode: int in [MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST]:
+		var combat := _ballista_field([Vector2(2, 1), Vector2(0, 3), Vector2(-2, 1)])
+		var tower: Dictionary = combat.towers[0][0]
+		combat.enemies[0][1]["hp"] = 200
+		combat.enemies[0][2]["pos"] = Vector2(-3, 1)
+		combat.set_targeting(0, tower["id"], mode)
+		var selected: int = 2 if mode == MatchCombat.TargetMode.FURTHEST else (0 if mode == MatchCombat.TargetMode.CLOSEST else 1)
+		var expected: Dictionary = combat.enemies[0][selected]
+		combat._attack(0, 0.01)
+		_check(tower["target_id"] == expected["id"] and tower["aim"] == expected["pos"] and tower["mode"] == mode, "Pierce ray obeys the existing primary targeting policy %s" % mode)
+		for index: int in range(combat.enemies[0].size()):
+			var original_hp: int = 200 if index == 1 else 100
+			_check(combat.enemies[0][index]["hp"] == original_hp - (9 if index == selected else 0), "Only the selected policy's ray deals damage, without redirecting off-ray")
+	var sole := _ballista_field([Vector2(0, 1)])
+	var sole_tower: Dictionary = sole.towers[0][0]
+	sole.enemies[0][0]["hp"] = 9
+	var before: int = sole.coins[0]
+	sole._attack(0, 0.01)
+	_check(sole.enemies[0].is_empty() and sole_tower["kills"] == 1 and sole.coins[0] == before + int(sole.snapshot()["rules"]["kill_bounty"]), "A lethal zero-direction Pierce retires the sole victim once and awards exactly one kill and bounty")
+
+
+func _test_ballista_pierce_snapshot_lifecycle() -> void:
+	var combat := _ballista_field([Vector2(1, 1), Vector2(3, 1)])
+	var tower: Dictionary = combat.towers[0][0]
+	_check(not tower["pierce_active"] and tower["pierce_aim"] == Vector2(tower["cell"]), "New Ballista snapshots initialize a disabled Pierce event at the tower cell")
+	combat._attack(0, 0.01)
+	var endpoint: Vector2 = tower["pierce_aim"]
+	var copy: Dictionary = combat.snapshot()
+	copy["towers"][0][0]["pierce_active"] = false
+	copy["towers"][0][0]["pierce_aim"] = Vector2(99, 99)
+	_check(tower["pierce_active"] and tower["pierce_aim"] == endpoint, "Pierce accepted endpoints and active state are detached snapshot values")
+	combat.phase = MatchCombat.Phase.PLANNING
+	var shots: int = tower["shot"]
+	combat.grow_for_main_round()
+	_check(tower["pierce_aim"] == endpoint + Vector2.DOWN and tower["pierce_active"] and tower["shot"] == shots, "Growth translates the accepted Pierce endpoint without changing the event")
+	_check(combat.debug_set_round(5) and not tower["pierce_active"] and tower["pierce_aim"] == Vector2(tower["cell"]) and tower["evolution"] == "pierce" and tower["special_upgraded"], "Debug round reset clears Pierce cosmetics while preserving the paid branch")
+	combat = _prepared_special(_special_rules(&"arrow_tower", 100, 1), &"arrow_tower")
+	tower = combat.towers[0][0]
+	_check(not tower["pierce_active"] and tower["pierce_aim"] == Vector2(tower["cell"]), "Non-Ballista towers carry the same inactive snapshot fields")
+	tower["pierce_active"] = true
+	combat.start_wave(_routes())
+	combat.advance(0.01)
+	_check(not tower["pierce_active"], "An ordinary authoritative shot clears stale Pierce state")
 
 
 func _prepared_evolution(branch: String, rules: CombatRules) -> MatchCombat:
@@ -1218,7 +1375,7 @@ func _test_evolution_configuration() -> void:
 	candidate.area_attack = false
 	_check(not MatchCombat._valid_evolutions(candidate), "Neighborhood evolutions require an area-attack definition")
 	candidate = definition.duplicate(true)
-	candidate.special_upgrade = "bounce"
+	candidate.special_upgrade = "second_archer"
 	_check(not MatchCombat._valid_evolutions(candidate), "Generic special and mutually exclusive evolutions cannot coexist")
 	for invalid: Variant in [null, {}, {"id": "unknown", "title": "Freeze Runes", "cost": 250}, {"id": "freeze_runes", "title": "", "cost": 250}, {"id": "freeze_runes", "title": "Freeze Runes", "cost": 0}, {"id": "freeze_runes", "title": "Freeze Runes", "cost": 250.0}]:
 		candidate = definition.duplicate(true)

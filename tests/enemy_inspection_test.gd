@@ -484,6 +484,11 @@ func _settle() -> void:
 
 
 func _click(point: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	motion.global_position = point
+	root.push_input(motion, true)
+	await process_frame
 	for pressed: bool in [true, false]:
 		var event := InputEventMouseButton.new()
 		event.position = point

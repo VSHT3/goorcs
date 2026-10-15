@@ -67,6 +67,7 @@ func _run() -> void:
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_rune_evolutions(board, viewport)
 	await _check_special_attacks(board, viewport)
+	await _check_pierce_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
 	await _check_slowed_enemies(board, viewport)
 	await _check_source_facing(board, viewport)
@@ -507,7 +508,10 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 	board.selected_tower_id = -1
 	board.tower_types = {
 		"arrow_tower": {"range": 3.0, "area_attack": false, "special_upgrade": "second_archer"},
-		"orc_ballista": {"range": 3.0, "area_attack": false, "special_upgrade": "bounce"},
+		"orc_ballista": {"range": 3.0, "area_attack": false, "evolutions": {
+			"pierce": {"title": "Pierce 2", "cost": 300},
+			"bounce": {"title": "Bounce 1", "cost": 300},
+		}},
 	}
 	for mirrored: bool in [false, true]:
 		board.mirror_horizontal = mirrored
@@ -556,6 +560,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		board.combat_towers = []
 		tower = _tower(91, Vector2i(2, 3), "orc_ballista")
 		tower["special_upgraded"] = true
+		tower["evolution"] = "bounce"
 		board.combat_towers = [tower]
 		baseline = await _board_image(board, viewport)
 		tower = tower.duplicate(true)
@@ -563,6 +568,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		tower["aim"] = Vector2(3, 1)
 		tower["bounce_active"] = true
 		tower["bounce_aim"] = Vector2(0, 1)
+		var accepted: Dictionary = tower.duplicate(true)
 		board.combat_towers = [tower]
 		board.set_process(false)
 		board._process(PathBoard.SHOT_DURATION * 0.5)
@@ -577,12 +583,113 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		flight = await _board_image(board, viewport)
 		_check(_pixels_changed_near(baseline, flight, primary.lerp(bounce, 0.5)) and not _pixels_changed_near(baseline, flight, first_midpoint),
 			"The same Ballista projectile subsequently travels primary-to-bounce, mirrored=%s" % mirrored)
+		board.combat_towers = [tower.duplicate(true)]
+		var repeated: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.size() == 1 and repeated.get_data() == flight.get_data(),
+			"Repeated Bounce snapshots preserve the single redirected projectile without restarting it")
+		_check(tower == accepted and board.combat_towers[0] == accepted,
+			"Rendering both Bounce legs after lethal hits does not mutate accepted tower state")
+		var later: Dictionary = tower.duplicate(true)
+		later["aim"] = Vector2(4, 4)
+		later["bounce_aim"] = Vector2(4, 0)
+		later["bounce_active"] = false
+		board.combat_towers = [later]
+		repeated = await _board_image(board, viewport)
+		_check(board._shot_traces[0]["aim"] == accepted["aim"]
+			and board._shot_traces[0]["bounce_aim"] == accepted["bounce_aim"]
+			and repeated.get_data() == flight.get_data() and board.combat_towers[0] == later,
+			"Later accepted aims cannot redirect an already captured Bounce shot")
+		board._process(PathBoard.SHOT_DURATION * 0.49)
+		_check(board._shot_traces.size() == 1, "Bounce remains visible until its full two-leg duration")
+		board._process(PathBoard.SHOT_DURATION * 0.02)
+		var expired: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.is_empty() and expired.get_data() == baseline.get_data(),
+			"Bounce expires at its nominal two-leg lifetime without a new combat snapshot")
 		board.combat_towers = []
 		_check(board._shot_traces.is_empty() and board._seen_shots.is_empty(),
 			"Clearing combat resets queued projectile lifetime and both seen counters")
 		board.combat_towers = [tower]
 		board.set_process(false)
 		_check(board._shot_traces.size() == 1, "A fresh combat can reuse a tower ID and shot number without losing its projectile")
+		board.combat_towers = []
+
+
+func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	board.combat_enemies = []
+	board.selected_tower_id = -1
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_towers = []
+		var tower: Dictionary = _tower(92, Vector2i(0, 3), "orc_ballista")
+		tower["special_upgraded"] = true
+		tower["evolution"] = "pierce"
+		board.combat_towers = [tower]
+		var baseline: Image = await _board_image(board, viewport)
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		tower["target_id"] = 901
+		tower["aim"] = Vector2(1, 3)
+		tower["pierce_active"] = true
+		tower["pierce_aim"] = Vector2(3.5, 3)
+		# A stale, off-axis endpoint must never become a second Pierce leg.
+		tower["bounce_aim"] = Vector2(1, 0)
+		var accepted: Dictionary = tower.duplicate(true)
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 1 and bool(board._shot_traces[0]["pierce_active"])
+			and not bool(board._shot_traces[0]["bounce_active"]),
+			"Pierce captures exactly one straight projectile even when all victims have already died")
+		var trace: Dictionary = board._shot_traces[0]
+		var origin: Vector2 = board._projectile_origin(trace)
+		var endpoint: Vector2 = origin + board._position_center(accepted["pierce_aim"]) - board.cell_center(accepted["cell"])
+		var primary: Vector2 = board._position_center(accepted["aim"]) + Vector2(0, board._cell_size() * 0.15)
+		var redirected: Vector2 = primary.lerp(board._position_center(tower["bounce_aim"]) + Vector2(0, board._cell_size() * 0.15), 0.5)
+		board._process(PathBoard.PIERCE_SHOT_DURATION * 0.25)
+		var flight: Image = await _board_image(board, viewport)
+		_check(board._projectile_position(trace).is_equal_approx(origin.lerp(endpoint, 0.25))
+			and _pixels_changed_near(baseline, flight, origin.lerp(endpoint, 0.25))
+			and not _pixels_changed_near(baseline, flight, endpoint),
+			"Pierce starts as one moving bolt, not a full-length tracer, mirrored=%s" % mirrored)
+		board._process(PathBoard.PIERCE_SHOT_DURATION * 0.5)
+		flight = await _board_image(board, viewport)
+		var beyond: Vector2 = origin.lerp(endpoint, 0.75)
+		_check(board._projectile_position(trace).is_equal_approx(beyond)
+			and _pixels_changed_near(baseline, flight, beyond)
+			and not _pixels_changed_near(baseline, flight, origin.lerp(endpoint, 0.25))
+			and not _pixels_changed_near(baseline, flight, redirected),
+			"The same Pierce bolt continues straight beyond its aimed enemy without bouncing, mirrored=%s" % mirrored)
+		var ray: Vector2 = endpoint - origin
+		_check(is_zero_approx(ray.cross(beyond - origin))
+			and (beyond - origin).length() > (board._position_center(accepted["aim"]) - board.cell_center(accepted["cell"])).length(),
+			"Pierce stays on the accepted forward ray after passing the primary target")
+		board.combat_towers = [tower.duplicate(true)]
+		var repeated: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.size() == 1 and repeated.get_data() == flight.get_data(),
+			"Repeated Pierce snapshots cannot duplicate, bend or restart the captured ray")
+		_check(tower == accepted and board.combat_towers[0] == accepted,
+			"Capturing and rendering a lethal Pierce shot preserves the accepted tower snapshot")
+		var later: Dictionary = tower.duplicate(true)
+		later["aim"] = Vector2(0, 0)
+		later["pierce_aim"] = Vector2(0, 0)
+		later["pierce_active"] = false
+		later["target_id"] = -1
+		board.combat_towers = [later]
+		repeated = await _board_image(board, viewport)
+		_check(trace["aim"] == accepted["aim"] and trace["pierce_aim"] == accepted["pierce_aim"]
+			and repeated.get_data() == flight.get_data() and board.combat_towers[0] == later,
+			"A later snapshot cannot move an accepted Pierce endpoint or require a living target")
+		board._process(PathBoard.PIERCE_SHOT_DURATION * 0.24)
+		var near_end: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.size() == 1
+			and _pixels_changed_near(baseline, near_end, origin.lerp(endpoint, 0.99)),
+			"Pierce remains one visible straight bolt until the full-ray lifetime ends")
+		board._process(PathBoard.PIERCE_SHOT_DURATION * 0.02)
+		var expired: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.is_empty() and expired.get_data() == baseline.get_data(),
+			"Pierce expires at its nominal full-ray lifetime without waiting for a snapshot")
+		_check(tower == accepted and board.combat_towers[0] == later,
+			"Expiring Pierce presentation never mutates either accepted snapshot")
 		board.combat_towers = []
 
 
@@ -955,7 +1062,9 @@ func _pixels_changed_near(before: Image, after: Image, position: Vector2) -> boo
 
 
 func _tower(id: int, cell: Vector2i, type_id: String) -> Dictionary:
-	return {"id": id, "cell": cell, "type_id": type_id, "evolution": "", "freeze_upgraded": false, "shot": 0, "aim": Vector2(cell)}
+	return {"id": id, "cell": cell, "type_id": type_id, "evolution": "", "freeze_upgraded": false,
+		"shot": 0, "aim": Vector2(cell), "pierce_active": false, "pierce_aim": Vector2(cell),
+		"bounce_active": false, "bounce_aim": Vector2(cell)}
 
 
 func _enemy(id: int, progress: float, position: Vector2, route: Array) -> Dictionary:

@@ -13,6 +13,13 @@ cost = 85
 upgrade_base_cost = 55
 damage_upgrade_bonus = 3
 speed_upgrade_multiplier = 0.75
-special_upgrade = "bounce"
-special_upgrade_title = "Bouncing Bolt"
-special_upgrade_cost = 300
+evolutions = {
+"pierce": {
+"title": "Pierce 2",
+"cost": 300
+},
+"bounce": {
+"title": "Bounce 1",
+"cost": 300
+}
+}
