@@ -9,6 +9,7 @@ const TARGET_HELP: Array[String] = [
 	"Nearest to this tower.",
 	"Highest current HP.",
 ]
+const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III"]
 
 var planning: MatchPlanning
 var selected_tower_id: int = -1
@@ -468,7 +469,7 @@ func _refresh_targeting() -> void:
 	var types: Dictionary = planning.combat.get("tower_types", {})
 	var stats: Dictionary = types.get(String(tower["type_id"]), {})
 	var interval: float = float(tower.get("interval", stats.get("interval", 1.0)))
-	_tower_title.text = String(stats.get("title", "Tower"))
+	_tower_title.text = "%s · Level %s" % [String(stats.get("title", "Tower")), TOWER_LEVEL_NUMERALS[MatchCombat.tower_level(tower) - 1]]
 	_tower_stats.text = "Kills %d · Damage %d\n%.2f attacks/s · Range %d" % [
 		int(tower.get("kills", 0)), int(tower.get("damage", stats.get("damage", 0))),
 		1.0 / interval, int(stats.get("range", 0)),
@@ -484,7 +485,7 @@ func _refresh_targeting() -> void:
 
 func _refresh_upgrade(button: Button, tower: Dictionary, stats: Dictionary, upgrade: String) -> void:
 	var purchased: bool = bool(tower.get(upgrade + "_upgraded", false))
-	var price: int = int(stats.get(upgrade + "_upgrade_cost", 0))
+	var price: int = MatchCombat.tower_upgrade_cost(tower, stats)
 	var benefit: String = "+%d damage" % int(stats.get("damage_upgrade_bonus", 0)) if upgrade == "damage" else "%.0f%% faster" % ((1.0 / float(stats.get("speed_upgrade_multiplier", 1.0)) - 1.0) * 100.0)
 	button.text = "%s\nPurchased" % benefit if purchased else "%s\n%d" % [benefit, price]
 	button.disabled = purchased or targeting_button.disabled or _own_coins() < price

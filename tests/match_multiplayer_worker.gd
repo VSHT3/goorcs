@@ -29,9 +29,9 @@ func _planning_rules() -> CombatRules:
 		definition.range_cells = 0.5 if _lane == "guest" else 1.5
 		definition.interval = 5.0 if _lane == "guest" else 0.05
 		definition.cost = source.cost
-		definition.damage_upgrade_cost = source.damage_upgrade_cost
+		definition.upgrade_base_cost = source.upgrade_base_cost
 		definition.damage_upgrade_bonus = source.damage_upgrade_bonus
-		definition.speed_upgrade_cost = source.speed_upgrade_cost
+		definition.upgrade_cost_step = source.upgrade_cost_step
 		definition.speed_upgrade_multiplier = source.speed_upgrade_multiplier
 		definition.area_attack = source.area_attack
 		definitions.append(definition)

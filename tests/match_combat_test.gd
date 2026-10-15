@@ -12,6 +12,7 @@ func _init() -> void:
 	_test_tower_type_stats()
 	_test_custom_tower_definition()
 	_test_economy_and_upgrades()
+	_test_level_pricing_orders()
 	_test_area_kills_and_bounties()
 	_test_builtin_upgrade_values()
 	_test_wave_scaling_and_rewards()
@@ -349,9 +350,9 @@ func _type_snapshot(definition: TowerDefinition) -> Dictionary:
 	return {
 		"title": definition.reward.title, "damage": definition.damage,
 		"range": definition.range_cells, "interval": definition.interval,
-		"cost": definition.cost, "damage_upgrade_cost": definition.damage_upgrade_cost,
+		"cost": definition.cost, "upgrade_base_cost": definition.upgrade_base_cost,
 		"damage_upgrade_bonus": definition.damage_upgrade_bonus,
-		"speed_upgrade_cost": definition.speed_upgrade_cost,
+		"upgrade_cost_step": definition.upgrade_cost_step,
 		"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
 		"area_attack": definition.area_attack,
 	}
@@ -359,32 +360,33 @@ func _type_snapshot(definition: TowerDefinition) -> Dictionary:
 
 func _test_economy_and_upgrades() -> void:
 	var rules := _rules()
-	rules.starting_coins = 105
+	rules.starting_coins = 70
 	var combat := MatchCombat.new(rules)
-	_check(combat.coins == [105, 105], "Each player starts with the configured Coins")
-	_check(combat.build(0, Vector2i(1, 1), &"arrow_tower", 0) and combat.coins == [60, 105], "Purchase spends the owning player's exact price")
+	_check(combat.coins == [70, 70], "Each player starts with the configured Coins")
+	_check(combat.build(0, Vector2i(1, 1), &"arrow_tower", 0) and combat.coins == [25, 70], "Purchase spends the owning player's exact price")
 	var id: int = combat.towers[0][0]["id"]
 	var frozen: Dictionary = combat.snapshot()
 	_check(not combat.upgrade_tower(1, id, "damage") and not combat.sell_tower(1, id) and not combat.upgrade_tower(0, id, "unknown") and not combat.sell_tower(0, -1), "Wrong owner, missing tower and unknown upgrade are rejected")
 	_check(not combat.build(0, Vector2i(1, 1), &"arrow_tower", 0) and combat.snapshot() == frozen, "Invalid purchases and tower commands spend nothing or change stats/IDs")
-	_check(combat.upgrade_tower(0, id, "damage") and combat.coins[0] == 30 and combat.towers[0][0]["damage"] == 3 and combat.towers[0][0]["damage_upgraded"], "One-time damage purchase applies its configured bonus atomically")
+	_check(combat.upgrade_tower(0, id, "damage") and combat.coins[0] == 15 and combat.towers[0][0]["damage"] == 3 and combat.towers[0][0]["damage_upgraded"], "One-time damage purchase applies its configured bonus atomically")
 	combat.start_wave(_routes())
 	combat.advance(0.1)
 	var cooldown: float = combat.towers[0][0]["cooldown"]
 	_check(combat.upgrade_tower(0, id, "speed") and combat.coins[0] == 0, "Exact remaining Coins buy a speed upgrade during combat")
 	var tower: Dictionary = combat.towers[0][0]
-	_check(tower["speed_upgraded"] and is_equal_approx(tower["interval"], 0.4) and is_equal_approx(tower["cooldown"], cooldown * 0.8) and tower["invested"] == 105 and tower["sell_value"] == 63, "Effective attack interval, reload and invested/refund stats include paid upgrades")
+	_check(tower["speed_upgraded"] and is_equal_approx(tower["interval"], 0.4) and is_equal_approx(tower["cooldown"], cooldown * 0.8) and tower["invested"] == 70 and tower["sell_value"] == 42, "Effective attack interval, reload and invested/refund stats include paid upgrades")
 	frozen = combat.snapshot()
 	_check(not combat.upgrade_tower(0, id, "damage") and not combat.upgrade_tower(0, id, "speed") and not combat.build(0, Vector2i(2, 1), &"arrow_tower", 0) and combat.snapshot() == frozen, "Repeated upgrades and insufficient-money purchase mutate nothing")
-	_check(combat.sell_tower(0, id) and combat.coins[0] == 63 and combat.towers[0].is_empty(), "Live sale refunds 60 percent of actual investment and removes the tower")
+	_check(combat.sell_tower(0, id) and combat.coins[0] == 42 and combat.towers[0].is_empty(), "Live sale refunds 60 percent of actual investment and removes the tower")
 	frozen = combat.snapshot()
 	_check(not combat.sell_tower(0, id) and not combat.upgrade_tower(0, id, "damage") and combat.snapshot() == frozen, "Repeated sale and stale upgrade cannot grant money or affect removed towers")
 	_check(combat.build(0, Vector2i(1, 1), &"arrow_tower", 0) and combat.towers[0][0]["id"] == id + 1, "Failed purchases do not consume IDs; rebuying gets the next identity")
+	combat.coins[0] = 54
 	var replacement: Dictionary = combat.towers[0][0]
 	_check(not replacement["damage_upgraded"] and not replacement["speed_upgraded"] and replacement["kills"] == 0 and replacement["damage"] == 2, "Rebuy has no inherited kills or upgrades")
 	frozen = combat.snapshot()
 	_check(not combat.upgrade_tower(0, replacement["id"], "damage") and not combat.upgrade_tower(0, replacement["id"], "speed") and combat.snapshot() == frozen, "Unaffordable upgrades leave Coins, readiness-independent stats, and investment untouched")
-	_check(combat.sell_tower(0, replacement["id"]) and combat.coins[0] == 45, "Sale/rebuy loses money rather than manufacturing it")
+	_check(combat.sell_tower(0, replacement["id"]) and combat.coins[0] == 36, "Sale/rebuy loses money rather than manufacturing it")
 	var rounding_rules := _rules()
 	rounding_rules.tower_definitions[0].cost = 46
 	combat = MatchCombat.new(rounding_rules)
@@ -393,6 +395,30 @@ func _test_economy_and_upgrades() -> void:
 
 
 func _test_area_kills_and_bounties() -> void:
+func _test_level_pricing_orders() -> void:
+	for first: String in ["damage", "speed"]:
+		var rules := _rules()
+		rules.starting_coins = 70
+		var combat := MatchCombat.new(rules)
+		combat.build(0, Vector2i(1, 1), &"arrow_tower", 0)
+		var tower: Dictionary = combat.towers[0][0]
+		var definition: Dictionary = combat.snapshot()["tower_types"]["arrow_tower"]
+		var second: String = "speed" if first == "damage" else "damage"
+		_check(MatchCombat.tower_level(tower) == 1 and MatchCombat.tower_upgrade_cost(tower, definition) == 10, "Fresh tower starts at level I with either upgrade costing 10")
+		_check(combat.upgrade_tower(0, tower["id"], first) and combat.coins[0] == 15 and MatchCombat.tower_level(tower) == 2, "Buying %s first pays 10 and advances exactly one level" % first)
+		_check(MatchCombat.tower_upgrade_cost(tower, definition) == 15, "The other stat uses the shared level-II price")
+		var frozen: Dictionary = combat.snapshot()
+		_check(not combat.upgrade_tower(0, tower["id"], first) and combat.snapshot() == frozen, "Repeating the first stat cannot advance level or spend Coins")
+		combat.coins[0] = 14
+		frozen = combat.snapshot()
+		_check(not combat.upgrade_tower(0, tower["id"], second) and combat.snapshot() == frozen, "14 Coins cannot buy the second upgrade at the stale first-upgrade price")
+		combat.coins[0] = 15
+		_check(combat.upgrade_tower(0, tower["id"], second) and combat.coins[0] == 0 and MatchCombat.tower_level(tower) == 3, "Exactly 15 Coins buys %s second and reaches level III" % second)
+		_check(tower["invested"] == 70 and tower["sell_value"] == 42, "Both purchase orders preserve the same actual investment and refund")
+		frozen = combat.snapshot()
+		_check(not combat.upgrade_tower(0, tower["id"], second) and combat.snapshot() == frozen, "Fully upgraded tower cannot advance beyond level III")
+
+
 	var rules := _rules()
 	rules.enemy_speed = 0.0
 	rules.enemy_health = 2
@@ -457,7 +483,6 @@ func _test_wave_scaling_and_rewards() -> void:
 func _test_builtin_upgrade_values() -> void:
 	var ids: Array[StringName] = [&"arrow_tower", &"orc_ballista", &"rune_obelisk"]
 	var costs: Array[int] = [45, 85, 70]
-	var upgrade_costs: Array[int] = [30, 55, 45]
 	var effective_damage: Array[int] = [3, 9, 2]
 	var multipliers: Array[float] = [0.8, 0.75, 0.85]
 	for index: int in range(ids.size()):
@@ -469,13 +494,12 @@ func _test_builtin_upgrade_values() -> void:
 		combat.build(0, Vector2i(0, 1), ids[index], 0)
 		var id: int = combat.towers[0][0]["id"]
 		_check(combat.upgrade_tower(0, id, "damage") and combat.upgrade_tower(0, id, "speed"), "Both configured one-time upgrades are affordable from starting Coins for %s" % ids[index])
-		var type_stats: Dictionary = combat.snapshot()["tower_types"][String(ids[index])]
-		_check(type_stats["cost"] == costs[index] and type_stats["damage_upgrade_cost"] == upgrade_costs[index] and type_stats["speed_upgrade_cost"] == upgrade_costs[index] and is_equal_approx(type_stats["speed_upgrade_multiplier"], multipliers[index]), "Tower %s publishes its distinct upgrade prices and speed bonus" % ids[index])
 		combat.start_wave(_routes())
 		combat.advance(0.01)
 		var tower: Dictionary = combat.towers[0][0]
 		_check(tower["damage"] == effective_damage[index] and combat.enemies[0][0]["hp"] == 100 - effective_damage[index] and is_equal_approx(tower["cooldown"], type_stats["interval"] * multipliers[index]), "Tower %s attacks using purchased effective damage and interval" % ids[index])
-		_check(combat.coins[0] == 200 - costs[index] - 2 * upgrade_costs[index] and tower["invested"] == costs[index] + 2 * upgrade_costs[index], "Tower %s accounts for each paid upgrade exactly once" % ids[index])
+		var type_stats: Dictionary = combat.snapshot()["tower_types"][String(ids[index])]
+		_check(combat.coins[0] == 200 - costs[index] - 25 and tower["invested"] == costs[index] + 25, "Tower %s pays shared level-based prices regardless of type" % ids[index])
 
 
 func _test_enemy_sends() -> void:
