@@ -1,0 +1,79 @@
+{
+  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "generator": "tools/author_enemy_sprites.py",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    640,
+    80
+  ],
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
+  "lighting": "upper left; dark fantasy outline",
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "sheet_sha256": "fd93cf2dc534505b39b029af84a2bfba2ec10160497b3a6623131ed8a21de011",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 8,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          21,
+          28,
+          60,
+          70
+        ],
+        [
+          21,
+          28,
+          60,
+          70
+        ],
+        [
+          21,
+          28,
+          61,
+          70
+        ],
+        [
+          21,
+          28,
+          60,
+          70
+        ],
+        [
+          21,
+          28,
+          60,
+          70
+        ],
+        [
+          20,
+          28,
+          61,
+          71
+        ],
+        [
+          19,
+          28,
+          61,
+          72
+        ],
+        [
+          20,
+          28,
+          61,
+          71
+        ]
+      ]
+    }
+  ],
+  "source": "assets/enemies/brute.png",
+  "source_sha256": "b2b2e7a4ffd6f0752783ff08c6a239dd1ac5537d703c02bbb32c34612ce42095",
+  "source_origin": "Accepted pre-existing PixelLab still; unchanged"
+}

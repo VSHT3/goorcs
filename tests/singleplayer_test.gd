@@ -18,6 +18,12 @@ func _run() -> void:
 	root.add_child(session)
 	var planning := MatchPlanning.new()
 	planning.session = session
+	# Isolate mirrored lifecycle from the shipped randomized horde composition.
+	var rules := CombatRules.new()
+	var grunt: EnemyDefinition = preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
+	grunt.send_first_wave = 1
+	rules.catalog.enemies = [grunt]
+	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.start_singleplayer()
 	_check(planning.active and planning.local_slot() == 0 and session.state == MultiplayerSession.State.IDLE and not root.multiplayer.multiplayer_peer is ENetMultiplayerPeer, "Singleplayer starts locally without installing a network peer")
@@ -180,6 +186,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	var grunt := preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
 	grunt.send_cost = 20
 	grunt.send_income = 2
+	grunt.send_first_wave = 1
 	rules.catalog.enemies = [grunt]
 	rules.send_spawn_interval = 0.35
 	planning.combat_rules = rules
@@ -255,7 +262,10 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	rules.send_spawn_interval = 0.35
 	var definitions: Array[EnemyDefinition] = []
 	for source: EnemyDefinition in rules.catalog.enemies:
-		definitions.append(source.duplicate() as EnemyDefinition)
+		if source.id in [&"grunt", &"runner", &"brute"]:
+			var enemy := source.duplicate() as EnemyDefinition
+			enemy.send_first_wave = 1
+			definitions.append(enemy)
 	rules.catalog.enemies = definitions
 	planning.combat_rules = rules
 	planning.start_singleplayer()

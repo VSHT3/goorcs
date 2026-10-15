@@ -29,7 +29,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	var screen: CollectionScreen = main.collection_screen
-	_check(screen.visible and not main.workshop.visible, "Collection navigation opens only the collection screen")
+	_check(screen.visible and (main.sandbox_screen == null or not main.sandbox_screen.visible), "Collection navigation opens only the collection screen")
 	await _click(screen.open_button)
 	var granted: int = main.collection_store.unlocked_count()
 	_check(granted > 0 and granted <= 3, "Opening actually grants eligible collection types")
@@ -58,7 +58,9 @@ func _run() -> void:
 	reloaded = CollectionStore.new(SAVE_PATH)
 	for reward: TowerReward in reloaded.catalog:
 		_check(reloaded.is_unlocked(reward.id), "Final save contains every unlocked identity")
-	main.layout.place(Vector2i(1, 4))
+	main.sandbox_button.pressed.emit()
+	main.sandbox_screen.controller.edit_path(Vector2i(1, 4), true)
+	main.get_node("Menu/Center/Panel/Collection").pressed.emit()
 	var before_reset: String = FileAccess.get_file_as_string(SAVE_PATH)
 	await _click(screen.reset_button)
 	await process_frame
@@ -70,7 +72,7 @@ func _run() -> void:
 	await _dialog_click(screen.reset_confirmation.get_ok_button())
 	_check(main.collection_store.unlocked_count() == 0 and not screen.open_button.disabled, "Confirmed reset clears progress and enables chests")
 	_check(screen.reveal.get_node("Results").get_child_count() == 0, "Reset clears old reward cards")
-	_check(main.layout.has_path(Vector2i(1, 4)), "Collection reset preserves the workshop layout")
+	_check(main.sandbox_screen.layout.has_path(Vector2i(1, 4)), "Collection reset preserves the sandbox layout")
 	reloaded = CollectionStore.new(SAVE_PATH)
 	_check(reloaded.unlocked_count() == 0 and reloaded.can_open(), "The empty collection persists after reset")
 	await _click(screen.open_button)

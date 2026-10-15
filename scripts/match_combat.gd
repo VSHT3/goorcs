@@ -20,6 +20,13 @@ var enemies: Array[Array] = [[], []]
 # One host-generated ordered regular stream, replayed independently on both boards.
 var wave_roster: Array[String] = []
 var spawn_times: Array[float] = []
+var wave_groups: Array[Dictionary] = []
+var statistics_id: String = Crypto.new().generate_random_bytes(16).hex_encode()
+var enemy_totals: Array[Dictionary] = [{"kills": {}, "sent": {}}, {"kills": {}, "sent": {}}]
+var _sandbox_mode: bool = false
+# Parallel to the individual FIFO: only the last member waits ordinary cooldown.
+var _send_group_ends: Array[Array] = [[], []]
+var _special_stream: bool = false
 
 var _rules: CombatRules
 # Captured once from resources so commands, attacks, and snapshots share host-owned stats.
@@ -36,6 +43,7 @@ var _max_spawn_interval_reduction: float
 var _random: RandomNumberGenerator
 var _wave_random: RandomNumberGenerator
 var _timing_random: RandomNumberGenerator
+var _group_random: RandomNumberGenerator = RandomNumberGenerator.new()
 var _roster_configuration_valid: bool = true
 var _routes: Array[Array] = [[], []]
 var _routing_next: Array[Dictionary] = [{}, {}]
@@ -57,7 +65,9 @@ var _step_start_time: float = 0.0
 
 
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
-	_rules = rules
+	# Freeze admitted rules; resource edits cannot enable a match bypass.
+	_rules = rules.duplicate() as CombatRules
+	_sandbox_mode = rules.sandbox_mode
 	_send_spawn_interval = rules.send_spawn_interval
 	_spawn_interval_reduction_per_wave = rules.spawn_interval_reduction_per_wave
 	_max_spawn_interval_reduction = rules.max_spawn_interval_reduction
@@ -73,6 +83,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 	if _timing_random == null:
 		_timing_random = RandomNumberGenerator.new()
 		_timing_random.randomize()
+	# Paid groups/rituals never perturb regular composition, timing or tie rolls.
+	_group_random.seed = _wave_random.seed ^ 0x534b454c
 	if rules.wave_weight <= 0 or rules.wave_weight_growth < 0 or not is_finite(rules.spawn_interval) or rules.spawn_interval < 0.0:
 		push_error("Combat waves require positive weight, nonnegative growth and a finite nonnegative spawn interval")
 		_roster_configuration_valid = false
@@ -99,10 +111,22 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"count_cap_growth": definition.count_cap_growth,
 			"count_cap_growth_interval": definition.count_cap_growth_interval,
 			"max_weight_share": definition.max_weight_share,
+			"send_first_wave": definition.send_first_wave,
+			"regular_spawn_enabled": definition.regular_spawn_enabled,
+			"send_enabled": definition.send_enabled,
+			"group_weights": definition.group_weights.duplicate(),
+			"group_interval": definition.group_interval, "kill_bounty": definition.kill_bounty,
+			"heal_interval": definition.heal_interval, "heal_radius": definition.heal_radius,
+			"heal_fraction": definition.heal_fraction,
+			"summon_interval": definition.summon_interval,
+			"summon_cast_duration": definition.summon_cast_duration,
+			"summon_type": String(definition.summon_type),
+			"summon_min": definition.summon_min, "summon_max": definition.summon_max,
+			"summon_limit": definition.summon_limit,
 		}
 	var has_remainder_enemy: bool = false
 	for definition: EnemyDefinition in rules.catalog.enemies:
-		if definition.spawn_weight == 1 and definition.first_wave == 1 and definition.max_per_wave == 0 and definition.max_weight_share == 1.0:
+		if definition.regular_spawn_enabled and definition.spawn_weight == 1 and definition.first_wave == 1 and definition.max_per_wave == 0 and definition.max_weight_share == 1.0:
 			has_remainder_enemy = true
 	if not has_remainder_enemy:
 		push_error("Combat regular waves require an always-unlocked weight-one enemy with unlimited count and full weight share")
@@ -130,7 +154,7 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 		return false
 	var definition: Dictionary = _tower_types[String(type_id)]
 	var cost: int = definition["cost"]
-	if coins[slot] < cost:
+	if not _sandbox_mode and coins[slot] < cost:
 		return false
 	towers[slot].append({
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
@@ -141,9 +165,10 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 		"bounce_active": false, "bounce_aim": Vector2(cell),
 		"pierce_active": false, "pierce_aim": Vector2(cell),
 		"damage": definition["damage"], "interval": definition["interval"],
-		"invested": cost, "sell_value": _sell_value(cost),
+		"invested": 0 if _sandbox_mode else cost, "sell_value": 0 if _sandbox_mode else _sell_value(cost),
 	})
-	coins[slot] -= cost
+	if not _sandbox_mode:
+		coins[slot] -= cost
 	_next_tower_id += 1
 	return true
 
@@ -192,12 +217,14 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 		if upgrade == "special" and definition["special_upgrade"].is_empty():
 			return false
 		var cost: int = int(definition["evolutions"]["boulders"]["followup"]["cost"]) if freeze else (int(definition["evolutions"][upgrade]["cost"]) if evolution else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition)))
-		if tower[flag] or coins[slot] < cost:
+		if tower[flag] or (not _sandbox_mode and coins[slot] < cost):
 			return false
-		coins[slot] -= cost
+		if not _sandbox_mode:
+			coins[slot] -= cost
 		tower[flag] = true
-		tower["invested"] += cost
-		tower["sell_value"] = _sell_value(tower["invested"])
+		if not _sandbox_mode:
+			tower["invested"] += cost
+			tower["sell_value"] = _sell_value(tower["invested"])
 		if evolution:
 			var config: Dictionary = definition["evolutions"][upgrade]
 			tower["evolution"] = upgrade
@@ -227,7 +254,8 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 		var tower: Dictionary = towers[slot][index]
 		if tower["id"] != tower_id:
 			continue
-		coins[slot] += _sell_value(tower["invested"])
+		if not _sandbox_mode:
+			coins[slot] += _sell_value(tower["invested"])
 		_continuous_damage.erase(tower_id)
 		_rune_damage.erase(tower_id)
 		towers[slot].remove_at(index)
@@ -277,17 +305,22 @@ func send_enemy(slot: int, type_id: StringName) -> bool:
 	if phase == Phase.FINISHED or not _valid_slot(slot) or not _enemy_types.has(String(type_id)) or not _valid_send_timing():
 		return false
 	var definition: Dictionary = _enemy_types[String(type_id)]
+	var delivery_wave: int = wave + 1 if phase == Phase.PLANNING else wave
 	var cost: int = definition["send_cost"]
-	if coins[slot] < cost:
+	if not definition["send_enabled"] or delivery_wave < int(definition["send_first_wave"]) or (not _sandbox_mode and coins[slot] < cost):
 		return false
 	var target: int = 1 - slot
-	# Payment, recurring income and FIFO reservation form one host transaction.
-	# An idle stream starts now, never at an old due time or in a catch-up burst.
+	var count: int = _roll_group(definition, _group_random)
+	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0
 	if _pending_sends(target) == 0 and phase == Phase.WAVE:
 		_next_send_times[target] = maxf(_next_send_times[target], _elapsed)
-	_send_queues[target].append(String(type_id))
-	coins[slot] -= cost
+	for member: int in range(count):
+		_send_queues[target].append(String(type_id))
+		_send_group_ends[target].append(member == count - 1)
+	if not _sandbox_mode:
+		coins[slot] -= cost
 	income[slot] += int(definition["send_income"])
+	_add_total(slot, "sent", String(type_id), count)
 	if phase == Phase.WAVE and _next_send_times[target] <= _elapsed:
 		_spawn_send(target)
 	return true
@@ -304,7 +337,7 @@ func _pending_sends(slot: int) -> int:
 
 # Debug jumps abandon a round, never clear it: no bounty, income or wave reward.
 func debug_set_round(round_number: int) -> bool:
-	if phase == Phase.FINISHED or round_number < 1 or round_number > 1000:
+	if (phase == Phase.FINISHED and not _sandbox_mode) or round_number < 1 or (round_number > 1000 and not _sandbox_mode):
 		return false
 	phase = Phase.PLANNING
 	wave = round_number - 1
@@ -312,8 +345,11 @@ func debug_set_round(round_number: int) -> bool:
 	coin_flip = false
 	enemies = [[], []]
 	wave_roster.clear()
+	wave_groups.clear()
+	_special_stream = false
 	spawn_times.clear()
 	_send_queues = [[], []]
+	_send_group_ends = [[], []]
 	_send_heads = [0, 0]
 	_next_send_times = [0.0, 0.0]
 	_active_send_spawn_interval = 0.0
@@ -343,30 +379,91 @@ func debug_set_round(round_number: int) -> bool:
 	return true
 
 func start_wave(routing: Array[Dictionary]) -> bool:
-	if phase != Phase.PLANNING or not _roster_configuration_valid or routing.size() != 2 or not _valid_spawn_timing() or not _valid_send_timing():
+	if phase != Phase.PLANNING or not _roster_configuration_valid or not _valid_routes(routing) or not _valid_spawn_timing() or not _valid_send_timing():
+		return false
+	var groups: Array[Dictionary] = _generate_wave_groups(wave + 1)
+	if groups.is_empty():
+		return false
+	_admit_wave(routing, wave + 1, groups)
+	return true
+
+
+func sandbox_start(routing: Array[Dictionary], round_number: int, roster: Array[String]) -> bool:
+	if not _sandbox_mode or not _roster_configuration_valid or round_number < 1 or not _valid_routes(routing) or not _valid_spawn_timing() or not _valid_send_timing():
+		return false
+	var groups: Array[Dictionary] = []
+	for type_id: String in roster:
+		if not _enemy_types.has(type_id):
+			return false
+		groups.append({"type_id": type_id, "count": 1})
+	debug_set_round(round_number)
+	_admit_wave(routing, round_number, groups)
+	return true
+
+
+func sandbox_start_wave(routing: Array[Dictionary], round_number: int) -> bool:
+	if not _sandbox_mode or round_number < 1 or not _roster_configuration_valid or not _valid_routes(routing) or not _valid_spawn_timing() or not _valid_send_timing():
+		return false
+	var groups: Array[Dictionary] = _generate_wave_groups(round_number)
+	if groups.is_empty():
+		return false
+	debug_set_round(round_number)
+	_admit_wave(routing, round_number, groups)
+	return true
+
+
+func sandbox_spawn(slot: int, type_id: StringName, count: int) -> bool:
+	if not _sandbox_mode or phase != Phase.WAVE or not _valid_slot(slot) or not _enemy_types.has(String(type_id)) or count < 1 or _routes[slot].is_empty():
+		return false
+	for index: int in range(count):
+		_spawn_enemy(slot, String(type_id), 0.0, _elapsed)
+	return true
+
+
+func _valid_routes(routing: Array[Dictionary]) -> bool:
+	if routing.size() != 2:
 		return false
 	for captured: Dictionary in routing:
 		if not _valid_routing(captured):
 			return false
-	var roster: Array[String] = _generate_wave_roster(wave + 1)
-	if roster.is_empty():
-		return false
-	var interval_multiplier: float = _spawn_interval_multiplier(wave + 1)
-	wave_roster = roster
-	spawn_times = _generate_spawn_times(roster.size(), _rules.spawn_interval * interval_multiplier)
+	return true
+
+
+func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dictionary]) -> void:
+	wave_groups = groups
+	wave_roster.clear()
+	spawn_times.clear()
+	_special_stream = false
+	for slot: int in range(2):
+		for index: int in range(_send_heads[slot], _send_queues[slot].size()):
+			var pending: Dictionary = _enemy_types[_send_queues[slot][index]]
+			_special_stream = _special_stream or float(pending["heal_interval"]) > 0.0 or float(pending["summon_interval"]) > 0.0
+	var interval_multiplier: float = _spawn_interval_multiplier(wave_number)
+	var group_times: Array[float] = _generate_spawn_times(groups.size(), _rules.spawn_interval * interval_multiplier)
+	var offset: float = 0.0
+	for index: int in range(groups.size()):
+		var group: Dictionary = groups[index]
+		var definition: Dictionary = _enemy_types[group["type_id"]]
+		_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0
+		var spacing: float = _enemy_types[group["type_id"]]["group_interval"]
+		for member: int in range(int(group["count"])):
+			wave_roster.append(group["type_id"])
+			spawn_times.append(group_times[index] + offset + member * spacing)
+		offset += (int(group["count"]) - 1) * spacing
 	_active_send_spawn_interval = _send_spawn_interval * interval_multiplier
 	_routes = [routing[0]["route"].duplicate(), routing[1]["route"].duplicate()]
 	_routing_next = [routing[0]["next"].duplicate(true), routing[1]["next"].duplicate(true)]
 	_fork_cursors = [{}, {}]
 	_spawned = [0, 0]
+	if _sandbox_mode:
+		_spawned[1] = wave_roster.size()
 	_elapsed = 0.0
 	_next_send_times = [0.0, 0.0]
-	wave += 1
+	wave = wave_number
 	phase = Phase.WAVE
 	for slot: int in range(2):
 		if _pending_sends(slot) > 0:
 			_spawn_send(slot)
-	return true
 
 
 func _valid_spawn_timing() -> bool:
@@ -465,15 +562,24 @@ func _assign_route(slot: int) -> Array[Vector2i]:
 # Only the host calls this, using fixed physics deltas. All towers hit immediately;
 # the shot counter and aim position are cosmetic events for snapshot consumers.
 func advance(delta: float) -> bool:
-	if phase != Phase.WAVE or delta <= 0.0:
+	if phase != Phase.WAVE or not is_finite(delta) or delta <= 0.0:
 		return false
-	_step_start_time = _elapsed
-	_elapsed += delta
-	for slot: int in range(2):
-		_move_enemies(slot, delta)
-		_spawn_enemies(slot)
-		_attack(slot, delta)
-		_apply_leaks(slot)
+	var remaining: float = delta
+	if _special_stream:
+		for slot: int in range(2):
+			_spawn_enemies(slot)
+	while remaining > 0.000000001:
+		var step: float = _next_event_step(remaining) if _special_stream else remaining
+		_step_start_time = _elapsed
+		_elapsed += step
+		for slot: int in range(2):
+			_move_enemies(slot, step)
+			_spawn_enemies(slot)
+			_attack(slot, step)
+			# A dead caster never resolves its due ritual.
+			_enemy_abilities(slot)
+			_apply_leaks(slot)
+		remaining -= step
 	# Resolve only after BOTH boards have applied this tick's damage.
 	if base_health[0] == 0 or base_health[1] == 0:
 		phase = Phase.FINISHED
@@ -487,9 +593,79 @@ func advance(delta: float) -> bool:
 	return true
 
 
+func _next_event_step(maximum: float) -> float:
+	var duration: float = maximum
+	for slot: int in range(2):
+		if _spawned[slot] < spawn_times.size():
+			duration = minf(duration, spawn_times[_spawned[slot]] - _elapsed)
+		if _pending_sends(slot) > 0:
+			duration = minf(duration, _next_send_times[slot] - _elapsed)
+		for enemy: Dictionary in enemies[slot]:
+			var definition: Dictionary = _enemy_types[enemy["type_id"]]
+			if float(enemy["cast_remaining"]) > 0.0:
+				duration = minf(duration, float(enemy["cast_remaining"]))
+			elif float(definition["summon_interval"]) > 0.0:
+				duration = minf(duration, float(enemy["next_summon"]) - float(enemy["age"]))
+			if float(definition["heal_interval"]) > 0.0:
+				duration = minf(duration, float(enemy["next_heal"]) - float(enemy["age"]))
+	return maxf(0.000000001, duration)
+
+
+func _enemy_abilities(slot: int) -> void:
+	# Children cannot enter this iteration or recursively act.
+	var count: int = enemies[slot].size()
+	for index: int in range(count):
+		var enemy: Dictionary = enemies[slot][index]
+		if int(enemy["hp"]) <= 0 or float(enemy["progress"]) >= enemy["route"].size() - 1:
+			continue
+		var definition: Dictionary = _enemy_types[enemy["type_id"]]
+		if enemy["animation"] == "heal" and float(enemy["animation_elapsed"]) >= 0.55:
+			enemy["animation"] = "walk"
+			enemy["animation_elapsed"] = 0.0
+		if float(definition["heal_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_heal"]):
+			enemy["next_heal"] += float(definition["heal_interval"])
+			enemy["heal_count"] += 1
+			enemy["animation"] = "heal"
+			enemy["animation_elapsed"] = 0.0
+			var radius_squared: float = float(definition["heal_radius"]) * float(definition["heal_radius"])
+			for ally: Dictionary in enemies[slot]:
+				if ally["id"] != enemy["id"] and int(ally["hp"]) > 0 and Vector2(enemy["pos"]).distance_squared_to(ally["pos"]) <= radius_squared:
+					ally["hp"] = mini(int(ally["max_hp"]), int(ally["hp"]) + maxi(1, ceili(float(ally["max_hp"]) * float(definition["heal_fraction"]))))
+		if float(definition["summon_interval"]) <= 0.0:
+			continue
+		if enemy["animation"] == "cast":
+			if float(enemy["cast_remaining"]) <= 0.000000001:
+				_finish_summon(slot, enemy, definition)
+				enemy["animation"] = "walk"
+				enemy["animation_elapsed"] = 0.0
+				enemy["speed"] = float(enemy["base_speed"]) * (TowerDefinition.FREEZE_SPEED_MULTIPLIER if enemy["slowed"] else 1.0)
+		elif float(enemy["age"]) + 0.000000001 >= float(enemy["next_summon"]):
+			enemy["next_summon"] += float(definition["summon_interval"])
+			enemy["cast_remaining"] = definition["summon_cast_duration"]
+			enemy["animation"] = "cast"
+			enemy["animation_elapsed"] = 0.0
+			enemy["speed"] = 0.0
+
+
+func _finish_summon(slot: int, caster: Dictionary, definition: Dictionary) -> void:
+	var living: int = 0
+	for enemy: Dictionary in enemies[slot]:
+		if enemy["summoner_id"] == caster["id"] and int(enemy["hp"]) > 0:
+			living += 1
+	var capacity: int = maxi(0, int(definition["summon_limit"]) - living)
+	if capacity == 0:
+		return
+	var count: int = mini(capacity, _group_random.randi_range(int(definition["summon_min"]), int(definition["summon_max"])))
+	caster["summon_count"] += 1
+	for member: int in range(count):
+		_spawn_enemy(slot, definition["summon_type"], caster["progress"], _elapsed, caster["route"], caster["id"])
+
+
 func snapshot() -> Dictionary:
 	return {
 		"phase": phase, "wave": wave, "health": base_health.duplicate(),
+		"statistics_id": statistics_id, "enemy_totals": enemy_totals.duplicate(true),
+		"wave_groups": wave_groups.duplicate(true),
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
 		"income": income.duplicate(), "queued_sends": queued_sends,
@@ -502,6 +678,7 @@ func snapshot() -> Dictionary:
 		"tower_types": _tower_types.duplicate(true),
 		"rules": {
 			"enemy_speed": _wave_speed(wave), "enemy_health": _wave_health(wave),
+			"sandbox_mode": _sandbox_mode,
 			"starting_coins": _rules.starting_coins, "kill_bounty": _rules.kill_bounty,
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
@@ -519,7 +696,16 @@ func _enemy_types_snapshot() -> Dictionary:
 	for type_id: String in result:
 		result[type_id]["health"] = _enemy_health(type_id, preview_wave)
 		result[type_id]["speed"] = _enemy_speed(type_id, preview_wave)
+		result[type_id]["send_available"] = bool(result[type_id]["send_enabled"]) and preview_wave >= int(result[type_id]["send_first_wave"])
 	return result
+
+
+static func enemy_preview(definition: EnemyDefinition, rules: CombatRules, wave_number: int = 1) -> Dictionary:
+	return {
+		"max_hp": maxi(1, ceili(float(rules.enemy_health + maxi(0, wave_number - 1) * rules.health_growth) * definition.health_multiplier)),
+		"speed": (rules.enemy_speed + maxi(0, wave_number - 1) * rules.speed_growth) * definition.speed_multiplier,
+		"base_damage": definition.base_damage,
+	}
 
 
 func _enemy_health(type_id: String, wave_number: int) -> int:
@@ -552,11 +738,11 @@ func _enemy_count_cap(definition: Dictionary, wave_number: int) -> int:
 	return base_cap + steps * int(definition["count_cap_growth"])
 
 
-func _generate_wave_roster(wave_number: int) -> Array[String]:
+func _generate_wave_groups(wave_number: int) -> Array[Dictionary]:
 	var budget: int = _wave_weight(wave_number)
 	var remaining: int = budget
 	var counts: Dictionary = {}
-	var roster: Array[String] = []
+	var roster: Array[Dictionary] = []
 	var eligible: Array[String] = []
 	var count_caps: Dictionary[String, int] = {}
 	for type_id: String in _enemy_types:
@@ -569,17 +755,37 @@ func _generate_wave_roster(wave_number: int) -> Array[String]:
 			var count: int = counts.get(type_id, 0)
 			var count_cap: int = count_caps[type_id]
 			var share_cap: int = floori(float(budget) * float(definition["max_weight_share"]))
-			if wave_number >= int(definition["first_wave"]) and weight <= remaining and (count_cap == 0 or count < count_cap) and (count + 1) * weight <= share_cap:
+			if definition["regular_spawn_enabled"] and wave_number >= int(definition["first_wave"]) and weight <= remaining and (count_cap == 0 or count < count_cap) and (count + 1) * weight <= share_cap:
 				eligible.append(type_id)
 		# A validated weight-one remainder enemy guarantees exact fill.
 		if eligible.is_empty():
 			push_error("Combat wave %d cannot fill its remaining weight %d" % [wave_number, remaining])
 			return []
 		var selected: String = eligible[_wave_random.randi_range(0, eligible.size() - 1)]
-		roster.append(selected)
+		roster.append({"type_id": selected, "count": _roll_group(_enemy_types[selected], _wave_random)})
 		counts[selected] = int(counts.get(selected, 0)) + 1
 		remaining -= int(_enemy_types[selected]["spawn_weight"])
 	return roster
+
+
+func _roll_group(definition: Dictionary, random: RandomNumberGenerator) -> int:
+	var weights: PackedInt32Array = definition["group_weights"]
+	if weights.size() == 1:
+		return 1
+	var total: int = 0
+	for weight: int in weights:
+		total += weight
+	var roll: int = random.randi_range(1, total)
+	for index: int in range(weights.size()):
+		roll -= weights[index]
+		if roll <= 0:
+			return index + 1
+	return 1
+
+
+func _add_total(slot: int, kind: String, type_id: String, count: int = 1) -> void:
+	var totals: Dictionary = enemy_totals[slot][kind]
+	totals[type_id] = int(totals.get(type_id, 0)) + count
 
 
 func _valid_slot(slot: int) -> bool:
@@ -592,9 +798,24 @@ func _valid_mode(mode: int) -> bool:
 
 func _move_enemies(slot: int, delta: float) -> void:
 	for enemy: Dictionary in enemies[slot]:
+		enemy["age"] += delta
+		enemy["animation_elapsed"] += delta
+		var casting: bool = float(enemy["cast_remaining"]) > 0.0
+		enemy["cast_remaining"] = maxf(0.0, float(enemy["cast_remaining"]) - delta)
 		var base_speed: float = enemy["base_speed"]
 		var slowed_seconds: float = minf(delta, float(enemy["slow_remaining"]))
-		if slowed_seconds > 0.0:
+		if casting:
+			if not _slow_motion.has(enemy["id"]):
+				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
+			var stationary: Array = _slow_motion[enemy["id"]]
+			stationary[0] = float(enemy["progress"])
+			stationary[1] = delta
+			stationary[2] = 0.0
+			stationary[3] = 0.0
+			enemy["slow_remaining"] = maxf(0.0, float(enemy["slow_remaining"]) - delta)
+			enemy["slowed"] = float(enemy["slow_remaining"]) > 0.000000001
+			enemy["speed"] = 0.0
+		elif slowed_seconds > 0.0:
 			var slow_speed: float = base_speed * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 			if not _slow_motion.has(enemy["id"]):
 				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
@@ -637,19 +858,22 @@ func _spawn_send(slot: int) -> void:
 	var type_id: String = _send_queues[slot][_send_heads[slot]]
 	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave)
 	_spawn_enemy(slot, type_id, progress, _next_send_times[slot])
-	_next_send_times[slot] += _active_send_spawn_interval
+	_next_send_times[slot] += _active_send_spawn_interval if _send_group_ends[slot][_send_heads[slot]] else float(_enemy_types[type_id]["group_interval"])
 	_send_heads[slot] += 1
 	if _send_heads[slot] == _send_queues[slot].size():
 		_send_queues[slot].clear()
 		_send_heads[slot] = 0
+		_send_group_ends[slot].clear()
 	elif _send_heads[slot] >= 64 and _send_heads[slot] * 2 >= _send_queues[slot].size():
 		_send_queues[slot] = _send_queues[slot].slice(_send_heads[slot])
+		_send_group_ends[slot] = _send_group_ends[slot].slice(_send_heads[slot])
 		_send_heads[slot] = 0
 
 
-func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float) -> void:
+func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float, captured_route: Array[Vector2i] = [], summoner_id: int = -1) -> void:
 	var hp: int = _enemy_health(type_id, wave)
-	var route: Array[Vector2i] = _assign_route(slot)
+	var route: Array[Vector2i] = _assign_route(slot) if captured_route.is_empty() else captured_route.duplicate()
+	_special_stream = _special_stream or float(_enemy_types[type_id]["heal_interval"]) > 0.0 or float(_enemy_types[type_id]["summon_interval"]) > 0.0
 	var speed: float = _enemy_speed(type_id, wave)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
@@ -657,6 +881,11 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"slowed": false, "slow_remaining": 0.0,
 		"damage": _enemy_types[type_id]["base_damage"],
 		"route": route, "progress": progress, "pos": _position(route, progress),
+		"animation": "walk", "animation_elapsed": maxf(0.0, _elapsed - spawn_time),
+		"age": maxf(0.0, _elapsed - spawn_time), "cast_remaining": 0.0,
+		"heal_count": 0, "summon_count": 0, "summoner_id": summoner_id,
+		"next_heal": _enemy_types[type_id]["heal_interval"],
+		"next_summon": _enemy_types[type_id]["summon_interval"],
 	})
 	_enemy_spawn_times[_next_enemy_id] = spawn_time
 	_next_enemy_id += 1
@@ -881,10 +1110,12 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> v
 		if hit_damage > 0 and tower["evolution"] == "boulders" and tower["freeze_upgraded"] and int(credit[enemy["id"]]) >= ceili(float(enemy["max_hp"]) * TowerDefinition.FREEZE_DAMAGE_THRESHOLD):
 			enemy["slowed"] = true
 			enemy["slow_remaining"] = TowerDefinition.FREEZE_DURATION
-			enemy["speed"] = float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
+			enemy["speed"] = 0.0 if enemy["animation"] == "cast" else float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1
-		coins[slot] += _rules.kill_bounty
+		var bounty: int = _enemy_types[enemy["type_id"]]["kill_bounty"]
+		coins[slot] += _rules.kill_bounty if bounty < 0 else bounty
+		_add_total(slot, "kills", enemy["type_id"])
 		_retire_enemy(enemy["id"])
 		enemies[slot].remove_at(enemy_index)
 
@@ -937,7 +1168,8 @@ func _apply_leaks(slot: int) -> void:
 	var index: int = enemies[slot].size() - 1
 	while index >= 0:
 		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1:
-			base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
+			if not _sandbox_mode:
+				base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
 			_retire_enemy(enemies[slot][index]["id"])
 			enemies[slot].remove_at(index)
 		index -= 1

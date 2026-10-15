@@ -95,10 +95,10 @@ func _run() -> void:
 	_check(title._idle_offset < 0.0 and title._roar_time < 0.0, "Tiny idle lift remains active without replaying the roar")
 
 	# Pointer navigation transfers keyboard focus instead of leaving two selections.
-	var workshop: Button = menu.get_node("Center/Panel/Open")
+	var sandbox: Button = menu.get_node("Center/Panel/Sandbox")
 	var collection: Button = menu.get_node("Center/Panel/Collection")
 	button.grab_focus()
-	for hovered: Button in [workshop, collection, button]:
+	for hovered: Button in [sandbox, collection, button]:
 		var motion := InputEventMouseMotion.new()
 		motion.position = hovered.get_global_rect().get_center()
 		motion.global_position = motion.position
@@ -111,7 +111,7 @@ func _run() -> void:
 		key.pressed = pressed
 		viewport.push_input(key, true)
 		await process_frame
-	_check(viewport.gui_get_focus_owner() == workshop, "Arrow navigation continues from the hovered menu item")
+	_check(viewport.gui_get_focus_owner() == sandbox, "Arrow navigation continues from the hovered menu item")
 
 	# Interrupting the first entrance also stays completed on menu return.
 	var interrupted: Control = load("res://scenes/main_menu.tscn").instantiate()

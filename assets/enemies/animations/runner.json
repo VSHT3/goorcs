@@ -1,0 +1,79 @@
+{
+  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "generator": "tools/author_enemy_sprites.py",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    640,
+    80
+  ],
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
+  "lighting": "upper left; dark fantasy outline",
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "sheet_sha256": "70c1bfb71c71b402f343cf9b73bad8d564314c974d9ed28f06212f9aaf7c0cd8",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 14,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          23,
+          31,
+          59,
+          70
+        ],
+        [
+          21,
+          31,
+          59,
+          69
+        ],
+        [
+          19,
+          31,
+          59,
+          69
+        ],
+        [
+          21,
+          31,
+          59,
+          69
+        ],
+        [
+          23,
+          31,
+          59,
+          70
+        ],
+        [
+          23,
+          31,
+          60,
+          71
+        ],
+        [
+          23,
+          31,
+          60,
+          71
+        ],
+        [
+          23,
+          31,
+          60,
+          71
+        ]
+      ]
+    }
+  ],
+  "source": "assets/enemies/runner.png",
+  "source_sha256": "d12be7b4067e10b475896409572cab1b563ad5c6e4a65a828ca4e8a2fdb3f545",
+  "source_origin": "Accepted pre-existing PixelLab still; unchanged"
+}

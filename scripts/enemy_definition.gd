@@ -18,6 +18,23 @@ extends Resource
 @export_range(0.0, 1.0) var max_weight_share: float = 1.0
 @export var send_cost: int = 20
 @export var send_income: int = 2
+@export var send_first_wave: int = 1
+@export var regular_spawn_enabled: bool = true
+@export var send_enabled: bool = true
+# Index zero is one member. A regular budget entry or purchase buys one group.
+@export var group_weights: PackedInt32Array = PackedInt32Array([1])
+@export var group_interval: float = 0.065
+@export var kill_bounty: int = -1
+@export var heal_interval: float = 0.0
+@export var heal_radius: float = 0.0
+@export var heal_fraction: float = 0.0
+@export var summon_interval: float = 0.0
+@export var summon_cast_duration: float = 0.0
+@export var summon_type: StringName
+@export var summon_min: int = 0
+@export var summon_max: int = 0
+@export var summon_limit: int = 0
+@export var animation_frames: SpriteFrames
 @export var texture: Texture2D
 @export var source_faces_left: bool = false
 

@@ -49,7 +49,10 @@ func _planning_rules() -> CombatRules:
 	rules.catalog.towers = definitions
 	var enemy_definitions: Array[EnemyDefinition] = []
 	for source: EnemyDefinition in rules.catalog.enemies:
+		if source.id not in [&"grunt", &"runner", &"brute"]:
+			continue
 		var definition := source.duplicate() as EnemyDefinition
+		definition.send_first_wave = 1
 		if _lane == "guest":
 			definition.health_multiplier = 9.0
 			definition.speed_multiplier = 0.1

@@ -87,6 +87,12 @@ var content_catalog: ContentCatalog = preload("res://resources/content_catalog.t
 			_enemy_art[String(definition.id)] = definition
 			_cache_texture_bounds(definition.texture)
 			_cache_slow_texture(definition.texture)
+			if definition.animation_frames != null:
+				for animation: StringName in definition.animation_frames.get_animation_names():
+					for frame: int in range(definition.animation_frames.get_frame_count(animation)):
+						var texture: Texture2D = definition.animation_frames.get_frame_texture(animation, frame)
+						_cache_texture_bounds(texture)
+						_cache_slow_texture(texture)
 		queue_redraw()
 var placement_enabled: bool = true:
 	set(value):
@@ -113,7 +119,6 @@ var _texture_bounds: Dictionary[Texture2D, Rect2] = {}
 var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
-var _enemy_hit_images: Dictionary[Texture2D, Image] = {}
 var _slowed_enemy_textures: Dictionary[Texture2D, Texture2D] = {}
 var _portal_texture: AtlasTexture
 var _crystal_texture: AtlasTexture
@@ -640,20 +645,7 @@ func _cache_texture_bounds(texture: Texture2D) -> void:
 func _cache_slow_texture(texture: Texture2D) -> void:
 	if texture == null or _slowed_enemy_textures.has(texture):
 		return
-	var image: Image = texture.get_image()
-	if image == null:
-		return
-	if image.is_compressed():
-		image.decompress()
-	_enemy_hit_images[texture] = image
-	var tinted: Image = image.duplicate()
-	tinted.convert(Image.FORMAT_RGBA8)
-	for y: int in range(tinted.get_height()):
-		for x: int in range(tinted.get_width()):
-			var pixel: Color = tinted.get_pixel(x, y)
-			if pixel.a > 0.0:
-				tinted.set_pixel(x, y, pixel.lerp(Color(0.40, 0.68, 0.91, pixel.a), 0.38))
-	_slowed_enemy_textures[texture] = ImageTexture.create_from_image(tinted)
+	_slowed_enemy_textures[texture] = EnemyVisuals.slowed_texture(texture)
 
 
 func _sprite_rect(texture: Texture2D, height: float, anchor: Vector2, foot: Vector2, flip: bool = false) -> Rect2:
@@ -676,9 +668,10 @@ func visual_headroom() -> float:
 		var top: float = rect.position.y + bounds.position.y * rect.size.y / reward.icon_texture.get_height()
 		headroom = maxf(headroom, -top)
 	for artwork: EnemyDefinition in _enemy_art.values():
-		var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, foot)
-		var bounds: Rect2 = _texture_bounds[artwork.texture]
-		var top: float = rect.position.y + bounds.position.y * rect.size.y / artwork.texture.get_height()
+		var texture: Texture2D = EnemyVisuals.frame_texture(artwork)
+		var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, texture, _cell_size() * artwork.board_height, foot)
+		var bounds: Rect2 = EnemyVisuals.union_bounds(artwork)
+		var top: float = rect.position.y + bounds.position.y * rect.size.y / texture.get_height()
 		headroom = maxf(headroom, -top + maxf(3.0, _cell_size() * 0.055) + 3.0)
 	return ceilf(headroom + 6.0)
 
@@ -812,22 +805,22 @@ func _draw_enemy(item: Dictionary) -> void:
 	var enemy: Dictionary = item["data"]
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
 	var flip: bool = _enemy_faces_left(enemy["route"], item["progress"]) != artwork.source_faces_left
-	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, item["foot"], flip)
+	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
+	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, item["foot"], flip)
+	var animation: StringName = StringName(enemy.get("animation", "walk"))
+	if animation == &"heal" or animation == &"cast":
+		EnemyVisuals.draw_action_effect(self, item["foot"], _cell_size() * 0.38, animation, float(enemy.get("animation_elapsed", 0.0)))
 	if flip:
 		rect.size.x = -rect.size.x
-	var texture: Texture2D = _slowed_enemy_textures.get(artwork.texture, artwork.texture) if bool(enemy.get("slowed", false)) else artwork.texture
+	var texture: Texture2D = _slowed_enemy_textures.get(frame, frame) if bool(enemy.get("slowed", false)) else frame
 	draw_texture_rect(texture, rect, false)
 
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
 	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
-	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, foot, flip)
-	var bounds: Rect2 = _texture_bounds[artwork.texture]
-	if flip:
-		bounds.position.x = artwork.texture.get_width() - bounds.end.x
-	var scale: Vector2 = rect.size / artwork.texture.get_size()
-	return Rect2(rect.position + bounds.position * scale, bounds.size * scale)
+	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
+	return EnemyVisuals.visible_rect(artwork, frame, _cell_size() * artwork.board_height, foot, flip)
 
 
 func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, position: Vector2) -> bool:
@@ -835,13 +828,12 @@ func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, po
 		return false
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
 	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
-	var rect: Rect2 = _sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, foot, flip)
+	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
+	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, foot, flip)
 	var uv: Vector2 = (position - rect.position) / rect.size
 	if flip:
 		uv.x = 1.0 - uv.x
-	if not _enemy_hit_images.has(artwork.texture):
-		_enemy_hit_images[artwork.texture] = artwork.texture.get_image()
-	var image: Image = _enemy_hit_images[artwork.texture]
+	var image: Image = EnemyVisuals.image(frame)
 	var pixel := Vector2i(uv * Vector2(image.get_size()))
 	pixel = pixel.clamp(Vector2i.ZERO, image.get_size() - Vector2i.ONE)
 	return image.get_pixelv(pixel).a >= 0.1

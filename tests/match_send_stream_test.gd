@@ -26,6 +26,14 @@ func _check(condition: bool, description: String) -> void:
 
 func _rules() -> CombatRules:
 	var rules := CombatRules.new()
+	# Isolate paid FIFO behavior from shipped progression/group composition.
+	rules.catalog.enemies = [
+		preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition,
+		preload("res://resources/combat/enemies/runner.tres").duplicate() as EnemyDefinition,
+		preload("res://resources/combat/enemies/brute.tres").duplicate() as EnemyDefinition,
+	]
+	for enemy: EnemyDefinition in rules.catalog.enemies:
+		enemy.send_first_wave = 1
 	rules.base_health = 1000
 	rules.starting_coins = 1000
 	rules.enemy_health = 8

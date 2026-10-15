@@ -392,7 +392,7 @@ func _refresh_sends() -> void:
 	var configured: bool = not stats.is_empty() and rules.has("send_spawn_interval")
 	var cost: int = int(stats.get("send_cost", 0))
 	var gain: int = int(stats.get("send_income", 0))
-	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured
+	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured and bool(stats.get("send_available", false))
 	enemy_selector.disabled = planning == null or not planning.active or finished or types.is_empty()
 	send_button.disabled = not available or _own_coins() < cost
 	send_button.text = "Send · %d/+%d" % [cost, gain] if configured else "Send unavailable"
@@ -419,10 +419,12 @@ func _refresh_sends() -> void:
 	var delivery: String = "Opponent's independent send stream, delivering during this round." if phase == MatchCombat.Phase.WAVE else "Queued for the opponent's independent stream when combat starts."
 	if not available:
 		delivery = "Match finished." if finished else ("Ready: planning actions are committed until the round starts." if planning != null and planning.active else "Waiting for match.")
+		if configured and not bool(stats.get("send_available", false)) and not finished:
+			delivery = "Available from round %d." % int(stats.get("send_first_wave", 1))
 	elif _own_coins() < cost:
 		delivery += "\nNeed %d more Coins." % (cost - _own_coins())
 	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
-	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nSend cadence: one enemy every %.3f simulation seconds, independently of regular spawns. No combat cutoff." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules["send_spawn_interval"])]
+	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nOrder cooldown: %.3f simulation seconds after its final member." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules["send_spawn_interval"])]
 	enemy_selector.tooltip_text = send_button.tooltip_text
 	for index: int in range(enemy_selector.item_count):
 		var type_stats: Dictionary = types[String(enemy_selector.get_item_metadata(index))]
@@ -432,7 +434,8 @@ func _refresh_sends() -> void:
 func _refresh_enemy_selector(types: Dictionary) -> void:
 	var ids: Array[String] = []
 	for id: String in types:
-		ids.append(id)
+		if bool(types[id].get("send_enabled", false)):
+			ids.append(id)
 	var rebuild: bool = enemy_selector.item_count != ids.size()
 	if not rebuild:
 		for index: int in range(ids.size()):
@@ -446,10 +449,16 @@ func _refresh_enemy_selector(types: Dictionary) -> void:
 			enemy_selector.set_item_metadata(enemy_selector.item_count - 1, id)
 	if ids.is_empty():
 		return
-	if not ids.has(String(_selected_enemy_type)):
+	if not ids.has(String(_selected_enemy_type)) or not bool(types[String(_selected_enemy_type)].get("send_available", false)):
 		_selected_enemy_type = StringName(ids[0])
+		for id: String in ids:
+			if bool(types[id].get("send_available", false)):
+				_selected_enemy_type = StringName(id)
+				break
 	for index: int in range(ids.size()):
 		enemy_selector.set_item_text(index, String(types[ids[index]].get("title", ids[index])))
+		var available: bool = bool(types[ids[index]].get("send_available", false))
+		enemy_selector.set_item_disabled(index, not available)
 		if ids[index] == String(_selected_enemy_type) and enemy_selector.selected != index:
 			enemy_selector.select(index)
 

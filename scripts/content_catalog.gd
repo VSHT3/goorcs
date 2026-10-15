@@ -42,6 +42,38 @@ func validation_errors() -> PackedStringArray:
 		enemy_ids[enemy.id] = true
 		if enemy.title.is_empty() or not is_finite(enemy.health_multiplier) or enemy.health_multiplier <= 0.0 or not is_finite(enemy.speed_multiplier) or enemy.speed_multiplier <= 0.0 or enemy.send_cost <= 0 or enemy.send_income < 0 or enemy.base_damage <= 0 or enemy.spawn_weight <= 0 or enemy.first_wave < 1 or enemy.max_per_wave < 0 or enemy.count_cap_growth < 0 or enemy.count_cap_growth_interval < 1 or not is_finite(enemy.max_weight_share) or enemy.max_weight_share < 0.0 or enemy.max_weight_share > 1.0:
 			errors.append("Enemy '%s' has invalid combat, economy, or wave values." % enemy.id)
+		if enemy.send_first_wave < 1 or enemy.kill_bounty < -1 or not is_finite(enemy.group_interval) or enemy.group_interval <= 0.0:
+			errors.append("Enemy '%s' has invalid send, bounty, or group timing metadata." % enemy.id)
+		var group_total: int = 0
+		for weight: int in enemy.group_weights:
+			if weight < 0:
+				errors.append("Enemy '%s' has negative group odds." % enemy.id)
+			group_total += weight
+		if group_total <= 0:
+			errors.append("Enemy '%s' requires positive group odds." % enemy.id)
+		if not is_finite(enemy.heal_interval) or enemy.heal_interval < 0.0 or not is_finite(enemy.heal_radius) or enemy.heal_radius < 0.0 or not is_finite(enemy.heal_fraction) or enemy.heal_fraction < 0.0 or enemy.heal_fraction > 1.0 or (enemy.heal_interval > 0.0 and (enemy.heal_radius <= 0.0 or enemy.heal_fraction <= 0.0)):
+			errors.append("Enemy '%s' has invalid healing metadata." % enemy.id)
+		if not is_finite(enemy.summon_interval) or enemy.summon_interval < 0.0 or not is_finite(enemy.summon_cast_duration) or enemy.summon_cast_duration < 0.0 or enemy.summon_min < 0 or enemy.summon_max < enemy.summon_min or enemy.summon_limit < 0 or (enemy.summon_interval > 0.0 and (enemy.summon_cast_duration <= 0.0 or enemy.summon_type == &"" or enemy.summon_min < 1 or enemy.summon_limit < 1)):
+			errors.append("Enemy '%s' has invalid summoning metadata." % enemy.id)
 		if not is_finite(enemy.board_height) or enemy.board_height <= 0.0 or not enemy.board_anchor.is_finite():
 			errors.append("Enemy '%s' has invalid presentation metadata." % enemy.id)
+		if enemy.animation_frames != null:
+			var required: Array[StringName] = [&"walk"]
+			if enemy.heal_interval > 0.0:
+				required.append(&"heal")
+			if enemy.summon_interval > 0.0:
+				required.append(&"cast")
+			for animation: StringName in required:
+				if not enemy.animation_frames.has_animation(animation) or enemy.animation_frames.get_frame_count(animation) == 0 or not is_finite(enemy.animation_frames.get_animation_speed(animation)) or enemy.animation_frames.get_animation_speed(animation) <= 0.0:
+					errors.append("Enemy '%s' requires a playable '%s' animation." % [enemy.id, animation])
+	for enemy: EnemyDefinition in enemies:
+		if enemy == null or enemy.summon_interval <= 0.0:
+			continue
+		var child: EnemyDefinition = null
+		for candidate: EnemyDefinition in enemies:
+			if candidate != null and candidate.id == enemy.summon_type:
+				child = candidate
+				break
+		if child == null or child.summon_interval > 0.0:
+			errors.append("Enemy '%s' requires a registered, non-summoning child." % enemy.id)
 	return errors

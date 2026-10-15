@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/necorcmancer.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/necorcmancer.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"necorcmancer"
+title = "NecOrcmancer"
+description = "A dark caster who raises fallen orcs to march again."
+health_multiplier = 5.0
+speed_multiplier = 0.55
+base_damage = 3
+spawn_weight = 15
+first_wave = 34
+max_per_wave = 1
+count_cap_growth = 1
+count_cap_growth_interval = 12
+max_weight_share = 0.25
+send_cost = 140
+send_income = 6
+send_first_wave = 46
+summon_interval = 7.0
+summon_cast_duration = 1.15
+summon_type = &"skeleorc"
+summon_min = 2
+summon_max = 4
+summon_limit = 6
+board_height = 0.72
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+board_anchor = Vector2(0.5, 0.875)

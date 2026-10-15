@@ -415,7 +415,11 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 
 
 func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:
-	var model := MatchCombat.new(main.combat_rules)
+	var rules: CombatRules = main.combat_rules.duplicate() as CombatRules
+	rules.catalog = rules.catalog.duplicate(true) as ContentCatalog
+	for enemy: EnemyDefinition in rules.catalog.enemies:
+		enemy.send_first_wave = 1
+	var model := MatchCombat.new(rules)
 	var income: Control = screen.get_node("%Income")
 	_check(model.send_enemy(1, &"grunt"), "Opponent purchase creates a real incoming-only planning queue")
 	_check(model.send_enemy(1, &"runner"), "A second purchase reserves a different type in the same incoming stream")

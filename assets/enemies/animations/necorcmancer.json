@@ -1,0 +1,132 @@
+{
+  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "generator": "tools/author_enemy_sprites.py",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    1280,
+    80
+  ],
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
+  "lighting": "upper left; dark fantasy outline",
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "sheet_sha256": "f4e2727413a7aca0686fe1f6dee418a1d0d785e286d7f568ff4c7e52785ba7ab",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 9,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          24,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          22,
+          10,
+          65,
+          70
+        ],
+        [
+          21,
+          10,
+          65,
+          70
+        ],
+        [
+          22,
+          10,
+          65,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "cast",
+      "fps": 7,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          8,
+          65,
+          70
+        ],
+        [
+          23,
+          8,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ],
+        [
+          23,
+          10,
+          65,
+          70
+        ]
+      ]
+    }
+  ],
+  "source_origin": "Original locally hand-plotted character in generator; no external generation service"
+}

@@ -27,6 +27,14 @@ func _random(seed_value: int) -> RandomNumberGenerator:
 
 func _rules() -> CombatRules:
 	var rules := CombatRules.new()
+	# Single-member fixture isolates ordinary jitter/cadence from group spacing.
+	rules.catalog.enemies = [
+		preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition,
+		preload("res://resources/combat/enemies/runner.tres").duplicate() as EnemyDefinition,
+		preload("res://resources/combat/enemies/brute.tres").duplicate() as EnemyDefinition,
+	]
+	for enemy: EnemyDefinition in rules.catalog.enemies:
+		enemy.send_first_wave = 1
 	rules.wave_weight = 30
 	rules.wave_weight_growth = 0
 	rules.enemy_speed = 0.1
@@ -91,9 +99,9 @@ func _test_edges_and_validation() -> void:
 				_check(combat.snapshot()["spawned"] == [count, count], "Zero interval delivers entire regular stream on both boards")
 	for ratio: float in [-0.1, 0.5, INF, NAN]:
 		var rules := _rules()
+		rules.spawn_jitter_ratio = ratio
 		var combat := _combat(rules)
 		combat.send_enemy(0, &"runner")
-		rules.spawn_jitter_ratio = ratio
 		var before: Dictionary = combat.snapshot()
 		var wave_state: int = combat._wave_random.state
 		var timing_state: int = combat._timing_random.state

@@ -29,6 +29,7 @@ func _run() -> void:
 	# Pixel differences must isolate enemies, not real-time portal/crystal frames.
 	board._endpoint_timer.stop()
 	await _check_spread()
+	await _check_animation_frames()
 	viewport.queue_free()
 	if failures == 0:
 		print("PASS: shipped small mixed horde silhouettes, stable route-normal spread, mirrored corners, isolated input/highlight and immutable snapshots")
@@ -174,6 +175,112 @@ func _check_corners(id: int, mirrored: bool) -> void:
 		previous_bounds = current_bounds
 
 
+func _check_animation_frames() -> void:
+	board.mirror_horizontal = false
+	board.selected_enemy_id = -1
+	var whole := Rect2i(Vector2i.ZERO, viewport.size)
+	var catalog: ContentCatalog = board.content_catalog
+	for definition: EnemyDefinition in catalog.enemies:
+		var frames: SpriteFrames = definition.animation_frames
+		_check(frames != null and frames.has_animation(&"walk") and frames.get_frame_count(&"walk") >= 4,
+			"Every enemy ships a real multiframe walk resource: %s" % definition.id)
+		if frames == null:
+			continue
+		for animation: StringName in frames.get_animation_names():
+			for index: int in range(frames.get_frame_count(animation)):
+				var image: Image = frames.get_frame_texture(animation, index).get_image()
+				var used: Rect2i = image.get_used_rect()
+				_check(used.position.x > 0 and used.position.y > 0 and used.end.x < image.get_width() and used.end.y < image.get_height(),
+					"Every authored limb/staff pose has transparent sheet margins: %s/%s/%s" % [definition.id, animation, index])
+				var hard_alpha: bool = true
+				for y: int in range(image.get_height()):
+					for x: int in range(image.get_width()):
+						var alpha: float = image.get_pixel(x, y).a
+						if alpha != 0.0 and alpha != 1.0:
+							hard_alpha = false
+				_check(hard_alpha, "Animation keeps binary alpha: %s/%s/%s" % [definition.id, animation, index])
+		var enemy: Dictionary = _enemy(700, 0.0, [])
+		enemy["type_id"] = String(definition.id)
+		enemy["pos"] = Vector2(2, 2)
+		enemy["animation"] = "walk"
+		enemy["animation_elapsed"] = 0.0
+		board.combat_enemies = [enemy.duplicate(true)]
+		var standing: Image = await _image()
+		enemy["animation_elapsed"] = 0.2
+		board.combat_enemies = [enemy.duplicate(true)]
+		var walking: Image = await _image()
+		_check(int(_changed_geometry(standing, walking, whole)["pixels"]) > 8,
+			"Accepted simulation animation time visibly advances actual walk frames: %s" % definition.id)
+		var first_frame: Image = frames.get_frame_texture(&"walk", 0).get_image()
+		var posed_frame: Image = EnemyVisuals.enemy_texture(definition, enemy).get_image()
+		var lower: Rect2i = first_frame.get_used_rect()
+		lower.position.y += floori(float(lower.size.y) * 0.5)
+		lower.size.y = first_frame.get_used_rect().end.y - lower.position.y
+		_check(int(_changed_geometry(first_frame, posed_frame, lower)["pixels"]) > 3,
+			"Walk changes actual leg/hem pixels, not just a whole still image offset: %s" % definition.id)
+		var accepted: Array = board.combat_enemies.duplicate(true)
+		board._process(0.8)
+		var frozen: Image = await _image()
+		_check(frozen.get_data() == walking.get_data() and board.combat_enemies == accepted,
+			"Local redraw time cannot advance paused simulation frames or mutate snapshots: %s" % definition.id)
+		var foot: Vector2 = _foot(enemy)
+		var progress: float = board._enemy_route_progress(enemy)
+		var bounds: Rect2 = board._enemy_sprite_bounds(enemy, foot, progress)
+		_check(whole.encloses(Rect2i(bounds)), "Board fully contains authored walking pose: %s" % definition.id)
+		enemy["slowed"] = true
+		board.combat_enemies = [enemy.duplicate(true)]
+		var slowed: Image = await _image()
+		_check(int(_changed_geometry(walking, slowed, Rect2i(bounds.grow(1.0)))["pixels"]) > 8
+			and board._enemy_sprite_bounds(enemy, foot, progress) == bounds,
+			"Slow palette follows the selected walk frame without changing silhouette: %s" % definition.id)
+		_check_hit_pixels([bounds], false, false)
+		for animation: StringName in [&"heal", &"cast"]:
+			if not frames.has_animation(animation):
+				continue
+			enemy["slowed"] = false
+			enemy["animation"] = String(animation)
+			enemy["animation_elapsed"] = 0.4
+			enemy["cast_remaining"] = 0.75 if animation == &"cast" else 0.0
+			board.combat_enemies = [enemy.duplicate(true)]
+			var acting: Image = await _image()
+			_check(int(_changed_geometry(walking, acting, whole)["pixels"]) > 15,
+				"Host action state visibly shows raised-hand heal / raised-staff cast: %s" % definition.id)
+			_check(board._enemy_route_progress(enemy) == progress,
+				"Casting pose does not invent movement independently of the host")
+	board.combat_enemies = []
+	var preview_viewport := SubViewport.new()
+	preview_viewport.transparent_bg = true
+	preview_viewport.size = Vector2i(320, 300)
+	preview_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(preview_viewport)
+	var portrait := EnemyPortrait.new()
+	portrait.size = Vector2(320, 300)
+	portrait.animate = false
+	preview_viewport.add_child(portrait)
+	for definition: EnemyDefinition in catalog.enemies:
+		portrait.configure(definition)
+		portrait.set_preview_time(0.2)
+		_check(EnemyVisuals.frame_texture(definition, portrait.preview_animation, portrait.preview_elapsed) == EnemyVisuals.frame_texture(definition, &"walk", 0.2),
+			"Portrait and board reuse the same authored frame selection: %s" % definition.id)
+		portrait.queue_redraw()
+		await process_frame
+		await RenderingServer.frame_post_draw
+		var walking: Image = preview_viewport.get_texture().get_image()
+		var used: Rect2i = walking.get_used_rect()
+		_check(used.has_area() and used.position.x > 0 and used.position.y > 0
+			and used.end.x < preview_viewport.size.x and used.end.y < preview_viewport.size.y,
+			"Large preview has no edge-clipped sheet pixels: %s" % definition.id)
+		if definition.animation_frames.has_animation(&"heal") or definition.animation_frames.has_animation(&"cast"):
+			portrait.set_preview_time(3.4)
+			_check(portrait.preview_animation != &"walk", "Preview explicitly loops the enemy's own special pose")
+			await process_frame
+			await RenderingServer.frame_post_draw
+			var acting: Image = preview_viewport.get_texture().get_image()
+			_check(int(_changed_geometry(walking, acting, Rect2i(Vector2i.ZERO, preview_viewport.size))["pixels"]) > 30,
+				"Preview renders distinct heal/cast pose and action feedback")
+	preview_viewport.queue_free()
+
+
 func _foot(enemy: Dictionary) -> Vector2:
 	return board._position_center(board._enemy_visual_position(enemy)) + Vector2(0, board._cell_size() * 0.28)
 
@@ -189,7 +296,7 @@ func _visible_enemy_point(enemy: Dictionary, bounds: Rect2) -> Vector2:
 	return Vector2(-1, -1)
 
 
-func _check_hit_pixels(bounds: Array[Rect2], mirrored: bool) -> void:
+func _check_hit_pixels(bounds: Array[Rect2], mirrored: bool, require_overlap: bool = true) -> void:
 	var region: Rect2 = bounds[0]
 	for rect: Rect2 in bounds:
 		region = region.merge(rect)
@@ -200,8 +307,9 @@ func _check_hit_pixels(bounds: Array[Rect2], mirrored: bool) -> void:
 		var enemy: Dictionary = item["data"]
 		var art: EnemyDefinition = board._enemy_art[enemy["type_id"]]
 		var flip: bool = board._enemy_faces_left(enemy["route"], item["progress"]) != art.source_faces_left
-		sources.append({"id": int(enemy["id"]), "image": art.texture.get_image(), "flip": flip,
-			"rect": board._sprite_rect(art.texture, art.board_height, art.board_anchor, item["foot"], flip)})
+		var texture: Texture2D = EnemyVisuals.enemy_texture(art, enemy)
+		sources.append({"id": int(enemy["id"]), "image": texture.get_image(), "flip": flip,
+			"rect": EnemyVisuals.sprite_rect(art, texture, board._cell_size() * art.board_height, item["foot"], flip)})
 	var mismatches: int = 0
 	var transparent_samples: int = 0
 	var overlapping_samples: int = 0
@@ -229,7 +337,7 @@ func _check_hit_pixels(bounds: Array[Rect2], mirrored: bool) -> void:
 				overlapping_samples += 1
 			if board.enemy_at(point) != expected:
 				mismatches += 1
-	_check(transparent_samples > 0 and overlapping_samples > 0 and mismatches == 0,
+	_check(transparent_samples > 0 and (overlapping_samples > 0 or not require_overlap) and mismatches == 0,
 		"Every sampled mixed-body hit follows topmost source opacity, not neighbor padding, mirrored=%s" % mirrored)
 
 

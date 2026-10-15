@@ -770,7 +770,7 @@ func _check_slowed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			var center := Vector2i(board.cell_center(Vector2i(2, 2)))
 			var region := Rect2i(center + Vector2i(-40, -100), Vector2i(80, 140))
 			var original_body: Dictionary = _changed_geometry(empty, ordinary, region)
-			var texture: Texture2D = board._enemy_art[type_id].texture
+			var texture: Texture2D = EnemyVisuals.enemy_texture(board._enemy_art[type_id], enemy)
 			var cached: Texture2D = board._slowed_enemy_textures[texture]
 			enemy = enemy.duplicate(true)
 			enemy["slowed"] = true

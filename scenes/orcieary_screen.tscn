@@ -1,0 +1,183 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/orcieary_screen.gd" id="1_screen"]
+[ext_resource type="Theme" path="res://resources/ui/menu_theme.tres" id="2_theme"]
+[ext_resource type="FontFile" path="res://assets/fonts/silkscreen/Silkscreen-Regular.ttf" id="3_digits"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleEmpty"]
+
+[node name="OrciearyScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+script = ExtResource("1_screen")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.067, 0.10, 0.086, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="Content" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="Header" type="HBoxContainer" parent="Margin/Content"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Margin/Content/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 30
+text = "Orcieary"
+
+[node name="Back" type="Button" parent="Margin/Content/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(150, 42)
+text = "Back / Esc"
+
+[node name="Workspace" type="HBoxContainer" parent="Margin/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 28
+
+[node name="ListScroll" type="ScrollContainer" parent="Margin/Content/Workspace"]
+layout_mode = 2
+custom_minimum_size = Vector2(222, 0)
+horizontal_scroll_mode = 0
+
+[node name="EnemyList" type="VBoxContainer" parent="Margin/Content/Workspace/ListScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="DetailsScroll" type="ScrollContainer" parent="Margin/Content/Workspace"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_scroll_mode = 0
+
+[node name="Details" type="VBoxContainer" parent="Margin/Content/Workspace/DetailsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="EnemyTitle" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+
+[node name="Availability" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.71, 0.85, 0.62, 1)
+theme_override_fonts/font = ExtResource("3_digits")
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+
+[node name="Description" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+autowrap_mode = 3
+
+[node name="Preview" type="CenterContainer" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(0, 220)
+size_flags_horizontal = 3
+
+[node name="Stats" type="GridContainer" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 10
+columns = 6
+
+[node name="Mechanics" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.88, 0.82, 0.65, 1)
+theme_override_fonts/font = ExtResource("3_digits")
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+
+[node name="Scaling" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.78, 0.70, 1)
+theme_override_fonts/font = ExtResource("3_digits")
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+
+[node name="Separator" type="HSeparator" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+layout_mode = 2
+
+[node name="LifetimeTitle" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Your lifetime totals"
+tooltip_text = "Your own board's kills and your accepted individual sends, across real matches on this computer. Leaks and sandbox play do not count."
+
+[node name="Counters" type="HBoxContainer" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="KillsCaption" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Killed"
+
+[node name="KillsValue" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_digits")
+theme_override_font_sizes/font_size = 22
+text = "0"
+
+[node name="SentCaption" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Sent"
+
+[node name="SentValue" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_digits")
+theme_override_font_sizes/font_size = 22
+text = "0"
+
+[node name="SaveError" type="RichTextLabel" parent="Margin/Content"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+focus_mode = 2
+theme_override_colors/default_color = Color(0.95, 0.70, 0.64, 1)
+theme_override_font_sizes/normal_font_size = 16
+theme_override_styles/normal = SubResource("StyleEmpty")
+selection_enabled = true

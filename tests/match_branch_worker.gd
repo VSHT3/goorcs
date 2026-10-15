@@ -25,6 +25,8 @@ func _new_session() -> void:
 
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
+	rules.catalog.enemies = [preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition]
+	rules.catalog.enemies[0].send_first_wave = 1
 	rules.base_health = 100 if _lane == "host" else 1
 	rules.starting_coins = 1000
 	rules.wave_weight = 4

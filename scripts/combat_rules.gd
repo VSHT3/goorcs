@@ -2,6 +2,8 @@ class_name CombatRules
 extends Resource
 
 # Provisional match-only playtest values, independent of collection progression.
+# Captured by MatchCombat at admission; never a command-controlled match bypass.
+@export var sandbox_mode: bool = false
 @export var base_health: int = 10
 @export var enemy_health: int = 8
 @export var enemy_speed: float = 2.0

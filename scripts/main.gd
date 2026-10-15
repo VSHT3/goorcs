@@ -1,30 +1,25 @@
 extends Control
 
-# Prototype settings, not final map or balance decisions.
 @export var board_dimensions := Vector2i(14, 9)
 @export var tile_budget: int = 30
 @export var entrance_cell := Vector2i(0, 4)
 @export var base_cell := Vector2i(13, 4)
 @export var combat_rules: CombatRules = preload("res://resources/combat/prototype.tres")
 
-var layout: PathLayout
-var _workshop_opened: bool = false
 var collection_store: CollectionStore
+var statistics_store: EnemyStatisticsStore
 var collection_screen: CollectionScreen
+var sandbox_screen: SandboxScreen
+var orcieary_screen: OrciearyScreen
 var session: MultiplayerSession
 var planning: MatchPlanning
 var play_screen: MultiplayerLobby
 var _last_activity: Control
 
-@onready var board: PathBoard = $Margin/Content/Workspace/BoardArea/Board
-@onready var status: Label = $Margin/Content/Workspace/Sidebar/Content/Status
-@onready var budget_label: Label = $Margin/Content/Workspace/Sidebar/Content/Budget
-@onready var route_label: Label = $Margin/Content/Workspace/Sidebar/Content/Route
-@onready var feedback_label: Label = $WorkshopFeedback
-@onready var _feedback_timer: Timer = $FeedbackTimer
 @onready var menu: Control = $Menu
-@onready var workshop: Control = $Margin
-@onready var open_button: Button = $Menu/Center/Panel/Open
+@onready var sandbox_button: Button = $Menu/Center/Panel/Sandbox
+@onready var orcieary_button: Button = $Menu/Center/Panel/Orcieary
+@onready var collection_button: Button = $Menu/Center/Panel/Collection
 @onready var play_button: Button = $Menu/Center/Panel/Play
 @onready var _match_music: AudioStreamPlayer = $MatchMusic
 
@@ -32,19 +27,15 @@ var _last_activity: Control
 func _ready() -> void:
 	Input.set_custom_mouse_cursor(preload("res://assets/ui/cursor_arrow.png"), Input.CURSOR_ARROW, Vector2(1, 1))
 	Input.set_custom_mouse_cursor(preload("res://assets/ui/cursor_hand.png"), Input.CURSOR_POINTING_HAND, Vector2(10, 2))
-	layout = PathLayout.new(board_dimensions, tile_budget, entrance_cell, base_cell)
-	board.layout = layout
-	board.edited.connect(_refresh)
-	board.feedback.connect(_show_feedback)
-	_feedback_timer.timeout.connect(_clear_feedback)
-	$Margin/Content/Workspace/Sidebar/Content/Clear.pressed.connect(_clear)
-	open_button.pressed.connect(_open_workshop)
-	$Menu/Center/Panel/Quit.pressed.connect(_quit)
-	$Margin/Content/Header/Content/Menu.pressed.connect(_show_menu)
-	$Menu/Center/Panel/Collection.pressed.connect(_open_collection)
+	sandbox_button.pressed.connect(_open_sandbox)
+	orcieary_button.pressed.connect(_open_orcieary)
+	collection_button.pressed.connect(_open_collection)
 	play_button.pressed.connect(_open_play)
+	$Menu/Center/Panel/Quit.pressed.connect(_quit)
 	if collection_store == null:
 		collection_store = CollectionStore.new("user://collection.json", combat_rules.catalog)
+	if statistics_store == null:
+		statistics_store = EnemyStatisticsStore.new()
 	session = MultiplayerSession.new()
 	session.name = "Session"
 	add_child(session)
@@ -62,6 +53,7 @@ func _ready() -> void:
 	add_child(play_screen)
 	(_match_music.stream as AudioStreamMP3).loop = true
 	planning.changed.connect(_sync_match_music)
+	planning.changed.connect(_observe_enemy_totals)
 	play_screen.visibility_changed.connect(_sync_match_music)
 	play_screen.back_requested.connect(_show_menu)
 	collection_screen = preload("res://scenes/collection_screen.tscn").instantiate()
@@ -69,59 +61,79 @@ func _ready() -> void:
 	collection_screen.hide()
 	add_child(collection_screen)
 	collection_screen.back_requested.connect(_show_menu)
-	budget_label.tooltip_text = "%d × %d board. Endpoints are free; unused budget is allowed." % [board_dimensions.x, board_dimensions.y]
-	_refresh()
 	_show_menu()
 
 
-func _open_workshop() -> void:
-	_workshop_opened = true
-	_last_activity = workshop
+func _hide_activities() -> void:
 	play_screen.prepare_to_leave()
 	play_screen.hide()
 	collection_screen.prepare_to_leave()
 	collection_screen.hide()
+	if sandbox_screen != null:
+		sandbox_screen.prepare_to_leave()
+		sandbox_screen.hide()
+	if orcieary_screen != null:
+		orcieary_screen.prepare_to_leave()
+		orcieary_screen.hide()
 	menu.hide()
-	workshop.show()
-	$Margin/Content/Header/Content/Menu.grab_focus()
+
+
+func _open_sandbox() -> void:
+	_hide_activities()
+	if sandbox_screen == null:
+		sandbox_screen = preload("res://scenes/sandbox_screen.tscn").instantiate()
+		sandbox_screen.configure(combat_rules.catalog, combat_rules)
+		sandbox_screen.hide()
+		add_child(sandbox_screen)
+		sandbox_screen.back_requested.connect(_show_menu)
+	_last_activity = sandbox_screen
+	sandbox_screen.show()
+	sandbox_screen.open()
+
+
+func _open_orcieary() -> void:
+	_hide_activities()
+	if orcieary_screen == null:
+		orcieary_screen = preload("res://scenes/orcieary_screen.tscn").instantiate()
+		orcieary_screen.configure(combat_rules.catalog, combat_rules, statistics_store)
+		orcieary_screen.hide()
+		add_child(orcieary_screen)
+		orcieary_screen.back_requested.connect(_show_menu)
+	_last_activity = orcieary_screen
+	orcieary_screen.show()
+	orcieary_screen.open()
 
 
 func _open_collection() -> void:
-	board.cancel_stroke()
+	_hide_activities()
 	_last_activity = collection_screen
-	play_screen.prepare_to_leave()
-	play_screen.hide()
-	menu.hide()
-	workshop.hide()
 	collection_screen.show()
+	collection_screen.back_button.grab_focus()
 
 
 func _open_play() -> void:
-	board.cancel_stroke()
+	_hide_activities()
 	_last_activity = play_screen
-	collection_screen.prepare_to_leave()
-	collection_screen.hide()
-	workshop.hide()
-	menu.hide()
 	play_screen.show()
 	play_screen.open()
 
 
 func _show_menu() -> void:
-	board.cancel_stroke()
-	_feedback_timer.stop()
-	_clear_feedback()
-	workshop.hide()
-	collection_screen.prepare_to_leave()
-	collection_screen.hide()
-	play_screen.prepare_to_leave()
-	play_screen.hide()
+	_hide_activities()
 	menu.show()
-	open_button.text = "Resume workshop" if _workshop_opened else "Workshop"
-	if _last_activity == workshop:
-		open_button.grab_focus()
+	if sandbox_screen != null and _last_activity == sandbox_screen:
+		sandbox_button.grab_focus()
+	elif orcieary_screen != null and _last_activity == orcieary_screen:
+		orcieary_button.grab_focus()
+	elif _last_activity == collection_screen:
+		collection_button.grab_focus()
 	else:
 		play_button.grab_focus()
+
+
+func _observe_enemy_totals() -> void:
+	if planning.active:
+		statistics_store.observe(planning.combat, planning.local_slot())
 
 
 func _sync_match_music() -> void:
@@ -135,12 +147,12 @@ func _sync_match_music() -> void:
 
 
 func _quit() -> void:
+	_observe_enemy_totals()
 	session.leave()
 	get_tree().quit()
 
 
 func _input(event: InputEvent) -> void:
-	# Connection forms still cancel with Escape; active matches open their menu.
 	if play_screen.visible and event is InputEventKey:
 		var key := event as InputEventKey
 		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
@@ -158,60 +170,41 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey:
-		var key := event as InputEventKey
-		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
-			if workshop.visible or collection_screen.visible:
-				_show_menu()
-			elif _last_activity == workshop:
-				_open_workshop()
-			elif _last_activity == collection_screen:
-				_open_collection()
-			elif _last_activity == play_screen:
+	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	var key := event as InputEventKey
+	if key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
+		return
+	if menu.visible:
+		match key.keycode:
+			KEY_P:
 				_open_play()
-			get_viewport().set_input_as_handled()
-
-
-func _refresh() -> void:
-	budget_label.text = "%d / %d tiles" % [layout.used_tiles(), layout.budget]
-	if layout.is_ready():
-		status.text = "Ready"
-		status.modulate = Color("b5e2b7")
-	elif layout.route.is_empty():
-		status.text = "No route"
-		status.modulate = Color("e0bc77")
+			KEY_S:
+				_open_sandbox()
+			KEY_B:
+				_open_orcieary()
+			KEY_C:
+				_open_collection()
+			KEY_ESCAPE:
+				if sandbox_screen != null and _last_activity == sandbox_screen:
+					_open_sandbox()
+				elif orcieary_screen != null and _last_activity == orcieary_screen:
+					_open_orcieary()
+				elif _last_activity == collection_screen:
+					_open_collection()
+				elif _last_activity == play_screen:
+					_open_play()
+				else:
+					return
+			_:
+				return
+	elif key.keycode == KEY_ESCAPE and collection_screen.visible:
+		_show_menu()
 	else:
-		status.text = "Disconnected"
-		status.modulate = Color("e0bc77")
-	if layout.route.is_empty():
-		route_label.text = "%d isolated tiles" % layout.disconnected_count if layout.disconnected_count > 0 else ""
-	else:
-		route_label.text = "%d steps" % [layout.route.size() - 1]
-		if layout.disconnected_count > 0:
-			route_label.text += " · %d isolated" % layout.disconnected_count
-	route_label.visible = not route_label.text.is_empty()
-	_feedback_timer.stop()
-	_clear_feedback()
-	board.queue_redraw()
-
-
-func _show_feedback(message: String) -> void:
-	feedback_label.text = message
-	feedback_label.show()
-	_feedback_timer.start()
-
-
-func _clear_feedback() -> void:
-	feedback_label.text = ""
-	feedback_label.hide()
-
-
-func _clear() -> void:
-	layout.clear()
-	_refresh()
+		return
+	get_viewport().set_input_as_handled()
 
 
 func _exit_tree() -> void:
-	# Release native cursor textures before the rendering server shuts down.
 	Input.set_custom_mouse_cursor(null, Input.CURSOR_ARROW)
 	Input.set_custom_mouse_cursor(null, Input.CURSOR_POINTING_HAND)

@@ -24,6 +24,7 @@ func _variant_catalog() -> ContentCatalog:
 	var enemy: EnemyDefinition = source.enemies[0].duplicate() as EnemyDefinition
 	enemy.id = &"catalog_scout"
 	enemy.title = "Catalog scout"
+	enemy.send_first_wave = 1
 	catalog.enemies = [enemy]
 	return catalog
 

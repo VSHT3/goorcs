@@ -1,0 +1,132 @@
+{
+  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "generator": "tools/author_enemy_sprites.py",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    1280,
+    80
+  ],
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
+  "lighting": "upper left; dark fantasy outline",
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "sheet_sha256": "06cda1eed2899e2ccef3d3ce898bd1849e0b884480ab244b9a7c8e8d4ffac6d0",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 8,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          14,
+          7,
+          64,
+          70
+        ],
+        [
+          15,
+          7,
+          64,
+          70
+        ],
+        [
+          16,
+          7,
+          63,
+          70
+        ],
+        [
+          15,
+          7,
+          64,
+          70
+        ],
+        [
+          14,
+          7,
+          64,
+          70
+        ],
+        [
+          13,
+          7,
+          65,
+          70
+        ],
+        [
+          12,
+          7,
+          66,
+          70
+        ],
+        [
+          13,
+          7,
+          65,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "heal",
+      "fps": 14.5,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          14,
+          7,
+          64,
+          70
+        ],
+        [
+          14,
+          7,
+          64,
+          70
+        ],
+        [
+          14,
+          7,
+          64,
+          70
+        ],
+        [
+          14,
+          7,
+          65,
+          70
+        ],
+        [
+          14,
+          7,
+          65,
+          70
+        ],
+        [
+          14,
+          7,
+          65,
+          70
+        ],
+        [
+          14,
+          7,
+          65,
+          70
+        ],
+        [
+          14,
+          7,
+          65,
+          70
+        ]
+      ]
+    }
+  ],
+  "source_origin": "Original locally hand-plotted character in generator; no external generation service"
+}

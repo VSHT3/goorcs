@@ -26,7 +26,8 @@ func _model_rules() -> CombatRules:
 	rules.speed_growth = 0.0
 	rules.enemy_speed = 26.0
 	rules.spawn_interval = 0.05
-	rules.catalog.enemies = [rules.catalog.enemies[0]]
+	rules.catalog.enemies = [preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition]
+	rules.catalog.enemies[0].send_first_wave = 1
 	return rules
 
 

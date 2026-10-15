@@ -1,0 +1,77 @@
+{
+  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "generator": "tools/author_enemy_sprites.py",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    640,
+    80
+  ],
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
+  "lighting": "upper left; dark fantasy outline",
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "sheet_sha256": "244a9492ebc25deea7931c25834b0d5d78c5f6cb0447a47fe0c04d2041957e5a",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 12,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          26,
+          24,
+          55,
+          70
+        ],
+        [
+          27,
+          24,
+          54,
+          70
+        ],
+        [
+          27,
+          24,
+          54,
+          70
+        ],
+        [
+          27,
+          24,
+          54,
+          70
+        ],
+        [
+          26,
+          24,
+          55,
+          70
+        ],
+        [
+          25,
+          24,
+          56,
+          70
+        ],
+        [
+          24,
+          24,
+          57,
+          70
+        ],
+        [
+          25,
+          24,
+          56,
+          70
+        ]
+      ]
+    }
+  ],
+  "source_origin": "Original locally hand-plotted character in generator; no external generation service"
+}

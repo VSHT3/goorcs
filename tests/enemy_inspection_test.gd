@@ -44,6 +44,8 @@ func _run() -> void:
 	rules.wave_weight = 3
 	rules.spawn_interval = 0.9
 	rules.wave_weight_growth = 0
+	# This lifecycle fixture needs three separated instances, not rolled groups.
+	rules.catalog.enemies = [preload("res://resources/combat/enemies/grunt.tres")]
 	main.combat_rules = rules
 	root.add_child(main)
 	await _open_match()
@@ -361,11 +363,8 @@ func _sprite_bounds(slot: int, id: int) -> Rect2:
 	var artwork: EnemyDefinition = board._enemy_art[String(enemy["type_id"])]
 	var foot: Vector2 = board._position_center(board._enemy_visual_position(enemy)) + Vector2(0, board._cell_size() * 0.28)
 	var flip: bool = board._enemy_faces_left(enemy["route"], board._enemy_route_progress(enemy)) != artwork.source_faces_left
-	var rect: Rect2 = board._sprite_rect(artwork.texture, artwork.board_height, artwork.board_anchor, foot, flip)
-	var opaque: Rect2 = board._texture_bounds[artwork.texture]
-	if flip:
-		opaque.position.x = artwork.texture.get_width() - opaque.end.x
-	return Rect2(rect.position + opaque.position * rect.size / artwork.texture.get_size(), opaque.size * rect.size / artwork.texture.get_size())
+	var texture: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
+	return EnemyVisuals.visible_rect(artwork, texture, board._cell_size() * artwork.board_height, foot, flip)
 
 
 func _body_position(slot: int, id: int) -> Vector2:

@@ -56,8 +56,24 @@ func _check(condition: bool, description: String) -> void:
 		failures += 1
 
 
-func _rules() -> CombatRules:
+# These existing tower/stream regressions isolate three single-member identities.
+# Shipped progression, groups and abilities are covered by enemy_mechanics_test.
+func _catalog_rules() -> CombatRules:
 	var rules := CombatRules.new()
+	rules.catalog.enemies = [
+		preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition,
+		preload("res://resources/combat/enemies/runner.tres").duplicate() as EnemyDefinition,
+		preload("res://resources/combat/enemies/brute.tres").duplicate() as EnemyDefinition,
+	]
+	for enemy: EnemyDefinition in rules.catalog.enemies:
+		enemy.send_first_wave = 1
+	rules.catalog.enemies[1].first_wave = 3
+	rules.catalog.enemies[2].first_wave = 6
+	return rules
+
+
+func _rules() -> CombatRules:
+	var rules := _catalog_rules()
 	rules.base_health = 10
 	rules.enemy_health = 8
 	rules.enemy_speed = 1.0
@@ -269,7 +285,7 @@ func _test_tower_type_stats() -> void:
 	var damages: Array[int] = [2, 6, 1]
 	var boundary_shots: Array[int] = [1, 2, 0]
 	for index: int in range(type_ids.size()):
-		var rules := CombatRules.new()
+		var rules := _catalog_rules()
 		var interval: float = rules.catalog.towers[index].interval
 		rules.enemy_health = 100
 		rules.enemy_speed = 0.0
@@ -292,7 +308,7 @@ func _test_tower_type_stats() -> void:
 
 
 func _test_custom_tower_definition() -> void:
-	var rules := CombatRules.new()
+	var rules := _catalog_rules()
 	rules.enemy_health = 20
 	rules.enemy_speed = 0.0
 	rules.wave_weight = 1
@@ -470,7 +486,7 @@ func _test_area_kills_and_bounties() -> void:
 
 
 func _test_wave_scaling_and_rewards() -> void:
-	var rules := CombatRules.new()
+	var rules := _catalog_rules()
 	rules.base_health = 100
 	rules.enemy_health = 8
 	rules.enemy_speed = 2.0
@@ -509,7 +525,7 @@ func _test_builtin_upgrade_values() -> void:
 	var effective_damage: Array[int] = [3, 9, 2]
 	var multipliers: Array[float] = [0.8, 0.75, 0.85]
 	for index: int in range(ids.size()):
-		var rules := CombatRules.new()
+		var rules := _catalog_rules()
 		rules.starting_coins = 300
 		rules.enemy_health = 100
 		rules.enemy_speed = 0.0
@@ -697,7 +713,7 @@ func _test_weighted_wave_constraints_and_streams() -> void:
 	var saw_runner: bool = false
 	var saw_brute: bool = false
 	for seed_value: int in range(16):
-		var rules := CombatRules.new()
+		var rules := _catalog_rules()
 		rules.base_health = 10000
 		# Roster/stat fixture fixes jitter; interval progression has its own boundary suite.
 		rules.spawn_jitter_ratio = 0.0
@@ -739,7 +755,7 @@ func _test_weighted_wave_constraints_and_streams() -> void:
 
 func _test_growing_count_caps() -> void:
 	# Large budgets isolate count growth; a separate share-limited case proves precedence.
-	var rules := CombatRules.new()
+	var rules := _catalog_rules()
 	rules.wave_weight = 100
 	rules.wave_weight_growth = 0
 	rules.catalog.enemies = rules.catalog.enemies.duplicate()
@@ -773,7 +789,7 @@ func _test_growing_count_caps() -> void:
 	_check(unlimited.wave_roster.count(String(growing.id)) > 2, "Zero base cap remains unlimited rather than becoming a finite grown cap")
 	_check_roster_constraints(unlimited.snapshot(), 4)
 	for type_id: String in ["runner", "brute"]:
-		var late := MatchCombat.new(CombatRules.new(), null, _wave_rng(17))
+		var late := MatchCombat.new(_catalog_rules(), null, _wave_rng(17))
 		late.wave = 49
 		late.start_wave(_routes(1000, 1000))
 		var original_limit: int = 4 if type_id == "runner" else 2
@@ -783,7 +799,7 @@ func _test_growing_count_caps() -> void:
 
 func _test_weighted_wave_randomness_and_extension() -> void:
 	var variants: Dictionary = {}
-	var rules := CombatRules.new()
+	var rules := _catalog_rules()
 	rules.catalog.enemies = rules.catalog.enemies.duplicate()
 	var fourth := EnemyDefinition.new()
 	fourth.id = &"test_fourth_enemy"
@@ -831,7 +847,7 @@ func _test_weighted_wave_randomness_and_extension() -> void:
 
 
 func _test_resource_damage_and_roster_clearance() -> void:
-	var rules := CombatRules.new()
+	var rules := _catalog_rules()
 	rules.base_health = 2
 	rules.wave_weight = 1
 	rules.wave_weight_growth = 0
@@ -975,7 +991,7 @@ func _test_routing_validation() -> void:
 
 
 func _special_rules(type_id: StringName, hp: int = 100, count: int = 3) -> CombatRules:
-	var rules := CombatRules.new()
+	var rules := _catalog_rules()
 	rules.starting_coins = 10000
 	rules.enemy_health = hp
 	rules.enemy_speed = 0.0

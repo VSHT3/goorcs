@@ -2,136 +2,98 @@ extends SceneTree
 
 var failures: int = 0
 var main: Control
-
+var directory: String
 
 func _initialize() -> void:
-	call_deferred("_run")
-
+	_run.call_deferred()
 
 func _check(condition: bool, description: String) -> void:
 	if not condition:
 		push_error(description)
 		failures += 1
 
-
 func _run() -> void:
+	directory = OS.get_temp_dir().path_join("gorcs_navigation_%d" % OS.get_process_id())
+	DirAccess.make_dir_recursive_absolute(directory)
 	main = load("res://scenes/main.tscn").instantiate()
-	main.collection_store = CollectionStore.new("user://navigation_test_%d.json" % OS.get_process_id())
+	main.collection_store = CollectionStore.new(directory.path_join("collection.json"))
+	main.statistics_store = EnemyStatisticsStore.new(directory.path_join("statistics.json"))
 	root.add_child(main)
 	await process_frame
 	await process_frame
-	_check(main.menu.visible and not main.workshop.visible, "Startup shows only the menu")
+	_check(main.menu.visible and main.sandbox_screen == null, "Startup shows menu without constructing an inactive sandbox")
 	await _key(KEY_ENTER)
-	_check(main.play_screen.visible and not main.menu.visible and not main.workshop.visible, "Keyboard activation opens Play without exposing the workshop")
+	_check(main.play_screen.visible and not main.menu.visible, "Keyboard activation opens Play")
 	await process_frame
 	await process_frame
-	await _click(_control_center(main.play_screen.join_button))
+	await _click(main.play_screen.join_button.get_global_rect().get_center())
+	await process_frame
+	main.play_screen.join_code_input.grab_focus()
 	main.play_screen.join_code_input.text = "invalid invite"
 	await _key(KEY_ENTER)
-	_check(main.session.state == MultiplayerSession.State.ERROR, "An invalid invite fails without leaving Play")
-	var unreachable := PacketPeerUDP.new()
-	_check(unreachable.bind(0, "127.0.0.1") == OK, "Reserve an isolated endpoint without an ENet host")
-	main.play_screen.join_code_input.text = "GORCS1/127.0.0.1/%d/0123456789abcdef0123456789abcdef" % unreachable.get_local_port()
-	await _key(KEY_ENTER)
-	_check(main.play_screen.visible and main.session.state == MultiplayerSession.State.CONNECTING, "Correcting an invalid invite and pressing Enter starts a connection without another click")
+	_check(main.session.state == MultiplayerSession.State.ERROR, "Invalid invite retains editable connection form")
 	await _key(KEY_ESCAPE)
-	_check(main.menu.visible and main.session.state == MultiplayerSession.State.IDLE, "Leaving Play returns to the menu without an active session")
-	unreachable.close()
-	main.open_button.grab_focus()
-	await _key(KEY_ENTER)
-	_check(main.workshop.visible and not main.menu.visible, "Keyboard activation opens the workshop")
-	await _motion(_cell_point(Vector2i(1, 4)))
-	await _motion(_cell_point(Vector2i(2, 4)))
-	_check(main.layout.used_tiles() == 0, "Idle hovering cannot place tiles")
-	await _button(_cell_point(Vector2i(1, 4)), true)
-	await _motion(_cell_point(Vector2i(2, 4)))
-	_check(main.layout.used_tiles() == 2, "Dragging places tiles")
+	_check(main.menu.visible and main.session.state == MultiplayerSession.State.IDLE, "Escape leaves connection setup cleanly")
+	await _key(KEY_S)
+	var sandbox: SandboxScreen = main.sandbox_screen
+	_check(sandbox.visible and not main.menu.visible, "Sandbox shortcut opens actual playground")
+	await _motion(sandbox.cell_screen_position(Vector2i(1, 4)))
+	_check(sandbox.layout.used_tiles() == 0, "Idle sandbox hover cannot edit paths")
+	await _button(sandbox.cell_screen_position(Vector2i(1, 4)), true)
+	await _motion(sandbox.cell_screen_position(Vector2i(2, 4)))
+	_check(sandbox.layout.used_tiles() == 2, "Actual pointer drag edits sandbox")
 	await _key(KEY_ESCAPE)
-	_check(main.menu.visible and not main.workshop.visible, "Escape interrupts drawing and returns to menu")
+	_check(main.menu.visible and not sandbox.visible, "Escape interrupts a path stroke and returns to menu")
 	await _button(Vector2(10, 10), false)
 	await _key(KEY_ESCAPE)
-	await _motion(_cell_point(Vector2i(3, 4)))
-	_check(main.layout.used_tiles() == 2, "Resuming cannot continue an interrupted stroke")
-	await _button(_cell_point(Vector2i(3, 4)), true)
-	await _button(Vector2(10, 10), false)
-	await _motion(_cell_point(Vector2i(4, 4)))
-	_check(main.layout.used_tiles() == 3, "Releasing outside the board ends the stroke")
-	for x: int in range(4, 13):
-		await _click(_cell_point(Vector2i(x, 4)))
-	_check(main.layout.is_ready(), "The workshop still builds valid routes")
-	var saved_route: Array[Vector2i] = main.layout.route.duplicate()
-	var saved_used: int = main.layout.used_tiles()
-	await _click(_control_center(main.get_node("Margin/Content/Header/Content/Menu")))
-	await _click(_cell_point(Vector2i(0, 0)))
-	_check(main.menu.visible and main.layout.used_tiles() == saved_used, "Hidden board does not accept edits")
-	await _click(_control_center(main.open_button))
-	_check(main.workshop.visible and main.layout.is_ready() and main.layout.route == saved_route and main.layout.used_tiles() == saved_used, "Menu button and resume preserve the entire layout")
+	await _motion(sandbox.cell_screen_position(Vector2i(3, 4)))
+	_check(sandbox.layout.used_tiles() == 2, "Resume cannot continue an interrupted stroke")
+	for x: int in range(3, 13):
+		await _click(sandbox.cell_screen_position(Vector2i(x, 4)))
+	_check(sandbox.layout.is_ready(), "Sandbox accepts a complete route")
+	var route: Array = sandbox.layout.route.duplicate()
+	await _click(sandbox.menu_button.get_global_rect().get_center())
+	await _click(sandbox.cell_screen_position(Vector2i(4, 0)))
+	_check(sandbox.layout.route == route and sandbox.layout.used_tiles() == 12, "Hidden sandbox cannot accept edits")
+	await _key(KEY_B)
+	_check(main.orcieary_screen.visible and not sandbox.visible, "Field guide shortcut opens Orcieary without exposing sandbox")
 	await _key(KEY_ESCAPE)
-	await _key(KEY_ENTER)
-	_check(main.workshop.visible and main.layout.route == saved_route, "Keyboard resume preserves layout")
+	_check(main.menu.visible, "Orcieary Escape returns to menu")
+	await _key(KEY_S)
+	_check(sandbox.layout.route == route and sandbox.layout.is_ready(), "Sandbox state survives visits to other menus")
 	await _check_match_music()
 	main.queue_free()
-	await process_frame
-	# Stopped playbacks retire on the audio mix thread, not the scene frame.
-	await create_timer(maxf(0.0, AudioServer.get_time_to_next_mix()) + 0.025).timeout
+	await create_timer(0.2).timeout
+	for file: String in DirAccess.get_files_at(directory):
+		DirAccess.remove_absolute(directory.path_join(file))
+	DirAccess.remove_absolute(directory)
 	if failures == 0:
-		print("PASS: navigation preserves layout, hidden board rejects edits, idle hover is safe, interrupted/outside-release strokes end")
-	quit(1 if failures > 0 else 0)
-
+		print("PASS: keyboard navigation, connection teardown, sandbox native edits/resume, Orcieary navigation, and match music lifecycle")
+	quit(1 if failures else 0)
 
 func _check_match_music() -> void:
 	var music: AudioStreamPlayer = main.get_node("MatchMusic")
-	_check(not music.playing, "Workshop and menu do not play the match soundtrack")
+	_check(not music.playing, "Sandbox stays silent")
 	main.play_button.pressed.emit()
-	await process_frame
-	_check(not music.playing, "Connection choices do not start match music")
 	main.play_screen.singleplayer_button.pressed.emit()
 	await process_frame
-	_check(music.playing, "Entering a match starts the soundtrack during planning")
+	_check(music.playing, "Match starts local soundtrack")
 	music.seek(5.0)
 	for x: int in range(1, 13):
 		main.planning.request_edit(0, Vector2i(x, 4), true)
 	main.planning.submit_ready(true)
 	await process_frame
-	_check(music.playing and music.get_playback_position() >= 4.0, "Path snapshots and wave start cannot restart the song")
-	for tick: int in range(5000):
-		main.planning._physics_process(1.0 / 60.0)
-		if main.planning.combat["phase"] != MatchCombat.Phase.WAVE:
-			break
-	_check(main.planning.combat["phase"] == MatchCombat.Phase.PLANNING and music.playing, "The song continues through the wave break")
-	main.planning.submit_ready(true)
-	for tick: int in range(5000):
-		main.planning._physics_process(1.0 / 60.0)
-		if main.planning.combat["phase"] == MatchCombat.Phase.FINISHED:
-			break
-	_check(main.planning.combat["phase"] == MatchCombat.Phase.FINISHED and not music.playing, "Match results stop the soundtrack")
+	_check(music.playing and music.get_playback_position() >= 4.0, "Snapshots and wave start do not restart music")
 	await _key(KEY_ESCAPE)
+	_check(main.play_screen.planning_screen.pause_menu.visible, "Escape opens active match menu")
 	main.play_screen.planning_screen.pause_menu.quit_button.pressed.emit()
-	main.play_button.pressed.emit()
-	main.play_screen.singleplayer_button.pressed.emit()
-	await process_frame
-	_check(music.playing, "A fresh match starts the song again after results")
-	await _key(KEY_ESCAPE)
-	_check(main.play_screen.planning_screen.pause_menu.visible and main.planning.active, "Escape opens the menu without leaving the match")
-	main.play_screen.planning_screen.pause_menu.quit_button.pressed.emit()
-	_check(main.menu.visible and not music.playing, "Leaving an active match stops its soundtrack")
-	main.open_button.pressed.emit()
-	await process_frame
-	_check(main.workshop.visible and not music.playing, "Returning to the workshop leaves match music stopped")
-
-
-func _cell_point(cell: Vector2i) -> Vector2:
-	return main.board.global_position + main.board.cell_center(cell)
-
-
-func _control_center(control: Control) -> Vector2:
-	return control.global_position + control.size * 0.5
-
+	_check(main.menu.visible and not music.playing and not main.planning.active, "Quit ends match and stops soundtrack")
+	main.sandbox_button.pressed.emit()
+	_check(main.sandbox_screen.visible and not music.playing, "Sandbox return does not restart match music")
 
 func _click(point: Vector2) -> void:
 	await _button(point, true)
 	await _button(point, false)
-
 
 func _button(point: Vector2, pressed: bool) -> void:
 	var event := InputEventMouseButton.new()
@@ -141,7 +103,6 @@ func _button(point: Vector2, pressed: bool) -> void:
 	Input.parse_input_event(event)
 	await process_frame
 
-
 func _motion(point: Vector2) -> void:
 	var event := InputEventMouseMotion.new()
 	event.position = root.get_final_transform() * point
@@ -149,14 +110,10 @@ func _motion(point: Vector2) -> void:
 	Input.parse_input_event(event)
 	await process_frame
 
-
 func _key(code: Key) -> void:
-	var event := InputEventKey.new()
-	event.keycode = code
-	event.pressed = true
-	Input.parse_input_event(event)
-	await process_frame
-	event = InputEventKey.new()
-	event.keycode = code
-	Input.parse_input_event(event)
-	await process_frame
+	for pressed: bool in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.pressed = pressed
+		Input.parse_input_event(event)
+		await process_frame

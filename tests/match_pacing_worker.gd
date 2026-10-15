@@ -23,9 +23,12 @@ func _planning_rules() -> CombatRules:
 	rules.send_spawn_interval = 0.6
 	var definitions: Array[EnemyDefinition] = []
 	for source: EnemyDefinition in rules.catalog.enemies:
+		if source.id not in [&"grunt", &"runner", &"brute"]:
+			continue
 		var definition := source.duplicate() as EnemyDefinition
 		# Every roster is eligible immediately in this isolated networking scenario.
 		definition.first_wave = 1
+		definition.send_first_wave = 1
 		definitions.append(definition)
 	rules.catalog.enemies = definitions
 	if _lane == "guest":

@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
 [ext_resource type="Texture2D" path="res://assets/enemies/runner.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/runner.tres" id="3_animation"]
 
 [resource]
 script = ExtResource("1_enemy")
@@ -12,13 +13,15 @@ health_multiplier = 0.6
 speed_multiplier = 1.7
 base_damage = 1
 spawn_weight = 2
-first_wave = 3
+first_wave = 6
 max_per_wave = 4
 count_cap_growth = 1
 count_cap_growth_interval = 3
 max_weight_share = 0.3
 send_cost = 25
 send_income = 2
+send_first_wave = 12
 texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
 board_height = 0.45
-board_anchor = Vector2(0.5, 0.90)
+board_anchor = Vector2(0.5, 0.875)

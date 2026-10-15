@@ -1,0 +1,79 @@
+{
+  "authoring": "Local hand-plotted pixels and joint-masked accepted source animation",
+  "generator": "tools/author_enemy_sprites.py",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    640,
+    80
+  ],
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing or dithering",
+  "lighting": "upper left; dark fantasy outline",
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "sheet_sha256": "1ad40a674230929935a5911486c2a1d2db8a843c2ccadb83beb1645bf80e15db",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 10,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          18,
+          18,
+          63,
+          70
+        ],
+        [
+          19,
+          18,
+          61,
+          70
+        ],
+        [
+          19,
+          18,
+          61,
+          69
+        ],
+        [
+          19,
+          18,
+          61,
+          70
+        ],
+        [
+          18,
+          18,
+          63,
+          70
+        ],
+        [
+          16,
+          18,
+          65,
+          70
+        ],
+        [
+          15,
+          18,
+          66,
+          70
+        ],
+        [
+          16,
+          18,
+          65,
+          70
+        ]
+      ]
+    }
+  ],
+  "source": "assets/enemies/grunt.png",
+  "source_sha256": "7005092f2216a6d57556010196978f57213f5a8e98a359cad9055959bb0927ca",
+  "source_origin": "Accepted pre-existing PixelLab still; unchanged"
+}

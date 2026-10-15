@@ -17,7 +17,8 @@ func _planning_rules() -> CombatRules:
 	rules.starting_coins = 2000
 	rules.wave_weight = 1
 	rules.wave_weight_growth = 0
-	rules.catalog.enemies = [rules.catalog.enemies[0]]
+	rules.catalog.enemies = [preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition]
+	rules.catalog.enemies[0].send_first_wave = 1
 	rules.enemy_speed = 26.0
 	rules.speed_growth = 0.0
 	rules.health_growth = 0

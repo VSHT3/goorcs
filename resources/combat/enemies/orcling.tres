@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/orcling.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/orcling.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"orcling"
+title = "Orcling"
+description = "Small, fragile orcs that crowd the path in tight packs."
+health_multiplier = 0.5
+speed_multiplier = 0.9
+base_damage = 1
+spawn_weight = 1
+first_wave = 1
+max_weight_share = 0.35
+send_cost = 12
+send_income = 1
+send_first_wave = 1
+group_weights = PackedInt32Array(0, 60, 30, 10)
+group_interval = 0.065
+kill_bounty = 1
+board_height = 0.32
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+board_anchor = Vector2(0.5, 0.875)
