@@ -10,6 +10,7 @@ const SIDE_MARGIN: float = 24.0
 const MIN_ZOOM_RATIO: float = 0.55
 const MAX_ZOOM_RATIO: float = 2.5
 const WHEEL_ZOOM_STEP: float = 1.12
+const ZOOM_RESPONSE: float = 18.0
 
 
 class CameraInput extends Node:
@@ -29,6 +30,8 @@ var _board_origin_y: int = 0
 var _fit_zoom: float = 0.0
 var _headroom: float = 0.0
 var _bounds_zoom := Vector2.ZERO
+var _target_zoom: float = 0.0
+var _zoom_anchor := Vector2.ZERO
 var _own_slot: int = 0
 var _active: bool = false
 var _input_blocked: bool = false
@@ -123,7 +126,7 @@ func pan(delta: float, direction: Vector2) -> void:
 		return
 	if not camera.zoom.is_equal_approx(_bounds_zoom):
 		_update_camera_bounds()
-	var next_position: Vector2 = camera.position + direction.limit_length() * PAN_SPEED * maxf(delta, 0.0)
+	var next_position: Vector2 = camera.position + direction.limit_length() * PAN_SPEED * (_fit_zoom / camera.zoom.x) * maxf(delta, 0.0)
 	next_position = _clamped_position(next_position)
 	if next_position.is_equal_approx(camera.position):
 		return
@@ -136,6 +139,7 @@ func _process(delta: float) -> void:
 	if not is_visible_in_tree() or _movement_blocked():
 		_cancel_motion()
 		return
+	_update_zoom(delta)
 	pan(delta, Vector2(float(_right_held) - float(_left_held), float(_down_held) - float(_up_held)))
 
 
@@ -182,19 +186,28 @@ func zoom_at(factor: float, screen_position: Vector2) -> bool:
 	var local_position: Vector2 = get_global_transform_with_canvas().affine_inverse() * screen_position
 	if not Rect2(Vector2.ZERO, size).has_point(local_position):
 		return false
-	var viewport_position: Vector2 = local_position * Vector2(_world_viewport.size) / size
-	var canvas_before: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * viewport_position
-	var next_zoom: float = clampf(camera.zoom.x * factor, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
+	_zoom_anchor = local_position * Vector2(_world_viewport.size) / size
+	_target_zoom = clampf(_target_zoom * factor, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
+	_cancel_strokes()
+	return true
+
+
+func _update_zoom(delta: float) -> void:
+	if camera.zoom.x == _target_zoom:
+		return
+	var next_zoom: float = lerpf(camera.zoom.x, _target_zoom, 1.0 - exp(-ZOOM_RESPONSE * maxf(delta, 0.0)))
+	if absf(next_zoom - _target_zoom) < 0.0001:
+		next_zoom = _target_zoom
+	var canvas_before: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * _zoom_anchor
 	_cancel_strokes()
 	camera.zoom = Vector2.ONE * next_zoom
 	camera.force_update_scroll()
-	var canvas_after: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * viewport_position
+	var canvas_after: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * _zoom_anchor
 	camera.position += canvas_before - canvas_after
 	_update_camera_bounds()
 	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
 	_configure_terrain()
-	return true
 
 
 func _hud_at_point(node: Node, point: Vector2) -> bool:
@@ -260,6 +273,7 @@ func _fit_camera() -> void:
 	var gameplay_height: float = maxf(size.y - HUD_TOP - HUD_BOTTOM, 1.0)
 	_fit_zoom = minf(maxf(size.x - SIDE_MARGIN * 2.0, 1.0) / initial_size.x, gameplay_height / (initial_size.y + _headroom))
 	camera.zoom = Vector2.ONE * clampf(_fit_zoom * ratio, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
+	_target_zoom = camera.zoom.x
 	_update_camera_bounds()
 	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
@@ -303,6 +317,7 @@ func _minimum_zoom() -> float:
 
 func _frame_expanded_board() -> void:
 	camera.zoom = Vector2.ONE * _expanded_fit_zoom()
+	_target_zoom = camera.zoom.x
 	_update_camera_bounds()
 	var board_size := Vector2(_dimensions) * CELL_SIZE
 	camera.position = boards[_own_slot].position + Vector2(board_size.x * 0.5,
@@ -335,6 +350,7 @@ func _cancel_motion() -> void:
 	_right_held = false
 	_up_held = false
 	_down_held = false
+	_target_zoom = camera.zoom.x
 	_cancel_strokes()
 
 

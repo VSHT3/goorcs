@@ -149,6 +149,7 @@ func _check_growth() -> void:
 
 func _check_four_way_keys() -> void:
 	world.zoom_at(1.5, world.get_global_rect().get_center())
+	world._process(1.0)
 	world.camera.position.y = (world.camera_vertical_bounds.x + world.camera_vertical_bounds.y) * 0.5
 	world.camera.force_update_scroll()
 	var start: Vector2 = world.camera.position
@@ -167,7 +168,7 @@ func _check_four_way_keys() -> void:
 	await _key(KEY_S, false)
 	var diagonal: Vector2 = world.camera.position - start
 	_check(diagonal.x > 0.0 and diagonal.y > 0.0 and is_equal_approx(diagonal.x, diagonal.y), "Two held physical keys move diagonally")
-	_check(is_equal_approx(diagonal.length(), MatchWorld.PAN_SPEED * 0.025), "Diagonal movement has the same total speed as cardinal movement")
+	_check(is_equal_approx(diagonal.length(), MatchWorld.PAN_SPEED * (world._fit_zoom / world.camera.zoom.x) * 0.025), "Diagonal movement has the same zoom-scaled speed as cardinal movement")
 	world.camera.position = start
 	world.camera.force_update_scroll()
 	await _key(KEY_W, true)
@@ -179,6 +180,30 @@ func _check_four_way_keys() -> void:
 
 
 func _check_zoom() -> void:
+	var anchor: Vector2 = world.cell_screen_position(0, Vector2i(6, 5))
+	var anchor_world: Vector2 = _world_point(anchor)
+	var start_zoom: float = world.camera.zoom.x
+	var start_position: Vector2 = world.camera.position
+	world.pan(0.01, Vector2.RIGHT)
+	var low_zoom_distance: float = world.camera.position.x - start_position.x
+	world.camera.position = start_position
+	world.camera.force_update_scroll()
+	world.zoom_at(1.2, anchor)
+	_check(world.camera.zoom.x == start_zoom, "Zoom input does not jump the camera immediately")
+	world._process(1.0 / 60.0)
+	_check(world.camera.zoom.x > start_zoom and world.camera.zoom.x < start_zoom * 1.2, "Zoom traverses an intermediate scale on the next frame")
+	_check(_world_point(anchor).distance_to(anchor_world) < 0.01, "Cursor anchor stays fixed during the zoom transition")
+	world.zoom_at(1.1, anchor)
+	for frame: int in range(60):
+		world._process(1.0 / 60.0)
+	_check(is_equal_approx(world.camera.zoom.x, start_zoom * 1.2 * 1.1), "Rapid inputs accumulate on the zoom destination, not the intermediate scale")
+	_check(_world_point(anchor).distance_to(anchor_world) < 0.01, "Cursor anchor stays fixed through zoom completion")
+	start_position = world.camera.position
+	world.pan(0.01, Vector2.RIGHT)
+	var high_zoom_distance: float = world.camera.position.x - start_position.x
+	_check(high_zoom_distance < low_zoom_distance and is_equal_approx(high_zoom_distance * world.camera.zoom.x, low_zoom_distance * start_zoom), "Zoomed-in panning covers less world distance at the same screen speed")
+	world.camera.position = start_position
+	world.camera.force_update_scroll()
 	var point: Vector2 = world.cell_screen_position(0, Vector2i(6, 5))
 	var before: Vector2 = _world_point(point)
 	var previous_zoom: float = world.camera.zoom.x
@@ -350,6 +375,7 @@ func _wheel(point: Vector2, button: MouseButton) -> void:
 	event.pressed = false
 	root.push_input(event, true)
 	await process_frame
+	world._process(1.0)
 
 
 func _magnify(point: Vector2, factor: float) -> void:
@@ -358,6 +384,7 @@ func _magnify(point: Vector2, factor: float) -> void:
 	event.factor = factor
 	root.push_input(event, true)
 	await process_frame
+	world._process(1.0)
 
 
 func _key(code: Key, pressed: bool) -> void:

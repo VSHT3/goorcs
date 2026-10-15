@@ -27,7 +27,7 @@ Title and Play menus share one hover/keyboard selection: moving onto an enabled 
 ## Test solo
 
 - Choose **Play → Singleplayer** to start immediately without a connection, port, or invite.
-- The initial view shows your own side of the continuous world. Hold **WASD** to pan and inspect the mirrored opponent; use **scroll / pinch** to zoom. The HUD stays fixed and opponent-side input remains read-only.
+- The initial view shows your own side of the continuous world. Hold **WASD** to pan and inspect the mirrored opponent; use **scroll / pinch** to zoom smoothly around the cursor. Panning slows down when zoomed in. The HUD stays fixed and opponent-side input remains read-only.
 - The opponent mirrors accepted path edits, tower purchases, targeting, upgrades, sales, enemy sends, and readiness. Pressing **Ready** starts both boards.
 - The pixel **> / >>** button toggles 2× simulation speed; the loop-arrow button toggles autoplay. Solo consent applies immediately, but autoplay still waits for Ready in initial setup and main rounds. It continues ordinary rounds after both boards clear; disabling restores manual planning.
 - Collection locks, prices, combat, wave breaks, and results use the same rules as multiplayer. Identical defenses can end in the existing simultaneous-defeat coin flip; this is a testing opponent, not AI.

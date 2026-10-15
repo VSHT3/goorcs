@@ -84,6 +84,7 @@ func _run() -> void:
 	var original_zoom: Vector2 = world.camera.zoom
 	world.pan(0.08, Vector2.RIGHT)
 	world.zoom_at(0.85, world.cell_screen_position(0, transformed_cell))
+	world._process(1.0)
 	await _settle()
 	_check(world.camera.position.x > original_position.x and not world.camera.zoom.is_equal_approx(original_zoom), "Second native drop uses an actually translated and scaled camera")
 	await _purchase(transformed_cell, "Native HUD drag purchases the exact owned cell after pan and zoom")

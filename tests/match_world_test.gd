@@ -138,6 +138,7 @@ func _check_camera_and_input(own_slot: int) -> void:
 	world.boards[opponent].cell_clicked.connect(collect_opponent)
 	var original_zoom: Vector2 = world.camera.zoom
 	world.zoom_at(0.85, world.cell_screen_position(own_slot, TOWER_CELL))
+	world._process(1.0)
 	await _settle()
 	var scaled_position: Vector2 = world.camera.position
 	var scaled_zoom: Vector2 = world.camera.zoom
@@ -174,6 +175,7 @@ func _check_camera_and_input(own_slot: int) -> void:
 	_check(not world.size.is_equal_approx(world_rect.size), "Resize actually changes the gameplay viewport")
 	_check(world.boards[0].size == board_sizes[0] and world.boards[1].size == board_sizes[1], "Resize preserves fixed world board dimensions")
 	world.zoom_at(0.85, world.cell_screen_position(own_slot, TOWER_CELL))
+	world._process(1.0)
 	await _settle()
 	clicks.clear()
 	await _click(world.cell_screen_position(own_slot, TOWER_CELL))
@@ -197,6 +199,7 @@ func _check_camera_and_input(own_slot: int) -> void:
 	root.content_scale_size = old_scale
 	root.size = old_size
 	world.zoom_at(original_zoom.x / world.camera.zoom.x, world.get_global_rect().get_center())
+	world._process(1.0)
 	await _settle()
 	world.set_active(false)
 	world.set_active(true)
