@@ -38,7 +38,7 @@ func _rules() -> CombatRules:
 	rules.wave_weight = 30
 	rules.wave_weight_growth = 0
 	rules.enemy_speed = 0.1
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.starting_coins = 1000
 	rules.spawn_jitter_ratio = 0.4
 	rules.spawn_interval_reduction_per_wave = 0.0

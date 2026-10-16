@@ -20,7 +20,7 @@ func _planning_rules() -> CombatRules:
 	rules.catalog.enemies = [preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition]
 	rules.catalog.enemies[0].send_first_wave = 1
 	rules.enemy_speed = 26.0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.health_growth = 0
 	rules.spawn_interval = 0.0
 	var tower := rules.catalog.towers[0].duplicate() as TowerDefinition

@@ -545,7 +545,7 @@ func _refresh_management(state: Dictionary) -> void:
 		var purchased: bool = chosen == command
 		var locked: bool = not chosen.is_empty() and not purchased
 		var button: Button = advancement_buttons[command]
-		button.text = "%s\n%s" % [String(definition.get("title", command)), "Purchased" if purchased else ("Locked" if locked else "Free")]
+		button.text = "%s\n%s" % [String(definition.get("title", command)), "Owned" if purchased else ("Locked" if locked else "Free")]
 		button.disabled = not _advancement_row.visible or definition.is_empty() or purchased or locked
 		button.tooltip_text = MatchPlanningScreen.advancement_tooltip(command, definition) + "\nFree in sandbox; sell and rebuild to choose another path."
 	var commands: Dictionary[String, Dictionary] = {

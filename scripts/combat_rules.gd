@@ -15,7 +15,9 @@ extends Resource
 @export_range(0.0, 0.999, 0.001) var max_spawn_interval_reduction: float = 0.5
 @export var catalog: ContentCatalog = preload("res://resources/content_catalog.tres")
 @export var health_growth: int = 2
-@export var speed_growth: float = 0.15
+# Each milestone adds a fraction of original speed; spans grow 5, 10, 15... rounds.
+@export_range(0.0, 1.0, 0.01, "or_greater") var speed_growth_fraction: float = 0.1
+@export_range(1, 1000, 1, "or_greater") var speed_growth_rounds: int = 5
 @export var wave_weight_growth: int = 2
 @export var starting_coins: int = 200
 @export var kill_bounty: int = 3
@@ -31,3 +33,16 @@ func _init() -> void:
 	# Each rules resource owns its registration arrays; definitions remain shared
 	# until a caller explicitly duplicates a definition to tune a fixture.
 	catalog = catalog.duplicate() as ContentCatalog
+
+
+func valid_speed_progression() -> bool:
+	return is_finite(enemy_speed) and enemy_speed >= 0.0 and is_finite(speed_growth_fraction) and speed_growth_fraction >= 0.0 and speed_growth_rounds > 0
+
+
+func enemy_speed_at_wave(wave_number: int) -> float:
+	var elapsed: int = maxi(0, wave_number - 1)
+	# Invert triangular milestone boundaries without looping through earlier rounds.
+	var completed: int = floori((sqrt(1.0 + 8.0 * float(elapsed) / speed_growth_rounds) - 1.0) * 0.5)
+	var boundary: float = float(speed_growth_rounds) * completed * (completed + 1) * 0.5
+	var progress: float = (float(elapsed) - boundary) / (float(speed_growth_rounds) * (completed + 1))
+	return enemy_speed * (1.0 + speed_growth_fraction * (completed + progress))

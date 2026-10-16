@@ -13,7 +13,7 @@ func _run() -> void:
 	planning.session = session
 	var rules := CombatRules.new()
 	rules.enemy_speed = 0.1
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.base_health = 1000
 	rules.spawn_interval = 0.0
 	planning.combat_rules = rules

@@ -17,7 +17,7 @@ func rules() -> CombatRules:
 	value.starting_coins = 10000
 	value.enemy_health = 100
 	value.enemy_speed = 0.0
-	value.speed_growth = 0.0
+	value.speed_growth_fraction = 0.0
 	value.health_growth = 0
 	return value
 func routes() -> Array[Dictionary]:

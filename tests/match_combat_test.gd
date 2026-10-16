@@ -84,7 +84,7 @@ func _rules() -> CombatRules:
 	rules.spawn_interval_reduction_per_wave = 0.0
 	rules.catalog.towers = [_definition(&"arrow_tower", 2, 20.0, 0.5)]
 	rules.health_growth = 2
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.wave_weight_growth = 0
 	return rules
 
@@ -485,7 +485,7 @@ func _test_wave_scaling_and_rewards() -> void:
 		combat.advance(0.1)
 		var budget: int = 6 + (wave_number - 1) * 2
 		var count: int = combat.wave_roster.size()
-		var speed: float = 2.0 + (wave_number - 1) * 0.15
+		var speed: float = rules.enemy_speed_at_wave(wave_number)
 		var hp: int = 8 + (wave_number - 1) * 2
 		var state: Dictionary = combat.snapshot()
 		_check(state["wave_weight"] == budget and state["total"] == count and state["spawned"] == [count, count] and combat.enemies[0].size() == count and combat.enemies[1].size() == count, "Wave %d schedules the shared actual roster within its growing weight budget" % wave_number)
@@ -587,7 +587,7 @@ func _test_typed_enemy_sends() -> void:
 	var rules := _rules()
 	rules.wave_weight = 1
 	rules.spawn_interval = 0.0
-	rules.speed_growth = 0.15
+	rules.speed_growth_fraction = 0.1
 	var combat := MatchCombat.new(rules)
 	var frozen: Dictionary = combat.snapshot()
 	_check(not combat.send_enemy(0, &"unknown") and not combat.send_enemy(0, &"") and combat.snapshot() == frozen, "Unknown/empty enemy IDs cannot spend Coins, grow income or create orders")
@@ -609,7 +609,7 @@ func _test_typed_enemy_sends() -> void:
 	_run_wave(combat)
 	_check(combat.base_health == [9, 5] and combat.coins == [176, 235], "Brute leaks three damage once and clear pays only sender's purchased income bonus")
 	var preview: Dictionary = combat.snapshot()["enemy_types"]
-	_check(preview["runner"]["health"] == 6 and preview["brute"]["health"] == 25 and is_equal_approx(preview["runner"]["speed"], 1.15 * 1.7), "Planning previews the next wave's effective typed stats, not the cleared wave")
+	_check(preview["runner"]["health"] == 6 and preview["brute"]["health"] == 25 and is_equal_approx(preview["runner"]["speed"], 1.02 * 1.7), "Planning previews the next wave's effective typed stats, not the cleared wave")
 	combat.start_wave(_routes(4, 4))
 	combat.advance(1.0)
 	combat.send_enemy(1, &"brute")
@@ -730,7 +730,7 @@ func _test_weighted_wave_constraints_and_streams() -> void:
 					var type_id: String = roster[index]
 					var definition: Dictionary = combat.snapshot()["enemy_types"][type_id]
 					var hp: int = ceili((8 + 2 * (wave_number - 1)) * float(definition["health_multiplier"]))
-					var speed: float = (2.0 + 0.15 * (wave_number - 1)) * float(definition["speed_multiplier"])
+					var speed: float = rules.enemy_speed_at_wave(wave_number) * float(definition["speed_multiplier"])
 					_check(enemy["type_id"] == type_id and enemy["max_hp"] == hp and is_equal_approx(float(enemy["speed"]), speed) and is_equal_approx(float(enemy["progress"]), speed * 0.01), "Both real streams share order and delivery-wave stats including fractional-tick type travel")
 					_check(int(enemy["damage"]) == int(definition["base_damage"]), "Regular spawns capture the same per-resource damage as sends")
 				_check(combat.enemies[0][index]["id"] != combat.enemies[1][index]["id"], "Shared roster never shares mutable enemy identity between boards")
@@ -814,7 +814,7 @@ func _test_weighted_wave_randomness_and_extension() -> void:
 		var regular_roster: Array = first.wave_roster.duplicate()
 		_check(first.send_enemy(0, fourth.id), "Fourth resource sends without a type-specific command branch")
 		var sent: Dictionary = first.enemies[1][0]
-		_check(sent["type_id"] == String(fourth.id) and sent["damage"] == 2 and sent["max_hp"] == ceili(30 * 1.25) and is_equal_approx(float(sent["speed"]), 3.65 * 0.9), "Fourth resource controls sent damage and delivery-wave multipliers")
+		_check(sent["type_id"] == String(fourth.id) and sent["damage"] == 2 and sent["max_hp"] == ceili(30 * 1.25) and is_equal_approx(float(sent["speed"]), rules.enemy_speed_at_wave(12) * 0.9), "Fourth resource controls sent damage and delivery-wave multipliers")
 		_check(first.wave_roster == regular_roster and first.snapshot()["total"] == regular_roster.size() and first.snapshot()["wave_weight"] == 28, "Immediate sends remain extra and consume no regular roster budget")
 		first.advance(0.01)
 		_check(first.enemies[1][1]["type_id"] == regular_roster[0], "Sent order does not replace the first regular scheduled type")
@@ -824,7 +824,7 @@ func _test_weighted_wave_randomness_and_extension() -> void:
 				var enemy: Dictionary = first.enemies[slot][index + (1 if slot == 1 else 0)]
 				_check(enemy["type_id"] == regular_roster[index], "Fourth resource participates in the same actual ordered stream on both boards")
 				if enemy["type_id"] == String(fourth.id):
-					_check(enemy["damage"] == 2 and enemy["max_hp"] == ceili(30 * 1.25) and is_equal_approx(float(enemy["speed"]), 3.65 * 0.9), "Fourth regular spawn uses its resource damage and scaled stats without a spawning branch")
+					_check(enemy["damage"] == 2 and enemy["max_hp"] == ceili(30 * 1.25) and is_equal_approx(float(enemy["speed"]), rules.enemy_speed_at_wave(12) * 0.9), "Fourth regular spawn uses its resource damage and scaled stats without a spawning branch")
 		saw_fourth = saw_fourth or regular_roster.has(String(fourth.id))
 		var locked := MatchCombat.new(rules, null, _wave_rng(seed_value))
 		locked.wave = 2
@@ -1601,7 +1601,7 @@ func _test_rune_evolution_persistence() -> void:
 	for branch: String in ["boulders", "onyx_ring"]:
 		var rules := _special_rules(&"rune_obelisk", 6, 1)
 		rules.health_growth = 0
-		rules.speed_growth = 0.0
+		rules.speed_growth_fraction = 0.0
 		var combat := _prepared_evolution(branch, rules)
 		combat.build(1, Vector2i(0, 1), &"rune_obelisk", 0)
 		var other: Dictionary = combat.towers[1][0]

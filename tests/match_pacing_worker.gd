@@ -18,7 +18,7 @@ func _planning_rules() -> CombatRules:
 	rules.enemy_health = 1000
 	rules.health_growth = 0
 	rules.enemy_speed = 13.0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.spawn_interval = 0.02
 	rules.send_spawn_interval = 0.6
 	var definitions: Array[EnemyDefinition] = []

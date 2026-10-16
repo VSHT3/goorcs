@@ -25,7 +25,7 @@ func _model() -> MatchCombat:
 	rules.sandbox_mode = true
 	rules.enemy_health = 1
 	rules.enemy_speed = 0.0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	var model := MatchCombat.new(rules)
 	var roster: Array[String] = []
 	model.sandbox_start(_routes(),1,roster)

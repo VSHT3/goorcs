@@ -291,15 +291,14 @@ func _check_lifecycle() -> void:
 
 
 func _check_leave_and_reopen() -> void:
-	await _click(screen.results_menu.menu_button.get_global_rect().get_center())
+	await _click_rendered_control(screen.results_menu.menu_button)
 	await _open_match()
 	await _start_wave()
 	var id: int = int(main.planning.combat["enemies"][0][0]["id"])
 	await _click_enemy(0, id)
 	_check_selected(0, id, "Fresh match enemy before Leave")
-	await _click(screen.menu_button.get_global_rect().get_center())
-	await _settle()
-	await _click(screen.pause_menu.quit_button.get_global_rect().get_center())
+	await _click_rendered_control(screen.menu_button)
+	await _click_rendered_control(screen.pause_menu.quit_button)
 	_check(main.menu.visible and not main.planning.active and not screen.is_visible_in_tree(), "Menu Quit deactivates the inspected match")
 	_check_closed("Leaving inspected match")
 	await _open_match()
@@ -480,6 +479,14 @@ func _same_rect(first: Rect2, second: Rect2) -> bool:
 func _settle() -> void:
 	await process_frame
 	await process_frame
+
+
+func _click_rendered_control(control: Control) -> void:
+	# New modal containers must finish layout before reading their click position.
+	await process_frame
+	RenderingServer.force_draw.call_deferred(false)
+	await RenderingServer.frame_post_draw
+	await _click(control.get_global_rect().get_center())
 
 
 func _click(point: Vector2) -> void:

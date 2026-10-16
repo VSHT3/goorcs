@@ -181,7 +181,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	rules.enemy_health = 4
 	rules.health_growth = 2
 	rules.enemy_speed = 10.0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.spawn_interval = 0.05
 	var grunt := preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
 	grunt.send_cost = 20
@@ -257,7 +257,7 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	rules.enemy_health = 4
 	rules.health_growth = 2
 	rules.enemy_speed = 10.0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.spawn_interval = 0.05
 	rules.send_spawn_interval = 0.35
 	var definitions: Array[EnemyDefinition] = []

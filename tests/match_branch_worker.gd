@@ -32,7 +32,7 @@ func _planning_rules() -> CombatRules:
 	rules.wave_weight = 4
 	rules.wave_weight_growth = 0
 	rules.enemy_speed = 1.0 if _lane == "host" else 99.0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.spawn_interval = 0.0
 	return rules
 

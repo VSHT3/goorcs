@@ -24,6 +24,22 @@ Chiefs begin at one regular selection per wave; the cap grows by one every ten w
 
 NecOrcmancers begin at one regular selection per wave; the cap grows by one every twelve waves after introduction. Every seven simulation seconds the caster stops for a 1.15-second staff-raising ritual, then raises two to four SkeleOrcs, limited to six living children per caster. Children inherit the caster's captured route and current progress instead of returning to the portal. A dead/leaked caster cannot finish its ritual. Living children still have to clear before the wave ends. SkeleOrcs have no kill bounty, preventing summon farming. Freeze slows movement, not the simulation ability clock; casting is stationary even while a slow expires. Two-times playback accelerates all of these simulation clocks consistently.
 
+## Movement progression
+
+Movement no longer gains a fixed 0.15 cells/second every round. `CombatRules.speed_growth_fraction = 0.1` and `speed_growth_rounds = 5` define additive milestones: the first extra 10% of original speed takes five completed rounds, the next ten, the next fifteen, then twenty, and so on. Growth is interpolated within each span, so enemies do not suddenly jump in speed at a milestone. It neither compounds nor resets the baseline between spans.
+
+| Round | Ordinary Orc speed (cells/s) | Increase over initial speed |
+| --- | ---: | ---: |
+| 1 | 2.00 | 0% |
+| 6 | 2.20 | 10% |
+| 16 | 2.40 | 20% |
+| 31 | 2.60 | 30% |
+| 51 | 2.80 | 40% |
+| 101 | 3.17 | 58.33% |
+
+`CombatRules.enemy_speed_at_wave` owns the curve. Match simulation, paid/regular deliveries, next-round previews, Sandbox, and Orcieary use it; an admitted host model retains its captured settings even if local source resources change. Existing per-type speed ratios, health scaling, weights/counts, irregular spawn cadence, ability clocks, and 1×/2×/3× playback are independent and unchanged. This is a deliberately restrained provisional movement curve; sustained late-round pressure still needs friend playtests.
+
+
 ## Presentation
 
 All seven enemies use a shared elevated three-quarter pixel-art language, material ramps, lighting and outlines, with separately authored faces/anatomy rather than a reused face or cut-out source limbs. Each has a twelve-frame articulated walk with opposing limbs, grounded backward foot sweep, airborne forward recovery, and role-specific equipment/cloth lag. Chief healing and NecOrcmancer casting have separate anticipation/action/recovery poses. Runtime stills match frame zero; historical source PNGs remain untouched. `tools/author_enemy_sprites.py` reproduces the sheets/stills and per-enemy JSON files in `assets/enemies/animations/` record their derivation and hashes.
@@ -55,3 +71,5 @@ Use the [single-command checks](development.md#single-command-verification). `en
 The expansion's full `python3 tools/verify.py all` run passed **41/41 checks** (36 suites plus five gates), including separate real host/client processes and rendered tests. A graphical main-scene smoke exercised menu shortcuts, all seven previews at 1000×720/1280×720, native sandbox path drawing, all three free tower branches, mixed exact spawns, paused navigation, and confirmed 40×24 resizing. A separate real simulation captured Chief healing, stationary staff casting, and living summoned children. A normal match UI smoke recorded three accepted Orcling sends and five actual Orcling kills, displayed them in Orcieary, and reloaded the same saved totals. Smoke resources/saves/scripts were isolated and removed; automated checks do not establish competitive balance or internet reachability.
 
 The portrait/order/art/death revision passed **43/43 project checks**, including real host/client kill-event replication and rendered corpse/blood cleanup. Native portrait clicks were exercised for every sorted entry at 1000×720 and 1280×720. Actual sandbox kills rendered each collapse, bloodless SkeleOrc bone heap, and expiry, including the final death after automatic wave clearance. The reversed grounded/airborne gait was corrected and numerically audited for source-left and mirrored-right before in-game inspection. A clipped Brute collapse frame was corrected; all 192 exported frames retain transparent margins. These checks validate behavior and readability, not objective aesthetic perfection.
+
+The diminishing movement revision passed **49/49 project checks**, including boundary/rate assertions, additive versus compounded milestones, configurable baseline/span/fraction, regular and paid movement, captured-source protection, and separate real host/client agreement with intentionally different client progression. A rendered game smoke inspected live enemies at rounds 1, 6, 16, 31, 51 and 101 and verified Sandbox selected-round speeds against the same owner. At round 101 the ordinary Orc's live inspector displayed 3.17 cells/second. Health, group/count budgets, economy, and spawn cadence were intentionally unchanged.

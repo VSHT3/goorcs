@@ -71,6 +71,9 @@ var _slow_motion: Dictionary = {}
 var _step_start_time: float = 0.0
 # Burn retains its original tower dictionary even after sale, never in snapshots.
 var _burns: Dictionary = {}
+var _speed_cache_wave: int = -1
+var _current_wave_speed: float = 0.0
+var _next_wave_speed: float = 0.0
 
 
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
@@ -96,6 +99,9 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 	_group_random.seed = _wave_random.seed ^ 0x534b454c
 	if rules.wave_weight <= 0 or rules.wave_weight_growth < 0 or not is_finite(rules.spawn_interval) or rules.spawn_interval < 0.0:
 		push_error("Combat waves require positive weight, nonnegative growth and a finite nonnegative spawn interval")
+		_roster_configuration_valid = false
+	if not rules.valid_speed_progression():
+		push_error("Combat speed requires a finite nonnegative baseline/growth fraction and positive milestone round span")
 		_roster_configuration_valid = false
 	base_health = [rules.base_health, rules.base_health]
 	coins = [rules.starting_coins, rules.starting_coins]
@@ -773,7 +779,7 @@ func _enemy_types_snapshot() -> Dictionary:
 static func enemy_preview(definition: EnemyDefinition, rules: CombatRules, wave_number: int = 1) -> Dictionary:
 	return {
 		"max_hp": maxi(1, ceili(float(rules.enemy_health + maxi(0, wave_number - 1) * rules.health_growth) * definition.health_multiplier)),
-		"speed": (rules.enemy_speed + maxi(0, wave_number - 1) * rules.speed_growth) * definition.speed_multiplier,
+		"speed": rules.enemy_speed_at_wave(wave_number) * definition.speed_multiplier,
 		"base_damage": definition.base_damage,
 		"fire_immune": definition.fire_immune, "ice_immune": definition.ice_immune,
 		"burning": false, "burn_remaining": 0.0,
@@ -795,7 +801,16 @@ func _wave_health(wave_number: int) -> int:
 
 
 func _wave_speed(wave_number: int) -> float:
-	return _rules.enemy_speed + maxi(0, wave_number - 1) * _rules.speed_growth
+	# Admitted rules are immutable; compute current/preview baselines once per round.
+	if _speed_cache_wave != wave:
+		_speed_cache_wave = wave
+		_current_wave_speed = _rules.enemy_speed_at_wave(wave)
+		_next_wave_speed = _rules.enemy_speed_at_wave(wave + 1)
+	if wave_number == wave:
+		return _current_wave_speed
+	if wave_number == wave + 1:
+		return _next_wave_speed
+	return _rules.enemy_speed_at_wave(wave_number)
 
 
 func _wave_weight(wave_number: int) -> int:

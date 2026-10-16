@@ -16,7 +16,7 @@ func _planning_rules() -> CombatRules:
 	rules.base_health = 2
 	rules.enemy_health = 4
 	rules.health_growth = 0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.wave_weight_growth = 0
 	rules.wave_weight = 1
 	rules.enemy_speed = 6.5

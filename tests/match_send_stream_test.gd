@@ -40,7 +40,7 @@ func _rules() -> CombatRules:
 	rules.enemy_speed = 1.0
 	rules.wave_weight = 1
 	rules.wave_weight_growth = 0
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.spawn_interval = 0.5
 	rules.spawn_jitter_ratio = 0.0
 	rules.spawn_interval_reduction_per_wave = 0.0
@@ -175,7 +175,7 @@ func _test_coarse_and_fine_delivery() -> void:
 func _test_mixed_delivery_stats_and_regular_limits() -> void:
 	var rules := _rules()
 	rules.health_growth = 3
-	rules.speed_growth = 0.2
+	rules.speed_growth_fraction = 0.2
 	var combat := _combat(rules)
 	for order: int in range(6):
 		combat.send_enemy(0, &"brute")
@@ -192,13 +192,13 @@ func _test_mixed_delivery_stats_and_regular_limits() -> void:
 	combat.send_enemy(0, &"brute")
 	combat.start_wave(_routing())
 	var runner: Dictionary = combat.enemies[1][0]
-	_check(runner["max_hp"] == 7 and is_equal_approx(runner["speed"], 1.2 * 1.7), "The first next-wave delivery captures delivery-wave rounded health and speed")
+	_check(runner["max_hp"] == 7 and is_equal_approx(runner["speed"], 1.04 * 1.7), "The first next-wave delivery captures delivery-wave rounded health and speed")
 	combat.advance(0.36)
 	var brute: Dictionary = combat.enemies[1][2]
-	_check(brute["type_id"] == "brute" and brute["max_hp"] == 28 and is_equal_approx(brute["speed"], 1.2 * 0.65) and is_equal_approx(brute["progress"], 0.01 * 1.2 * 0.65), "A paced mixed successor uses the same delivery-wave scaling and its own due time")
+	_check(brute["type_id"] == "brute" and brute["max_hp"] == 28 and is_equal_approx(brute["speed"], 1.04 * 0.65) and is_equal_approx(brute["progress"], 0.01 * 1.04 * 0.65), "A paced mixed successor uses the same delivery-wave scaling and its own due time")
 	combat.send_enemy(0, &"grunt")
 	combat.advance(0.35)
-	_check(combat.enemies[1].back()["type_id"] == "grunt" and combat.enemies[1].back()["max_hp"] == 11 and is_equal_approx(combat.enemies[1].back()["speed"], 1.2), "A live successor joins that same wave's ordinary stat rules")
+	_check(combat.enemies[1].back()["type_id"] == "grunt" and combat.enemies[1].back()["max_hp"] == 11 and is_equal_approx(combat.enemies[1].back()["speed"], 1.04), "A live successor joins that same wave's ordinary stat rules")
 
 
 func _test_pending_gaps_rewards_and_late_orders() -> void:

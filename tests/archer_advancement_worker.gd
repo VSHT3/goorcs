@@ -7,7 +7,7 @@ func _planning_rules() -> CombatRules:
 	rules.enemy_health = 400
 	rules.health_growth = 0
 	rules.enemy_speed = 0.01
-	rules.speed_growth = 0.0
+	rules.speed_growth_fraction = 0.0
 	rules.wave_weight = 6
 	rules.spawn_interval = 0.0
 	var enemy: EnemyDefinition = rules.catalog.enemies[0].duplicate() as EnemyDefinition
