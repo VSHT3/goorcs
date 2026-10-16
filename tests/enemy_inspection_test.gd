@@ -220,11 +220,11 @@ func _check_opponent_and_layout() -> void:
 	_check(main.planning._snapshot() == accepted and main.planning.combat == presentation, "Opponent inspection, pan, resize and forbidden drop cannot mutate authoritative or accepted gameplay")
 	var close: Button = _close_control()
 	if close != null:
-		await _click(close.get_global_rect().get_center())
+		await _click_rendered_control(close)
 	_check_closed("Actual inspector Close button")
 	await _click_enemy(1, id)
 	_check_selected(1, id, "Reopen after Close")
-	await _click(screen.shop_buttons[&"arrow_tower"].get_global_rect().get_center())
+	await _click_rendered_control(screen.shop_buttons[&"arrow_tower"])
 	_check_closed("Entering tower placement")
 	_check(not world.boards[0].enemy_inspection_enabled and not world.boards[1].enemy_inspection_enabled, "Placement disables inspection on both boards")
 	await _click_enemy(1, id)
@@ -483,9 +483,11 @@ func _settle() -> void:
 
 func _click_rendered_control(control: Control) -> void:
 	# New modal containers must finish layout before reading their click position.
+	root.grab_focus()
 	await process_frame
 	RenderingServer.force_draw.call_deferred(false)
 	await RenderingServer.frame_post_draw
+	await process_frame
 	await _click(control.get_global_rect().get_center())
 
 

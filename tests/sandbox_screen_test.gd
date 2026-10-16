@@ -121,6 +121,7 @@ func _run() -> void:
 	_check(returned.size() == 1 and not screen.controller.active, "Unconsumed Escape returns to menu and deactivates simulation")
 	screen.queue_free()
 	await _settle()
+	await create_timer(maxf(0.0, AudioServer.get_time_to_next_mix()) + 0.025).timeout
 	if failures == 0:
 		print("PASS: sandbox screen controls, compact layout, confirmations, exact spawns, keyboard and menu persistence")
 	quit(1 if failures > 0 else 0)

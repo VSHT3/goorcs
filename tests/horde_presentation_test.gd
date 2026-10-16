@@ -264,6 +264,7 @@ func _check_animation_frames() -> void:
 			"Resting portrait reuses the board's first authored walk frame: %s" % definition.id)
 		portrait.queue_redraw()
 		await process_frame
+		RenderingServer.force_draw.call_deferred(false)
 		await RenderingServer.frame_post_draw
 		var walking: Image = preview_viewport.get_texture().get_image()
 		var used: Rect2i = walking.get_used_rect()
@@ -275,6 +276,7 @@ func _check_animation_frames() -> void:
 			portrait.set_preview_time(0.4)
 			_check(portrait.preview_animation != &"walk", "Preview explicitly plays the enemy's own special pose on demand")
 			await process_frame
+			RenderingServer.force_draw.call_deferred(false)
 			await RenderingServer.frame_post_draw
 			var acting: Image = preview_viewport.get_texture().get_image()
 			_check(int(_changed_geometry(walking, acting, Rect2i(Vector2i.ZERO, preview_viewport.size))["pixels"]) > 30,
@@ -346,6 +348,7 @@ func _image() -> Image:
 	board.set_process(false)
 	board.queue_redraw()
 	await process_frame
+	RenderingServer.force_draw.call_deferred(false)
 	await RenderingServer.frame_post_draw
 	return viewport.get_texture().get_image()
 

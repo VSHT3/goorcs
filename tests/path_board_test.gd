@@ -527,14 +527,10 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		tower["special_upgraded"] = true
 		board.combat_towers = [tower]
 		var baseline: Image = await _board_image(board, viewport)
-		var artwork: TowerReward = board._tower_art["arrow_tower"]
-		var foot: Vector2 = board.cell_center(tower["cell"]) + Vector2(0, board._cell_size() * 0.28)
-		var rect: Rect2 = board._sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
-		var art_scale: Vector2 = rect.size / artwork.icon_texture.get_size()
-		var second_rect := Rect2(rect.position + (artwork.secondary_sprite_region.position + artwork.secondary_sprite_offset) * art_scale,
-			artwork.secondary_sprite_region.size * art_scale)
-		_check(int(_changed_geometry(ordinary, baseline, Rect2i(second_rect.grow(1.0)))["pixels"]) > 20,
-			"Only the special Arrow tower gains a visibly separate cropped source archer, mirrored=%s" % mirrored)
+		var second: Dictionary = board._archer_geometry(tower, 1, 1.0)
+		var second_rect := Rect2(Vector2(second["pivot"]) - Vector2(16, 24), Vector2(32, 40))
+		_check(int(_changed_geometry(ordinary, baseline, Rect2i(second_rect))["pixels"]) > 20,
+			"Only the special Arrow tower gains a visibly separate upright archer, mirrored=%s" % mirrored)
 		tower = tower.duplicate(true)
 		tower["shot"] = 1
 		tower["aim"] = Vector2(4, 1)
@@ -634,6 +630,7 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		board.combat_towers = []
 		var tower: Dictionary = _tower(190, Vector2i(2, 3), "arrow_tower")
 		tower["special_upgraded"] = true
+		tower["aim"] = Vector2(0, 0)
 		tower["secondary_shot"] = 0
 		tower["secondary_aim"] = Vector2(1, 0)
 		board.combat_towers = [tower]
@@ -645,14 +642,40 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 			{"shot": 0, "aim": Vector2(4, 0), "mode": 2, "target_id": -1}]
 		board.combat_towers = [tower]
 		var four: Image = await _board_image(board, viewport)
+		for index: int in range(2, 4):
+			var geometry: Dictionary = board._archer_geometry(tower, index, 1.0)
+			var head := Rect2(Vector2(geometry["pivot"]) + Vector2(-8, -15) * float(geometry["scale"]),
+				Vector2(16, 14) * float(geometry["scale"]))
+			_check(int(_changed_geometry(two, four, Rect2i(head.grow(1.0)))["pixels"]) > 4,
+				"Each rear archer has a visible native-scale pink head above the roof, mirrored=%s" % mirrored)
+		var held_tips: Array[Vector2] = []
+		var directions: Array[Vector2] = []
+		for index: int in range(4):
+			var geometry: Dictionary = board._archer_geometry(tower, index, 1.0)
+			var toward: Vector2 = (board._position_center(board._archer_aim(tower, index))
+				+ Vector2(0, board._cell_size() * 0.15) - Vector2(geometry["pivot"])).normalized()
+			_check(Vector2(geometry["direction"]).dot(toward) > 0.999,
+				"Each upright archer faces its own accepted target, mirrored=%s archer=%s" % [mirrored, index])
+			held_tips.append(board._tower_muzzle(tower, index))
+			directions.append(geometry["direction"])
+		var redirected: Dictionary = tower.duplicate(true)
+		redirected["extra_archers"][1]["aim"] = Vector2(0, 4)
+		board.combat_towers = [redirected]
+		var turned: Image = await _board_image(board, viewport)
+		var fourth: Dictionary = board._archer_geometry(redirected, 3, 1.0)
+		_check(int(_changed_geometry(four, turned,
+			Rect2i(Vector2(fourth["pivot"]) - Vector2(18, 20), Vector2(36, 40)))["pixels"]) > 8,
+			"A changed fourth accepted aim visibly turns its head and bow without firing")
+		for index: int in range(3):
+			_check(Vector2(board._archer_geometry(redirected, index, 1.0)["direction"]).is_equal_approx(directions[index]),
+				"Turning one shooter cannot redirect another archer's rig")
 		var foot: Vector2 = board.cell_center(tower["cell"]) + Vector2(0, board._cell_size() * 0.28)
 		var rect: Rect2 = board._sprite_rect(art.icon_texture, art.board_height, art.board_anchor, foot)
-		var scale: Vector2 = rect.size / art.icon_texture.get_size()
-		for offset: Vector2 in art.additional_archer_offsets:
-			var head := Rect2(rect.position + (art.secondary_sprite_region.position + offset) * scale,
-				Vector2(art.secondary_sprite_region.size.x, 12.0) * scale)
-			_check(int(_changed_geometry(two, four, Rect2i(head.grow(1.0)))["pixels"]) > 4,
-				"Each rear archer has visible native-scale head/bow pixels above the roof, mirrored=%s" % mirrored)
+		var ground_region := Rect2i(rect.position + Vector2(0, 38) * rect.size / art.icon_texture.get_size(),
+			Vector2(rect.size.x, rect.size.y * 0.45))
+		_check(int(_changed_geometry(four, turned, ground_region)["pixels"]) == 0,
+			"Archer facing never rotates or repaints the tower's stone base")
+		board.combat_towers = [tower]
 		tower = tower.duplicate(true)
 		tower["shot"] = 1
 		tower["aim"] = Vector2(0, 0)
@@ -667,12 +690,17 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		for trace: Dictionary in board._shot_traces:
 			var index: int = int(trace["archer_index"])
 			var origin: Vector2 = board._projectile_origin(trace)
-			var expected: Vector2 = rect.position + (art.projectile_origin + board._archer_offset(art, index)) * scale
-			_check(origin.is_equal_approx(expected) and not origins.has(origin),
-				"Each of four arrows leaves its own authored archer muzzle")
+			_check(origin.is_equal_approx(held_tips[index]) and not origins.has(origin),
+				"Each released arrow tip begins exactly at its own previously held arrow tip")
 			origins.append(origin)
-			_check(board._seen_shots[Vector2i(190, index)] == 1, "Accepted counters are tracked per tower and archer")
 		board._process(PathBoard.SHOT_DURATION * 0.5)
+		var release_pose: Image = await _board_image(board, viewport)
+		var age: float = float(board._archer_poses[Vector2i(190, 0)]["age"])
+		board._corpse_paused = true
+		board._process(0.2)
+		_check(float(board._archer_poses[Vector2i(190, 0)]["age"]) == age,
+			"Paused Sandbox freezes the draw/release rig as well as its flight")
+		board._corpse_paused = false
 		var flights: Image = await _board_image(board, viewport)
 		for trace: Dictionary in board._shot_traces:
 			_check(_pixels_changed_near(four, flights, board._projectile_position(trace)),
@@ -687,12 +715,24 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		board.combat_towers = [changed]
 		board.set_process(false)
 		_check(board._shot_traces.size() == 5 and board._shot_traces[4]["archer_index"] == 3
-			and board._shot_traces[3]["aim"] == accepted["extra_archers"][1]["aim"],
+			and board._shot_traces[3]["aim"] == accepted["extra_archers"][1]["aim"]
+			and board._projectile_origin(board._shot_traces[3]).is_equal_approx(origins[3]),
 			"An extra-only counter adds only its flight and never redirects a prior accepted shot")
 		board._process(PathBoard.SHOT_DURATION)
+		board._corpse_speed = 3.0
+		board._process(0.1)
+		board._corpse_speed = 1.0
+		var drawn_pose: Image = await _board_image(board, viewport)
+		var archer_region := Rect2i(Vector2(board._archer_geometry(changed, 0, 1.0)["pivot"]) - Vector2(22, 24), Vector2(44, 44))
+		_check(int(_changed_geometry(release_pose, drawn_pose, archer_region)["pixels"]) > 8
+			and board._archer_draw_amount(changed, 0) > 0.0,
+			"Release recovers into visibly tensioned nocked bows at accepted 3x speed")
 		board.combat_towers = []
+		_check(board._archer_poses.is_empty() and board._seen_shots.is_empty(),
+			"Leaving/resetting combat removes every per-archer pose and counter")
 		tower = _tower(191, Vector2i(2, 3), "arrow_tower")
 		tower["special_upgraded"] = true
+		tower["aim"] = Vector2(0, 0)
 		tower["secondary_shot"] = 0
 		tower["secondary_aim"] = Vector2(4, 0)
 		board.combat_towers = [tower]
@@ -724,6 +764,7 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		_check(is_equal_approx(board._flame_elapsed, phase + 0.1), "Held fire uses the board's accepted visual speed")
 		board._corpse_speed = 1.0
 		fire_idle = await _board_image(board, viewport)
+		var fire_tips: Array[Vector2] = [board._tower_muzzle(tower, 0), board._tower_muzzle(tower, 1)]
 		tower = tower.duplicate(true)
 		tower["shot"] = 1
 		tower["aim"] = Vector2(0, 0)
@@ -731,12 +772,15 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		accepted = tower.duplicate(true)
 		board.combat_towers = [tower]
 		board.set_process(false)
+		for trace: Dictionary in board._shot_traces:
+			_check(board._projectile_origin(trace).is_equal_approx(fire_tips[int(trace["archer_index"])]),
+				"Released flames start on the exact previously held fire arrow tip")
 		board._process(PathBoard.SHOT_DURATION * 0.5)
 		var fire_flight: Image = await _board_image(board, viewport)
 		for trace: Dictionary in board._shot_traces:
 			var position: Vector2 = board._projectile_position(trace)
 			var direction: Vector2 = (board._projectile_destination(trace) - board._projectile_origin(trace)).normalized()
-			var tail: Vector2 = position - direction * board._cell_size() * art.projectile_length * 0.5
+			var tail: Vector2 = position - direction * board._cell_size() * art.projectile_length
 			var trail := Rect2i(Vector2i(tail - direction * 8.0) - Vector2i(6, 6), Vector2i(13, 13))
 			_check(int(_changed_geometry(fire_idle, fire_flight, trail)["pixels"]) > 2
 				and _warm_pixels(fire_flight, Rect2i(Vector2i(position) - Vector2i(16, 16), Vector2i(33, 33))) > 4,
@@ -745,6 +789,7 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		board.combat_towers = []
 		tower = _tower(192, Vector2i(2, 3), "arrow_tower")
 		tower["special_upgraded"] = true
+		tower["aim"] = Vector2(0, 0)
 		tower["advancement"] = "blast"
 		tower["secondary_shot"] = 0
 		tower["secondary_aim"] = Vector2(4, 0)
@@ -753,6 +798,7 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		for index: int in range(2):
 			_check(_pixels_changed_near(plain, bomb_idle, board._tower_muzzle(tower, index)),
 				"Both held bomb arrows carry dark physical heads rather than recolored shafts")
+		var bomb_tips: Array[Vector2] = [board._tower_muzzle(tower, 0), board._tower_muzzle(tower, 1)]
 		tower = tower.duplicate(true)
 		tower["shot"] = 1
 		tower["aim"] = Vector2(0, 0)
@@ -760,12 +806,14 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		accepted = tower.duplicate(true)
 		board.combat_towers = [tower]
 		board.set_process(false)
+		for trace: Dictionary in board._shot_traces:
+			_check(board._projectile_origin(trace).is_equal_approx(bomb_tips[int(trace["archer_index"])]),
+				"Released bombheads start on the exact previously held bomb arrow tip")
 		board._process(PathBoard.SHOT_DURATION * 0.5)
 		var bomb_flight: Image = await _board_image(board, viewport)
 		for trace: Dictionary in board._shot_traces:
 			var position: Vector2 = board._projectile_position(trace)
-			var direction: Vector2 = (board._projectile_destination(trace) - board._projectile_origin(trace)).normalized()
-			var head: Vector2 = position + direction * board._cell_size() * art.projectile_length * 0.5
+			var head: Vector2 = position
 			_check(_dark_pixels(bomb_flight, Rect2i(Vector2i(head) - Vector2i(3, 3), Vector2i(7, 7))) >= 6,
 				"Each moving bomb arrow has a readable broad dark bombhead")
 		board._process(PathBoard.SHOT_DURATION * 0.5 + PathBoard.BOMB_IMPACT_DURATION * 0.25)
@@ -779,7 +827,10 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		_check(board._shot_traces.size() == 2 and tower == accepted, "Repeated bomb snapshots cannot replay impacts or affect gameplay")
 		board._process(PathBoard.BOMB_IMPACT_DURATION)
 		var expired: Image = await _board_image(board, viewport)
-		_check(board._shot_traces.is_empty() and expired.get_data() == bomb_idle.get_data(), "Bomb puffs, rings and sparks fully expire")
+		_check(board._shot_traces.is_empty(), "Bomb puffs, rings and sparks fully expire")
+		for trace: Dictionary in [{"aim": tower["aim"]}, {"aim": tower["secondary_aim"]}]:
+			var hit: Vector2 = board._position_center(trace["aim"]) + Vector2(0, board._cell_size() * 0.15)
+			_check(not _pixels_changed_near(bomb_idle, expired, hit), "No impact pixels linger after the captured bomb lifetime")
 		board.combat_towers = []
 	_check(art.icon_texture.get_image().get_data() == original_pixels, "All branches leave original tower PNG pixels unchanged")
 	await _check_burning_enemies(board, viewport)

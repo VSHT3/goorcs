@@ -30,6 +30,7 @@ var _death_heads: Array[int] = [0, 0]
 var _death_time: float = 0.0
 var _death_generation: int = 0
 var _next_death_id: int = 1
+var _sound_events := CombatSoundEvents.new()
 var _sandbox_mode: bool = false
 # Parallel to the individual FIFO: only the last member waits ordinary cooldown.
 var _send_group_ends: Array[Array] = [[], []]
@@ -120,6 +121,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"title": definition.title, "health_multiplier": definition.health_multiplier,
 			"description": definition.description,
 			"fire_immune": definition.fire_immune, "ice_immune": definition.ice_immune,
+			"death_sound": CombatSoundEvents.Cue.BONES if definition.blood_color.a == 0.0 else CombatSoundEvents.Cue.DEATH,
 			"speed_multiplier": definition.speed_multiplier,
 			"send_cost": definition.send_cost, "send_income": definition.send_income,
 			"base_damage": definition.base_damage, "spawn_weight": definition.spawn_weight,
@@ -156,6 +158,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"damage_upgrade_bonus": definition.damage_upgrade_bonus,
 			"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
 			"area_attack": definition.area_attack,
+			"attack_sound": definition.attack_sound,
 			"special_upgrade": definition.special_upgrade,
 			"special_upgrade_title": definition.special_upgrade_title,
 			"special_upgrade_cost": definition.special_upgrade_cost,
@@ -188,6 +191,7 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 	if not _sandbox_mode:
 		coins[slot] -= cost
 	_next_tower_id += 1
+	_sound_events.record(CombatSoundEvents.Cue.PURCHASE, slot, Vector2(cell), _death_time)
 	return true
 
 
@@ -256,6 +260,7 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 					tower["extra_archers"].append({"mode": tower["mode"], "shot": 0, "aim": Vector2(tower["cell"]), "target_id": -1})
 				tower["interval"] /= float(config["attack_rate_multiplier"])
 				tower["cooldown"] /= float(config["attack_rate_multiplier"])
+			_sound_events.record(CombatSoundEvents.Cue.UPGRADE, slot, Vector2(tower["cell"]), _death_time)
 			return true
 		var freeze: bool = upgrade == "freeze_runes"
 		if upgrade not in ["damage", "speed", "special"] and not evolution and not freeze:
@@ -294,6 +299,7 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 		elif upgrade == "special" and definition["special_upgrade"] == "second_archer":
 			tower["interval"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
 			tower["cooldown"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
+		_sound_events.record(CombatSoundEvents.Cue.UPGRADE, slot, Vector2(tower["cell"]), _death_time)
 		return true
 	return false
 
@@ -375,6 +381,7 @@ func send_enemy(slot: int, type_id: StringName) -> bool:
 		coins[slot] -= cost
 	income[slot] += int(definition["send_income"])
 	_add_total(slot, "sent", String(type_id), count)
+	_sound_events.record(CombatSoundEvents.Cue.SEND, slot, Vector2.ZERO, _death_time)
 	if phase == Phase.WAVE and _next_send_times[target] <= _elapsed:
 		_spawn_send(target)
 	return true
@@ -748,6 +755,7 @@ func snapshot() -> Dictionary:
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
 		"death_generation": _death_generation,
+		"sounds": _sound_events.snapshot(_death_time),
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
 		"wave_roster": wave_roster.duplicate(), "wave_weight": _wave_weight(maxi(1, wave)),
 		"spawn_times": spawn_times.duplicate(),
@@ -945,6 +953,7 @@ func _spawn_send(slot: int) -> void:
 	var type_id: String = _send_queues[slot][_send_heads[slot]]
 	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave)
 	_spawn_enemy(slot, type_id, progress, _next_send_times[slot])
+	_sound_events.record(CombatSoundEvents.Cue.PORTAL, slot, Vector2(_routes[slot][0]), _death_time)
 	_next_send_times[slot] += _active_send_spawn_interval if _send_group_ends[slot][_send_heads[slot]] else float(_enemy_types[type_id]["group_interval"])
 	_send_heads[slot] += 1
 	if _send_heads[slot] == _send_queues[slot].size():
@@ -1007,6 +1016,7 @@ func _attack(slot: int, delta: float) -> void:
 		tower["target_id"] = enemy["id"]
 		tower["aim"] = enemy["pos"]
 		tower["shot"] += 1
+		_sound_events.record(int(definition["attack_sound"]), slot, Vector2(tower["cell"]), _death_time)
 		tower["cooldown"] = tower["interval"]
 		tower["bounce_active"] = false
 		tower["pierce_active"] = false
@@ -1069,6 +1079,7 @@ func _attack_arrow(slot: int, tower: Dictionary, target_id: int, impact: Vector2
 			if primary >= 0:
 				_ignite(enemies[slot][primary], tower, config)
 	if config.has("splash_radius"):
+		_sound_events.record(CombatSoundEvents.Cue.EXPLOSION, slot, impact, _death_time)
 		var radius_squared: float = float(config["splash_radius"]) * float(config["splash_radius"])
 		var damage: int = ceili(float(tower["damage"]) * float(config["splash_multiplier"]))
 		for index: int in range(enemies[slot].size() - 1, -1, -1):
@@ -1198,6 +1209,7 @@ func _attack_pulses(slot: int, tower: Dictionary, range_cells: float, delta: flo
 			_hit(slot, tower, index)
 		if hit_any:
 			tower["shot"] += 1
+			_sound_events.record(CombatSoundEvents.Cue.RUNE, slot, Vector2(tower["cell"]), _death_time)
 
 
 func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta: float) -> void:
@@ -1278,6 +1290,7 @@ func _death_snapshot(slot: int) -> Array[Dictionary]:
 
 
 func _reset_death_events() -> void:
+	_sound_events.reset()
 	if _death_heads[0] < _death_events[0].size() or _death_heads[1] < _death_events[1].size():
 		_death_generation += 1
 	_death_heads = [0, 0]
@@ -1308,6 +1321,7 @@ func _record_death(slot: int, enemy: Dictionary) -> void:
 		"pos": enemy["pos"], "faces_left": faces_left, "time": _death_time,
 	})
 	_next_death_id += 1
+	_sound_events.record(int(_enemy_types[enemy["type_id"]]["death_sound"]), slot, enemy["pos"], _death_time)
 
 
 func _retire_enemy(enemy_id: int) -> void:
@@ -1324,6 +1338,8 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> v
 	var enemy: Dictionary = enemies[slot][enemy_index]
 	var hit_damage: int = mini(int(enemy["hp"]), int(tower["damage"]) if damage < 0 else damage)
 	enemy["hp"] -= hit_damage
+	if hit_damage > 0:
+		_sound_events.record(CombatSoundEvents.Cue.HIT, slot, enemy["pos"], _death_time)
 	if not bool(enemy.get("ice_immune", false)) and _tower_types[tower["type_id"]]["evolutions"].has("boulders"):
 		var tower_id: int = tower["id"]
 		if not _rune_damage.has(tower_id):
@@ -1393,6 +1409,8 @@ func _apply_leaks(slot: int) -> void:
 	while index >= 0:
 		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1:
 			if not _sandbox_mode:
+				if base_health[slot] > 0:
+					_sound_events.record(CombatSoundEvents.Cue.CRYSTAL, slot, Vector2(enemies[slot][index]["route"].back()), _death_time)
 				base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
 			_retire_enemy(enemies[slot][index]["id"])
 			enemies[slot].remove_at(index)

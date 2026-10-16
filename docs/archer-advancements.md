@@ -24,6 +24,11 @@ Bombs preserve the accepted primary impact point before any victim is removed. T
 
 Fire Arrows adds animated pixel flames to both arrows held on the tower, moving flame trails, and a warm red/orange current-frame enemy palette with restrained fire motes. Bomb Arrows adds bombheads/fuses to held/moving arrows and a small accepted-impact puff/ring/spark animation. Original tower PNGs remain unchanged. All effects are local presentation and cannot apply damage; repeated snapshots cannot duplicate/restart captured flights.
 
+The runtime archer is now a layered upright pixel rig, not a repeated baked crop. Head/body directional sheets and an archer-free board texture preserve the original collection PNG. Each of the one/two/four shooters reads its own accepted aim; the tower structure never rotates. Bow joints/string and nocked arrow share geometry with the captured release tip. Fire and bombs attach to that tip in hand and flight. Directional heads use eight authored directions; bow direction remains continuous with pixel-snapped joints.
+
+An accepted shot releases immediately with a short recoil/string recovery, then nocks and progressively draws for the next volley. The first shot does not fake pre-shot anticipation, and presentation cannot delay host damage. Pose ages use simulation playback speed and explicit pause. Repeated snapshots do not restart a pose; stream removal, debug, new run and leaving retire stale presentation. Captured normalized origins remain fixed when later targets change. Native48px render tests cover stationary base, independent aiming, tip-to-flight continuity, fire/bomb attachment, mirrored placement, paused poses,3× recovery and cleanup. Actual mixed-tower gameplay was rendered at1×/3× and both board orientations; sound is independently bounded rather than squeak-pitched with speed.
+
+
 `EnemyDefinition.fire_immune` and `ice_immune` are captured by the host. SkeleOrcs enable both: physical arrows, bombs and Rune damage still work, but ignition/burn damage and Freeze slow do not. The Orcieary lists these immunities. Status rendering uses accepted instance immunity flags rather than independent client calculations; picking still uses the current opaque animation frame.
 
 ## Verification

@@ -112,6 +112,8 @@ var _hover := Vector2i(-1, -1)
 var _paint_button: MouseButton = MOUSE_BUTTON_NONE
 var _last_painted := Vector2i(-1, -1)
 var _seen_shots: Dictionary = {}
+var _archer_poses: Dictionary[Vector2i, Dictionary] = {}
+var _has_archer_motion: bool = false
 var _shot_traces: Array[Dictionary] = []
 var _has_boulders: bool = false
 var _has_idle_flames: bool = false
@@ -189,7 +191,7 @@ func _advance_endpoints() -> void:
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty()))
 
 
 func _process(delta: float) -> void:
@@ -200,6 +202,11 @@ func _process(delta: float) -> void:
 		_flame_elapsed = fposmod(_flame_elapsed + visual_delta, 12.0)
 	if _has_boulders:
 		_boulder_phase = fposmod(_boulder_phase + visual_delta * BOULDER_ORBIT_SPEED, TAU)
+	_has_archer_motion = false
+	for pose: Dictionary in _archer_poses.values():
+		var interval: float = float(pose["interval"])
+		pose["age"] = minf(float(pose["age"]) + visual_delta, interval)
+		_has_archer_motion = _has_archer_motion or float(pose["age"]) < interval
 	_enemy_blend_elapsed = minf(_enemy_blend_elapsed + delta, ENEMY_BLEND_DURATION)
 	for index: int in range(_shot_traces.size() - 1, -1, -1):
 		_shot_traces[index]["life"] -= visual_delta
@@ -255,9 +262,12 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 func _capture_shots() -> void:
 	_has_boulders = false
 	_has_idle_flames = false
+	var active_archers: Dictionary[Vector2i, bool] = {}
 	if combat_towers.is_empty():
 		_seen_shots.clear()
 		_shot_traces.clear()
+		_archer_poses.clear()
+		_has_archer_motion = false
 		_sync_combat_animation()
 		return
 	for tower: Dictionary in combat_towers:
@@ -267,12 +277,24 @@ func _capture_shots() -> void:
 		var advancement: Dictionary = _archer_advancement(tower, definition)
 		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0
 		_capture_archer(tower, definition, 0, int(tower.get("shot", 0)), tower.get("aim", Vector2(tower["cell"])), not boulders)
+		active_archers[Vector2i(int(tower["id"]), 0)] = true
 		if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer":
 			_capture_archer(tower, definition, 1, int(tower.get("secondary_shot", 0)), tower.get("secondary_aim", Vector2(tower["cell"])))
+			active_archers[Vector2i(int(tower["id"]), 1)] = true
 		var extras: Array = tower.get("extra_archers", [])
 		for index: int in range(extras.size()):
 			var archer: Dictionary = extras[index]
 			_capture_archer(tower, definition, index + 2, int(archer.get("shot", 0)), archer.get("aim", Vector2(tower["cell"])))
+			active_archers[Vector2i(int(tower["id"]), index + 2)] = true
+	for key: Vector2i in _archer_poses.keys():
+		if not active_archers.has(key):
+			_archer_poses.erase(key)
+	for key: Vector2i in _seen_shots.keys():
+		if not active_archers.has(key):
+			_seen_shots.erase(key)
+	_has_archer_motion = false
+	for pose: Dictionary in _archer_poses.values():
+		_has_archer_motion = _has_archer_motion or float(pose["age"]) < float(pose["interval"])
 
 
 func _archer_advancement(tower: Dictionary, definition: Dictionary) -> Dictionary:
@@ -281,8 +303,22 @@ func _archer_advancement(tower: Dictionary, definition: Dictionary) -> Dictionar
 
 func _capture_archer(tower: Dictionary, definition: Dictionary, archer_index: int, shot: int, aim: Vector2, visible_shot: bool = true) -> void:
 	var key := Vector2i(int(tower["id"]), archer_index)
+	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	var rigged: bool = artwork != null and artwork.archer_head_texture != null
+	var interval: float = maxf(0.22, float(tower.get("interval", definition.get("interval", 0.8))))
+	var pose: Dictionary = _archer_poses.get(key, {"age": interval, "interval": interval})
+	pose["interval"] = interval
+	if shot < int(_seen_shots.get(key, 0)):
+		# A reset counter is a new presentation generation, never a new attack.
+		pose["age"] = interval
 	if shot > int(_seen_shots.get(key, 0)) and visible_shot:
 		_capture_attack(tower, definition, archer_index, aim)
+		if rigged:
+			pose["age"] = 0.0
+	elif rigged and shot > 0 and tower.has("cooldown"):
+		pose["age"] = maxf(float(pose["age"]), interval - float(tower["cooldown"]))
+	if rigged:
+		_archer_poses[key] = pose
 	_seen_shots[key] = shot
 
 
@@ -304,12 +340,20 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 			if MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), float(definition.get("range", 0.0))):
 				hits.append(enemy["pos"])
 	# Copy accepted positions, including lethal hits whose enemies already disappeared.
+	var origin: Vector2 = _tower_muzzle(tower, archer_index)
+	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	if artwork != null and artwork.archer_head_texture != null:
+		origin = _archer_geometry(tower, archer_index, 1.0)["tip"]
+	var origin_offset: Vector2 = (origin - cell_center(tower["cell"])) / _cell_size()
+	if mirror_horizontal:
+		origin_offset.x = -origin_offset.x
 	_shot_traces.append({
 		"cell": tower["cell"],
 		"type_id": tower["type_id"],
 		"evolution": evolution,
 		"aim": aim,
 		"archer_index": archer_index,
+		"origin_offset": origin_offset,
 		"burning": float(advancement.get("burn_dps", 0.0)) > 0.0,
 		"splash_radius": splash_radius,
 		"pierce_active": pierce,
@@ -745,12 +789,13 @@ func visual_headroom() -> float:
 		var top: float = rect.position.y + bounds.position.y * rect.size.y / reward.icon_texture.get_height()
 		headroom = maxf(headroom, -top)
 		var scale: Vector2 = rect.size / reward.icon_texture.get_size()
-		for offset: Vector2 in reward.additional_archer_offsets:
-			var archer_top: float = rect.position.y + (reward.secondary_sprite_region.position.y + offset.y) * scale.y
-			headroom = maxf(headroom, -archer_top)
-		# Held flames extend above authored archer muzzles, never fallback origins.
-		if reward.secondary_sprite_region.has_area() and reward.projectile_origin.y >= 0.0:
-			headroom = maxf(headroom, -(rect.position.y + reward.projectile_origin.y * scale.y - 8.0))
+		if reward.archer_head_texture != null:
+			# Upright heads and a fully vertical bow, including held fire/bomb tips.
+			var offsets: Array[Vector2] = [Vector2.ZERO, reward.secondary_sprite_offset]
+			for offset: Vector2 in reward.additional_archer_offsets:
+				offsets.append(offset)
+			for offset: Vector2 in offsets:
+				headroom = maxf(headroom, -(rect.position.y + (reward.archer_pivot.y + offset.y - 25.0) * scale.y - 6.0))
 	for artwork: EnemyDefinition in _enemy_art.values():
 		var texture: Texture2D = EnemyVisuals.frame_texture(artwork)
 		var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, texture, _cell_size() * artwork.board_height, foot)
@@ -843,14 +888,16 @@ func _draw_combat() -> void:
 					_draw_boulders(tower, item["foot"], false)
 				if artwork != null and artwork.icon_texture != null:
 					var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, item["foot"])
-					var extras: Array = tower.get("extra_archers", [])
-					for index: int in range(extras.size()):
-						_draw_archer_overlay(artwork, rect, _archer_offset(artwork, index + 2))
-					draw_texture_rect(artwork.icon_texture, rect, false)
-					var definition: Dictionary = tower_types.get(tower["type_id"], {})
-					if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer":
-						_draw_archer_overlay(artwork, rect, artwork.secondary_sprite_offset)
-						_draw_held_arrowheads(tower, definition)
+					draw_texture_rect(artwork.board_texture if artwork.board_texture != null else artwork.icon_texture, rect, false)
+					if artwork.archer_head_texture != null:
+						# Rear shooters are drawn first; no cloned baked bows or roof cutouts.
+						var extras: Array = tower.get("extra_archers", [])
+						for index: int in range(extras.size()):
+							_draw_archer(tower, artwork, index + 2)
+						var definition: Dictionary = tower_types.get(tower["type_id"], {})
+						if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer":
+							_draw_archer(tower, artwork, 1)
+						_draw_archer(tower, artwork, 0)
 				match String(tower.get("evolution", "")):
 					"boulders":
 						_draw_boulders(tower, item["foot"], true)
@@ -1037,12 +1084,19 @@ func _draw_onyx_pulse(trace: Dictionary, remaining: float) -> void:
 
 
 func _projectile_origin(trace: Dictionary) -> Vector2:
+	if trace.has("origin_offset"):
+		var offset: Vector2 = trace["origin_offset"]
+		if mirror_horizontal:
+			offset.x = -offset.x
+		return cell_center(trace["cell"]) + offset * _cell_size()
 	return _tower_muzzle(trace, int(trace["archer_index"]))
 
 
 func _tower_muzzle(tower: Dictionary, archer_index: int) -> Vector2:
 	var cell_size: float = _cell_size()
 	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	if artwork != null and artwork.archer_head_texture != null:
+		return _archer_geometry(tower, archer_index, _archer_draw_amount(tower, archer_index))["tip"]
 	if artwork != null and artwork.icon_texture != null and artwork.projectile_origin.x >= 0.0 and artwork.projectile_origin.y >= 0.0:
 		var foot: Vector2 = cell_center(tower["cell"]) + Vector2(0, cell_size * 0.28)
 		var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
@@ -1091,8 +1145,9 @@ func _draw_projectiles() -> void:
 		var artwork: TowerReward = _tower_art.get(trace["type_id"])
 		var length: float = cell_size * (artwork.projectile_length if artwork != null else 0.18)
 		var width: float = artwork.projectile_width if artwork != null else 1.3
-		var tail: Vector2 = position - direction * length * 0.5
-		var tip: Vector2 = position + direction * length * 0.5
+		# Position is the physical arrow TIP, shared with the nocked arrow at release.
+		var tail: Vector2 = position - direction * length
+		var tip: Vector2 = position
 		draw_line(tail, tip, Color("b9a575"), width, true)
 		if float(trace["splash_radius"]) > 0.0:
 			_draw_bomb_head(tip, maxf(1.0, floorf(cell_size * 0.022)), int(elapsed * 20.0))
@@ -1120,29 +1175,110 @@ func _archer_offset(artwork: TowerReward, archer_index: int) -> Vector2:
 	return Vector2.ZERO
 
 
-func _draw_archer_overlay(artwork: TowerReward, rect: Rect2, offset: Vector2) -> void:
-	var crop: Rect2 = artwork.secondary_sprite_region
-	if not crop.has_area():
+func _archer_aim(tower: Dictionary, archer_index: int) -> Vector2:
+	if archer_index == 1:
+		return tower.get("secondary_aim", Vector2(tower["cell"]))
+	if archer_index >= 2:
+		var extras: Array = tower.get("extra_archers", [])
+		if archer_index - 2 < extras.size():
+			return extras[archer_index - 2].get("aim", Vector2(tower["cell"]))
+	return tower.get("aim", Vector2(tower["cell"]))
+
+
+func _archer_draw_amount(tower: Dictionary, archer_index: int) -> float:
+	var pose: Dictionary = _archer_poses.get(Vector2i(int(tower["id"]), archer_index), {})
+	if pose.is_empty():
+		return 1.0
+	var age: float = float(pose["age"])
+	# Host-confirmed first shots release immediately. Recovery, nocking and then
+	# string tension anticipate the NEXT accepted volley, never inventing a hit.
+	return smoothstep(0.16, maxf(0.21, float(pose["interval"]) * 0.85), age)
+
+
+func _archer_geometry(tower: Dictionary, archer_index: int, tension: float) -> Dictionary:
+	var artwork: TowerReward = _tower_art[tower["type_id"]]
+	var foot: Vector2 = cell_center(tower["cell"]) + Vector2(0, _cell_size() * 0.28)
+	var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
+	var scale: float = rect.size.y / artwork.icon_texture.get_height()
+	var local: Vector2 = artwork.archer_pivot + _archer_offset(artwork, archer_index)
+	# Mirror the whole placement, never rotate/mirror the stationary tower.
+	if mirror_horizontal:
+		local.x = artwork.icon_texture.get_width() - local.x
+	var pivot: Vector2 = (rect.position + local * scale).round()
+	var aim: Vector2 = _archer_aim(tower, archer_index)
+	var direction: Vector2 = Vector2.LEFT if mirror_horizontal else Vector2.RIGHT
+	if not aim.is_equal_approx(Vector2(tower["cell"])):
+		direction = (_position_center(aim) + Vector2(0, _cell_size() * 0.15) - pivot).normalized()
+	var side := Vector2(-direction.y, direction.x)
+	var bow: Vector2 = pivot + direction * 9.0 * scale
+	var nock: Vector2 = bow - direction * lerpf(1.0, 7.0, tension) * scale
+	var tip: Vector2 = nock + direction * _cell_size() * artwork.projectile_length
+	return {"pivot": pivot, "direction": direction, "side": side, "bow": bow,
+		"nock": nock.round(), "tip": tip.round(), "scale": scale}
+
+
+func _draw_archer(tower: Dictionary, artwork: TowerReward, archer_index: int) -> void:
+	var tension: float = _archer_draw_amount(tower, archer_index)
+	var geometry: Dictionary = _archer_geometry(tower, archer_index, tension)
+	var pivot: Vector2 = geometry["pivot"]
+	var direction: Vector2 = geometry["direction"]
+	var scale: float = geometry["scale"]
+	var pose: Dictionary = _archer_poses.get(Vector2i(int(tower["id"]), archer_index), {})
+	var age: float = float(pose.get("age", 100.0))
+	var recoil: Vector2 = -direction * scale * (2.0 * (1.0 - clampf(age / 0.12, 0.0, 1.0)))
+	var facing: int = posmod(roundi(direction.angle() / (PI / 4.0)), 8)
+	var body_facing: int = posmod(roundi(direction.angle() / (PI / 2.0)), 4)
+	var body_rect := Rect2((pivot + Vector2(-7, -3) * scale + recoil).round(), Vector2(14, 14) * scale)
+	draw_texture_rect_region(artwork.archer_body_texture, body_rect, Rect2(body_facing * 14, 0, 14, 14))
+	# Upward bows sit behind the head; downward/sideways bows pass in front.
+	if direction.y < -0.4:
+		_draw_archer_bow(tower, archer_index, geometry, age)
+	var head_rect := Rect2((pivot + Vector2(-8, -15) * scale + recoil).round(), Vector2(16, 14) * scale)
+	draw_texture_rect_region(artwork.archer_head_texture, head_rect, Rect2(facing * 16, 0, 16, 14))
+	if direction.y >= -0.4:
+		_draw_archer_bow(tower, archer_index, geometry, age)
+
+
+func _draw_archer_bow(tower: Dictionary, archer_index: int, geometry: Dictionary, age: float) -> void:
+	var pivot: Vector2 = geometry["pivot"]
+	var direction: Vector2 = geometry["direction"]
+	var side: Vector2 = geometry["side"]
+	var scale: float = geometry["scale"]
+	var bow: Vector2 = geometry["bow"]
+	var nock: Vector2 = geometry["nock"]
+	var tip: Vector2 = geometry["tip"]
+	var upper: Vector2 = (bow + (side * 8.0 - direction * 2.0) * scale).round()
+	var lower: Vector2 = (bow + (-side * 8.0 - direction * 2.0) * scale).round()
+	var belly: Vector2 = (bow + direction * 2.0 * scale).round()
+	var elbow: Vector2 = (pivot - direction * 3.0 * scale + side * 4.0 * scale).round()
+	var string_nock: Vector2 = nock if age >= 0.14 else (bow - direction * scale * (1.0 + sin(age * 110.0) * 0.6)).round()
+	var arm_width: float = maxf(1.0, roundf(scale * 2.0))
+	draw_line(pivot, bow.round(), Color("30291e"), arm_width + 2.0)
+	draw_line(pivot, bow.round(), Color("dca27a"), arm_width)
+	draw_line(pivot, elbow, Color("536e3f"), arm_width + 1.0)
+	draw_line(elbow, nock if age >= 0.14 else (pivot - direction * scale * 3.0).round(), Color("dca27a"), arm_width)
+	draw_line(upper, belly, Color("50361f"), maxf(2.0, scale * 3.0))
+	draw_line(belly, lower, Color("50361f"), maxf(2.0, scale * 3.0))
+	draw_line(upper, belly, Color("ba8b4f"), maxf(1.0, scale))
+	draw_line(belly, lower, Color("ba8b4f"), maxf(1.0, scale))
+	draw_line(upper, string_nock, Color("d3cbab"), 1.0)
+	draw_line(string_nock, lower, Color("d3cbab"), 1.0)
+	if age < 0.14:
 		return
-	var scale: Vector2 = rect.size / artwork.icon_texture.get_size()
-	var overlay := Rect2(rect.position + (crop.position + offset) * scale, crop.size * scale)
-	draw_texture_rect_region(artwork.icon_texture, overlay, crop)
-
-
-func _draw_held_arrowheads(tower: Dictionary, definition: Dictionary) -> void:
+	draw_line(nock, tip, Color("b9a575"), maxf(1.0, scale))
+	draw_line(nock, (nock + (direction * 3.0 + side * 2.0) * scale).round(), Color("d3cbab"), 1.0)
+	draw_line(nock, (nock + (direction * 3.0 - side * 2.0) * scale).round(), Color("d3cbab"), 1.0)
+	var definition: Dictionary = tower_types.get(tower["type_id"], {})
 	var advancement: Dictionary = _archer_advancement(tower, definition)
-	var burning: bool = float(advancement.get("burn_dps", 0.0)) > 0.0
-	var bomb: bool = float(advancement.get("splash_radius", 0.0)) > 0.0
-	if not burning and not bomb:
-		return
 	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
-	var phase: int = int(_flame_elapsed * 12.0) + int(tower["id"])
-	for index: int in range(2):
-		var muzzle: Vector2 = _tower_muzzle(tower, index)
-		if burning:
-			_draw_pixel_flame(muzzle, pixel, phase + index * 2)
-		else:
-			_draw_bomb_head(muzzle, pixel, phase + index)
+	var phase: int = int(_flame_elapsed * 12.0) + int(tower["id"]) + archer_index * 2
+	if float(advancement.get("splash_radius", 0.0)) > 0.0:
+		_draw_bomb_head(tip, pixel, phase)
+	else:
+		draw_line(tip, (tip - direction * scale * 3.0 + side * scale * 2.0).round(), Color("e8e3c9"), 1.0)
+		draw_line(tip, (tip - direction * scale * 3.0 - side * scale * 2.0).round(), Color("e8e3c9"), 1.0)
+	if float(advancement.get("burn_dps", 0.0)) > 0.0:
+		_draw_pixel_flame(tip, pixel, phase)
 
 
 func _draw_pixel_flame(position: Vector2, pixel: float, phase: int) -> void:

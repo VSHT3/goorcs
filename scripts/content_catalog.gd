@@ -31,8 +31,10 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Tower '%s' has invalid special upgrade or evolution metadata." % id)
 		if not TowerDefinition.valid_advancements(tower):
 			errors.append("Tower '%s' has invalid advancement metadata." % id)
+		if tower.attack_sound not in [CombatSoundEvents.Cue.BOW, CombatSoundEvents.Cue.BALLISTA, CombatSoundEvents.Cue.RUNE]:
+			errors.append("Tower '%s' has an unknown attack sound family." % id)
 		var art: TowerReward = tower.reward
-		if not is_finite(art.board_height) or art.board_height <= 0.0 or not art.board_anchor.is_finite() or not art.projectile_origin.is_finite() or not is_finite(art.projectile_length) or art.projectile_length <= 0.0 or not is_finite(art.projectile_width) or art.projectile_width <= 0.0 or not art.secondary_sprite_region.position.is_finite() or not art.secondary_sprite_region.size.is_finite() or art.secondary_sprite_region.size.x < 0.0 or art.secondary_sprite_region.size.y < 0.0 or not art.secondary_sprite_offset.is_finite():
+		if not is_finite(art.board_height) or art.board_height <= 0.0 or not art.board_anchor.is_finite() or not art.projectile_origin.is_finite() or not is_finite(art.projectile_length) or art.projectile_length <= 0.0 or not is_finite(art.projectile_width) or art.projectile_width <= 0.0 or not art.archer_pivot.is_finite() or not art.secondary_sprite_offset.is_finite():
 			errors.append("Tower '%s' has invalid presentation metadata." % id)
 		for offset: Vector2 in art.additional_archer_offsets:
 			if not offset.is_finite():

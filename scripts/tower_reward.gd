@@ -11,12 +11,16 @@ extends Resource
 @export var board_height: float = 1.45
 @export var board_anchor: Vector2 = Vector2(0.5, 0.94)
 
-# Texture-local pixels for an authored muzzle and optional second-archer overlay.
+# Board-only layers leave collection/source artwork intact. Rig coordinates share
+# the icon's texture-local space, so inherited tower variants need no ID switches.
+@export var board_texture: Texture2D
+@export var archer_head_texture: Texture2D
+@export var archer_body_texture: Texture2D
+@export var archer_pivot: Vector2 = Vector2.ZERO
 # A negative muzzle coordinate uses the ordinary centered projectile origin.
 @export var projectile_origin: Vector2 = Vector2(-1, -1)
 @export var projectile_length: float = 0.18
 @export var projectile_width: float = 1.3
-@export var secondary_sprite_region: Rect2
 @export var secondary_sprite_offset: Vector2
-# Rear archers reuse the same crop and muzzle, with these texture-local offsets.
+# Rear archers reuse the same layered rig with these texture-local offsets.
 @export var additional_archer_offsets: PackedVector2Array = PackedVector2Array()

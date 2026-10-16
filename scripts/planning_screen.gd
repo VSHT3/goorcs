@@ -26,6 +26,7 @@ var _alternate_upgrade_command: String = ""
 var advancement_buttons: Dictionary[String, Button] = {}
 var results_menu: MatchResultsMenu
 var _results_run_id: String = ""
+var sound_player: GameSoundPlayer
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -74,6 +75,9 @@ var _results_run_id: String = ""
 
 
 func _ready() -> void:
+	sound_player = GameSoundPlayer.new()
+	sound_player.world = world
+	add_child(sound_player)
 	for slot: int in range(boards.size()):
 		boards[slot].edit_requested.connect(_request_edit.bind(slot))
 		boards[slot].cell_clicked.connect(_cell_clicked.bind(slot))
@@ -163,6 +167,7 @@ func open_pause_menu() -> void:
 	world.set_input_blocked(true)
 	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
 	pause_menu.open_menu(not planning.singleplayer)
+	sound_player.set_combat_paused(planning.singleplayer)
 	_owns_tree_pause = planning.singleplayer
 	if _owns_tree_pause:
 		get_tree().paused = true
@@ -185,6 +190,7 @@ func _close_pause_menu() -> void:
 		get_tree().paused = false
 		_owns_tree_pause = false
 	pause_menu.close_menu()
+	sound_player.set_combat_paused(false)
 	$HUD.process_mode = Node.PROCESS_MODE_INHERIT
 	world.set_input_blocked(false)
 
@@ -199,6 +205,7 @@ func _visibility_changed() -> void:
 	if not is_node_ready():
 		return
 	if not is_visible_in_tree():
+		sound_player.deactivate()
 		debug_popup.hide()
 		_close_results()
 		_close_pause_menu()
@@ -952,6 +959,7 @@ func _refresh() -> void:
 	if not planning.active:
 		cancel_strokes()
 	world.set_active(planning.active and is_visible_in_tree())
+	sound_player.observe(state, own_slot, planning.active and is_visible_in_tree(), _owns_tree_pause)
 	if not finished or not planning.active:
 		_results_run_id = ""
 		_close_results()
@@ -1006,6 +1014,8 @@ func handle_results_escape() -> void:
 
 
 func _show_feedback(message: String) -> void:
+	if is_visible_in_tree():
+		sound_player.reject()
 	_pending_tower_cell = Vector2i(-1, -1)
 	_feedback.text = message
 	_feedback.show()

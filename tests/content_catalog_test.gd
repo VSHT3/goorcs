@@ -119,13 +119,14 @@ func _run() -> void:
 		if board._shot_traces.size() == 2:
 			var primary: Dictionary = board._shot_traces[0]
 			var secondary: Dictionary = board._shot_traces[1]
-			var artwork: TowerReward = catalog.towers[0].reward
-			var foot: Vector2 = board.cell_center(primary["cell"]) + Vector2(0, board._cell_size() * 0.28)
-			var rect: Rect2 = board._sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
-			var expected: Vector2 = rect.position + artwork.projectile_origin * rect.size / artwork.icon_texture.get_size()
-			_check(board._projectile_origin(primary).is_equal_approx(expected), "Unknown tower muzzle uses authored texture-local coordinates")
-			var offset: Vector2 = artwork.secondary_sprite_offset * rect.size / artwork.icon_texture.get_size()
-			_check((board._projectile_origin(secondary) - board._projectile_origin(primary)).is_equal_approx(offset), "Unknown secondary projectile uses the authored overlay offset")
+			var first_tip: Vector2 = board._projectile_origin(primary)
+			var second_tip: Vector2 = board._projectile_origin(secondary)
+			_check(not first_tip.is_equal_approx(second_tip), "Custom two-archer content captures distinct physical projectile tips")
+			_check(board._projectile_position(primary).is_equal_approx(first_tip), "A new projectile begins exactly at its captured held-arrow tip")
+			var captured_tip: Vector2 = first_tip
+			planning._host_combat.towers[0][0]["aim"] = Vector2(12, 0)
+			planning._publish_snapshot()
+			_check(board._projectile_origin(primary).is_equal_approx(captured_tip), "Later accepted aim cannot drag a custom variant's in-flight source")
 		var captured: Dictionary = accepted["enemy_types"].duplicate(true)
 		catalog.enemies[0].send_cost = 1
 		_check(planning._host_combat.snapshot()["enemy_types"] == captured, "Editing source definitions cannot rewrite admitted host stats")
@@ -138,4 +139,4 @@ func _run() -> void:
 	DirAccess.remove_absolute(directory)
 	if failures == 0:
 		print("PASS: typed catalog validation and custom IDs across collection, actual UI, host commands, waves, snapshots, board artwork, and projectiles")
-	quit(1 if failures else 0)
+	quit.call_deferred(1 if failures else 0)

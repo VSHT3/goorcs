@@ -51,6 +51,7 @@ var _advancement_row: HBoxContainer
 var _inspector: EnemyInspector
 var _pending_dimensions := Vector2i.ZERO
 var _active: bool = false
+var sound_player: GameSoundPlayer
 
 @onready var world: SandboxWorld = $World
 @onready var board: PathBoard = world.boards[0]
@@ -78,6 +79,9 @@ func _ready() -> void:
 			style.content_margin_bottom = 3
 	if controller == null:
 		configure(preload("res://resources/content_catalog.tres"), CombatRules.new())
+	sound_player = GameSoundPlayer.new()
+	sound_player.world = world
+	add_child(sound_player)
 	_build_interface()
 	board.content_catalog = catalog
 	board.edit_requested.connect(_edit)
@@ -104,6 +108,7 @@ func cell_screen_position(cell: Vector2i) -> Vector2:
 
 
 func prepare_to_leave() -> void:
+	sound_player.deactivate()
 	_active = false
 	controller.set_active(false)
 	world.set_active(false)
@@ -492,6 +497,7 @@ func _refresh() -> void:
 	board.combat_towers = state["towers"][0]
 	board.combat_enemies = state["enemies"][0]
 	board.apply_deaths(state, 0, controller.speed, controller.paused and running)
+	sound_player.observe(state, 0, _active and is_visible_in_tree(), controller.paused and running)
 	board.queue_redraw()
 	for type_id: StringName in shop_buttons:
 		shop_buttons[type_id].set_pressed_no_signal(type_id == placement_id)
@@ -581,6 +587,8 @@ func _upgrade(command: String) -> void:
 
 
 func _show_notice(message: String) -> void:
+	if is_visible_in_tree():
+		sound_player.reject()
 	_notice.text = message
 	_notice_timer.start()
 

@@ -16,6 +16,8 @@ const FREEZE_DURATION: float = 2.0
 @export var damage_upgrade_bonus: int = 1
 @export var speed_upgrade_multiplier: float = 0.8
 @export var area_attack: bool = false
+# Presentation family, not a targeting or damage rule.
+@export_enum("Bow", "Ballista", "Rune") var attack_sound: int = CombatSoundEvents.Cue.BOW
 @export var special_upgrade: String = ""
 @export var special_upgrade_title: String = ""
 @export var special_upgrade_cost: int = 0
