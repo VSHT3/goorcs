@@ -279,7 +279,7 @@ Verification passed atomic debug bounds/authority, same-round money preservation
 
 #### Third tower upgrades
 
-`upgrade_tower(..., "special")` now applies only to Arrow after both stat flags; success raises III → IV. Arrow divides interval and remaining reload by 1.1, and fires a full-damage second arrow at a distinct in-range enemy using `secondary_mode`. The second selector appears only after purchase and uses the same authenticated ownership/Ready gate; Singleplayer mirrors it by cell. A sole enemy never receives both arrows.
+`upgrade_tower(..., "special")` applies only to Arrow after both stat flags; success raises III → IV. Arrow divides interval and remaining reload by1.1 and fires a full-damage second arrow using `secondary_mode`, preferring a distinct in-range enemy but sharing the primary when no unused target remains. Four Archers extends the same distinct-first/shared-fallback rule to four independently targeted streams. The second selector appears only after purchase and uses authenticated ownership/Ready gates; Singleplayer mirrors it by cell. See [current targeting rules](archer-advancements.md#targeting-and-damage).
 
 Ballista instead requires explicit `"pierce"` or `"bounce"` commands after both stat upgrades. Both configurations live in `TowerDefinition.evolutions` with their title and fixed 300-Coin price; `tower.evolution` records the exclusive branch and level IV. Choosing either preserves upgraded damage, interval, and remaining reload. Generic Ballista `"special"` commands are rejected, and no old bounce alias remains. Both buttons reflect captured host prices, funds, committed Ready, and Purchased/Locked state through the same rules as Rune choices.
 

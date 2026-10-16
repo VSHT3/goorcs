@@ -1110,13 +1110,13 @@ func _test_second_archer_targets_and_cadence() -> void:
 	combat.upgrade_tower(0, tower["id"], "special")
 	combat.start_wave(_routes())
 	combat.advance(0.01)
-	_check(combat.enemies[0][0]["hp"] == 97 and tower["shot"] == 1 and tower["secondary_shot"] == 0 and tower["secondary_target_id"] == -1, "A sole living enemy never receives a second arrow")
+	_check(combat.enemies[0][0]["hp"] == 94 and tower["shot"] == 1 and tower["secondary_shot"] == 1 and tower["secondary_target_id"] == tower["target_id"], "Both archers fire at the sole eligible enemy")
 	combat = _prepared_special(_special_rules(&"arrow_tower", 3, 1), &"arrow_tower")
 	tower = combat.towers[0][0]
 	combat.upgrade_tower(0, tower["id"], "special")
 	combat.start_wave(_routes())
 	combat.advance(0.01)
-	_check(combat.enemies[0].is_empty() and tower["secondary_shot"] == 0, "Killing the only enemy does not manufacture a second arrow event")
+	_check(combat.enemies[0].is_empty() and tower["secondary_shot"] == 1 and tower["kills"] == 1, "A shared-target lethal volley still releases both arrows but pays one kill")
 	combat = _prepared_special(_special_rules(&"arrow_tower", 100, 3), &"arrow_tower")
 	tower = combat.towers[0][0]
 	combat.upgrade_tower(0, tower["id"], "special")
@@ -1138,7 +1138,7 @@ func _test_second_archer_targets_and_cadence() -> void:
 	combat.enemies[0][1]["progress"] = 5.0
 	combat.enemies[0][2]["progress"] = 6.0
 	combat.advance(float(tower["interval"]))
-	_check(combat.enemies[0][0]["hp"] == 94 and combat.enemies[0][1]["hp"] == 87 and combat.enemies[0][2]["hp"] == 1000 and tower["secondary_shot"] == secondary_shots and tower["secondary_target_id"] == -1, "Out-of-range enemies cannot supply a second target or create a phantom secondary event")
+	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 87 and combat.enemies[0][2]["hp"] == 1000 and tower["secondary_shot"] == secondary_shots + 1 and tower["secondary_target_id"] == tower["target_id"], "With only one in-range enemy both archers share it and ignore out-of-range alternatives")
 
 
 func _test_ballista_bounce() -> void:

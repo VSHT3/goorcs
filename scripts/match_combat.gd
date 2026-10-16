@@ -1045,6 +1045,8 @@ func _attack(slot: int, delta: float) -> void:
 # archer's victim, but its accepted aim and projectile still belong to this volley.
 func _attack_archers(slot: int, tower: Dictionary, definition: Dictionary) -> void:
 	var secondary: int = _target(slot, tower, definition["range"], tower["secondary_mode"], tower["target_id"])
+	if secondary < 0:
+		secondary = _target(slot, tower, definition["range"], tower["secondary_mode"])
 	if secondary >= 0:
 		tower["secondary_target_id"] = enemies[slot][secondary]["id"]
 		tower["secondary_aim"] = enemies[slot][secondary]["pos"]
@@ -1054,6 +1056,8 @@ func _attack_archers(slot: int, tower: Dictionary, definition: Dictionary) -> vo
 		var archer: Dictionary = tower["extra_archers"][index]
 		archer["target_id"] = -1
 		var selected: int = _target(slot, tower, definition["range"], archer["mode"], tower["target_id"], tower["secondary_target_id"], third_id)
+		if selected < 0:
+			selected = _target(slot, tower, definition["range"], archer["mode"])
 		if selected >= 0:
 			archer["target_id"] = enemies[slot][selected]["id"]
 			archer["aim"] = enemies[slot][selected]["pos"]

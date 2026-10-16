@@ -76,21 +76,31 @@ func _four_targets() -> void:
 	tower["cooldown"] = 0.0
 	var hp: int = model.enemies[0][0]["hp"]
 	model._attack(0,0.01)
-	check(model.enemies[0][0]["hp"]==hp-3,"Fewer enemies do not receive duplicated four-archer hits")
+	check(model.enemies[0][0]["hp"]==hp-12,"All four archers fire full-damage arrows at a sole eligible enemy")
 	check(tower["extra_archers"][0]["mode"]==MatchCombat.TargetMode.STRONGEST and tower["extra_archers"][1]["mode"]==MatchCombat.TargetMode.CLOSEST,"Extra independent targeting modes survive volley")
+	for count: int in [2,3]:
+		model=prepared("four_archers")
+		tower=model.towers[0][0]
+		for index: int in range(count): spawn(model,&"grunt",Vector2(index*0.2,4))
+		model._attack(0,0.01)
+		var total_hp: int=0
+		var victims: Dictionary={}
+		for enemy: Dictionary in model.enemies[0]: total_hp+=int(enemy["hp"])
+		for target: int in [tower["target_id"],tower["secondary_target_id"],tower["extra_archers"][0]["target_id"],tower["extra_archers"][1]["target_id"]]: victims[target]=true
+		check(total_hp==count*100-12 and victims.size()==count and not victims.has(-1),"Two/three-enemy volleys cover distinct enemies first, then reuse targets without idle archers")
 func _fire() -> void:
 	var model: MatchCombat = prepared("fire_arrows")
 	var tower: Dictionary = model.towers[0][0]
 	var enemy: Dictionary = spawn(model,&"grunt",Vector2(0,4))
 	tower["cooldown"] = 0.0
 	model._attack(0,0.01)
-	check(enemy["hp"]==97 and enemy["burning"],"Ignition keeps current physical damage and grants no instant burn tick")
+	check(enemy["hp"]==94 and enemy["burning"],"Both physical arrows hit while ignition grants no instant burn tick")
 	tower["cooldown"] = 100.0
 	model.advance(0.25)
-	check(enemy["hp"]==96,"Burn integrates exactly four damage per simulation second")
+	check(enemy["hp"]==93,"Burn integrates exactly four damage per simulation second")
 	model._ignite(enemy,tower,model.snapshot()["tower_types"]["arrow_tower"]["advancements"]["fire_arrows"])
 	model.advance(0.25)
-	check(enemy["hp"]==95,"Repeated ignition refreshes rather than stacks damage")
+	check(enemy["hp"]==92,"Repeated ignition refreshes rather than stacks damage")
 	model.sell_tower(0,tower["id"])
 	model._spawn_enemy(1,"grunt",0.0,model._elapsed)
 	enemy["hp"] = 1
@@ -111,9 +121,9 @@ func _immunity() -> void:
 	var skeleton: Dictionary = spawn(model,&"skeleorc",Vector2(0,4))
 	tower["cooldown"] = 0.0
 	model._attack(0,0.01)
-	check(skeleton["hp"]==47 and not skeleton["burning"],"Fire-immune skeleton takes physical arrow damage but never ignites")
+	check(skeleton["hp"]==44 and not skeleton["burning"],"Fire-immune skeleton takes both physical arrows but never ignites")
 	model.build(0,Vector2i(1,3),&"rune_obelisk",0)
 	var rune: Dictionary = model.towers[0][1]
 	for command: String in ["damage","speed","boulders","freeze_runes"]: model.upgrade_tower(0,rune["id"],command)
 	model._hit(0,rune,0,20)
-	check(skeleton["hp"]==27 and not skeleton["slowed"] and skeleton["slow_remaining"]==0.0,"Ice immunity preserves physical Rune damage but rejects threshold-qualified Freeze")
+	check(skeleton["hp"]==24 and not skeleton["slowed"] and skeleton["slow_remaining"]==0.0,"Ice immunity preserves physical Rune damage but rejects threshold-qualified Freeze")

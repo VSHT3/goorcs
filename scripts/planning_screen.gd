@@ -729,7 +729,7 @@ func _refresh_special_upgrade(tower: Dictionary, stats: Dictionary) -> void:
 	special_upgrade.disabled = not special_upgrade.visible or purchased or targeting_button.disabled or _own_coins() < price
 	match String(stats.get("special_upgrade", "")):
 		"second_archer":
-			special_upgrade.tooltip_text = "Adds a second archer with independent targeting and 10% more attacks per second. Archers choose different enemies."
+			special_upgrade.tooltip_text = "Adds a second archer with independent targeting and 10% more attacks per second. Prefers a different enemy; shares a target when no unused enemy is in range."
 		_:
 			special_upgrade.tooltip_text = ""
 	special_upgrade.tooltip_text += "\nFixed price; unaffected by level pricing."
@@ -782,7 +782,7 @@ static func advancement_tooltip(command: String, definition: Dictionary) -> Stri
 	var details: String = ""
 	match command:
 		"four_archers":
-			details = "%d archers with independent targeting; each chooses a different enemy. Attack rate ×%s." % [int(definition.get("archer_count", 0)), String.num(float(definition.get("attack_rate_multiplier", 1.0)), 2)]
+			details = "%d archers with independent targeting; prefer distinct enemies, then share targets if needed. Attack rate ×%s." % [int(definition.get("archer_count", 0)), String.num(float(definition.get("attack_rate_multiplier", 1.0)), 2)]
 		"fire_arrows":
 			details = "Physical arrows ignite enemies for %s damage/s over %ss. Burn refreshes without stacking." % [String.num(float(definition.get("burn_dps", 0.0)), 2), String.num(float(definition.get("burn_duration", 0.0)), 2)]
 		"bomb_arrows":
