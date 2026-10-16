@@ -61,6 +61,11 @@ The enemy/Orcieary/Sandbox expansion passed all 41 checks (36 suites plus five g
 
 Subsequent passes verified enemy art/confirmed deaths (**43 checks**), archer advancements/immunities (**45 checks**), and results/solo three-speed playback (**47 checks**). Graphical smoke proof included both real peer result surfaces, solo keyboard replay, and the >>> indicator; a focused modal test additionally covered a selector open when defeat occurs. See [archer advancements](archer-advancements.md) and [results/playback](match-results.md) for exact exercised behavior and limits.
 
+The publication integration pass completed **49/49 checks**, including the later diminishing-speed model/real-peer suites, clean imports, actual save isolation, both startup modes, and all rendered regressions. The inspection lifecycle test now renders newly opened result/pause modals before reading their button coordinates and injecting clicks; the native Quit, match teardown, and selection-reset assertions remain intact, without retries or diagnostic exemptions. The triple-speed icon's import metadata is tracked alongside its source.
+
+A separate isolated graphical main-scene walkthrough bought Four Archers, Fire Arrows, and Bomb Arrows through Sandbox controls; spawned all seven enemy types; observed real attacks/kills; and exercised Orcieary, the solo 3× clock, actual defeat, View battlefield, reopened results, Enter-to-replay, and native Quit afterward. Main-menu, Sandbox management, HUD, guide, and results captures were inspected at supported 1000×720/1280×720 widths. Sandbox advancement buttons use the shorter accepted-state label **Owned** so the narrow three-choice row never splits “Purchased” mid-word; purchase/exclusivity rules are unchanged. Temporary project/saves/diagnostic scripts were removed and local proof retained under ignored `.verify-logs/`. This establishes the exercised desktop integration, not competitive balance or separate-network internet play.
+
+
 ## Repository editing rules
 
 Read [AGENTS.md](../AGENTS.md) before editing. It owns implementation conventions, future state-ownership constraints, scope boundaries, and completion requirements. This document owns the engine release and executable commands; update them here rather than maintaining duplicate copies.
