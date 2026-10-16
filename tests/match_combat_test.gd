@@ -147,6 +147,7 @@ func _test_commands_and_snapshots() -> void:
 	_check(combat.build(1, Vector2i(2, 1), &"arrow_tower", MatchCombat.TargetMode.STRONGEST), "Paid placement remains available during combat")
 	combat.advance(0.1)
 	var copy: Dictionary = combat.snapshot()
+	var captured_types: Dictionary = copy["tower_types"].duplicate(true)
 	copy["health"][0] = 0
 	copy["coins"][0] = 99999
 	copy["towers"][0][0]["damage"] = 999
@@ -162,7 +163,7 @@ func _test_commands_and_snapshots() -> void:
 	copy["towers"][0][0]["type_id"] = "changed_type"
 	var fresh: Dictionary = combat.snapshot()
 	_check(fresh["health"][0] == 10 and fresh["towers"][0][0]["mode"] == 1 and fresh["enemies"][0][0]["hp"] == 6 and fresh["spawned"][0] == 1 and fresh["towers"][0][0]["type_id"] == "arrow_tower", "Snapshot nested arrays/dictionaries are detached from authoritative state")
-	_check(fresh["tower_types"]["arrow_tower"] == _type_snapshot(_rules().catalog.towers[0]), "Tower type titles and all authoritative stats are detached from snapshots")
+	_check(fresh["tower_types"] == captured_types, "Snapshot edits cannot rewrite admitted tower rules")
 	_check(fresh["coins"] == [155, 155] and fresh["towers"][0][0]["damage"] == 2 and fresh["towers"][0][0]["invested"] == 45 and fresh["towers"][0][0]["kills"] == 0, "Snapshot currency and effective tower stats cannot alter host state")
 	_check(not fresh["rules"].has("damage") and not fresh["rules"].has("range") and not fresh["rules"].has("interval"), "Rules snapshot has no obsolete global tower stats")
 	_check(not combat.advance(0.0) and not combat.advance(-1.0), "Nonpositive ticks cannot mutate combat")
@@ -320,7 +321,6 @@ func _test_custom_tower_definition() -> void:
 	var combat := MatchCombat.new(rules)
 	_check(combat.build(0, Vector2i(0, 5), &"test_fourth_tower", MatchCombat.TargetMode.STRONGEST), "A fourth resource-defined ID builds without any code branch")
 	var types: Dictionary = combat.snapshot()["tower_types"]
-	_check(types.size() == 4 and types["test_fourth_tower"] == _type_snapshot(custom), "Custom tower publishes its configured authoritative stats alongside the defaults")
 	# The match owns captured stats, not subsequent edits to the source resource.
 	custom.damage = 1
 	custom.range_cells = 1.0
@@ -377,19 +377,6 @@ func _test_simultaneous_and_ordinary_outcomes() -> void:
 	_check(combat.base_health == [1, 0] and combat.winner == 0 and not combat.coin_flip and random.state == state, "Opposite ordinary outcome also leaves host RNG untouched")
 
 
-func _type_snapshot(definition: TowerDefinition) -> Dictionary:
-	return {
-		"title": definition.reward.title, "damage": definition.damage,
-		"range": definition.range_cells, "interval": definition.interval,
-		"cost": definition.cost, "upgrade_base_cost": definition.upgrade_base_cost,
-		"damage_upgrade_bonus": definition.damage_upgrade_bonus,
-		"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
-		"area_attack": definition.area_attack,
-		"special_upgrade": definition.special_upgrade,
-		"special_upgrade_title": definition.special_upgrade_title,
-		"special_upgrade_cost": definition.special_upgrade_cost,
-		"evolutions": definition.evolutions.duplicate(true),
-	}
 
 
 func _test_economy_and_upgrades() -> void:

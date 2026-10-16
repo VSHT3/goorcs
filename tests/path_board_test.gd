@@ -70,6 +70,7 @@ func _run() -> void:
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_rune_evolutions(board, viewport)
 	await _check_special_attacks(board, viewport)
+	await _check_archer_advancements(board, viewport)
 	await _check_pierce_attacks(board, viewport)
 	await _check_typed_enemies(board, viewport)
 	await _check_slowed_enemies(board, viewport)
@@ -548,7 +549,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 			var destination: Vector2 = board._position_center(trace["aim"]) + Vector2(0, board._cell_size() * 0.15)
 			var midpoint: Vector2 = board._projectile_origin(trace).lerp(destination, 0.5)
 			_check(_pixels_changed_near(baseline, flight, midpoint),
-				"Both independently aimed arrow streams remain visible, mirrored=%s secondary=%s" % [mirrored, trace["secondary"]])
+				"Both independently aimed arrow streams remain visible, mirrored=%s archer=%s" % [mirrored, trace["archer_index"]])
 		board.combat_towers = [tower.duplicate(true)]
 		board.set_process(false)
 		_check(board._shot_traces.size() == 2, "Repeated snapshots do not duplicate either arrow stream")
@@ -556,7 +557,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		tower["secondary_shot"] = 2
 		board.combat_towers = [tower]
 		board.set_process(false)
-		_check(board._shot_traces.size() == 3 and bool(board._shot_traces[2]["secondary"]),
+		_check(board._shot_traces.size() == 3 and int(board._shot_traces[2]["archer_index"]) == 1,
 			"A secondary-only counter advance cannot overwrite or replay the primary stream")
 		board._process(PathBoard.SHOT_DURATION)
 		_check(board._shot_traces.is_empty(), "Both arrow streams expire without waiting for another snapshot")
@@ -615,6 +616,263 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		board.set_process(false)
 		_check(board._shot_traces.size() == 1, "A fresh combat can reuse a tower ID and shot number without losing its projectile")
 		board.combat_towers = []
+
+
+func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void:
+	var old_size: Vector2 = board.size
+	board.size = Vector2(240, 240) # Actual 48-pixel game cells, not a magnified preview.
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	board.combat_enemies = []
+	board.selected_tower_id = -1
+	board.tower_types = {"arrow_tower": {"range": 3.0, "area_attack": false, "special_upgrade": "second_archer",
+		"advancements": {"crowd": {"archer_count": 4}, "ember": {"burn_dps": 4.0},
+			"blast": {"splash_radius": 0.85}}}}
+	var art: TowerReward = board._tower_art["arrow_tower"]
+	var original_pixels: PackedByteArray = art.icon_texture.get_image().get_data()
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_towers = []
+		var tower: Dictionary = _tower(190, Vector2i(2, 3), "arrow_tower")
+		tower["special_upgraded"] = true
+		tower["secondary_shot"] = 0
+		tower["secondary_aim"] = Vector2(1, 0)
+		board.combat_towers = [tower]
+		var two: Image = await _board_image(board, viewport)
+		tower = tower.duplicate(true)
+		tower["advancement"] = "crowd"
+		tower["extra_archers"] = [
+			{"shot": 0, "aim": Vector2(3, 0), "mode": 1, "target_id": -1},
+			{"shot": 0, "aim": Vector2(4, 0), "mode": 2, "target_id": -1}]
+		board.combat_towers = [tower]
+		var four: Image = await _board_image(board, viewport)
+		var foot: Vector2 = board.cell_center(tower["cell"]) + Vector2(0, board._cell_size() * 0.28)
+		var rect: Rect2 = board._sprite_rect(art.icon_texture, art.board_height, art.board_anchor, foot)
+		var scale: Vector2 = rect.size / art.icon_texture.get_size()
+		for offset: Vector2 in art.additional_archer_offsets:
+			var head := Rect2(rect.position + (art.secondary_sprite_region.position + offset) * scale,
+				Vector2(art.secondary_sprite_region.size.x, 12.0) * scale)
+			_check(int(_changed_geometry(two, four, Rect2i(head.grow(1.0)))["pixels"]) > 4,
+				"Each rear archer has visible native-scale head/bow pixels above the roof, mirrored=%s" % mirrored)
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		tower["aim"] = Vector2(0, 0)
+		tower["secondary_shot"] = 1
+		tower["extra_archers"][0]["shot"] = 1
+		tower["extra_archers"][1]["shot"] = 1
+		var accepted: Dictionary = tower.duplicate(true)
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 4, "Four accepted counters create four actual independent flights")
+		var origins: Array[Vector2] = []
+		for trace: Dictionary in board._shot_traces:
+			var index: int = int(trace["archer_index"])
+			var origin: Vector2 = board._projectile_origin(trace)
+			var expected: Vector2 = rect.position + (art.projectile_origin + board._archer_offset(art, index)) * scale
+			_check(origin.is_equal_approx(expected) and not origins.has(origin),
+				"Each of four arrows leaves its own authored archer muzzle")
+			origins.append(origin)
+			_check(board._seen_shots[Vector2i(190, index)] == 1, "Accepted counters are tracked per tower and archer")
+		board._process(PathBoard.SHOT_DURATION * 0.5)
+		var flights: Image = await _board_image(board, viewport)
+		for trace: Dictionary in board._shot_traces:
+			_check(_pixels_changed_near(four, flights, board._projectile_position(trace)),
+				"Every accepted archer stream has a rendered native-scale projectile")
+		board.combat_towers = [tower.duplicate(true)]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 4 and is_equal_approx(float(board._shot_traces[3]["life"]), PathBoard.SHOT_DURATION * 0.5),
+			"Repeated four-archer snapshots neither duplicate nor restart flights")
+		var changed: Dictionary = tower.duplicate(true)
+		changed["extra_archers"][1]["shot"] = 2
+		changed["extra_archers"][1]["aim"] = Vector2(4, 1)
+		board.combat_towers = [changed]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 5 and board._shot_traces[4]["archer_index"] == 3
+			and board._shot_traces[3]["aim"] == accepted["extra_archers"][1]["aim"],
+			"An extra-only counter adds only its flight and never redirects a prior accepted shot")
+		board._process(PathBoard.SHOT_DURATION)
+		board.combat_towers = []
+		tower = _tower(191, Vector2i(2, 3), "arrow_tower")
+		tower["special_upgraded"] = true
+		tower["secondary_shot"] = 0
+		tower["secondary_aim"] = Vector2(4, 0)
+		board.combat_towers = [tower]
+		var plain: Image = await _board_image(board, viewport)
+		tower = tower.duplicate(true)
+		tower["advancement"] = "ember"
+		board.combat_towers = [tower]
+		_check(board.is_processing(), "Idle held fire arrows request local animation without enemies or shots")
+		var fire_idle: Image = await _board_image(board, viewport)
+		board._process(0.1)
+		var fire_next: Image = await _board_image(board, viewport)
+		for index: int in range(2):
+			var tip: Vector2 = board._tower_muzzle(tower, index)
+			var flame_region := Rect2i(Vector2i(tip) - Vector2i(5, 8), Vector2i(11, 12))
+			_check(int(_changed_geometry(plain, fire_idle, flame_region)["pixels"]) > 3
+				and int(_changed_geometry(fire_idle, fire_next, flame_region)["pixels"]) > 0,
+				"Both held fire arrow tips visibly flicker while idle at native scale")
+		var phase: float = board._flame_elapsed
+		board.hide()
+		board._process(0.2)
+		_check(not board.is_processing() and board._flame_elapsed == phase, "Hidden idle fire animation stops without resetting")
+		board.show()
+		board._corpse_paused = true
+		board._process(0.2)
+		_check(board._flame_elapsed == phase, "Paused visual state freezes held fire")
+		board._corpse_paused = false
+		board._corpse_speed = 2.0
+		board._process(0.05)
+		_check(is_equal_approx(board._flame_elapsed, phase + 0.1), "Held fire uses the board's accepted visual speed")
+		board._corpse_speed = 1.0
+		fire_idle = await _board_image(board, viewport)
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		tower["aim"] = Vector2(0, 0)
+		tower["secondary_shot"] = 1
+		accepted = tower.duplicate(true)
+		board.combat_towers = [tower]
+		board.set_process(false)
+		board._process(PathBoard.SHOT_DURATION * 0.5)
+		var fire_flight: Image = await _board_image(board, viewport)
+		for trace: Dictionary in board._shot_traces:
+			var position: Vector2 = board._projectile_position(trace)
+			var direction: Vector2 = (board._projectile_destination(trace) - board._projectile_origin(trace)).normalized()
+			var tail: Vector2 = position - direction * board._cell_size() * art.projectile_length * 0.5
+			var trail := Rect2i(Vector2i(tail - direction * 8.0) - Vector2i(6, 6), Vector2i(13, 13))
+			_check(int(_changed_geometry(fire_idle, fire_flight, trail)["pixels"]) > 2
+				and _warm_pixels(fire_flight, Rect2i(Vector2i(position) - Vector2i(16, 16), Vector2i(33, 33))) > 4,
+				"Each moving fire arrow carries actual warm flame and trailing ember pixels")
+		_check(tower == accepted, "Idle flames and fire trails cannot mutate accepted gameplay")
+		board.combat_towers = []
+		tower = _tower(192, Vector2i(2, 3), "arrow_tower")
+		tower["special_upgraded"] = true
+		tower["advancement"] = "blast"
+		tower["secondary_shot"] = 0
+		tower["secondary_aim"] = Vector2(4, 0)
+		board.combat_towers = [tower]
+		var bomb_idle: Image = await _board_image(board, viewport)
+		for index: int in range(2):
+			_check(_pixels_changed_near(plain, bomb_idle, board._tower_muzzle(tower, index)),
+				"Both held bomb arrows carry dark physical heads rather than recolored shafts")
+		tower = tower.duplicate(true)
+		tower["shot"] = 1
+		tower["aim"] = Vector2(0, 0)
+		tower["secondary_shot"] = 1
+		accepted = tower.duplicate(true)
+		board.combat_towers = [tower]
+		board.set_process(false)
+		board._process(PathBoard.SHOT_DURATION * 0.5)
+		var bomb_flight: Image = await _board_image(board, viewport)
+		for trace: Dictionary in board._shot_traces:
+			var position: Vector2 = board._projectile_position(trace)
+			var direction: Vector2 = (board._projectile_destination(trace) - board._projectile_origin(trace)).normalized()
+			var head: Vector2 = position + direction * board._cell_size() * art.projectile_length * 0.5
+			_check(_dark_pixels(bomb_flight, Rect2i(Vector2i(head) - Vector2i(3, 3), Vector2i(7, 7))) >= 6,
+				"Each moving bomb arrow has a readable broad dark bombhead")
+		board._process(PathBoard.SHOT_DURATION * 0.5 + PathBoard.BOMB_IMPACT_DURATION * 0.25)
+		var impact: Image = await _board_image(board, viewport)
+		for trace: Dictionary in board._shot_traces:
+			var hit: Vector2 = board._projectile_destination(trace)
+			_check(_pixels_changed_near(bomb_idle, impact, hit), "Captured lethal hit positions produce visible bomb puffs without live targets")
+			_check(float(trace["splash_radius"]) == 0.85, "Impact radius comes from accepted behavior metadata")
+		board.combat_towers = [tower.duplicate(true)]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 2 and tower == accepted, "Repeated bomb snapshots cannot replay impacts or affect gameplay")
+		board._process(PathBoard.BOMB_IMPACT_DURATION)
+		var expired: Image = await _board_image(board, viewport)
+		_check(board._shot_traces.is_empty() and expired.get_data() == bomb_idle.get_data(), "Bomb puffs, rings and sparks fully expire")
+		board.combat_towers = []
+	_check(art.icon_texture.get_image().get_data() == original_pixels, "All branches leave original tower PNG pixels unchanged")
+	await _check_burning_enemies(board, viewport)
+	board.size = old_size
+
+
+func _check_burning_enemies(board: PathBoard, viewport: SubViewport) -> void:
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		for type_id: String in ["grunt", "skeleorc"]:
+			var enemy: Dictionary = _enemy(193, 0.0, Vector2(2, 2), [])
+			enemy["type_id"] = type_id
+			enemy["age"] = 0.23
+			var definition: EnemyDefinition = board._enemy_art[type_id]
+			enemy["fire_immune"] = definition.fire_immune
+			enemy["ice_immune"] = definition.ice_immune
+			board.combat_enemies = [enemy]
+			var normal: Image = await _board_image(board, viewport)
+			var frame: Texture2D = EnemyVisuals.enemy_texture(definition, enemy)
+			var source_pixels: PackedByteArray = frame.get_image().get_data()
+			enemy = enemy.duplicate(true)
+			enemy["burning"] = true
+			enemy["slowed"] = true
+			board.combat_enemies = [enemy]
+			var burn: Image = await _board_image(board, viewport)
+			var local_immunity: bool = definition.fire_immune
+			definition.fire_immune = not local_immunity
+			board.combat_enemies = [enemy.duplicate(true)]
+			var local_changed: Image = await _board_image(board, viewport)
+			definition.fire_immune = local_immunity
+			_check(local_changed.get_data() == burn.get_data(), "Accepted host immunity, not mutable local resource flags, controls burn rendering")
+			var region := Rect2i(Vector2i(board.cell_center(Vector2i(2, 2))) + Vector2i(-35, -80), Vector2i(70, 110))
+			if definition.fire_immune:
+				_check(normal.get_data() == burn.get_data(), "Immune SkeleOrc never acquires orange/blue status pixels or flames")
+				continue
+			_check(int(_changed_geometry(normal, burn, region)["pixels"]) > 20
+				and _warm_pixels(burn, region) > _warm_pixels(normal, region), "Burning current-frame bodies visibly shift warm red-orange")
+			var cached: Texture2D = board._burning_enemy_textures[frame]
+			_check(cached == EnemyVisuals.burning_texture(frame)
+				and cached.get_image().get_used_rect() == frame.get_image().get_used_rect()
+				and frame.get_image().get_data() == source_pixels, "Burn palette is cached per current frame, preserves alpha, and never mutates source art")
+			var source: Image = frame.get_image()
+			var tinted: Image = cached.get_image()
+			var warmth_gain: float = 0.0
+			var alpha_preserved: bool = true
+			for y: int in range(source.get_height()):
+				for x: int in range(source.get_width()):
+					var original: Color = source.get_pixel(x, y)
+					var orange: Color = tinted.get_pixel(x, y)
+					alpha_preserved = alpha_preserved and is_equal_approx(original.a, orange.a)
+					if original.a > 0.5:
+						warmth_gain += (orange.r - orange.b) - (original.r - original.b)
+			_check(alpha_preserved and warmth_gain > 1.0, "The actual cached current-frame palette shifts red-orange while preserving every alpha pixel")
+			enemy["slowed"] = false
+			board.combat_enemies = [enemy]
+			var burn_only: Image = await _board_image(board, viewport)
+			_check(burn_only.get_data() == burn.get_data(), "Burn palette has visual priority over Freeze without changing status state")
+			var foot: Vector2 = board.cell_center(Vector2i(2, 2)) + Vector2(0, board._cell_size() * 0.28)
+			var bounds: Rect2 = board._enemy_sprite_bounds(enemy, foot, 0.0)
+			var opaque: int = 0
+			for y: int in range(floori(bounds.position.y), ceili(bounds.end.y)):
+				for x: int in range(floori(bounds.position.x), ceili(bounds.end.x)):
+					if board._enemy_contains_point(enemy, foot, 0.0, Vector2(x, y)):
+						opaque += 1
+			enemy["burning"] = false
+			board.combat_enemies = [enemy]
+			var normal_opaque: int = 0
+			for y: int in range(floori(bounds.position.y), ceili(bounds.end.y)):
+				for x: int in range(floori(bounds.position.x), ceili(bounds.end.x)):
+					if board._enemy_contains_point(enemy, foot, 0.0, Vector2(x, y)):
+						normal_opaque += 1
+			_check(opaque == normal_opaque, "Burn tint/flames leave current-frame alpha picking unchanged")
+	board.combat_enemies = []
+
+
+func _warm_pixels(image: Image, region: Rect2i) -> int:
+	var pixels: int = 0
+	for y: int in range(region.position.y, region.end.y):
+		for x: int in range(region.position.x, region.end.x):
+			var color: Color = image.get_pixel(x, y)
+			if color.r > color.g * 1.35 and color.g > color.b * 1.25 and color.r > 0.45:
+				pixels += 1
+	return pixels
+
+
+func _dark_pixels(image: Image, region: Rect2i) -> int:
+	var pixels: int = 0
+	for y: int in range(region.position.y, region.end.y):
+		for x: int in range(region.position.x, region.end.x):
+			var color: Color = image.get_pixel(x, y)
+			if color.r < 0.15 and color.g < 0.15 and color.b < 0.16:
+				pixels += 1
+	return pixels
 
 
 func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:

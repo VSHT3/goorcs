@@ -231,6 +231,15 @@ func _select(index: int) -> void:
 	_stat_values[&"cost"].text = "%d %s" % [definition.send_cost, "Coin" if definition.send_cost == 1 else "Coins"] if definition.send_enabled else "—"
 	_stat_values[&"income"].text = "+%d / clear" % definition.send_income if definition.send_enabled else "—"
 	mechanics_label.text = _mechanics(definition)
+	var immunities := PackedStringArray()
+	if definition.fire_immune:
+		immunities.append("Fire")
+	if definition.ice_immune:
+		immunities.append("Ice")
+	if not immunities.is_empty():
+		if not mechanics_label.text.is_empty():
+			mechanics_label.text += "\n"
+		mechanics_label.text += "Immune: " + " · ".join(immunities)
 	mechanics_label.visible = not mechanics_label.text.is_empty()
 	scaling_label.text = "Wave 1 · HP ×%s · Speed ×%s\nHP and speed grow with the delivery wave." % [String.num(definition.health_multiplier, 2), String.num(definition.speed_multiplier, 2)]
 	_details_scroll.scroll_vertical = 0

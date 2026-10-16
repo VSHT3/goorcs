@@ -29,9 +29,14 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Tower '%s' requires a title, positive stats/prices, and speed multiplier between zero and one." % id)
 		if tower.special_upgrade not in ["", "second_archer"] or (not tower.special_upgrade.is_empty() and (tower.special_upgrade_title.is_empty() or tower.special_upgrade_cost <= 0)) or not TowerDefinition.valid_evolutions(tower):
 			errors.append("Tower '%s' has invalid special upgrade or evolution metadata." % id)
+		if not TowerDefinition.valid_advancements(tower):
+			errors.append("Tower '%s' has invalid advancement metadata." % id)
 		var art: TowerReward = tower.reward
 		if not is_finite(art.board_height) or art.board_height <= 0.0 or not art.board_anchor.is_finite() or not art.projectile_origin.is_finite() or not is_finite(art.projectile_length) or art.projectile_length <= 0.0 or not is_finite(art.projectile_width) or art.projectile_width <= 0.0 or not art.secondary_sprite_region.position.is_finite() or not art.secondary_sprite_region.size.is_finite() or art.secondary_sprite_region.size.x < 0.0 or art.secondary_sprite_region.size.y < 0.0 or not art.secondary_sprite_offset.is_finite():
 			errors.append("Tower '%s' has invalid presentation metadata." % id)
+		for offset: Vector2 in art.additional_archer_offsets:
+			if not offset.is_finite():
+				errors.append("Tower '%s' has invalid additional archer offsets." % id)
 	var enemy_ids: Dictionary[StringName, bool] = {}
 	for enemy: EnemyDefinition in enemies:
 		if enemy == null:

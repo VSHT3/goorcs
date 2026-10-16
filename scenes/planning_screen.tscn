@@ -388,6 +388,33 @@ custom_minimum_size = Vector2(118, 34)
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="ExtraTargetRow" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="ThirdLabel" type="Label" parent="HUD/TowerManagement/Content/ExtraTargetRow"]
+layout_mode = 2
+text = "Archer 3"
+
+[node name="ThirdTargeting" type="OptionButton" parent="HUD/TowerManagement/Content/ExtraTargetRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(118, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="FourthLabel" type="Label" parent="HUD/TowerManagement/Content/ExtraTargetRow"]
+layout_mode = 2
+text = "Archer 4"
+
+[node name="FourthTargeting" type="OptionButton" parent="HUD/TowerManagement/Content/ExtraTargetRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(118, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="Upgrades" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
 layout_mode = 2
 mouse_filter = 2
@@ -426,6 +453,36 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_fonts/font = ExtResource("3_numbers")
 theme_override_font_sizes/font_size = 16
+
+[node name="AdvancementRow" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="four_archers" type="Button" parent="HUD/TowerManagement/Content/AdvancementRow"]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 2
+
+[node name="fire_arrows" type="Button" parent="HUD/TowerManagement/Content/AdvancementRow"]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 2
+
+[node name="bomb_arrows" type="Button" parent="HUD/TowerManagement/Content/AdvancementRow"]
+custom_minimum_size = Vector2(0, 76)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 2
 
 [node name="Actions" type="HBoxContainer" parent="HUD/TowerManagement/Content"]
 layout_mode = 2

@@ -25,6 +25,7 @@ const ENEMY_BLEND_DURATION: float = 0.1
 const SHOT_DURATION: float = 0.18
 const PIERCE_SHOT_DURATION: float = SHOT_DURATION * 2.0
 const PULSE_DURATION: float = 0.14
+const BOMB_IMPACT_DURATION: float = 0.28
 const ENEMY_LATERAL_SPREAD: float = 0.10
 const ENEMY_CORNER_BLEND: float = 0.25
 const ENDPOINT_FRAME_SIZE: int = 96
@@ -88,13 +89,13 @@ var content_catalog: ContentCatalog = preload("res://resources/content_catalog.t
 		for definition: EnemyDefinition in value.enemies:
 			_enemy_art[String(definition.id)] = definition
 			_cache_texture_bounds(definition.texture)
-			_cache_slow_texture(definition.texture)
+			_cache_status_textures(definition.texture)
 			if definition.animation_frames != null:
 				for animation: StringName in definition.animation_frames.get_animation_names():
 					for frame: int in range(definition.animation_frames.get_frame_count(animation)):
 						var texture: Texture2D = definition.animation_frames.get_frame_texture(animation, frame)
 						_cache_texture_bounds(texture)
-						_cache_slow_texture(texture)
+						_cache_status_textures(texture)
 		queue_redraw()
 var placement_enabled: bool = true:
 	set(value):
@@ -113,6 +114,8 @@ var _last_painted := Vector2i(-1, -1)
 var _seen_shots: Dictionary = {}
 var _shot_traces: Array[Dictionary] = []
 var _has_boulders: bool = false
+var _has_idle_flames: bool = false
+var _flame_elapsed: float = 0.0
 var _boulder_phase: float = 0.0
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
@@ -122,6 +125,7 @@ var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
 var _slowed_enemy_textures: Dictionary[Texture2D, Texture2D] = {}
+var _burning_enemy_textures: Dictionary[Texture2D, Texture2D] = {}
 var _corpse_traces: Array[Dictionary] = []
 var _death_match_id: String = ""
 var _death_generation: int = -1
@@ -185,17 +189,20 @@ func _advance_endpoints() -> void:
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty()))
 
 
 func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
+	var visual_delta: float = 0.0 if _corpse_paused else delta * _corpse_speed
+	if _has_idle_flames:
+		_flame_elapsed = fposmod(_flame_elapsed + visual_delta, 12.0)
 	if _has_boulders:
-		_boulder_phase = fposmod(_boulder_phase + delta * BOULDER_ORBIT_SPEED, TAU)
+		_boulder_phase = fposmod(_boulder_phase + visual_delta * BOULDER_ORBIT_SPEED, TAU)
 	_enemy_blend_elapsed = minf(_enemy_blend_elapsed + delta, ENEMY_BLEND_DURATION)
 	for index: int in range(_shot_traces.size() - 1, -1, -1):
-		_shot_traces[index]["life"] -= delta
+		_shot_traces[index]["life"] -= visual_delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
 			_shot_traces.remove_at(index)
 	var expired: bool = false
@@ -247,34 +254,50 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 
 func _capture_shots() -> void:
 	_has_boulders = false
+	_has_idle_flames = false
 	if combat_towers.is_empty():
 		_seen_shots.clear()
 		_shot_traces.clear()
 		_sync_combat_animation()
 		return
 	for tower: Dictionary in combat_towers:
-		var tower_id: int = int(tower["id"])
-		var shot: int = int(tower.get("shot", 0))
-		var secondary_shot: int = int(tower.get("secondary_shot", 0))
-		var previous: Vector2i = _seen_shots.get(tower_id, Vector2i.ZERO)
 		var definition: Dictionary = tower_types.get(tower["type_id"], {})
 		var boulders: bool = tower.get("evolution", "") == "boulders"
 		_has_boulders = _has_boulders or boulders
-		if shot > previous.x and not boulders:
-			_capture_attack(tower, definition, false)
-		if secondary_shot > previous.y and bool(tower.get("special_upgraded", false)):
-			_capture_attack(tower, definition, true)
-		_seen_shots[tower_id] = Vector2i(shot, secondary_shot)
+		var advancement: Dictionary = _archer_advancement(tower, definition)
+		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0
+		_capture_archer(tower, definition, 0, int(tower.get("shot", 0)), tower.get("aim", Vector2(tower["cell"])), not boulders)
+		if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer":
+			_capture_archer(tower, definition, 1, int(tower.get("secondary_shot", 0)), tower.get("secondary_aim", Vector2(tower["cell"])))
+		var extras: Array = tower.get("extra_archers", [])
+		for index: int in range(extras.size()):
+			var archer: Dictionary = extras[index]
+			_capture_archer(tower, definition, index + 2, int(archer.get("shot", 0)), archer.get("aim", Vector2(tower["cell"])))
 
 
-func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool) -> void:
+func _archer_advancement(tower: Dictionary, definition: Dictionary) -> Dictionary:
+	return definition.get("advancements", {}).get(tower.get("advancement", ""), {})
+
+
+func _capture_archer(tower: Dictionary, definition: Dictionary, archer_index: int, shot: int, aim: Vector2, visible_shot: bool = true) -> void:
+	var key := Vector2i(int(tower["id"]), archer_index)
+	if shot > int(_seen_shots.get(key, 0)) and visible_shot:
+		_capture_attack(tower, definition, archer_index, aim)
+	_seen_shots[key] = shot
+
+
+func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: int, aim: Vector2) -> void:
 	var area_attack: bool = bool(definition.get("area_attack", false))
-	var pierce: bool = not secondary and bool(tower.get("pierce_active", false))
-	var bounce: bool = not secondary and not pierce and bool(tower.get("bounce_active", false))
+	var pierce: bool = archer_index == 0 and bool(tower.get("pierce_active", false))
+	var bounce: bool = archer_index == 0 and not pierce and bool(tower.get("bounce_active", false))
 	var evolution: String = tower.get("evolution", "")
 	var duration: float = (ONYX_PULSE_DURATION if evolution == "onyx_ring" else PULSE_DURATION) if area_attack else SHOT_DURATION * (2.0 if bounce else 1.0)
 	if pierce:
 		duration = PIERCE_SHOT_DURATION
+	var advancement: Dictionary = _archer_advancement(tower, definition)
+	var splash_radius: float = float(advancement.get("splash_radius", 0.0))
+	if splash_radius > 0.0:
+		duration += BOMB_IMPACT_DURATION
 	var hits: Array[Vector2] = []
 	if area_attack:
 		for enemy: Dictionary in combat_enemies:
@@ -285,8 +308,10 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, secondary: bool)
 		"cell": tower["cell"],
 		"type_id": tower["type_id"],
 		"evolution": evolution,
-		"aim": tower.get("secondary_aim" if secondary else "aim", Vector2(tower["cell"])),
-		"secondary": secondary,
+		"aim": aim,
+		"archer_index": archer_index,
+		"burning": float(advancement.get("burn_dps", 0.0)) > 0.0,
+		"splash_radius": splash_radius,
 		"pierce_active": pierce,
 		"pierce_aim": tower.get("pierce_aim", tower.get("aim", Vector2(tower["cell"]))),
 		"bounce_active": bounce,
@@ -693,10 +718,11 @@ func _cache_texture_bounds(texture: Texture2D) -> void:
 	_texture_bounds[texture] = Rect2(image.get_used_rect()) if image != null else Rect2(Vector2.ZERO, texture.get_size())
 
 
-func _cache_slow_texture(texture: Texture2D) -> void:
+func _cache_status_textures(texture: Texture2D) -> void:
 	if texture == null or _slowed_enemy_textures.has(texture):
 		return
 	_slowed_enemy_textures[texture] = EnemyVisuals.slowed_texture(texture)
+	_burning_enemy_textures[texture] = EnemyVisuals.burning_texture(texture)
 
 
 func _sprite_rect(texture: Texture2D, height: float, anchor: Vector2, foot: Vector2, flip: bool = false) -> Rect2:
@@ -718,6 +744,13 @@ func visual_headroom() -> float:
 		var bounds: Rect2 = _texture_bounds[reward.icon_texture]
 		var top: float = rect.position.y + bounds.position.y * rect.size.y / reward.icon_texture.get_height()
 		headroom = maxf(headroom, -top)
+		var scale: Vector2 = rect.size / reward.icon_texture.get_size()
+		for offset: Vector2 in reward.additional_archer_offsets:
+			var archer_top: float = rect.position.y + (reward.secondary_sprite_region.position.y + offset.y) * scale.y
+			headroom = maxf(headroom, -archer_top)
+		# Held flames extend above authored archer muzzles, never fallback origins.
+		if reward.secondary_sprite_region.has_area() and reward.projectile_origin.y >= 0.0:
+			headroom = maxf(headroom, -(rect.position.y + reward.projectile_origin.y * scale.y - 8.0))
 	for artwork: EnemyDefinition in _enemy_art.values():
 		var texture: Texture2D = EnemyVisuals.frame_texture(artwork)
 		var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, texture, _cell_size() * artwork.board_height, foot)
@@ -810,14 +843,14 @@ func _draw_combat() -> void:
 					_draw_boulders(tower, item["foot"], false)
 				if artwork != null and artwork.icon_texture != null:
 					var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, item["foot"])
+					var extras: Array = tower.get("extra_archers", [])
+					for index: int in range(extras.size()):
+						_draw_archer_overlay(artwork, rect, _archer_offset(artwork, index + 2))
 					draw_texture_rect(artwork.icon_texture, rect, false)
-					if bool(tower.get("special_upgraded", false)) and tower_types.get(tower["type_id"], {}).get("special_upgrade", "") == "second_archer" and artwork.secondary_sprite_region.has_area():
-						# Reuse authored texture pixels; the source texture stays untouched.
-						var art_scale: Vector2 = rect.size / artwork.icon_texture.get_size()
-						var crop: Rect2 = artwork.secondary_sprite_region
-						var second_rect := Rect2(rect.position + (crop.position + artwork.secondary_sprite_offset) * art_scale,
-							crop.size * art_scale)
-						draw_texture_rect_region(artwork.icon_texture, second_rect, crop)
+					var definition: Dictionary = tower_types.get(tower["type_id"], {})
+					if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer":
+						_draw_archer_overlay(artwork, rect, artwork.secondary_sprite_offset)
+						_draw_held_arrowheads(tower, definition)
 				match String(tower.get("evolution", "")):
 					"boulders":
 						_draw_boulders(tower, item["foot"], true)
@@ -906,8 +939,18 @@ func _draw_enemy(item: Dictionary) -> void:
 		EnemyVisuals.draw_action_effect(self, item["foot"], _cell_size() * 0.38, animation, float(enemy.get("animation_elapsed", 0.0)))
 	if flip:
 		rect.size.x = -rect.size.x
-	var texture: Texture2D = _slowed_enemy_textures.get(frame, frame) if bool(enemy.get("slowed", false)) else frame
+	var burning: bool = bool(enemy.get("burning", false)) and not bool(enemy.get("fire_immune", false))
+	var texture: Texture2D = frame
+	if burning:
+		texture = _burning_enemy_textures.get(frame, frame)
+	elif bool(enemy.get("slowed", false)) and not bool(enemy.get("ice_immune", false)):
+		texture = _slowed_enemy_textures.get(frame, frame)
 	draw_texture_rect(texture, rect, false)
+	if burning:
+		var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
+		var phase: int = int(float(enemy.get("age", 0.0)) * 10.0) + int(enemy["id"])
+		_draw_pixel_flame(item["foot"] + Vector2(-pixel * 3.0, -_cell_size() * artwork.board_height * 0.30), pixel, phase)
+		_draw_pixel_flame(item["foot"] + Vector2(pixel * 3.0, -_cell_size() * artwork.board_height * 0.48), pixel, phase + 2)
 
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
@@ -994,14 +1037,18 @@ func _draw_onyx_pulse(trace: Dictionary, remaining: float) -> void:
 
 
 func _projectile_origin(trace: Dictionary) -> Vector2:
+	return _tower_muzzle(trace, int(trace["archer_index"]))
+
+
+func _tower_muzzle(tower: Dictionary, archer_index: int) -> Vector2:
 	var cell_size: float = _cell_size()
-	var artwork: TowerReward = _tower_art.get(trace["type_id"])
+	var artwork: TowerReward = _tower_art.get(tower["type_id"])
 	if artwork != null and artwork.icon_texture != null and artwork.projectile_origin.x >= 0.0 and artwork.projectile_origin.y >= 0.0:
-		var foot: Vector2 = cell_center(trace["cell"]) + Vector2(0, cell_size * 0.28)
+		var foot: Vector2 = cell_center(tower["cell"]) + Vector2(0, cell_size * 0.28)
 		var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
-		var muzzle: Vector2 = artwork.projectile_origin + (artwork.secondary_sprite_offset if bool(trace["secondary"]) else Vector2.ZERO)
+		var muzzle: Vector2 = artwork.projectile_origin + _archer_offset(artwork, archer_index)
 		return rect.position + muzzle * rect.size / artwork.icon_texture.get_size()
-	return cell_center(trace["cell"]) + Vector2(0, -cell_size * 0.30)
+	return cell_center(tower["cell"]) + Vector2(0, -cell_size * 0.30)
 
 
 func _projectile_destination(trace: Dictionary) -> Vector2:
@@ -1030,6 +1077,9 @@ func _draw_projectiles() -> void:
 		var position: Vector2 = _projectile_position(trace)
 		var elapsed: float = float(trace["duration"]) - float(trace["life"])
 		var end: Vector2 = _projectile_destination(trace)
+		if float(trace["splash_radius"]) > 0.0 and elapsed >= SHOT_DURATION:
+			_draw_bomb_impact(end, float(trace["splash_radius"]), (elapsed - SHOT_DURATION) / BOMB_IMPACT_DURATION)
+			continue
 		var start: Vector2 = _projectile_origin(trace)
 		if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
 			start = end
@@ -1044,7 +1094,86 @@ func _draw_projectiles() -> void:
 		var tail: Vector2 = position - direction * length * 0.5
 		var tip: Vector2 = position + direction * length * 0.5
 		draw_line(tail, tip, Color("b9a575"), width, true)
-		draw_line(tip, tip - direction * length * 0.32 + side * length * 0.22, Color("e8e3c9"), width, true)
-		draw_line(tip, tip - direction * length * 0.32 - side * length * 0.22, Color("e8e3c9"), width, true)
+		if float(trace["splash_radius"]) > 0.0:
+			_draw_bomb_head(tip, maxf(1.0, floorf(cell_size * 0.022)), int(elapsed * 20.0))
+		else:
+			draw_line(tip, tip - direction * length * 0.32 + side * length * 0.22, Color("e8e3c9"), width, true)
+			draw_line(tip, tip - direction * length * 0.32 - side * length * 0.22, Color("e8e3c9"), width, true)
+		if bool(trace["burning"]):
+			var pixel: float = maxf(1.0, floorf(cell_size * 0.022))
+			var phase: int = int(elapsed * 24.0) + int(trace["archer_index"])
+			_draw_pixel_flame(tip, pixel, phase)
+			for index: int in range(3):
+				var ember: Vector2 = tail - direction * pixel * float(index * 4 + 2)
+				ember.y -= pixel * float((index + phase) % 3)
+				draw_rect(Rect2(ember.floor(), Vector2.ONE * pixel * (2.0 if index == 0 else 1.0)),
+					Color("ef7d35") if index == 0 else Color("b94a2c"))
 		draw_line(tail, tail + direction * length * 0.25 + side * length * 0.18, Color("d3cbab"), width, true)
 		draw_line(tail, tail + direction * length * 0.25 - side * length * 0.18, Color("d3cbab"), width, true)
+
+
+func _archer_offset(artwork: TowerReward, archer_index: int) -> Vector2:
+	if archer_index == 1:
+		return artwork.secondary_sprite_offset
+	if archer_index >= 2 and archer_index - 2 < artwork.additional_archer_offsets.size():
+		return artwork.additional_archer_offsets[archer_index - 2]
+	return Vector2.ZERO
+
+
+func _draw_archer_overlay(artwork: TowerReward, rect: Rect2, offset: Vector2) -> void:
+	var crop: Rect2 = artwork.secondary_sprite_region
+	if not crop.has_area():
+		return
+	var scale: Vector2 = rect.size / artwork.icon_texture.get_size()
+	var overlay := Rect2(rect.position + (crop.position + offset) * scale, crop.size * scale)
+	draw_texture_rect_region(artwork.icon_texture, overlay, crop)
+
+
+func _draw_held_arrowheads(tower: Dictionary, definition: Dictionary) -> void:
+	var advancement: Dictionary = _archer_advancement(tower, definition)
+	var burning: bool = float(advancement.get("burn_dps", 0.0)) > 0.0
+	var bomb: bool = float(advancement.get("splash_radius", 0.0)) > 0.0
+	if not burning and not bomb:
+		return
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
+	var phase: int = int(_flame_elapsed * 12.0) + int(tower["id"])
+	for index: int in range(2):
+		var muzzle: Vector2 = _tower_muzzle(tower, index)
+		if burning:
+			_draw_pixel_flame(muzzle, pixel, phase + index * 2)
+		else:
+			_draw_bomb_head(muzzle, pixel, phase + index)
+
+
+func _draw_pixel_flame(position: Vector2, pixel: float, phase: int) -> void:
+	# Deliberately tiny, hard-edged native pixels, not a glow/particle billboard.
+	var base: Vector2 = position.floor()
+	var lean: float = float(posmod(phase, 3) - 1) * pixel
+	var height: float = float(4 + posmod(phase, 2)) * pixel
+	draw_rect(Rect2(base + Vector2(-pixel * 2.0, -pixel * 2.0), Vector2(pixel * 4.0, pixel * 3.0)), Color("b94027"))
+	draw_rect(Rect2(base + Vector2(-pixel, -height), Vector2(pixel * 2.0, height + pixel)), Color("ef7d35"))
+	draw_rect(Rect2(base + Vector2(lean, -height - pixel), Vector2(pixel, pixel * 2.0)), Color("ef7d35"))
+	draw_rect(Rect2(base + Vector2(0.0, -pixel * 2.0), Vector2(pixel, pixel * 2.0)), Color("ffe3a0"))
+
+
+func _draw_bomb_head(position: Vector2, pixel: float, phase: int) -> void:
+	var base: Vector2 = position.floor()
+	draw_rect(Rect2(base + Vector2(-pixel * 2.0, -pixel * 2.0), Vector2.ONE * pixel * 4.0), Color("171b20"))
+	draw_rect(Rect2(base + Vector2(-pixel * 3.0, -pixel), Vector2(pixel * 6.0, pixel * 2.0)), Color("171b20"))
+	draw_rect(Rect2(base + Vector2(-pixel, -pixel * 2.0), Vector2(pixel * 2.0, pixel)), Color("707477"))
+	draw_line(base + Vector2(pixel, -pixel * 2.0), base + Vector2(pixel * 2.0, -pixel * 4.0), Color("c6a671"), pixel)
+	draw_rect(Rect2(base + Vector2(pixel * 2.0, -pixel * 5.0), Vector2.ONE * pixel), Color("ffe3a0") if posmod(phase, 2) else Color("ef7d35"))
+
+
+func _draw_bomb_impact(position: Vector2, splash_radius: float, phase: float) -> void:
+	var fade: float = 1.0 - clampf(phase, 0.0, 1.0)
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
+	var radius: float = splash_radius * _cell_size()
+	draw_arc(position, radius * phase, 0.0, TAU, 24, Color(0.85, 0.66, 0.40, fade * 0.45), pixel, false)
+	var puff: float = pixel * (3.0 + phase * 5.0)
+	draw_rect(Rect2((position - Vector2(puff, puff * 0.5)).floor(), Vector2(puff * 2.0, puff)), Color(0.48, 0.44, 0.37, fade))
+	draw_rect(Rect2((position - Vector2(puff * 0.5, puff)).floor(), Vector2(puff, puff * 2.0)), Color(0.62, 0.57, 0.46, fade))
+	for index: int in range(5):
+		var angle: float = float(index) * TAU / 5.0
+		var spark: Vector2 = position + Vector2(cos(angle), sin(angle)) * radius * phase * 0.55
+		draw_rect(Rect2(spark.floor(), Vector2.ONE * pixel * 2.0), Color(1.0, 0.62, 0.24, fade))

@@ -23,6 +23,7 @@ var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
 var _owns_tree_pause: bool = false
 var _special_upgrade_command: String = ""
 var _alternate_upgrade_command: String = ""
+var advancement_buttons: Dictionary[String, Button] = {}
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -53,6 +54,10 @@ var _alternate_upgrade_command: String = ""
 @onready var alternate_upgrade: Button = %AlternateUpgrade
 @onready var secondary_targeting: OptionButton = %SecondaryTargeting
 @onready var _secondary_target_row: HBoxContainer = %SecondaryTargetRow
+@onready var third_targeting: OptionButton = %ThirdTargeting
+@onready var fourth_targeting: OptionButton = %FourthTargeting
+@onready var _extra_target_row: HBoxContainer = %ExtraTargetRow
+@onready var _advancement_row: HBoxContainer = %AdvancementRow
 @onready var sell_button: Button = %SellTower
 @onready var close_button: Button = %CloseTower
 @onready var targeting_button: OptionButton = %Targeting
@@ -75,7 +80,7 @@ func _ready() -> void:
 		boards[slot].command_mode = true
 		if planning != null:
 			boards[slot].content_catalog = planning.combat_rules.catalog
-	for selector: OptionButton in [targeting_button, secondary_targeting]:
+	for selector: OptionButton in [targeting_button, secondary_targeting, third_targeting, fourth_targeting]:
 		selector.add_item("Furthest", 0)
 		selector.add_item("Closest", 1)
 		selector.add_item("Strongest", 2)
@@ -92,6 +97,14 @@ func _ready() -> void:
 	sell_button.pressed.connect(_sell)
 	targeting_button.item_selected.connect(_target_selected)
 	secondary_targeting.item_selected.connect(_secondary_target_selected)
+	third_targeting.item_selected.connect(_extra_target_selected.bind(2))
+	fourth_targeting.item_selected.connect(_extra_target_selected.bind(3))
+	for selector: OptionButton in [third_targeting, fourth_targeting]:
+		world._hud_popups.append(selector.get_popup())
+	for command: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
+		var button: Button = _advancement_row.get_node(NodePath(command)) as Button
+		advancement_buttons[command] = button
+		button.pressed.connect(_upgrade.bind(command))
 	clear_button.pressed.connect(_clear)
 	ready_button.pressed.connect(_toggle_ready)
 	send_button.pressed.connect(_send_enemy)
@@ -135,7 +148,7 @@ func open_pause_menu() -> void:
 	debug_popup.hide()
 	cancel_interaction()
 	cancel_strokes()
-	for selector: OptionButton in [targeting_button, secondary_targeting, enemy_selector]:
+	for selector: OptionButton in [targeting_button, secondary_targeting, third_targeting, fourth_targeting, enemy_selector]:
 		selector.get_popup().hide()
 	world.set_input_blocked(true)
 	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
@@ -194,7 +207,7 @@ func _open_debug() -> void:
 		return
 	cancel_interaction()
 	cancel_strokes()
-	for selector: OptionButton in [targeting_button, secondary_targeting, enemy_selector]:
+	for selector: OptionButton in [targeting_button, secondary_targeting, third_targeting, fourth_targeting, enemy_selector]:
 		selector.get_popup().hide()
 	var state: Dictionary = planning.combat
 	debug_round.value = int(state.get("wave", 0)) + (1 if int(state.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.PLANNING else 0)
@@ -504,6 +517,13 @@ func _secondary_target_selected(index: int) -> void:
 	_refresh_targeting()
 
 
+func _extra_target_selected(mode: int, archer_index: int) -> void:
+	var selector: OptionButton = third_targeting if archer_index == 2 else fourth_targeting
+	if planning != null and selector.is_visible_in_tree() and not selector.disabled and not _selected_tower().is_empty():
+		planning.set_archer_targeting(planning.local_slot(), selected_tower_id, archer_index, mode)
+	_refresh_targeting()
+
+
 func _request_pacing(option: String) -> void:
 	if planning == null or not planning.active:
 		return
@@ -632,6 +652,36 @@ func _refresh_targeting() -> void:
 	_secondary_target_row.visible = second_archer
 	secondary_targeting.disabled = targeting_button.disabled or not second_archer
 	secondary_targeting.select(int(tower.get("secondary_mode", tower["mode"])))
+	var advancements: Dictionary = stats.get("advancements", {})
+	_advancement_row.visible = second_archer and not advancements.is_empty()
+	if _advancement_row.visible:
+		special_upgrade.hide()
+		special_upgrade.disabled = true
+		_special_upgrade_command = ""
+	for command: String in advancement_buttons:
+		var button: Button = advancement_buttons[command]
+		var definition: Dictionary = advancements.get(command, {})
+		var chosen: String = String(tower.get("advancement", ""))
+		var purchased: bool = chosen == command
+		var locked: bool = not chosen.is_empty() and not purchased
+		var price: int = int(definition.get("cost", 0))
+		button.text = "%s\n%s" % [String(definition.get("title", command)), "Purchased" if purchased else ("Locked" if locked else str(price))]
+		button.disabled = not _advancement_row.visible or definition.is_empty() or purchased or locked or targeting_button.disabled or _own_coins() < price
+		button.tooltip_text = advancement_tooltip(command, definition)
+		if locked:
+			button.tooltip_text += "\nLocked: another advancement was purchased."
+		elif not purchased and _own_coins() < price:
+			button.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
+		if targeting_button.disabled:
+			button.tooltip_text += "\nUnavailable while Ready or after the run ends."
+	var extra_archers: Array = tower.get("extra_archers", [])
+	var four_archers: bool = tower.get("advancement", "") == "four_archers" and extra_archers.size() == 2
+	_extra_target_row.visible = four_archers
+	for index: int in range(2):
+		var selector: OptionButton = third_targeting if index == 0 else fourth_targeting
+		selector.disabled = targeting_button.disabled or not four_archers
+		if four_archers:
+			selector.select(int(extra_archers[index]["mode"]))
 	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
 	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
 	sell_button.disabled = targeting_button.disabled
@@ -704,6 +754,18 @@ func _refresh_evolution(button: Button, tower: Dictionary, evolutions: Dictionar
 		button.tooltip_text += "\nReady commits planning purchases until combat starts."
 
 
+
+static func advancement_tooltip(command: String, definition: Dictionary) -> String:
+	var details: String = ""
+	match command:
+		"four_archers":
+			details = "%d archers with independent targeting; each chooses a different enemy. Attack rate ×%s." % [int(definition.get("archer_count", 0)), String.num(float(definition.get("attack_rate_multiplier", 1.0)), 2)]
+		"fire_arrows":
+			details = "Physical arrows ignite enemies for %s damage/s over %ss. Burn refreshes without stacking." % [String.num(float(definition.get("burn_dps", 0.0)), 2), String.num(float(definition.get("burn_duration", 0.0)), 2)]
+		"bomb_arrows":
+			details = "Primary damage ×%s; other enemies within %s cells take ×%s damage, rounded up." % [String.num(float(definition.get("primary_multiplier", 0.0)), 2), String.num(float(definition.get("splash_radius", 0.0)), 2), String.num(float(definition.get("splash_multiplier", 0.0)), 2)]
+	return details + "\nRequires Second Archer. Choose one advancement."
+
 func _choice_upgrade_pressed(alternate: bool) -> void:
 	_upgrade(_alternate_upgrade_command if alternate else _special_upgrade_command)
 
@@ -711,6 +773,8 @@ func _choice_upgrade_pressed(alternate: bool) -> void:
 func _upgrade(upgrade: String) -> void:
 	var button: Button
 	match upgrade:
+		"four_archers", "fire_arrows", "bomb_arrows":
+			button = advancement_buttons[upgrade]
 		"special", "boulders", "freeze_runes", "pierce", "bounce", "onyx_ring":
 			if upgrade == _special_upgrade_command:
 				button = special_upgrade

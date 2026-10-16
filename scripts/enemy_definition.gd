@@ -8,6 +8,8 @@ extends Resource
 @export var health_multiplier: float = 1.0
 @export var speed_multiplier: float = 1.0
 @export var base_damage: int = 1
+@export var fire_immune: bool = false
+@export var ice_immune: bool = false
 @export var spawn_weight: int = 1
 @export var first_wave: int = 1
 # Zero means unlimited. Share caps this type's total weight, not its head count.

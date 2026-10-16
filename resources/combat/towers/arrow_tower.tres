@@ -16,3 +16,8 @@ speed_upgrade_multiplier = 0.8
 special_upgrade = "second_archer"
 special_upgrade_title = "Second Archer"
 special_upgrade_cost = 200
+advancements = {
+"four_archers": {"title": "Four Archers", "cost": 650, "attack_rate_multiplier": 1.1, "archer_count": 4},
+"fire_arrows": {"title": "Fire Arrows", "cost": 600, "burn_dps": 4.0, "burn_duration": 3.0},
+"bomb_arrows": {"title": "Bomb Arrows", "cost": 750, "primary_multiplier": 1.5, "splash_multiplier": 0.5, "splash_radius": 0.85}
+}

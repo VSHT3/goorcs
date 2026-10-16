@@ -180,6 +180,12 @@ func set_secondary_targeting(slot: int, tower_id: int, mode: int) -> void:
 	_request_tower_command("target_secondary", slot, Vector2i.ZERO, tower_id, mode, "")
 
 
+func set_archer_targeting(slot: int, tower_id: int, archer_index: int, mode: int) -> void:
+	if archer_index not in [2, 3]:
+		return
+	_request_tower_command("target_archer_%d" % (archer_index + 1), slot, Vector2i.ZERO, tower_id, mode, "")
+
+
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> void:
 	_request_tower_command("upgrade", slot, Vector2i.ZERO, tower_id, -1, upgrade)
 
@@ -348,6 +354,11 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	elif command == "target_secondary":
 		if not _host_combat.set_secondary_targeting(slot, tower_id, mode):
 			_reject(sender, "Choose an upgraded own Arrow tower and a different valid second-archer targeting mode.")
+			return
+	elif command in ["target_archer_3", "target_archer_4"]:
+		var archer_index: int = 2 if command == "target_archer_3" else 3
+		if not _host_combat.set_archer_targeting(slot, tower_id, archer_index, mode):
+			_reject(sender, "Choose a Four Archers tower you own and a different valid archer targeting mode.")
 			return
 	elif command == "upgrade":
 		if not _host_combat.upgrade_tower(slot, tower_id, argument):

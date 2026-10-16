@@ -93,6 +93,7 @@ func _run() -> void:
 	_check_send_visibility(main, screen)
 	await _check_ballista_evolutions(main, screen)
 	await _check_rune_evolutions(main, screen)
+	await _check_archer_advancements(main, screen)
 	await _check_debug_popup(main, screen)
 	main.planning.stop_singleplayer()
 	main.queue_free()
@@ -320,6 +321,100 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		planning.stop_singleplayer()
 		# Let the audio mixer release each stopped solo fixture before starting another.
 		await create_timer(0.2).timeout
+
+
+func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> void:
+	main.play_screen.show()
+	var planning: MatchPlanning = main.planning
+	var save_path: String = directory.path_join("collection.json")
+	FileAccess.open(save_path, FileAccess.WRITE).store_string(JSON.stringify({"version": 1, "unlocked": ["arrow_tower"]}))
+	planning.collection_store = CollectionStore.new(save_path)
+	var original_size: Vector2i = root.size
+	for branch: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
+		planning.start_singleplayer()
+		planning.set_physics_process(false)
+		await create_timer(0.05).timeout
+		var model: MatchCombat = planning._host_combat
+		model.coins = [10000, 10000]
+		planning.build_tower(0, Vector2i(3, 3), &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
+		var tower: Dictionary = model.towers[0][0]
+		var id: int = int(tower["id"])
+		screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+		var frozen: Dictionary = planning.combat.duplicate(true)
+		for button: Button in screen.advancement_buttons.values():
+			button.pressed.emit()
+		planning.upgrade_tower(0, id, branch)
+		planning.set_archer_targeting(0, id, 2, 1)
+		_check(planning.combat == frozen, "Hidden Arrow advancement and extra-target controls cannot bypass prerequisites")
+		screen.damage_upgrade.pressed.emit()
+		screen.speed_upgrade.pressed.emit()
+		_check(not screen._advancement_row.visible and screen.special_upgrade.visible, "Both stats expose Second Archer, not level-V choices")
+		frozen = planning.combat.duplicate(true)
+		planning.upgrade_tower(0, id, branch)
+		_check(planning.combat == frozen, "Level-V purchase requires the accepted fourth level")
+		screen.special_upgrade.pressed.emit()
+		_check(screen._advancement_row.visible and not screen.special_upgrade.visible and MatchCombat.tower_level(tower) == 4, "Second Archer replaces its action with three advancement choices")
+		var choices: Dictionary = planning.combat["tower_types"]["arrow_tower"]["advancements"]
+		var price: int = int(choices[branch]["cost"])
+		var chosen: Button = screen.advancement_buttons[branch]
+		_check(chosen.text.contains(str(price)), "Arrow button shows the accepted host resource price")
+		model.coins = [price - 1, price - 1]
+		planning._publish_snapshot()
+		_check(chosen.disabled, "Arrow path affordability uses the accepted exact price")
+		frozen = planning.combat.duplicate(true)
+		chosen.pressed.emit()
+		planning.upgrade_tower(0, id, branch)
+		_check(planning.combat == frozen, "Insufficient funds reject both button and command")
+		model.coins = [price, price]
+		planning._host_ready[0] = true
+		planning._publish_snapshot()
+		frozen = planning.combat.duplicate(true)
+		chosen.pressed.emit()
+		planning.upgrade_tower(0, id, branch)
+		_check(chosen.disabled and planning.combat == frozen, "Ready commits Arrow path purchases")
+		planning._host_ready[0] = false
+		planning._publish_snapshot()
+		chosen.pressed.emit()
+		_check(tower["advancement"] == branch and MatchCombat.tower_level(tower) == 5 and model.coins == [0, 0], "Native advancement control buys its exclusive fifth level through mirrored owner commands")
+		for command: String in screen.advancement_buttons:
+			var button: Button = screen.advancement_buttons[command]
+			_check(button.disabled, "Chosen and excluded paths cannot be bought again")
+		_check(screen.third_targeting.is_visible_in_tree() == (branch == "four_archers") and screen.fourth_targeting.is_visible_in_tree() == (branch == "four_archers"), "Only accepted Four Archers exposes selectors three and four")
+		if branch == "four_archers":
+			screen.targeting_button.item_selected.emit(1)
+			screen.secondary_targeting.item_selected.emit(2)
+			screen.third_targeting.item_selected.emit(2)
+			screen.fourth_targeting.item_selected.emit(1)
+			for slot: int in range(2):
+				var accepted: Dictionary = planning.combat["towers"][slot][0]
+				_check(accepted["mode"] == 1 and accepted["secondary_mode"] == 2 and accepted["extra_archers"][0]["mode"] == 2 and accepted["extra_archers"][1]["mode"] == 1, "All four actual selectors persist independent accepted modes through snapshots")
+			planning._host_ready[0] = true
+			planning._publish_snapshot()
+			frozen = planning.combat.duplicate(true)
+			screen.third_targeting.item_selected.emit(0)
+			planning.set_archer_targeting(0, id, 3, 0)
+			_check(planning.combat == frozen, "Ready also blocks extra targeting controls and direct gateway commands")
+			planning._host_ready[0] = false
+			planning._publish_snapshot()
+		for width: int in [1000, 1280]:
+			root.size = Vector2i(width, 720)
+			await process_frame
+			var surface := Rect2(screen.global_position, screen.size)
+			_check(surface.encloses(screen._management.get_global_rect()), "Arrow management remains inside the compact game surface")
+			for button: Button in screen.advancement_buttons.values():
+				_check(screen._management.get_global_rect().encloses(button.get_global_rect()), "Three wrapped choices stay inside the management panel")
+		model.coins = [10000, 10000]
+		planning._publish_snapshot()
+		frozen = planning.combat.duplicate(true)
+		for command: String in screen.advancement_buttons:
+			screen.advancement_buttons[command].pressed.emit()
+			planning.upgrade_tower(0, id, command)
+		planning.set_archer_targeting(0, id, 4, 1)
+		planning.upgrade_tower(1, id, branch)
+		_check(planning.combat == frozen, "Repeat, switch, foreign-owner and invalid archer-index commands are atomic rejections")
+		planning.stop_singleplayer()
+		await create_timer(0.2).timeout
+	root.size = original_size
 
 
 func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:

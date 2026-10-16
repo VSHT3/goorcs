@@ -18,3 +18,5 @@ extends Resource
 @export var projectile_width: float = 1.3
 @export var secondary_sprite_region: Rect2
 @export var secondary_sprite_offset: Vector2
+# Rear archers reuse the same crop and muzzle, with these texture-local offsets.
+@export var additional_archer_offsets: PackedVector2Array = PackedVector2Array()

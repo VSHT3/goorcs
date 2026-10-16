@@ -159,6 +159,13 @@ func set_targeting(tower_id: int, mode: int, secondary: bool = false) -> bool:
 	return accepted
 
 
+func set_archer_targeting(tower_id: int, archer_index: int, mode: int) -> bool:
+	var accepted: bool = combat.set_archer_targeting(0, tower_id, archer_index, mode)
+	if accepted:
+		_publish()
+	return accepted
+
+
 func _new_layout(dimensions: Vector2i) -> PathLayout:
 	var row: int = floori(float(dimensions.y) * 0.5)
 	return PathLayout.new(dimensions, dimensions.x * dimensions.y - 2, Vector2i(0, row), Vector2i(dimensions.x - 1, row))

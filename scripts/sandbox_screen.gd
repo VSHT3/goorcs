@@ -29,6 +29,9 @@ var count_input: SpinBox
 var enemy_selector: OptionButton
 var targeting: OptionButton
 var secondary_targeting: OptionButton
+var third_targeting: OptionButton
+var fourth_targeting: OptionButton
+var advancement_buttons: Dictionary[String, Button] = {}
 var play_button: Button
 var wave_button: Button
 var spawn_button: Button
@@ -44,6 +47,7 @@ var _tower_title: Label
 var _tower_stats: Label
 var _upgrade_list: VBoxContainer
 var _upgrade_buttons: Dictionary[String, Button] = {}
+var _advancement_row: HBoxContainer
 var _inspector: EnemyInspector
 var _pending_dimensions := Vector2i.ZERO
 var _active: bool = false
@@ -213,7 +217,7 @@ func _build_interface() -> void:
 	_inspector.close_requested.connect(cancel_interaction)
 	resize_dialog = _confirmation("Resize map?", "This removes every path tile, tower, and enemy. The selected round is kept.", _confirm_resize)
 	reset_dialog = _confirmation("Reset build?", "This removes every tower and enemy. The map, path, and selected round are kept.", _confirm_reset)
-	for selector: OptionButton in [enemy_selector, targeting, secondary_targeting]:
+	for selector: OptionButton in [enemy_selector, targeting, secondary_targeting, third_targeting, fourth_targeting]:
 		world._hud_popups.append(selector.get_popup())
 
 
@@ -248,19 +252,38 @@ func _build_management() -> void:
 	_tower_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_button(heading, "×", cancel_interaction)
 	_tower_stats = _label(content, "", true)
-	targeting = _target_selector(content, false)
-	secondary_targeting = _target_selector(content, true)
+	targeting = _target_selector(content, 0)
+	secondary_targeting = _target_selector(content, 1)
+	third_targeting = _target_selector(content, 2)
+	fourth_targeting = _target_selector(content, 3)
 	_upgrade_list = VBoxContainer.new()
 	content.add_child(_upgrade_list)
+	_advancement_row = HBoxContainer.new()
+	content.add_child(_advancement_row)
+	for command: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
+		var button: Button = _button(_advancement_row, "", _upgrade.bind(command))
+		button.custom_minimum_size = Vector2(0, 76)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		advancement_buttons[command] = button
 	_button(content, "Sell tower", _sell)
 
 
-func _target_selector(parent: Node, secondary: bool) -> OptionButton:
+func _target_selector(parent: Node, archer_index: int) -> OptionButton:
 	var selector := OptionButton.new()
 	for title: String in ["Furthest", "Closest", "Strongest"]:
 		selector.add_item(title)
-	selector.tooltip_text = "Second archer targeting" if secondary else "Tower targeting"
-	selector.item_selected.connect(func(mode: int) -> void: controller.set_targeting(selected_tower_id, mode, secondary))
+	for index: int in range(MatchPlanningScreen.TARGET_HELP.size()):
+		selector.set_item_tooltip(index, MatchPlanningScreen.TARGET_HELP[index])
+	selector.tooltip_text = "Tower targeting" if archer_index == 0 else "Archer %d targeting" % (archer_index + 1)
+	selector.item_selected.connect(func(mode: int) -> void:
+		if not selector.is_visible_in_tree() or selector.disabled:
+			return
+		if archer_index < 2:
+			controller.set_targeting(selected_tower_id, mode, archer_index == 1)
+		else:
+			controller.set_archer_targeting(selected_tower_id, archer_index, mode)
+	)
 	parent.add_child(selector)
 	return selector
 
@@ -506,12 +529,31 @@ func _refresh_management(state: Dictionary) -> void:
 	targeting.select(int(tower["mode"]))
 	secondary_targeting.visible = bool(tower["special_upgraded"]) and stats.get("special_upgrade", "") == "second_archer"
 	secondary_targeting.select(int(tower["secondary_mode"]))
+	var extra_archers: Array = tower.get("extra_archers", [])
+	var four_archers: bool = tower.get("advancement", "") == "four_archers" and extra_archers.size() == 2
+	for index: int in range(2):
+		var selector: OptionButton = third_targeting if index == 0 else fourth_targeting
+		selector.visible = four_archers
+		selector.disabled = not four_archers
+		if four_archers:
+			selector.select(int(extra_archers[index]["mode"]))
+	var advancements: Dictionary = stats.get("advancements", {})
+	_advancement_row.visible = secondary_targeting.visible and not advancements.is_empty()
+	for command: String in advancement_buttons:
+		var definition: Dictionary = advancements.get(command, {})
+		var chosen: String = String(tower.get("advancement", ""))
+		var purchased: bool = chosen == command
+		var locked: bool = not chosen.is_empty() and not purchased
+		var button: Button = advancement_buttons[command]
+		button.text = "%s\n%s" % [String(definition.get("title", command)), "Purchased" if purchased else ("Locked" if locked else "Free")]
+		button.disabled = not _advancement_row.visible or definition.is_empty() or purchased or locked
+		button.tooltip_text = MatchPlanningScreen.advancement_tooltip(command, definition) + "\nFree in sandbox; sell and rebuild to choose another path."
 	var commands: Dictionary[String, Dictionary] = {
 		"damage": {"title": "+%d damage" % int(stats["damage_upgrade_bonus"]), "purchased": bool(tower["damage_upgraded"]), "locked": false},
 		"speed": {"title": "%.0f%% faster" % ((1.0 / float(stats["speed_upgrade_multiplier"]) - 1.0) * 100.0), "purchased": bool(tower["speed_upgraded"]), "locked": false},
 	}
 	var ready_special: bool = bool(tower["damage_upgraded"]) and bool(tower["speed_upgraded"])
-	if not String(stats.get("special_upgrade", "")).is_empty():
+	if not String(stats.get("special_upgrade", "")).is_empty() and not _advancement_row.visible:
 		commands["special"] = {"title": stats["special_upgrade_title"], "purchased": bool(tower["special_upgraded"]), "locked": not ready_special}
 	var evolutions: Dictionary = stats.get("evolutions", {})
 	for branch: String in evolutions:
@@ -533,7 +575,9 @@ func _refresh_management(state: Dictionary) -> void:
 
 
 func _upgrade(command: String) -> void:
-	controller.upgrade(selected_tower_id, command)
+	var button: Button = advancement_buttons.get(command, _upgrade_buttons.get(command))
+	if button != null and button.is_visible_in_tree() and not button.disabled:
+		controller.upgrade(selected_tower_id, command)
 
 
 func _show_notice(message: String) -> void:

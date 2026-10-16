@@ -20,6 +20,36 @@ const FREEZE_DURATION: float = 2.0
 @export var special_upgrade_title: String = ""
 @export var special_upgrade_cost: int = 0
 @export var evolutions: Dictionary = {}
+@export var advancements: Dictionary = {}
+
+
+static func valid_advancements(definition: TowerDefinition) -> bool:
+	if not definition.advancements.is_empty() and (definition.special_upgrade != "second_archer" or definition.area_attack or not definition.evolutions.is_empty()):
+		return false
+	for branch: Variant in definition.advancements:
+		if not branch is String or branch not in ["four_archers", "fire_arrows", "bomb_arrows"] or not definition.advancements[branch] is Dictionary:
+			return false
+		var config: Dictionary = definition.advancements[branch]
+		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
+			return false
+		var fields: Array[String] = []
+		match branch:
+			"four_archers":
+				if config.size() != 4 or not config.get("archer_count") is int or config["archer_count"] != 4:
+					return false
+				fields = ["attack_rate_multiplier"]
+			"fire_arrows":
+				if config.size() != 4:
+					return false
+				fields = ["burn_dps", "burn_duration"]
+			"bomb_arrows":
+				if config.size() != 5:
+					return false
+				fields = ["primary_multiplier", "splash_multiplier", "splash_radius"]
+		for field: String in fields:
+			if typeof(config.get(field)) not in [TYPE_FLOAT, TYPE_INT] or not is_finite(float(config[field])) or float(config[field]) <= 0.0:
+				return false
+	return true
 
 
 static func valid_evolutions(definition: TowerDefinition) -> bool:

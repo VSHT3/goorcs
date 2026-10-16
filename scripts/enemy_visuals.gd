@@ -6,6 +6,7 @@ extends RefCounted
 static var _bounds: Dictionary[Texture2D, Rect2] = {}
 static var _images: Dictionary[Texture2D, Image] = {}
 static var _slow_textures: Dictionary[Texture2D, Texture2D] = {}
+static var _burn_textures: Dictionary[Texture2D, Texture2D] = {}
 static var _unions: Dictionary[EnemyDefinition, Rect2] = {}
 
 
@@ -98,6 +99,24 @@ static func slowed_texture(texture: Texture2D) -> Texture2D:
 					tinted.set_pixel(x, y, pixel.lerp(Color(0.40, 0.68, 0.91, pixel.a), 0.38))
 		_slow_textures[texture] = ImageTexture.create_from_image(tinted)
 	return _slow_textures[texture]
+
+
+static func burning_texture(texture: Texture2D) -> Texture2D:
+	if not _burn_textures.has(texture):
+		var source: Image = image(texture)
+		if source == null:
+			return texture
+		var tinted: Image = source.duplicate()
+		tinted.convert(Image.FORMAT_RGBA8)
+		for y: int in range(tinted.get_height()):
+			for x: int in range(tinted.get_width()):
+				var pixel: Color = tinted.get_pixel(x, y)
+				if pixel.a > 0.0:
+					var light: float = pixel.get_luminance()
+					var ember := Color(0.48 + light * 0.52, 0.12 + light * 0.39, 0.04 + light * 0.12, pixel.a)
+					tinted.set_pixel(x, y, pixel.lerp(ember, 0.72))
+		_burn_textures[texture] = ImageTexture.create_from_image(tinted)
+	return _burn_textures[texture]
 
 
 static func effect_color(animation: StringName) -> Color:
