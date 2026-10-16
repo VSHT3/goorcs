@@ -24,6 +24,7 @@ var _host_layouts: Array[PathLayout] = []
 var _host_ready: Array[bool] = [false, false]
 var _host_routes: Array[Array] = [[], []]
 var _host_speed_votes: Array[bool] = [false, false]
+var _solo_speed: int = 1
 var _host_autoplay_votes: Array[bool] = [false, false]
 var _host_locked: bool = false
 var _active_peer_id: int = 0
@@ -64,6 +65,7 @@ func _physics_process(delta: float) -> void:
 			_host_ready = [false, false]
 			_ready_seconds_left = -1.0
 			_host_speed_votes = [false, false]
+			_solo_speed = 1
 			_host_autoplay_votes = [false, false]
 		else:
 			_enter_planning()
@@ -137,6 +139,7 @@ func debug_set_values(round_number: int, money: int) -> bool:
 			return false
 		_host_routes = [[], []]
 		_host_speed_votes = [false, false]
+		_solo_speed = 1
 		_host_autoplay_votes = [false, false]
 		_enter_planning()
 	_host_combat.coins[0] = money
@@ -163,6 +166,15 @@ func request_pacing(option: String, enabled: bool) -> void:
 	if option not in ["speed", "autoplay"]:
 		return
 	_request_command(option, local_slot(), Vector2i.ZERO, enabled)
+
+
+func cycle_singleplayer_speed() -> bool:
+	if not singleplayer or not active or _host_combat.phase == MatchCombat.Phase.FINISHED:
+		return false
+	_solo_speed = _solo_speed % 3 + 1
+	_host_speed_votes = [_solo_speed > 1, _solo_speed > 1]
+	_publish_snapshot()
+	return true
 
 
 func build_tower(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> void:
@@ -263,6 +275,7 @@ func _reset_match() -> void:
 	_host_ready = [false, false]
 	_host_routes = [[], []]
 	_host_speed_votes = [false, false]
+	_solo_speed = 1
 	_host_autoplay_votes = [false, false]
 	_host_locked = false
 	ready_flags = [false, false]
@@ -457,6 +470,11 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 func _apply_pacing(option: String, slot: int, enabled: bool) -> void:
 	if not active or _host_combat.phase not in [MatchCombat.Phase.PLANNING, MatchCombat.Phase.WAVE]:
 		return
+	if singleplayer and option == "speed":
+		_solo_speed = 2 if enabled else 1
+		_host_speed_votes = [enabled, enabled]
+		_publish_snapshot()
+		return
 	var votes: Array[bool] = _host_speed_votes if option == "speed" else _host_autoplay_votes
 	if votes[slot] == enabled:
 		return
@@ -469,6 +487,8 @@ func _apply_pacing(option: String, slot: int, enabled: bool) -> void:
 
 
 func _speed_multiplier() -> float:
+	if singleplayer:
+		return float(_solo_speed)
 	return 2.0 if _host_speed_votes[0] and _host_speed_votes[1] else 1.0
 
 

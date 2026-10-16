@@ -291,9 +291,7 @@ func _check_lifecycle() -> void:
 
 
 func _check_leave_and_reopen() -> void:
-	await _click(screen.menu_button.get_global_rect().get_center())
-	await _settle()
-	await _click(screen.pause_menu.quit_button.get_global_rect().get_center())
+	await _click(screen.results_menu.menu_button.get_global_rect().get_center())
 	await _open_match()
 	await _start_wave()
 	var id: int = int(main.planning.combat["enemies"][0][0]["id"])

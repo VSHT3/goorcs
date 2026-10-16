@@ -158,6 +158,10 @@ func _input(event: InputEvent) -> void:
 		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:
 			var screen: MatchPlanningScreen = play_screen.planning_screen
 			if screen != null and screen.is_visible_in_tree():
+				if int(planning.combat.get("phase",-1)) == MatchCombat.Phase.FINISHED:
+					screen.handle_results_escape()
+					get_viewport().set_input_as_handled()
+					return
 				if screen.debug_popup.visible:
 					screen.debug_popup.hide()
 				elif screen.pause_menu.visible:

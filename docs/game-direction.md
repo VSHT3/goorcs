@@ -221,6 +221,10 @@ Regular waves fill a growing integer weight budget with one host-randomized grou
 
 All seven enemies have real walk animation, with separate Chief heal/Necromancer casting poses, stable anchors/facing, current-frame alpha picking, and blue slowed palettes. Orcieary previews reuse those frames and show encounter/send availability, stats, descriptions, and saved owned-side kills/sends. Exact rules and provisional balance live in [enemy roster and sandbox](enemy-roster.md), with one resource catalog for authoring. Real 1v1 pressure, long-run density/performance, and separate-network reachability still need human validation.
 
+**Implemented Arrow advancements:** after Second Archer, one exclusive level-V choice adds Four Archers, Fire Arrows, or Bomb Arrows. The host captures their fixed costs and validates the same purchase command; four independent distinct-target streams, fractional timed burn, circular reduced splash, and SkeleOrc fire/ice immunity are implemented with matching local visuals. See [advancement balance and rules](archer-advancements.md).
+
+**Implemented results/playback:** both modes display the accepted local Victory/Defeat outcome and final match details with inspection/menu actions. Solo can create a fresh run from results and cycles 1×/2×/3× speed; multiplayer retains unanimous 2× consent. The completed model never restarts, countdowns stay real time, and progression is not granted by the result UI. See [results and playback](match-results.md).
+
 
 ## First playable proof of the core rules
 

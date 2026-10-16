@@ -24,6 +24,8 @@ var _owns_tree_pause: bool = false
 var _special_upgrade_command: String = ""
 var _alternate_upgrade_command: String = ""
 var advancement_buttons: Dictionary[String, Button] = {}
+var results_menu: MatchResultsMenu
+var _results_run_id: String = ""
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -121,6 +123,11 @@ func _ready() -> void:
 		spin.get_line_edit().add_theme_font_size_override("font_size", 16)
 	pause_menu.resume_requested.connect(_resume_match)
 	pause_menu.quit_requested.connect(_quit_match)
+	results_menu = preload("res://scenes/match_results_menu.tscn").instantiate()
+	add_child(results_menu)
+	results_menu.menu_requested.connect(_quit_match)
+	results_menu.inspect_requested.connect(_inspect_results)
+	results_menu.replay_requested.connect(_replay_results)
 	visibility_changed.connect(_visibility_changed)
 	_feedback_timer.timeout.connect(_clear_feedback)
 	if planning != null:
@@ -145,6 +152,9 @@ func cancel_strokes() -> void:
 func open_pause_menu() -> void:
 	if planning == null or not planning.active or not is_visible_in_tree() or pause_menu.visible:
 		return
+	if int(planning.combat.get("phase",-1)) == MatchCombat.Phase.FINISHED:
+		open_results()
+		return
 	debug_popup.hide()
 	cancel_interaction()
 	cancel_strokes()
@@ -166,6 +176,7 @@ func _resume_match() -> void:
 
 func _quit_match() -> void:
 	_close_pause_menu()
+	_close_results()
 	leave_requested.emit()
 
 
@@ -189,6 +200,7 @@ func _visibility_changed() -> void:
 		return
 	if not is_visible_in_tree():
 		debug_popup.hide()
+		_close_results()
 		_close_pause_menu()
 		world.set_active(false)
 		cancel_strokes()
@@ -527,6 +539,9 @@ func _extra_target_selected(mode: int, archer_index: int) -> void:
 func _request_pacing(option: String) -> void:
 	if planning == null or not planning.active:
 		return
+	if option == "speed" and planning.singleplayer:
+		planning.cycle_singleplayer_speed()
+		return
 	var votes: Array = planning.combat.get(option + "_votes", [false, false])
 	planning.request_pacing(option, not bool(votes[planning.local_slot()]))
 
@@ -546,8 +561,9 @@ func _refresh_pacing() -> void:
 		for theme_color: String in ["icon_normal_color", "icon_pressed_color", "icon_hover_color", "icon_hover_pressed_color"]:
 			button.add_theme_color_override(theme_color, color)
 		if option == "speed":
-			button.icon = preload("res://assets/ui/speed_double.svg") if enabled else preload("res://assets/ui/speed_normal.svg")
-		button.tooltip_text = "2× speed" if option == "speed" else "Autoplay"
+			var multiplier: int = int(state.get("speed_multiplier",1.0))
+			button.icon = preload("res://assets/ui/speed_triple.svg") if multiplier == 3 else (preload("res://assets/ui/speed_double.svg") if enabled else preload("res://assets/ui/speed_normal.svg"))
+		button.tooltip_text = ("%d× speed · click to cycle 1× / 2× / 3×" % int(state.get("speed_multiplier",1.0)) if planning != null and planning.singleplayer else "2× speed") if option == "speed" else "Autoplay"
 		if agreed:
 			button.tooltip_text += " · On"
 		elif enabled:
@@ -803,6 +819,9 @@ func _clear() -> void:
 
 
 func _toggle_ready() -> void:
+	if planning != null and int(planning.combat.get("phase",-1)) == MatchCombat.Phase.FINISHED:
+		open_results()
+		return
 	if planning != null and not ready_button.disabled:
 		planning.submit_ready(true)
 
@@ -897,10 +916,10 @@ func _refresh() -> void:
 			_counts[slot].tooltip_text = "%s\nPaths change only in setup and main rounds. WASD: pan · Scroll / pinch: zoom." % path_state
 			_counts[slot].modulate = Color("b5e2b7") if layout.is_ready() else Color("e0bc77")
 	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
-	ready_button.disabled = not planning.active or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[own_slot] or not planning.layouts[own_slot].is_ready()
+	ready_button.disabled = not finished and (not planning.active or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[own_slot] or not planning.layouts[own_slot].is_ready())
 	clear_button.visible = planning.active and bool(state.get("main_round", false))
-	ready_button.visible = planning.active and phase == MatchCombat.Phase.PLANNING
-	ready_button.text = "Ready"
+	ready_button.visible = planning.active and (phase == MatchCombat.Phase.PLANNING or finished)
+	ready_button.text = "Results" if finished else "Ready"
 	var time_left: float = float(state.get("ready_seconds_left", -1.0))
 	_ready_timer.visible = planning.active and phase == MatchCombat.Phase.PLANNING and time_left >= 0.0
 	_ready_timer.text = "%ds" % ceili(time_left) if time_left >= 0.0 else ""
@@ -933,6 +952,57 @@ func _refresh() -> void:
 	if not planning.active:
 		cancel_strokes()
 	world.set_active(planning.active and is_visible_in_tree())
+	if not finished or not planning.active:
+		_results_run_id = ""
+		_close_results()
+	elif is_visible_in_tree() and _results_run_id != String(state.get("statistics_id","")):
+		_results_run_id = state.get("statistics_id","")
+		open_results()
+
+
+func open_results() -> void:
+	if planning == null or not planning.active or int(planning.combat.get("phase",-1)) != MatchCombat.Phase.FINISHED:
+		return
+	_close_pause_menu()
+	debug_popup.hide()
+	cancel_strokes()
+	for selector: OptionButton in [targeting_button,secondary_targeting,third_targeting,fourth_targeting,enemy_selector]:
+		selector.get_popup().hide()
+	selected_tower_id = -1
+	_placement_id = &""
+	_management.hide()
+	world.set_input_blocked(true)
+	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
+	results_menu.open_result(planning.combat,planning.local_slot(),planning.singleplayer)
+
+
+func _close_results() -> void:
+	if results_menu == null or not results_menu.visible:
+		return
+	results_menu.hide()
+	$HUD.process_mode = Node.PROCESS_MODE_INHERIT
+	world.set_input_blocked(false)
+
+
+func _inspect_results() -> void:
+	_close_results()
+	menu_button.grab_focus()
+
+
+func _replay_results() -> void:
+	if planning == null or not planning.singleplayer or int(planning.combat.get("phase",-1)) != MatchCombat.Phase.FINISHED:
+		return
+	_close_results()
+	world.set_active(false)
+	planning.start_singleplayer()
+	ready_button.grab_focus()
+
+
+func handle_results_escape() -> void:
+	if results_menu.visible:
+		_inspect_results()
+	else:
+		open_results()
 
 
 func _show_feedback(message: String) -> void:
