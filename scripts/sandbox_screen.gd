@@ -32,6 +32,7 @@ var secondary_targeting: TargetingCycle
 var third_targeting: TargetingCycle
 var fourth_targeting: TargetingCycle
 var advancement_buttons: Dictionary[String, Button] = {}
+var extra_targeting: Array[TargetingCycle] = []
 var play_button: Button
 var wave_button: Button
 var spawn_button: Button
@@ -247,7 +248,9 @@ func _build_management() -> void:
 	panel_style.content_margin_bottom = 8
 	_management.add_theme_stylebox_override("panel", panel_style)
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	_management.add_child(scroll)
 	var content := VBoxContainer.new()
 	content.custom_minimum_size.x = 0
@@ -274,6 +277,9 @@ func _build_management() -> void:
 	secondary_targeting = _target_selector(content, 1)
 	third_targeting = _target_selector(content, 2)
 	fourth_targeting = _target_selector(content, 3)
+	extra_targeting.assign([third_targeting, fourth_targeting])
+	for archer_index: int in range(4, 8):
+		extra_targeting.append(_target_selector(content, archer_index))
 	_upgrade_list = VBoxContainer.new()
 	content.add_child(_upgrade_list)
 	_advancement_row = HBoxContainer.new()
@@ -549,28 +555,38 @@ func _refresh_management(state: Dictionary) -> void:
 	targeting.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
 	targeting.mode = int(tower["mode"])
 	targeting.disabled = not _active
-	secondary_targeting.get_parent_control().visible = bool(tower["special_upgraded"]) and stats.get("special_upgrade", "") == "second_archer"
+	var count: int = MatchPlanningScreen.independent_weapon_count(tower, stats)
+	secondary_targeting.get_parent_control().visible = count > 1 and bool(tower["special_upgraded"]) and stats.get("special_upgrade", "") == "second_archer"
 	secondary_targeting.disabled = not _active or not secondary_targeting.get_parent_control().visible
 	secondary_targeting.mode = int(tower["secondary_mode"])
 	var extra_archers: Array = tower.get("extra_archers", [])
-	var four_archers: bool = tower.get("advancement", "") == "four_archers" and extra_archers.size() == 2
-	for index: int in range(2):
-		var selector: TargetingCycle = third_targeting if index == 0 else fourth_targeting
-		selector.get_parent_control().visible = four_archers
-		selector.disabled = not _active or not four_archers
-		if four_archers:
+	for index: int in range(extra_targeting.size()):
+		var selector: TargetingCycle = extra_targeting[index]
+		selector.get_parent_control().visible = index + 2 < count
+		selector.disabled = not _active or index + 2 >= count
+		if index + 2 < count and index < extra_archers.size():
 			selector.mode = int(extra_archers[index]["mode"])
 	var advancements: Dictionary = stats.get("advancements", {})
-	_advancement_row.visible = secondary_targeting.get_parent_control().visible and not advancements.is_empty()
+	var available: Dictionary = MatchPlanningScreen.advancement_actions(tower, stats)
+	_advancement_row.visible = bool(tower["special_upgraded"]) and not available.is_empty()
+	for command: String in advancements:
+		if not advancement_buttons.has(command):
+			var button: Button = _button(_advancement_row, "", _upgrade.bind(command))
+			button.custom_minimum_size = Vector2(0, 84)
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.add_theme_font_override("font", NUMBERS)
+			button.add_theme_font_size_override("font_size", 16)
+			advancement_buttons[command] = button
 	for command: String in advancement_buttons:
-		var definition: Dictionary = advancements.get(command, {})
-		var chosen: String = String(tower.get("advancement", ""))
-		var purchased: bool = chosen == command
-		var locked: bool = not chosen.is_empty() and not purchased
 		var button: Button = advancement_buttons[command]
-		button.text = "%s\n%s" % [String(definition.get("title", command)), "Owned" if purchased else ("Locked" if locked else "Free")]
-		button.disabled = not _active or not _advancement_row.visible or definition.is_empty() or purchased or locked
-		button.tooltip_text = MatchPlanningScreen.advancement_tooltip(command, definition) + "\nFree in sandbox; sell and rebuild to choose another path."
+		button.visible = available.has(command)
+		if not available.has(command):
+			continue
+		var action: Dictionary = available[command]
+		button.text = "%s\n%s" % [action["title"], "Owned" if action["purchased"] else ("Locked" if action["locked"] else "Free")]
+		button.disabled = not _active or not _advancement_row.visible or action["purchased"] or action["locked"]
+		button.tooltip_text = String(action["description"]) + "\nFree in Sandbox; normal price %d Coins." % int(action["cost"])
 	var commands: Dictionary = MatchPlanningScreen.tower_upgrade_actions(tower, stats)
 	for command: String in _upgrade_buttons:
 		_upgrade_buttons[command].visible = commands.has(command)

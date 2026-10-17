@@ -168,8 +168,12 @@ static func _stages(definition: TowerDefinition) -> Array[Dictionary]:
 		parent_id = "/".join(path)
 	for command: String in definition.advancements:
 		var advancement_path: Array[String] = path.duplicate()
-		advancement_path.append(command)
-		stages.append(_stage(advancement_path, definition.advancements[command]["title"], parent_id))
+		var chain: Array[String] = _advancement_chain(definition.advancements, command)
+		advancement_path.append_array(chain)
+		var advancement_parent: String = parent_id
+		if chain.size() > 1:
+			advancement_parent = "/".join(advancement_path.slice(0, advancement_path.size() - 1))
+		stages.append(_stage(advancement_path, definition.advancements[command]["title"], advancement_parent))
 	for command: String in definition.evolutions:
 		var branch: Dictionary = definition.evolutions[command]
 		var branch_path: Array[String] = path.duplicate()
@@ -186,6 +190,15 @@ static func _stages(definition: TowerDefinition) -> Array[Dictionary]:
 			followup_path.append(followup_id)
 			stages.append(_stage(followup_path, branch["followups"][followup_id]["title"], branch_id))
 	return stages
+
+
+static func _advancement_chain(advancements: Dictionary, command: String) -> Array[String]:
+	var chain: Array[String] = []
+	var current: String = command
+	while not current.is_empty() and advancements.has(current) and not chain.has(current):
+		chain.push_front(current)
+		current = String(advancements[current].get("requires", ""))
+	return chain
 
 
 static func _stat_title(definition: TowerDefinition, command: String) -> String:

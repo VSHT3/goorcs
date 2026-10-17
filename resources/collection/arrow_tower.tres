@@ -1,10 +1,23 @@
-[gd_resource type="Resource" script_class="TowerReward" load_steps=7 format=3 uid="uid://bqsgjcaqvhkti"]
+[gd_resource type="Resource" script_class="TowerReward" load_steps=20 format=3 uid="uid://bqsgjcaqvhkti"]
 
 [ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
 [ext_resource type="Texture2D" path="res://assets/towers/arrow_tower.png" id="2_icon"]
 [ext_resource type="Texture2D" path="res://assets/towers/arrow_tower_board.png" id="3_board"]
 [ext_resource type="Texture2D" path="res://assets/towers/archer_heads.png" id="4_heads"]
 [ext_resource type="Texture2D" path="res://assets/towers/archer_bodies.png" id="5_bodies"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_fire_arrows.png" id="6_fire"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_molotov.png" id="7_molotov"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_quick_pitch.png" id="8_pitch"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_flamethrower.png" id="9_flame"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_bomb_arrows.png" id="10_bomb"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_bigger_bombs.png" id="11_bigger"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_anti_orc_grenades.png" id="12_grenade"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_aom.png" id="13_aom"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_aom_speed_1.png" id="14_speed1"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_aom_speed_2.png" id="15_speed2"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_four_archers.png" id="16_four"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_eight_archers.png" id="17_eight"]
+[ext_resource type="Texture2D" path="res://assets/towers/arrow_arrow_minigun.png" id="18_minigun"]
 
 [sub_resource type="AtlasTexture" id="AtlasArrow"]
 atlas = ExtResource("2_icon")
@@ -20,6 +33,21 @@ accent = Color(0.78, 0.69, 0.43, 1)
 board_height = 1.42
 board_anchor = Vector2(0.5, 0.94)
 board_texture = ExtResource("3_board")
+board_variants = {
+"fire_arrows": {"texture": ExtResource("6_fire")},
+"molotov": {"texture": ExtResource("7_molotov"), "portrait_bounds": Rect2(-0.85, -1.9, 1.7, 1.95)},
+"quick_pitch": {"texture": ExtResource("8_pitch"), "portrait_bounds": Rect2(-0.85, -1.9, 1.7, 1.95)},
+"flamethrower": {"texture": ExtResource("9_flame"), "portrait_bounds": Rect2(-0.9, -2.0, 1.8, 2.05)},
+"bomb_arrows": {"texture": ExtResource("10_bomb")},
+"bigger_bombs": {"texture": ExtResource("11_bigger")},
+"anti_orc_grenades": {"texture": ExtResource("12_grenade"), "portrait_bounds": Rect2(-0.85, -1.9, 1.7, 1.95)},
+"aom": {"texture": ExtResource("13_aom"), "portrait_bounds": Rect2(-1.0, -1.9, 2.0, 1.95)},
+"aom_speed_1": {"texture": ExtResource("14_speed1"), "portrait_bounds": Rect2(-1.0, -1.9, 2.0, 1.95)},
+"aom_speed_2": {"texture": ExtResource("15_speed2"), "portrait_bounds": Rect2(-1.0, -1.9, 2.0, 1.95)},
+"four_archers": {"texture": ExtResource("16_four")},
+"eight_archers": {"texture": ExtResource("17_eight"), "board_height": 2.04744186, "board_anchor": Vector2(0.5, 0.9583871), "archer_pivot": Vector2(37, 57), "additional_archer_offsets": PackedVector2Array(-10, -12, 10, -12, -20, -38, 0, -38, -10, -50, 10, -50), "portrait_bounds": Rect2(-0.85, -2.5, 1.7, 2.55)},
+"arrow_minigun": {"texture": ExtResource("18_minigun"), "portrait_bounds": Rect2(-1.05, -1.95, 2.1, 2.0)}
+}
 archer_head_texture = ExtResource("4_heads")
 archer_body_texture = ExtResource("5_bodies")
 archer_pivot = Vector2(37, 19)

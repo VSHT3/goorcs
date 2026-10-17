@@ -42,29 +42,58 @@ static func valid_advancements(definition: TowerDefinition) -> bool:
 	if not definition.advancements.is_empty() and (definition.behavior_kind != "attack" or definition.special_upgrade != "second_archer" or definition.area_attack or not definition.evolutions.is_empty()):
 		return false
 	for branch: Variant in definition.advancements:
-		if not branch is String or branch not in ["four_archers", "fire_arrows", "bomb_arrows"] or not definition.advancements[branch] is Dictionary:
+		if not branch is String or String(branch).is_empty() or branch in ["damage", "speed", "special"] or not definition.advancements[branch] is Dictionary:
 			return false
 		var config: Dictionary = definition.advancements[branch]
-		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
+		if not _valid_advancement(config):
 			return false
-		var fields: Array[String] = []
-		match branch:
-			"four_archers":
-				if config.size() != 4 or not config.get("archer_count") is int or config["archer_count"] != 4:
-					return false
-				fields = ["attack_rate_multiplier"]
-			"fire_arrows":
-				if config.size() != 4:
-					return false
-				fields = ["burn_dps", "burn_duration"]
-			"bomb_arrows":
-				if config.size() != 5:
-					return false
-				fields = ["primary_multiplier", "splash_multiplier", "splash_radius"]
-		for field: String in fields:
-			if typeof(config.get(field)) not in [TYPE_FLOAT, TYPE_INT] or not is_finite(float(config[field])) or float(config[field]) <= 0.0:
+		var effective_interval: float = definition.interval * definition.speed_upgrade_multiplier / SECOND_ARCHER_ATTACK_RATE_MULTIPLIER / float(config.get("attack_rate_multiplier", 1.0))
+		var visited: Dictionary = {branch: true}
+		var previous: String = String(config.get("requires", ""))
+		while not previous.is_empty():
+			if visited.has(previous) or not definition.advancements.has(previous) or not definition.advancements[previous] is Dictionary:
 				return false
+			visited[previous] = true
+			var ancestor: Dictionary = definition.advancements[previous]
+			if not _valid_advancement(ancestor):
+				return false
+			effective_interval /= float(ancestor.get("attack_rate_multiplier", 1.0))
+			previous = String(ancestor.get("requires", ""))
+		if not is_finite(effective_interval) or effective_interval <= 0.0:
+			return false
 	return true
+
+
+static func _valid_advancement(config: Dictionary) -> bool:
+	if not config.get("title") is String or String(config["title"]).strip_edges().is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
+		return false
+	var numeric: Array[String] = ["attack_rate_multiplier", "primary_multiplier", "splash_multiplier", "splash_radius", "burn_dps", "burn_duration", "continuous_dps", "fuel_duration", "refuel_duration"]
+	for field: Variant in config:
+		if field in numeric:
+			if not _positive_number(config[field]):
+				return false
+		elif field not in ["title", "cost", "requires", "weapon", "archer_count"]:
+			return false
+	if config.has("requires") and (not config["requires"] is String or String(config["requires"]).is_empty()):
+		return false
+	var weapon: Variant = config.get("weapon", "arrow")
+	if not weapon is String or weapon not in ["arrow", "molotov", "flamethrower", "grenade", "rocket", "minigun"]:
+		return false
+	if config.has("archer_count") and (not config["archer_count"] is int or int(config["archer_count"]) < 1 or int(config["archer_count"]) > 8):
+		return false
+	if not config.has("archer_count") and not config.has("attack_rate_multiplier") and not config.has("primary_multiplier") and not config.has("splash_radius") and not config.has("burn_dps") and not config.has("continuous_dps"):
+		return false
+	if config.has("splash_radius") != config.has("splash_multiplier") or config.has("burn_dps") != config.has("burn_duration"):
+		return false
+	if weapon in ["flamethrower", "rocket", "minigun"] and config.get("archer_count") != 1:
+		return false
+	if weapon in ["molotov", "grenade", "rocket"] and (not config.has("primary_multiplier") or not config.has("splash_radius")):
+		return false
+	if weapon == "molotov" and not config.has("burn_dps"):
+		return false
+	if weapon == "flamethrower":
+		return config.has("continuous_dps") and config.has("fuel_duration") and config.has("refuel_duration") and config.has("burn_dps") and not config.has("primary_multiplier") and not config.has("splash_radius")
+	return not config.has("continuous_dps") and not config.has("fuel_duration") and not config.has("refuel_duration")
 
 
 static func valid_evolutions(definition: TowerDefinition) -> bool:

@@ -33,6 +33,20 @@ func _run() -> void:
 		_check(images[index].get_data() != images[0].get_data(), "Archer advancement renders differently from its base tower")
 	_check(images[1].get_data() != images[2].get_data(), "Two and four archers have distinct rendered silhouettes")
 	_check(images[3].get_data() != images[4].get_data(), "Fire and bomb arrows retain distinct held-arrow effects")
+	var branch_images: Array[Image] = []
+	for suffix: String in [
+		"four_archers/eight_archers",
+		"four_archers/eight_archers/arrow_minigun",
+		"fire_arrows/molotov",
+		"fire_arrows/molotov/quick_pitch/flamethrower",
+		"bomb_arrows/bigger_bombs/anti_orc_grenades",
+		"bomb_arrows/bigger_bombs/anti_orc_grenades/aom",
+	]:
+		portrait.configure(guide.preview(&"arrow_tower", "damage/speed/special/" + suffix))
+		var image: Image = await _capture()
+		for earlier: Image in branch_images:
+			_check(image.get_data() != earlier.get_data(), "Each new weapon/operator tier retains a distinct shared-renderer silhouette")
+		branch_images.append(image)
 	for record: Dictionary in guide.entries:
 		for stage: Dictionary in record["stages"]:
 			var preview: Dictionary = guide.preview(record["id"], stage["id"])

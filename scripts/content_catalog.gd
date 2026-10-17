@@ -131,7 +131,7 @@ static func _valid_board_variants(tower: TowerDefinition) -> bool:
 			return false
 		var variant: Dictionary = art.board_variants[branch]
 		for field: Variant in variant:
-			if typeof(field) != TYPE_STRING or field not in ["texture", "board_height", "board_anchor"]:
+			if typeof(field) != TYPE_STRING or field not in ["texture", "board_height", "board_anchor", "archer_pivot", "secondary_sprite_offset", "additional_archer_offsets", "portrait_bounds"]:
 				return false
 		if not variant.get("texture") is Texture2D:
 			return false
@@ -144,4 +144,20 @@ static func _valid_board_variants(tower: TowerDefinition) -> bool:
 		var normalized_anchor: Vector2 = anchor
 		if not normalized_anchor.is_finite() or normalized_anchor.x < 0.0 or normalized_anchor.x > 1.0 or normalized_anchor.y < 0.0 or normalized_anchor.y > 1.0:
 			return false
+		for field: String in ["archer_pivot", "secondary_sprite_offset"]:
+			if variant.has(field):
+				if not variant[field] is Vector2 or not Vector2(variant[field]).is_finite():
+					return false
+		if variant.has("additional_archer_offsets"):
+			if not variant["additional_archer_offsets"] is PackedVector2Array:
+				return false
+			for offset: Vector2 in variant["additional_archer_offsets"]:
+				if not offset.is_finite():
+					return false
+		if variant.has("portrait_bounds"):
+			if not variant["portrait_bounds"] is Rect2:
+				return false
+			var portrait: Rect2 = variant["portrait_bounds"]
+			if not portrait.position.is_finite() or not portrait.size.is_finite() or portrait.size.x <= 0.0 or portrait.size.y <= 0.0:
+				return false
 	return true

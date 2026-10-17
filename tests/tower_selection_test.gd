@@ -462,11 +462,34 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 			var surface := Rect2(screen.global_position, screen.size)
 			_check(surface.encloses(screen._management.get_global_rect()), "Arrow management remains inside the compact game surface")
 			for button: Button in screen.advancement_buttons.values():
-				_check(screen._management.get_global_rect().encloses(button.get_global_rect()), "Three wrapped choices stay inside the management panel")
+				if button.is_visible_in_tree():
+					_check(screen._management.get_global_rect().encloses(button.get_global_rect()), "Eligible wrapped choices stay inside the management panel")
 			for selector: TargetingCycle in [screen.targeting_button, screen.secondary_targeting, screen.third_targeting, screen.fourth_targeting]:
 				if selector.is_visible_in_tree():
 					for control: Control in [selector.previous_button, selector.mode_label, selector.next_button]:
 						_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "Labeled archer cycles stay inside the management panel at width %d" % width)
+		var followups: Array = {
+			"four_archers": ["eight_archers", "arrow_minigun"],
+			"fire_arrows": ["molotov", "quick_pitch", "flamethrower"],
+			"bomb_arrows": ["bigger_bombs", "anti_orc_grenades", "aom", "aom_speed_1", "aom_speed_2"],
+		}[branch]
+		for command: String in followups:
+			var next_price: int = int(choices[command]["cost"])
+			model.coins = [next_price, next_price]
+			planning._publish_snapshot()
+			var next_button: Button = screen.advancement_buttons[command]
+			_check(next_button.is_visible_in_tree() and not next_button.disabled, "Immediate prerequisite exposes the next native branch purchase")
+			await _press_cycle_button(next_button)
+			_check(tower["advancement"] == command and model.coins == [0, 0], "Each deeper native upgrade charges the exact authored price on both mirrored boards")
+			_check(tower["advancement_path"].back() == command, "Each accepted native branch purchase appends its history")
+			if command == "eight_archers":
+				for index: int in range(2, screen.extra_targeting.size()):
+					var selector: TargetingCycle = screen.extra_targeting[index]
+					_check(selector.is_visible_in_tree(), "Eight Archers exposes all independent native stream selectors")
+					await _press_cycle_button(selector.next_button)
+					for slot: int in range(2):
+						_check(planning.combat["towers"][slot][0]["extra_archers"][index]["mode"] == selector.mode, "Streams five through eight dispatch accepted mirrored target policies")
+		_check(not screen.secondary_targeting.is_visible_in_tree() and not screen._extra_target_row.is_visible_in_tree(), "Single-weapon terminal tiers hide obsolete secondary targeting controls")
 		model.coins = [10000, 10000]
 		planning._publish_snapshot()
 		frozen = planning.combat.duplicate(true)

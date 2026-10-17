@@ -14,8 +14,9 @@ extends Resource
 # Board-only layers leave collection/source artwork intact. Rig coordinates share
 # the icon's texture-local space, so inherited tower variants need no ID switches.
 @export var board_texture: Texture2D
-# Optional branch records: {texture: Texture2D, board_height: float,
-# board_anchor: Vector2}. Follow-up keys take precedence over evolution keys.
+# Optional branch records: {texture, board_height, board_anchor, archer_pivot,
+# secondary_sprite_offset, additional_archer_offsets, portrait_bounds}.
+# Advancement keys use the evolution argument; follow-up keys retain precedence.
 @export var board_variants: Dictionary = {}
 @export var mirror_board: bool = false
 @export var archer_head_texture: Texture2D

@@ -27,6 +27,7 @@ var rarity_reroll: Button
 var attribute_reroll: Button
 var _extra_upgrades: VBoxContainer
 var _extra_upgrade_buttons: Dictionary[String, Button] = {}
+var extra_targeting: Array[TargetingCycle] = []
 var _reroll_balance: Label
 
 @onready var world: MatchWorld = $World
@@ -104,9 +105,24 @@ func _ready() -> void:
 	secondary_targeting.mode_requested.connect(_secondary_target_selected)
 	third_targeting.mode_requested.connect(_extra_target_selected.bind(2))
 	fourth_targeting.mode_requested.connect(_extra_target_selected.bind(3))
+	extra_targeting.assign([third_targeting, fourth_targeting])
+	for archer_index: int in range(4, 8):
+		var row := HBoxContainer.new()
+		var caption := Label.new()
+		caption.text = "Archer %d" % (archer_index + 1)
+		row.add_child(caption)
+		var selector := TargetingCycle.new()
+		selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		selector.mode_requested.connect(_extra_target_selected.bind(archer_index))
+		row.add_child(selector)
+		_extra_target_row.add_child(row)
+		extra_targeting.append(selector)
 	for command: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
 		var button: Button = _advancement_row.get_node(NodePath(command)) as Button
 		advancement_buttons[command] = button
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.custom_minimum_size = Vector2(0, 84)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_upgrade.bind(command))
 	clear_button.pressed.connect(_clear)
 	ready_button.pressed.connect(_toggle_ready)
@@ -144,8 +160,16 @@ func _build_tower_management() -> void:
 	scroll.name = "InspectionScroll"
 	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_management.add_child(scroll)
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	var shell := VBoxContainer.new()
+	shell.add_theme_constant_override("separation", 8)
+	_management.add_child(shell)
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shell.add_child(scroll)
 	content.reparent(scroll, false)
+	# Keep the current/next purchase reachable while long targeting and
+	# modifier lists scroll independently above it.
+	_advancement_row.reparent(shell, false)
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_roll_details = Label.new()
 	_roll_details.name = "TowerRoll"
@@ -590,7 +614,7 @@ func _secondary_target_selected(mode: int) -> void:
 
 
 func _extra_target_selected(mode: int, archer_index: int) -> void:
-	var selector: TargetingCycle = third_targeting if archer_index == 2 else fourth_targeting
+	var selector: TargetingCycle = extra_targeting[archer_index - 2]
 	if planning != null and selector.is_visible_in_tree() and not selector.disabled and not _selected_tower().is_empty():
 		planning.set_archer_targeting(planning.local_slot(), selected_tower_id, archer_index, mode)
 	_refresh_targeting()
@@ -724,39 +748,42 @@ func _refresh_targeting() -> void:
 			_extra_upgrade_buttons[command] = button
 		_extra_upgrade_buttons[command].show()
 		_refresh_action(_extra_upgrade_buttons[command], actions[command])
+	var count: int = independent_weapon_count(tower, stats)
 	var second_archer: bool = bool(tower.get("special_upgraded", false)) and String(stats.get("special_upgrade", "")) == "second_archer"
-	_secondary_target_row.visible = second_archer
-	secondary_targeting.disabled = targeting_button.disabled or not second_archer
+	_secondary_target_row.visible = count > 1 and second_archer
+	secondary_targeting.disabled = targeting_button.disabled or not _secondary_target_row.visible
 	secondary_targeting.mode = int(tower.get("secondary_mode", tower["mode"]))
 	var advancements: Dictionary = stats.get("advancements", {})
-	_advancement_row.visible = second_archer and not advancements.is_empty()
+	var available: Dictionary = advancement_actions(tower, stats)
+	_advancement_row.visible = second_archer and not available.is_empty()
 	if _advancement_row.visible:
 		special_upgrade.hide()
 		special_upgrade.disabled = true
 		_special_upgrade_command = ""
+	for command: String in advancements:
+		if not advancement_buttons.has(command):
+			var button := Button.new()
+			button.custom_minimum_size = Vector2(0, 84)
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.add_theme_font_size_override("font_size", 16)
+			button.pressed.connect(_upgrade.bind(command))
+			_advancement_row.add_child(button)
+			advancement_buttons[command] = button
 	for command: String in advancement_buttons:
 		var button: Button = advancement_buttons[command]
-		var definition: Dictionary = advancements.get(command, {})
-		var chosen: String = String(tower.get("advancement", ""))
-		var purchased: bool = chosen == command
-		var locked: bool = not chosen.is_empty() and not purchased
-		var price: int = int(definition.get("cost", 0))
-		button.text = "%s\n%s" % [String(definition.get("title", command)), "Purchased" if purchased else ("Locked" if locked else str(price))]
-		button.disabled = not _advancement_row.visible or definition.is_empty() or purchased or locked or targeting_button.disabled or _own_coins() < price
-		button.tooltip_text = advancement_tooltip(command, definition)
-		if locked:
-			button.tooltip_text += "\nLocked: another advancement was purchased."
-		elif not purchased and _own_coins() < price:
-			button.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
-		if targeting_button.disabled:
-			button.tooltip_text += "\nUnavailable while Ready or after the run ends."
+		button.visible = available.has(command)
+		if available.has(command):
+			_refresh_action(button, available[command])
+		else:
+			button.disabled = true
 	var extra_archers: Array = tower.get("extra_archers", [])
-	var four_archers: bool = tower.get("advancement", "") == "four_archers" and extra_archers.size() == 2
-	_extra_target_row.visible = four_archers
-	for index: int in range(2):
-		var selector: TargetingCycle = third_targeting if index == 0 else fourth_targeting
-		selector.disabled = targeting_button.disabled or not four_archers
-		if four_archers:
+	_extra_target_row.visible = count > 2
+	for index: int in range(extra_targeting.size()):
+		var selector: TargetingCycle = extra_targeting[index]
+		selector.get_parent_control().visible = index + 2 < count
+		selector.disabled = targeting_button.disabled or index + 2 >= count
+		if index + 2 < count and index < extra_archers.size():
 			selector.mode = int(extra_archers[index]["mode"])
 	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
 	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
@@ -800,7 +827,8 @@ static func tower_display_title(tower: Dictionary, stats: Dictionary) -> String:
 	var branch: Dictionary = evolutions.get(String(tower.get("evolution", "")), {})
 	var followups: Dictionary = branch.get("followups", {})
 	var followup: Dictionary = followups.get(String(tower.get("followup", "")), {})
-	var title: String = String(followup.get("title", branch.get("title", stats.get("title", "Tower"))))
+	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
+	var title: String = String(advancement.get("title", followup.get("title", branch.get("title", stats.get("title", "Tower")))))
 	var level: int = MatchCombat.tower_level(tower)
 	return "%s · %s" % [title, TOWER_LEVEL_NUMERALS[level - 1] if level <= TOWER_LEVEL_NUMERALS.size() else str(level)]
 
@@ -864,6 +892,21 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 				result = "Damage %d · %.2f attacks/s\nEvery %.2fs" % [damage, 1.0 / interval, interval]
 			if kind == "chain":
 				result += "\n%d chain hits · %.2f jump reach\n+%.0f%% damage / successive hit" % [int(config.get("hit_count", 1)), float(config.get("jump_distance", 0.0)), float(config.get("successive_hit_bonus", 0.0)) * 100.0]
+	var advancement: Dictionary = fallback.get("advancements", {}).get(state.get("advancement", ""), {})
+	if not advancement.is_empty():
+		var weapon: String = String(advancement.get("weapon", "arrow"))
+		var damage: float = float(state.get("damage", 0))
+		var interval: float = maxf(float(state.get("interval", 1.0)), 0.001)
+		if weapon == "flamethrower":
+			result = "%s FIRE / s · 1 operator\n%ss fuel · %ss refuel" % [String.num(float(advancement.get("continuous_dps", 0.0)) * float(state.get("damage_multiplier", 1.0)) * float(state.get("speed_multiplier", 1.0)), 1), String.num(float(advancement.get("fuel_duration", 60.0)), 0), String.num(float(advancement.get("refuel_duration", 6.0)), 0)]
+		elif weapon == "minigun":
+			result = "3 crew · 1 arrow stream\n%s damage · %.2f arrows/s" % [String.num(damage, 0), 1.0 / interval]
+		else:
+			result = "%d %s · %.2f attacks/s each\n%s primary damage" % [independent_weapon_count(state, fallback), "rocket operator" if weapon == "rocket" else ("throwers" if weapon in ["grenade", "molotov"] else "archers"), 1.0 / interval, String.num(ceilf(damage * float(advancement.get("primary_multiplier", 1.0))), 0)]
+		if advancement.has("splash_multiplier"):
+			result += "\n%s splash · %s cells" % [String.num(ceilf(damage * float(advancement["splash_multiplier"])), 0), String.num(float(advancement.get("splash_radius", 0.0)), 2)]
+		if advancement.has("burn_dps"):
+			result += "\n%s burn/s · %ss" % [String.num(float(advancement["burn_dps"]) * float(state.get("damage_multiplier", 1.0)), 1), String.num(float(advancement.get("burn_duration", 0.0)), 1)]
 	return result + "\nRange %.2f cells" % range_cells
 
 
@@ -938,16 +981,60 @@ static func upgrade_description(command: String, definition: Dictionary) -> Stri
 
 
 
-static func advancement_tooltip(command: String, definition: Dictionary) -> String:
-	var details: String = ""
-	match command:
-		"four_archers":
-			details = "%d archers with independent targeting; prefer distinct enemies, then share targets if needed. Attack rate ×%s." % [int(definition.get("archer_count", 0)), String.num(float(definition.get("attack_rate_multiplier", 1.0)), 2)]
-		"fire_arrows":
-			details = "Physical arrows ignite enemies for %s damage/s over %ss. Burn refreshes without stacking." % [String.num(float(definition.get("burn_dps", 0.0)), 2), String.num(float(definition.get("burn_duration", 0.0)), 2)]
-		"bomb_arrows":
-			details = "Primary damage ×%s; other enemies within %s cells take ×%s damage, rounded up." % [String.num(float(definition.get("primary_multiplier", 0.0)), 2), String.num(float(definition.get("splash_radius", 0.0)), 2), String.num(float(definition.get("splash_multiplier", 0.0)), 2)]
-	return details + "\nRequires Second Archer. Choose one advancement."
+static func advancement_actions(tower: Dictionary, stats: Dictionary) -> Dictionary:
+	var result: Dictionary = {}
+	var advancements: Dictionary = stats.get("advancements", {})
+	var chosen: String = String(tower.get("advancement", ""))
+	var history: Array = tower.get("advancement_path", [])
+	var ready: bool = bool(tower.get("special_upgraded", false))
+	for command: String in advancements:
+		var definition: Dictionary = advancements[command]
+		var requires: String = String(definition.get("requires", ""))
+		var purchased: bool = chosen == command or history.has(command)
+		# Before choosing, show roots. Thereafter show the accepted node and
+		# its immediate successors, never unrelated or unreachable purchases.
+		if (chosen.is_empty() and not requires.is_empty()) or (not chosen.is_empty() and command != chosen and requires != chosen):
+			continue
+		var title: String = String(definition.get("title", command.capitalize()))
+		if command in ["aom_speed_1", "aom_speed_2"]:
+			title = "Rapid Reload I" if command == "aom_speed_1" else "Rapid Reload II"
+		result[command] = {
+			"title": title,
+			"cost": int(definition.get("cost", 0)), "purchased": purchased,
+			"locked": not ready, "description": advancement_tooltip(command, definition),
+		}
+	return result
+
+
+static func independent_weapon_count(tower: Dictionary, stats: Dictionary) -> int:
+	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
+	return int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) and stats.get("special_upgrade", "") == "second_archer" else 1))
+
+
+static func advancement_tooltip(_command: String, definition: Dictionary) -> String:
+	var parts := PackedStringArray()
+	var weapon: String = String(definition.get("weapon", "arrow"))
+	match weapon:
+		"flamethrower":
+			parts.append("Continuous FIRE damage; one operator. Fire for %ss uninterrupted, then refuel for %ss. Losing a target resets the firing streak; refueling cannot be canceled." % [String.num(float(definition.get("fuel_duration", 60.0)), 0), String.num(float(definition.get("refuel_duration", 6.0)), 0)])
+		"minigun":
+			parts.append("Three-archer crew; one rotary arrow stream with the output of twenty archers.")
+		"rocket":
+			parts.append("One rocket operator. Slow, heavy missiles with a huge blast.")
+		"molotov":
+			parts.append("Thrown incendiary bottles; impact, splash, and refreshing burn.")
+		"grenade":
+			parts.append("Thrown anti-orc grenades; heavy impact and a wide blast.")
+		_:
+			parts.append("%d independently targeted archers." % int(definition.get("archer_count", 2)))
+	if definition.has("primary_multiplier"):
+		parts.append("Primary ×%s; splash ×%s within %s cells." % [String.num(float(definition["primary_multiplier"]), 2), String.num(float(definition.get("splash_multiplier", 0.0)), 2), String.num(float(definition.get("splash_radius", 0.0)), 2)])
+	if definition.has("burn_dps"):
+		parts.append("Burn %s/s for %ss; refreshes without stacking." % [String.num(float(definition["burn_dps"]), 1), String.num(float(definition.get("burn_duration", 0.0)), 1)])
+	var rate: float = float(definition.get("attack_rate_multiplier", 1.0))
+	if not is_equal_approx(rate, 1.0):
+		parts.append("Attack rate +%s%%." % String.num((rate - 1.0) * 100.0, 0))
+	return "\n".join(parts)
 
 func _choice_upgrade_pressed(alternate: bool) -> void:
 	_upgrade(_alternate_upgrade_command if alternate else _special_upgrade_command)

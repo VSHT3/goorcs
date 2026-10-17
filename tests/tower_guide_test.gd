@@ -8,6 +8,7 @@ func _init() -> void:
 	_test_exclusive_nested_branches()
 	_test_passive_roles()
 	_test_stage_index()
+	_test_flat_advancement_chains()
 	_test_isolation_and_reconfiguration()
 	_test_invalid_inputs()
 	if failures == 0:
@@ -202,6 +203,37 @@ func _test_stage_index() -> void:
 			_check(stage["parent_id"] == "" or ids.has(stage["parent_id"]), "Selectable progression parents exist before their children")
 			ids[stage["id"]] = true
 
+
+
+func _test_flat_advancement_chains() -> void:
+	var rules: CombatRules = preload("res://resources/combat/prototype.tres")
+	var guide := TowerGuide.new()
+	guide.configure(rules.catalog, rules)
+	var definition: TowerDefinition = rules.catalog.towers[0]
+	var record: Dictionary = guide.entry(definition.reward.id)
+	var visited: Dictionary = {}
+	for stage: Dictionary in record["stages"]:
+		var commands: Array = stage["commands"]
+		if commands.is_empty() or not definition.advancements.has(commands.back()):
+			continue
+		var command: String = commands.back()
+		var config: Dictionary = definition.advancements[command]
+		var preview: Dictionary = guide.preview(definition.reward.id, stage["id"])
+		_check(not preview.is_empty(), "Every flat advancement can be purchased through the real owner")
+		if preview.is_empty():
+			continue
+		visited[command] = true
+		var history: Array = commands.slice(3)
+		_check(preview["tower"]["advancement_path"] == history and preview["tower"]["advancement"] == command, "Accepted branch history includes every prerequisite, root onward")
+		_check(int(preview["steps"].back()["cost"]) == int(config["cost"]) and preview["steps"].back()["title"] == config["title"], "Flat node title and exact price come from the authored config")
+		var sum: int = int(preview["stats"]["cost"])
+		for step: Dictionary in preview["steps"]:
+			sum += int(step["cost"])
+		_check(sum == int(preview["total_cost"]), "Deep branch total includes every actual charge once")
+		var requires: String = String(config.get("requires", ""))
+		if not requires.is_empty():
+			_check(commands[commands.size() - 2] == requires and stage["parent_id"] == "/".join(commands.slice(0, commands.size() - 1)), "Recursive prerequisite ancestry supplies the immediate connected graph parent")
+	_check(visited.size() == definition.advancements.size() and visited.size() == 13, "Guide exposes all thirteen Arrow branch tiers")
 
 func _test_isolation_and_reconfiguration() -> void:
 	var rules: CombatRules = _fixture()

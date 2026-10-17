@@ -19,6 +19,7 @@ func configure(preview: Dictionary) -> void:
 	tower_types.clear()
 	_tower_art.clear()
 	if preview.is_empty():
+		queue_redraw()
 		return
 	var tower: Dictionary = preview["tower"].duplicate(true)
 	var reward: TowerReward = preview["reward"]
@@ -31,7 +32,10 @@ func configure(preview: Dictionary) -> void:
 
 
 func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
-	var variant: Dictionary = reward.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
+	var art_branch: String = String(tower.get("advancement", ""))
+	if art_branch.is_empty():
+		art_branch = String(tower.get("evolution", ""))
+	var variant: Dictionary = reward.board_variant(art_branch, tower.get("followup", ""))
 	var texture: Texture2D = variant.get("texture", reward.icon_texture)
 	if texture == null:
 		return
@@ -44,15 +48,20 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 	_frame = _frame.merge(Rect2(-0.7, -0.85, 1.4, 0.65))
 	if reward.archer_head_texture != null:
 		var offsets: Array[Vector2] = [Vector2.ZERO]
-		if bool(tower.get("special_upgraded", false)) and tower_types[String(tower["type_id"])].get("special_upgrade", "") == "second_archer":
-			offsets.append(reward.secondary_sprite_offset)
-		for index: int in range(tower.get("extra_archers", []).size()):
-			offsets.append(_archer_offset(reward, index + 2))
+		var advancement: Dictionary = tower_types[String(tower["type_id"])].get("advancements", {}).get(tower.get("advancement", ""), {})
+		var count: int = int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) else 1))
+		if count > 1:
+			offsets.append(variant.get("secondary_sprite_offset", reward.secondary_sprite_offset))
+		var additional: PackedVector2Array = variant.get("additional_archer_offsets", reward.additional_archer_offsets)
+		for index: int in range(maxi(0, count - 2)):
+			offsets.append(additional[index] if index < additional.size() else _archer_offset(reward, index + 2))
 		for offset: Vector2 in offsets:
-			var pivot: Vector2 = (reward.archer_pivot + offset - texture.get_size() * anchor) * units
+			var pivot: Vector2 = (Vector2(variant.get("archer_pivot", reward.archer_pivot)) + offset - texture.get_size() * anchor) * units
 			# Upright head, bow, held arrow, and attached fire/bomb tip at any facing.
 			var radius: float = 25.0 * units + reward.projectile_length
 			_frame = _frame.merge(Rect2(pivot - Vector2.ONE * radius, Vector2.ONE * radius * 2.0))
+	if variant.has("portrait_bounds"):
+		_frame = _frame.merge(variant["portrait_bounds"])
 	_frame = _frame.grow(0.08)
 	queue_redraw()
 

@@ -319,6 +319,17 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 		"chain":
 			return "Chains through nearby enemies, dealing more damage with each jump." if float(config.get("successive_hit_bonus", 0.0)) > 0.0 else "Chains through nearby enemies at full damage."
 	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
+	match String(advancement.get("weapon", "arrow")):
+		"flamethrower":
+			return "One operator sprays continuous FIRE damage. After 60 uninterrupted firing seconds, refuel for 6 seconds. Losing a target resets the streak; refueling cannot be canceled. Burn refreshes without stacking."
+		"molotov":
+			return "Two throwers lob incendiary bottles: impact, splash, and refreshing burn."
+		"grenade":
+			return "Two throwers lob anti-orc grenades with a wider, heavier blast."
+		"rocket":
+			return "One muscular operator fires slow, heavy rockets with a huge blast."
+		"minigun":
+			return "Three archers crew one rotary arrow gun: a single stream with the output of twenty archers."
 	if advancement.has("burn_dps"):
 		return "Independent archers fire arrows that burn their targets. Burning refreshes without stacking."
 	if advancement.has("splash_multiplier"):
@@ -367,14 +378,22 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 	var continuous: bool = bool(branch.get("continuous", false))
 	var damage: int = int(tower["damage"])
 	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
+	var weapon: String = String(advancement.get("weapon", "arrow"))
+	continuous = continuous or weapon == "flamethrower"
 	if continuous:
-		_add_stat(_stats, &"continuous_dps", "Continuous damage", "%d / s" % damage)
+		var dps: float = float(advancement.get("continuous_dps", damage)) * (float(tower.get("damage_multiplier", 1.0)) * float(tower.get("speed_multiplier", 1.0)) if weapon == "flamethrower" else 1.0)
+		_add_stat(_stats, &"continuous_dps", "Continuous FIRE" if weapon == "flamethrower" else "Continuous damage", "%s / s" % _number(dps))
 	else:
 		var caption: String = "Initial hit damage" if tower.get("behavior_kind", "attack") == "chain" else ("Damage per pulse" if bool(stats.get("area_attack", false)) else "Damage per hit")
 		if advancement.has("primary_multiplier"):
-			caption = "Base projectile damage"
-		_add_stat(_stats, &"damage", caption, str(damage))
+			_add_stat(_stats, &"primary_damage", "Primary hit damage", str(ceili(float(damage) * float(advancement["primary_multiplier"]))))
+		else:
+			_add_stat(_stats, &"damage", caption, str(damage))
 		_add_stat(_stats, &"interval", "Attack interval", "%s s" % _number(float(tower["interval"])))
+		_add_stat(_stats, &"attack_rate", "Stream rate" if weapon == "minigun" else "Attacks / s per weapon", _number(1.0 / maxf(float(tower["interval"]), 0.001)))
+	if weapon == "flamethrower":
+		_add_stat(_stats, &"fuel_duration", "Uninterrupted fire", "%s s" % _number(float(advancement.get("fuel_duration", 60.0))))
+		_add_stat(_stats, &"refuel_duration", "Mandatory refuel", "%s s" % _number(float(advancement.get("refuel_duration", 6.0))))
 	if tower.get("behavior_kind", "attack") == "chain":
 		var config: Dictionary = tower["behavior_config"]
 		_add_stat(_stats, &"chain_hits", "Maximum chain hits", str(int(config["hit_count"])))
@@ -388,9 +407,10 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 	else:
 		if stats.get("special_upgrade", "") == "second_archer":
 			var count: int = int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) else 1))
-			_add_stat(_stats, &"archers", "Independent archers", str(count))
-			if advancement.has("primary_multiplier"):
-				_add_stat(_stats, &"primary_damage", "Bomb primary damage", str(ceili(float(damage) * float(advancement["primary_multiplier"]))))
+			if weapon == "minigun":
+				_add_stat(_stats, &"crew", "Crew / arrow streams", "3 / 1")
+			else:
+				_add_stat(_stats, &"archers", "Operators" if weapon in ["flamethrower", "rocket"] else ("Independent throwers" if weapon in ["molotov", "grenade"] else "Independent archers"), str(count))
 			if advancement.has("splash_multiplier"):
 				_add_stat(_stats, &"splash_damage", "Other splash targets", str(ceili(float(damage) * float(advancement["splash_multiplier"]))))
 				_add_stat(_stats, &"splash_radius", "Splash radius", "%s cells" % _number(float(advancement["splash_radius"])))

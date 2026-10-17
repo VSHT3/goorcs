@@ -89,6 +89,18 @@ func _check_input() -> void:
 	_check(viewport.gui_get_focus_owner() == screen.back_button, "BackTab wraps from the selected index to X")
 	await _key(KEY_TAB, true)
 	_check_graph_preview("damage/speed", "BackTab from X reaches the remembered selected node")
+	screen.select_tower(&"arrow_tower")
+	var deepest: Dictionary = screen.entries[screen.selected_index]["stages"].back()
+	screen.select_stage(deepest["id"])
+	await _settle()
+	screen.stage_graph.focus_selected_stage()
+	await _settle()
+	_check(screen.stage_graph.get_global_rect().encloses(screen.stage_graph.stage_buttons[deepest["id"]].get_global_rect()), "Programmatic deep selection automatically reveals a full-size node")
+	_check(screen.stage_graph.scroll.scroll_vertical > 0, "Deep branches use real scroll space rather than shrinking the graph")
+	await _key(KEY_UP)
+	_check(screen.selected_stage_id == deepest["parent_id"], "Keyboard Up from a deep tier follows its prerequisite")
+	await _key(KEY_DOWN)
+	_check(screen.selected_stage_id == deepest["id"], "Keyboard Down returns to the deep tier and keeps it revealed")
 
 
 func _check_catalog() -> void:
@@ -147,6 +159,12 @@ func _check_graph_nodes(record: Dictionary) -> void:
 		var button: Button = screen.stage_graph.stage_buttons[stage_id]
 		_check(button.get_meta("stage_id") is String and button.get_meta("stage_id") == stage_id, "Native Button metadata retains the exact String stage identity")
 		_check(button.is_visible_in_tree() and not button.disabled, "Every actual graph node remains visible and clickable")
+		var caption: Label = button.get_child(0).get_child(button.get_child(0).get_child_count() - 1) as Label
+		_check(caption != null and button.get_global_rect().encloses(caption.get_global_rect()), "Wrapped captions stay within full-size upgrade nodes")
+		if stage["commands"].size() != 1:
+			var thumbnail: TowerPortrait = button.get_child(0).get_child(0) as TowerPortrait
+			var accepted: Dictionary = expected.preview(record["id"], stage_id)
+			_check(thumbnail != null and thumbnail.combat_towers[0] == accepted["tower"], "Each illustrated node renders its own accepted battlefield geometry")
 
 
 func _check_fixed_graph() -> void:
@@ -163,12 +181,15 @@ func _check_fixed_graph() -> void:
 	for index: int in range(buttons.size()):
 		var button: Button = buttons[index]
 		var node_rect: Rect2 = button.get_global_rect()
-		_check(node_rect.size.x > 0.0 and node_rect.size.y > 0.0 and graph_rect.encloses(node_rect), "Every upgrade node fits completely inside its diagram")
+		_check(node_rect.size.x >= 140.0 and node_rect.size.y >= 52.0, "Deep upgrades retain readable native node sizes")
+		if button == screen.stage_graph.stage_buttons[screen.selected_stage_id]:
+			_check(graph_rect.encloses(node_rect), "Selection is automatically revealed inside the scrollable graph")
 		for other_index: int in range(index + 1, buttons.size()):
 			_check(not node_rect.intersects(buttons[other_index].get_global_rect()), "Actual upgrade node rectangles never overlap")
 	for button: Button in screen.tower_buttons:
 		_check(viewport_rect.encloses(button.get_global_rect()) and not graph_rect.intersects(button.get_global_rect()), "Every tower rail control fits without overflowing into the diagram")
 	_check(viewport.gui_get_focus_owner() == screen.stage_graph.stage_buttons[screen.selected_stage_id], "The selected native graph Button keeps actual focus even when stat height changes")
+	_check(not screen.stage_graph.scroll.get_v_scroll_bar().is_visible_in_tree() and not screen.stage_graph.scroll.get_h_scroll_bar().is_visible_in_tree(), "The graph scrolls without scrollbar chrome")
 
 
 func _check_graph_preview(stage_id: String, description: String, require_focus: bool = true) -> void:
@@ -183,6 +204,8 @@ func _check_graph_preview(stage_id: String, description: String, require_focus: 
 
 func _choose_stage(stage_id: String) -> void:
 	var button: Button = screen.stage_graph.stage_buttons[stage_id]
+	screen.stage_graph.scroll.ensure_control_visible(button)
+	await _settle()
 	await _click(button.get_global_rect().get_center())
 	_check_graph_preview(stage_id, "Real pointer input selects the requested native node and actual preview")
 
@@ -207,11 +230,19 @@ func _check_role(preview: Dictionary) -> void:
 		"income_aura":
 			_check_value(&"kill_income", float(config["kill_income_bonus"]) * 100.0)
 		_:
-			if tower["evolution"] == "boulders":
+			var advancement: Dictionary = stats["advancements"].get(tower["advancement"], {})
+			var weapon: String = String(advancement.get("weapon", "arrow"))
+			if weapon == "flamethrower":
+				_check_value(&"continuous_dps", float(advancement["continuous_dps"]) * float(tower.get("damage_multiplier", 1.0)) * float(tower.get("speed_multiplier", 1.0)))
+				_check_value(&"fuel_duration", float(advancement["fuel_duration"]))
+				_check_value(&"refuel_duration", float(advancement["refuel_duration"]))
+				_check(not screen.stat_values.has(&"interval"), "Continuous flame is not represented as discrete projectile attacks")
+			elif tower["evolution"] == "boulders":
 				_check_value(&"continuous_dps", float(tower["damage"]))
 				_check(not screen.stat_values.has(&"interval"), "Continuous damage is never divided by a zero attack interval")
 			else:
-				_check_value(&"damage", float(tower["damage"]))
+				if not advancement.has("primary_multiplier"):
+					_check_value(&"damage", float(tower["damage"]))
 				_check_value(&"interval", float(tower["interval"]))
 			if kind == "chain":
 				_check_value(&"chain_hits", float(config["hit_count"]))
@@ -221,9 +252,13 @@ func _check_role(preview: Dictionary) -> void:
 				_check_value(&"freeze_threshold", TowerDefinition.FREEZE_DAMAGE_THRESHOLD * 100.0)
 				_check_value(&"freeze_slow", (1.0 - TowerDefinition.FREEZE_SPEED_MULTIPLIER) * 100.0)
 				_check_value(&"freeze_duration", TowerDefinition.FREEZE_DURATION)
-			var advancement: Dictionary = stats["advancements"].get(tower["advancement"], {})
+			if weapon == "minigun":
+				_check(screen.stat_values.has(&"crew") and not screen.stat_values.has(&"archers"), "The minigun has three crew and one stream, not one independent archer")
+			elif stats.get("special_upgrade", "") == "second_archer":
+				_check_value(&"archers", float(MatchPlanningScreen.independent_weapon_count(tower, stats)))
 			if advancement.has("primary_multiplier"):
 				_check_value(&"primary_damage", float(ceili(float(tower["damage"]) * float(advancement["primary_multiplier"]))))
+			if advancement.has("splash_multiplier"):
 				_check_value(&"splash_damage", float(ceili(float(tower["damage"]) * float(advancement["splash_multiplier"]))))
 			if advancement.has("burn_dps"):
 				_check_value(&"burn_dps", float(advancement["burn_dps"]))
@@ -261,6 +296,9 @@ func _check_injected_catalog() -> void:
 	injected.enemies.assign(rules.catalog.enemies)
 	var tower := TowerDefinition.new()
 	tower.reward = rules.catalog.towers[0].reward.duplicate() as TowerReward
+	# This fixture borrows only baseline artwork, not branches it does not
+	# declare. Branch-art admission deliberately rejects unknown stage keys.
+	tower.reward.board_variants = {}
 	tower.reward.id = &"injected_sentry"
 	tower.reward.title = "Injected sentry"
 	tower.damage = 37

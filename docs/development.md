@@ -105,6 +105,19 @@ The portrait rendered regression passed every catalog stage, clipping bounds, di
 
 The broader isolated `python3 tools/verify.py all` attempt passed **57/62 checks**, before that board-test correction. Four other suites failed in the concurrent boss/combat/Orcieary work: `enemy_boss_test`, `gameplay_peer_test`, `match_combat_test`, and `orcieary_screen_test`. Those files were not changed by the portrait/orbit fix; this is not a green full-suite claim. Evidence is retained under `.verify-logs/20261017T180823Z-all-a90cdfee/` and `.verify-logs/gorcs-verify-portrait-smoke-33a32c66a17e4d3eacee1c5b59eae13e/`. Private smoke projects/saves are disposable; internet reachability, long-run performance, and blanket artwork approval remain unverified.
 
+### Late-game Arrow branch verification
+
+Arrow now extends all three entry choices through Molotov/Quick Pitch/Flamethrower, Bigger Explosions/Grenades/A.O.M./two reload kits, and Eight Archers/Arrow Minigun. [Archer rules](archer-advancements.md) own prices, targeting, provisional cross-branch tuning, and the host's uninterrupted-firing/refuel contract. The guide keeps connected full-size nodes in a chrome-free scrollable graph; thumbnails and portraits reuse battlefield rendering.
+
+The focused advancement, tower-selection, Towerieary, and rendered board suites passed after integration fixes. A real graphical endurance walkthrough exposed a fractional refuel-time residue that suppressed the resumed flame jet; the combat owner now retires that flag exactly at zero, with a regression covering 0.05-second clock steps.
+
+The isolated `python3 tools/verify.py all` run passed **62/62 checks**, including clean imports, actual save isolation, both startup modes, all model/control/provider/rendered suites, and real separate host/client processes. Logs: `.verify-logs/20261017T184054Z-all-61bbef80/`.
+
+After final stat/chrome/blast polish, all four focused suites and an isolated **15.24-second actual-main-scene rendered walkthrough** passed on macOS Compatibility/OpenGL (Apple M2). It used native T/S, pointer-selected every Arrow stage at **1000×720 / 1280×720**, built a real path/tower, purchased every tier through Sandbox controls, spawned enemies, exercised throws/rockets/rotary arrows/flame and both orientations, and completed **60 seconds firing → 6 seconds refueling → resumed flame**. Only private fixture enemy health/movement changed for endurance; tower mechanics remained real. Native48px and representative guide/Sandbox/refuel captures were inspected. Evidence: `.verify-logs/gorcs-verify-archer-smoke-1d075d4687274300b3e685a13fd7ae6c/`.
+
+This verifies those controls, pixels, combat paths, and timing, not final competitive balance, creator artwork approval, long-run density/performance, or separate-network internet behavior. Disposable projects/saves keep player progress isolated.
+
+
 
 ### Maintenance verification
 
