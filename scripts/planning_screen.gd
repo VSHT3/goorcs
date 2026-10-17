@@ -975,7 +975,7 @@ static func upgrade_description(command: String, definition: Dictionary) -> Stri
 		"bounce":
 			return "A bolt redirects to the nearest other enemy for 50% damage, rounded up. Rolled extra Bounce adds more redirects."
 		"freeze_runes":
-			return "Boulders also slow eligible enemies, following the authored freeze duration and strength. Ice-immune enemies ignore the slow."
+			return "Boulders immediately slow ice-susceptible enemies by 20% while exposed. Higher maximum HP means faster thawing; ice-immune enemies ignore the slow."
 		_:
 			return "Deals %d %s to every enemy in the surrounding neighborhood%s." % [int(definition.get("damage", 0)), "damage per second" if bool(definition.get("continuous", false)) else "damage", "" if bool(definition.get("continuous", false)) else " every %.2fs" % float(definition.get("interval", 1.0))]
 

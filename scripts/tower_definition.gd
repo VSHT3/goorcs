@@ -3,7 +3,7 @@ extends Resource
 
 const SECOND_ARCHER_ATTACK_RATE_MULTIPLIER: float = 1.1
 const BOUNCE_DAMAGE_MULTIPLIER: float = 0.5
-const FREEZE_DAMAGE_THRESHOLD: float = 0.2
+const FREEZE_HP_SCALE: float = 100.0
 const FREEZE_SPEED_MULTIPLIER: float = 0.8
 const FREEZE_DURATION: float = 2.0
 
@@ -36,6 +36,12 @@ const FREEZE_DURATION: float = 2.0
 @export var special_upgrade_config: Dictionary = {}
 @export var evolutions: Dictionary = {}
 @export var advancements: Dictionary = {}
+
+
+static func freeze_duration(max_hp: int) -> float:
+	return FREEZE_DURATION / (1.0 + float(max_hp) / FREEZE_HP_SCALE)
+
+
 
 
 static func valid_advancements(definition: TowerDefinition) -> bool:

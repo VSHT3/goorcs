@@ -55,14 +55,15 @@ func _run() -> void:
 	await _start_wave()
 	if main.planning.combat["enemies"][0].size() != 3 or main.planning.combat["enemies"][1].size() != 3:
 		_check(false, "Real wave spawns three separated instances on each board")
-		await _finish()
+		_finish.call_deferred()
 		return
 	await _check_identity_and_stats()
 	await _check_interpolation()
 	await _check_opponent_and_layout()
 	await _check_lifecycle()
 	await _check_leave_and_reopen()
-	await _finish()
+	# Release this coroutine's private rules before starting fixture teardown.
+	_finish.call_deferred()
 
 
 func _open_match() -> void:
@@ -530,7 +531,7 @@ func _finish() -> void:
 	_check(DirAccess.remove_absolute(directory) == OK, "Remove isolated enemy-inspection collection directory")
 	if failures == 0:
 		print("PASS: instance-identity enemy inspection, real accepted stats, interpolated highlight, transformed mirrored/opponent input, anchored HUD and lifecycle reset")
-	quit(1 if failures else 0)
+	quit.call_deferred(1 if failures else 0)
 
 
 func _check(condition: bool, description: String) -> void:

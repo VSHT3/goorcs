@@ -1754,27 +1754,48 @@ func _test_freeze_damage_and_expiry() -> void:
 	_check(enemy["hp"] == 18 and not enemy["slowed"], "Ordinary Rune damage is real HP damage, not an early slow")
 	combat.upgrade_tower(0, tower["id"], "boulders")
 	combat.advance(0.34)
-	_check(enemy["hp"] == 16 and not enemy["slowed"] and combat._rune_damage[tower["id"]][enemy["id"]] == 4, "Host keeps prior base and Boulders actual damage for the same source")
+	_check(enemy["hp"] == 16 and not enemy["slowed"], "Unupgraded Boulders deals physical damage without slowing")
 	var hp: int = enemy["hp"]
 	combat.upgrade_tower(0, tower["id"], "freeze_runes")
-	_check(enemy["hp"] == hp and not enemy["slowed"] and enemy["slow_remaining"] == 0.0, "Buying Freeze above threshold grants neither retroactive slow nor damage")
-	combat.advance(0.17)
-	_check(enemy["hp"] == hp - 1 and enemy["slowed"] and enemy["slow_remaining"] == 2.0, "The next qualifying upgraded damage tick activates a two-second slow")
-	combat.advance(0.05)
-	_check(is_equal_approx(enemy["slow_remaining"], 1.95), "Fractional exposure without actual HP damage does not refresh Freeze")
-	combat.advance(0.12)
-	_check(enemy["slow_remaining"] == 2.0, "Later actual damage above threshold refreshes rather than stacks the timer")
+	_check(enemy["hp"] == hp and not enemy["slowed"] and enemy["slow_remaining"] == 0.0, "Buying Freeze grants neither retroactive slow nor damage")
+	combat.advance(0.01)
+	var duration: float = 2.0 / (1.0 + 20.0 / 100.0)
+	_check(enemy["hp"] == hp and enemy["slowed"] and is_equal_approx(enemy["slow_remaining"], duration), "Positive fractional Boulders exposure slows immediately before any whole HP damage")
+	combat.advance(0.01)
+	_check(enemy["hp"] == hp and is_equal_approx(enemy["slow_remaining"], duration), "Even sub-HP exposure refreshes the same timer without stacking")
 	var id: int = tower["id"]
 	combat.sell_tower(0, id)
-	_check(enemy["slowed"] and not combat._rune_damage.has(id) and not combat._continuous_damage.has(id), "Sale retires both source ledgers without cancelling an existing enemy slow")
-	combat.advance(1.99)
-	_check(enemy["slowed"] and is_equal_approx(enemy["slow_remaining"], 0.01), "Sold-tower slow persists for its remaining simulation lifetime")
+	_check(enemy["slowed"] and not combat._continuous_damage.has(id), "Sale retires the source's fractions without cancelling an existing enemy slow")
+	combat.advance(duration - 0.01)
+	_check(enemy["hp"] == hp and enemy["slowed"] and is_equal_approx(enemy["slow_remaining"], 0.01), "Sold-tower slow persists for its remaining simulation lifetime without further damage")
 	combat.advance(0.01)
 	_check(not enemy["slowed"] and enemy["slow_remaining"] == 0.0 and enemy["speed"] == enemy["base_speed"], "Slow expires exactly and restores effective base speed")
 
+	# Equal current HP must not conceal the shorter duration of a stronger enemy.
+	combat = _prepared_evolution("boulders", _special_rules(&"rune_obelisk", 100, 3))
+	tower = combat.towers[0][0]
+	combat.upgrade_tower(0, tower["id"], "freeze_runes")
+	combat.start_wave(_routes(100, 100))
+	combat.advance(0.01)
+	var weak: Dictionary = combat.enemies[0][0]
+	var strong: Dictionary = combat.enemies[0][1]
+	var wounded: Dictionary = combat.enemies[0][2]
+	strong["max_hp"] = 300
+	wounded["max_hp"] = 300
+	wounded["hp"] = 30
+	combat.advance(0.01)
+	_check(weak["hp"] == 100 and strong["hp"] == 100 and wounded["hp"] == 30 and weak["slowed"] and strong["slowed"] and wounded["slowed"], "Every exposed enemy slows independently before fractional damage reaches one HP")
+	_check(is_equal_approx(weak["slow_remaining"], 1.0) and is_equal_approx(strong["slow_remaining"], 0.5) and is_equal_approx(wounded["slow_remaining"], 0.5), "Maximum HP shortens Freeze duration regardless of equal or wounded current HP")
+	for target: Dictionary in [weak, strong, wounded]:
+		target["progress"] = 10.0
+	combat.advance(0.5)
+	_check(weak["slowed"] and is_equal_approx(weak["slow_remaining"], 0.5) and not strong["slowed"] and not wounded["slowed"], "Stronger enemies thaw sooner after leaving contact, without refreshing from out-of-range sources")
+	combat.advance(0.5)
+	_check(not weak["slowed"] and weak["slow_remaining"] == 0.0, "The weaker enemy also thaws once its own longer timer expires")
+
 
 func _test_freeze_source_isolation() -> void:
-	var combat := _prepared_evolution("boulders", _special_rules(&"rune_obelisk", 101, 2))
+	var combat := _prepared_evolution("boulders", _special_rules(&"rune_obelisk", 100, 2))
 	var first: Dictionary = combat.towers[0][0]
 	combat.upgrade_tower(0, first["id"], "freeze_runes")
 	combat.build(0, Vector2i(1, 1), &"rune_obelisk", 0)
@@ -1782,19 +1803,30 @@ func _test_freeze_source_isolation() -> void:
 	for upgrade: String in ["damage", "speed", "boulders", "freeze_runes"]:
 		combat.upgrade_tower(0, second["id"], upgrade)
 	combat.start_wave(_routes(100, 100))
-	combat.advance(2.0)
-	var untouched: Dictionary = combat.enemies[0][0]
-	var qualifying: Dictionary = combat.enemies[0][1]
-	_check(untouched["hp"] == 77 and not untouched["slowed"] and not qualifying["slowed"], "Two sources dealing 12 HP each cannot pool their damage toward one Freeze threshold")
-	second["cell"] = Vector2i(20, 20)
-	untouched["progress"] = 10.0
-	combat.advance(1.3333333333333333)
-	_check(qualifying["hp"] == 69 and not qualifying["slowed"], "Twenty source damage stays below ceil(101 times .2), even after combined damage exceeds it")
-	combat.advance(1.0 / 6.0)
-	_check(qualifying["slowed"] and qualifying["slow_remaining"] == 2.0 and not untouched["slowed"], "Twenty-one actual source damage freezes only that source/enemy pair")
-	var enemy_id: int = qualifying["id"]
+	combat.advance(0.01)
+	var departed: Dictionary = combat.enemies[0][0]
+	var exposed: Dictionary = combat.enemies[0][1]
+	_check(departed["hp"] == 100 and exposed["hp"] == 100 and departed["slowed"] and exposed["slowed"] and is_equal_approx(exposed["slow_remaining"], 1.0), "Overlapping Freeze sources slow every enemy immediately but never stack duration or damage fractions")
+	departed["progress"] = 10.0
+	first["cell"] = Vector2i(20, 20)
+	combat.advance(0.1)
+	_check(departed["hp"] == 100 and is_equal_approx(departed["slow_remaining"], 0.9) and exposed["hp"] == 100 and is_equal_approx(exposed["slow_remaining"], 1.0), "Only the enemy still touching the other source refreshes its nonstacking timer")
+	var enemy_id: int = exposed["id"]
 	combat._hit(0, first, 1, 1000)
-	_check(not combat._rune_damage[first["id"]].has(enemy_id) and not combat._rune_damage[second["id"]].has(enemy_id) and not combat._enemy_spawn_times.has(enemy_id), "Enemy retirement erases damage credit from every source")
+	_check(not combat._continuous_damage[first["id"]].has(enemy_id) and not combat._continuous_damage[second["id"]].has(enemy_id) and not combat._enemy_spawn_times.has(enemy_id) and not combat._slow_motion.has(enemy_id), "Enemy retirement erases fractional exposure and movement tracking from every source")
+	var sold_id: int = second["id"]
+	combat.sell_tower(0, sold_id)
+	_check(not combat._continuous_damage.has(sold_id), "Selling an overlapping source removes its entire fractional state")
+	combat.send_enemy(1, &"grunt")
+	combat.advance(0.01)
+	var newcomer: Dictionary = combat.enemies[0].back()
+	_check(newcomer["id"] != departed["id"] and newcomer["id"] != enemy_id and newcomer["hp"] == 100 and not newcomer["slowed"] and newcomer["slow_remaining"] == 0.0, "A new out-of-range enemy cannot inherit a retired target's or sold source's slow")
+	for branch: String in ["boulders", "onyx_ring"]:
+		var ordinary := _prepared_evolution(branch, _special_rules(&"rune_obelisk", 100, 1))
+		ordinary.start_wave(_routes(100, 100))
+		ordinary.advance(0.75)
+		var target: Dictionary = ordinary.enemies[0][0]
+		_check(target["hp"] < 100 and not target["slowed"] and target["slow_remaining"] == 0.0, "Unupgraded Boulders and Onyx damage cannot acquire Freeze from another match or source")
 
 
 func _slow_expiry_fixture(branch: String) -> MatchCombat:
@@ -1805,9 +1837,10 @@ func _slow_expiry_fixture(branch: String) -> MatchCombat:
 	source["cell"] = Vector2i(1, 1)
 	combat.upgrade_tower(0, source["id"], "freeze_runes")
 	combat.start_wave(_routes(100, 100))
-	combat.advance(0.84)
+	combat.advance(0.01)
+	combat.advance(0.83)
 	var enemy: Dictionary = combat.enemies[0][0]
-	_check(enemy["hp"] == 20 and enemy["slowed"] and enemy["base_speed"] == 2.0 and enemy["speed"] == 1.6 and is_equal_approx(enemy["progress"], 1.68), "Actual ceil-five threshold applies a nonstacking twenty-percent movement slow")
+	_check(enemy["hp"] == 20 and enemy["slowed"] and enemy["base_speed"] == 2.0 and enemy["speed"] == 1.6 and is_equal_approx(enemy["slow_remaining"], 1.6) and is_equal_approx(enemy["progress"], 1.348), "Immediate contact applies a nonstacking twenty-percent movement slow with a maximum-HP-dependent lifetime")
 	combat.sell_tower(0, source["id"])
 	combat.build(0, Vector2i(4, 1), &"rune_obelisk", 0)
 	var observer: Dictionary = combat.towers[0][0]
@@ -1826,9 +1859,9 @@ func _test_slow_motion_history() -> void:
 		var enemy: Dictionary = coarse.enemies[0][0]
 		var fine_enemy: Dictionary = fine.enemies[0][0]
 		var expected_hp: int = 10 if branch == "boulders" else 2
-		_check(is_equal_approx(enemy["progress"], 6.88) and is_equal_approx(enemy["progress"], fine_enemy["progress"]) and not enemy["slowed"] and enemy["speed"] == 2.0, "Coarse and fine movement split exactly at sold-source slow expiry")
+		# Starting at 1.348, travel 1.6 seconds at 1.6 then 1.4 at 2.
+		_check(is_equal_approx(enemy["progress"], 6.708) and is_equal_approx(enemy["progress"], fine_enemy["progress"]) and not enemy["slowed"] and enemy["speed"] == 2.0, "Coarse and fine movement split exactly at sold-source slow expiry")
 		_check(enemy["hp"] == expected_hp and fine_enemy["hp"] == expected_hp, "Continuous exposure and historical Onyx pulses both honor the mixed-speed path")
-		_check(coarse._rune_damage[coarse.towers[0][0]["id"]][enemy["id"]] == 20 - expected_hp, "Damage ledger counts actual observer HP removed, not nominal DPS or pulses")
 
 
 func _test_debug_round_reset() -> void:
@@ -1846,7 +1879,7 @@ func _test_debug_round_reset() -> void:
 	_check(combat.debug_set_round(31) and combat.wave == 30 and combat.phase == MatchCombat.Phase.PLANNING, "Debug round denotes the upcoming displayed round")
 	_check(combat.coins == coins and combat.base_health == health and combat.income == income and combat.towers[0][0] == retained, "Debug abandonment keeps the build, upgrades, currency, income and base health without a clear reward")
 	_check(combat.enemies == [[], []] and combat.queued_sends == [0, 0] and combat.wave_roster.is_empty() and combat.spawn_times.is_empty() and combat._routes == [[], []] and combat._routing_next == [{}, {}] and combat._fork_cursors == [{}, {}] and combat._spawned == [0, 0], "Debug abandonment clears every enemy, route, fork, send and spawn timetable")
-	_check(combat._elapsed == 0.0 and combat._continuous_damage.is_empty() and combat._rune_damage.is_empty() and combat._enemy_spawn_times.is_empty() and combat._slow_motion.is_empty(), "Debug abandonment clears all elapsed-time, fractional and damage-credit accounting")
+	_check(combat._elapsed == 0.0 and combat._continuous_damage.is_empty() and combat._enemy_spawn_times.is_empty() and combat._slow_motion.is_empty(), "Debug abandonment clears all elapsed-time, fractional exposure and movement accounting")
 	_check(combat.start_wave(_routes(100, 100)) and combat.wave == 31, "A debug jump restarts using newly captured routes at the chosen round")
 	_check(combat.debug_set_round(31) and combat.phase == MatchCombat.Phase.PLANNING and combat.wave == 30, "Selecting the same displayed active round restarts its planning phase")
 	_check(combat.debug_set_round(1) and combat.wave == 0 and combat.debug_set_round(1000) and combat.wave == 999, "Both debug round bounds are accepted")

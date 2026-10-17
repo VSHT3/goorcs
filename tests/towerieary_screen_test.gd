@@ -249,7 +249,7 @@ func _check_role(preview: Dictionary) -> void:
 				_check_value(&"jump_distance", float(config["jump_distance"]))
 				_check_value(&"successive_bonus", float(config["successive_hit_bonus"]) * 100.0)
 			if bool(tower["freeze_upgraded"]):
-				_check_value(&"freeze_threshold", TowerDefinition.FREEZE_DAMAGE_THRESHOLD * 100.0)
+				_check_value(&"freeze_hp_scale", TowerDefinition.FREEZE_HP_SCALE)
 				_check_value(&"freeze_slow", (1.0 - TowerDefinition.FREEZE_SPEED_MULTIPLIER) * 100.0)
 				_check_value(&"freeze_duration", TowerDefinition.FREEZE_DURATION)
 			if weapon == "minigun":

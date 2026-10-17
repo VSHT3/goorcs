@@ -340,7 +340,7 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 	var branch: Dictionary = stats.get("evolutions", {}).get(evolution, {})
 	if bool(stats.get("area_attack", false)):
 		if bool(tower.get("freeze_upgraded", false)):
-			return "Damages nearby enemies and slows susceptible targets after enough damage."
+			return "Immediately slows nearby ice-susceptible enemies. Higher maximum HP means faster thawing."
 		if bool(branch.get("continuous", false)):
 			return "Deals continuous damage to enemies in the surrounding tile neighborhood."
 		return "Pulses damage through enemies in the surrounding tile neighborhood."
@@ -401,9 +401,9 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 		_add_stat(_stats, &"successive_bonus", "Each successive hit", "+%s%% base damage" % _number(float(config["successive_hit_bonus"]) * 100.0))
 	elif bool(stats.get("area_attack", false)):
 		if bool(tower.get("freeze_upgraded", false)):
-			_add_stat(_stats, &"freeze_threshold", "Damage needed to slow", "%s%% max HP" % _number(TowerDefinition.FREEZE_DAMAGE_THRESHOLD * 100.0))
+			_add_stat(_stats, &"freeze_hp_scale", "Thaw HP scale", "%s HP" % _number(TowerDefinition.FREEZE_HP_SCALE))
 			_add_stat(_stats, &"freeze_slow", "Movement reduction", "%s%%" % _number((1.0 - TowerDefinition.FREEZE_SPEED_MULTIPLIER) * 100.0))
-			_add_stat(_stats, &"freeze_duration", "Slow duration", "%s s" % _number(TowerDefinition.FREEZE_DURATION))
+			_add_stat(_stats, &"freeze_duration", "Base slow duration", "%s s" % _number(TowerDefinition.FREEZE_DURATION))
 	else:
 		if stats.get("special_upgrade", "") == "second_archer":
 			var count: int = int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) else 1))

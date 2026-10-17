@@ -160,8 +160,11 @@ func _immunity() -> void:
 	model.build(0,Vector2i(1,3),&"rune_obelisk",0)
 	var rune: Dictionary = model.towers[0][1]
 	for command: String in ["damage","speed","boulders","freeze_runes"]: model.upgrade_tower(0,rune["id"],command)
-	model._hit(0,rune,0,20)
-	check(skeleton["hp"]==24 and not skeleton["slowed"] and skeleton["slow_remaining"]==0.0,"Ice immunity preserves physical Rune damage but rejects threshold-qualified Freeze")
+	tower["cooldown"] = 100.0
+	model.advance(0.01)
+	check(skeleton["hp"]==44 and not skeleton["slowed"] and skeleton["slow_remaining"]==0.0,"Ice-immune enemy rejects Freeze even on positive sub-HP continuous contact")
+	model.advance(0.16)
+	check(skeleton["hp"]==43 and not skeleton["slowed"] and skeleton["slow_remaining"]==0.0,"Ice immunity preserves continuous Boulders physical damage without applying a slow")
 
 func _progression() -> void:
 	var model := MatchCombat.new(rules())

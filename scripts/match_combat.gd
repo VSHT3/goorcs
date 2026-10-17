@@ -68,8 +68,6 @@ var _next_enemy_id: int = 1
 var _continuous_damage: Dictionary = {}
 # Spawn times cap first-tick exposure even when due events arrive mid-tick.
 var _enemy_spawn_times: Dictionary = {}
-# Actual Rune HP removed, including damage before either evolution purchase.
-var _rune_damage: Dictionary = {}
 # Only enemies slowed at tick start need a two-speed historical motion record.
 # Reused float records retain precision without per-tick history allocations.
 var _slow_motion: Dictionary = {}
@@ -580,7 +578,6 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 		if not _sandbox_mode:
 			coins[slot] += _sell_value(tower["invested"])
 		_continuous_damage.erase(tower_id)
-		_rune_damage.erase(tower_id)
 		_clear_tower_mark(slot, tower)
 		towers[slot].remove_at(index)
 		_refresh_board(slot)
@@ -713,7 +710,6 @@ func debug_set_round(round_number: int) -> bool:
 	_step_start_time = 0.0
 	_continuous_damage.clear()
 	_burns.clear()
-	_rune_damage.clear()
 	_enemy_spawn_times.clear()
 	_slow_motion.clear()
 	for board: Array in towers:
@@ -1823,6 +1819,10 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 		var exposure: float = _continuous_exposure(tower["cell"], range_cells, enemy, minf(delta, _elapsed - float(_enemy_spawn_times[enemy["id"]])))
 		if exposure <= 0.0:
 			continue
+		if bool(tower["freeze_upgraded"]) and not bool(enemy["ice_immune"]):
+			enemy["slowed"] = true
+			enemy["slow_remaining"] = TowerDefinition.freeze_duration(int(enemy["max_hp"]))
+			enemy["speed"] = 0.0 if enemy["animation"] == "cast" else float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 		var total: float = float(fractions.get(enemy["id"], 0.0)) + float(tower["base_damage"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * exposure * (1.0 + float(enemy["bounty_damage_bonus"]))
 		# Credit is already vulnerability-adjusted HP: mark changes affect only
 		# new exposure, not saved fractions. The epsilon corrects whole-HP sums.
@@ -1929,8 +1929,6 @@ func _retire_enemy(enemy_id: int) -> void:
 	_enemy_spawn_times.erase(enemy_id)
 	_slow_motion.erase(enemy_id)
 	_burns.erase(enemy_id)
-	for tower_id: int in _rune_damage:
-		_rune_damage[tower_id].erase(enemy_id)
 	for tower_id: int in _continuous_damage:
 		_continuous_damage[tower_id].erase(enemy_id)
 	for board: Array in towers:
@@ -1948,16 +1946,6 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 	enemy["hp"] -= hit_damage
 	if hit_damage > 0:
 		_sound_events.record(CombatSoundEvents.Cue.HIT, slot, enemy["pos"], _death_time)
-	if not bool(enemy.get("ice_immune", false)) and _tower_types[tower["type_id"]]["evolutions"].has("boulders"):
-		var tower_id: int = tower["id"]
-		if not _rune_damage.has(tower_id):
-			_rune_damage[tower_id] = {}
-		var credit: Dictionary = _rune_damage[tower_id]
-		credit[enemy["id"]] = int(credit.get(enemy["id"], 0)) + hit_damage
-		if hit_damage > 0 and tower["evolution"] == "boulders" and tower["freeze_upgraded"] and int(credit[enemy["id"]]) >= ceili(float(enemy["max_hp"]) * TowerDefinition.FREEZE_DAMAGE_THRESHOLD):
-			enemy["slowed"] = true
-			enemy["slow_remaining"] = TowerDefinition.FREEZE_DURATION
-			enemy["speed"] = 0.0 if enemy["animation"] == "cast" else float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1
 		var definition: Dictionary = _enemy_types[enemy["type_id"]]
