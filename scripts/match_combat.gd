@@ -453,6 +453,14 @@ func set_archer_targeting(slot: int, tower_id: int, archer_index: int, mode: int
 
 
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
+	return _upgrade_tower(slot, tower_id, upgrade, false)
+
+
+func upgrade_tower_mirrored(slot: int, tower_id: int, upgrade: String) -> bool:
+	return _upgrade_tower(slot, tower_id, upgrade, true)
+
+
+func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -> bool:
 	if phase == Phase.FINISHED or not _valid_slot(slot):
 		return false
 	var tower: Dictionary = _find_tower(slot, tower_id)
@@ -500,6 +508,16 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 	var cost: int = int(config["cost"]) if not config.is_empty() else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition))
 	if not _sandbox_mode and coins[slot] < cost:
 		return false
+	if mirrored:
+		var counterpart: Dictionary = {}
+		for other: Dictionary in towers[1 - slot]:
+			if other["cell"] == tower["cell"] and other["type_id"] == tower["type_id"]:
+				counterpart = other
+				break
+		# Local validation is complete; after the counterpart accepts, neither
+		# board has a remaining rejection path or an intervening callback.
+		if counterpart.is_empty() or not upgrade_tower(1 - slot, counterpart["id"], upgrade):
+			return false
 	if not _sandbox_mode:
 		coins[slot] -= cost
 		tower["invested"] += cost
@@ -603,14 +621,32 @@ func grow_for_main_round() -> void:
 			tower["pierce_aim"] += Vector2.DOWN
 
 
-func send_enemy(slot: int, type_id: StringName) -> bool:
+func _can_send_enemy(slot: int, type_id: StringName) -> bool:
 	if phase == Phase.FINISHED or not _valid_slot(slot) or not _enemy_types.has(String(type_id)) or not _valid_send_timing():
 		return false
 	var definition: Dictionary = _enemy_types[String(type_id)]
 	var delivery_wave: int = wave + 1 if phase == Phase.PLANNING else wave
-	var cost: int = definition["send_cost"]
-	if not definition["send_enabled"] or delivery_wave < int(definition["send_first_wave"]) or (not _sandbox_mode and coins[slot] < cost):
+	return definition["send_enabled"] and delivery_wave >= int(definition["send_first_wave"]) and (_sandbox_mode or coins[slot] >= int(definition["send_cost"]))
+
+
+func send_enemy(slot: int, type_id: StringName) -> bool:
+	if not _can_send_enemy(slot, type_id):
 		return false
+	_send_enemy_accepted(slot, type_id)
+	return true
+
+
+func send_enemy_mirrored(slot: int, type_id: StringName) -> bool:
+	if not _can_send_enemy(slot, type_id) or not _can_send_enemy(1 - slot, type_id):
+		return false
+	_send_enemy_accepted(slot, type_id)
+	_send_enemy_accepted(1 - slot, type_id)
+	return true
+
+
+func _send_enemy_accepted(slot: int, type_id: StringName) -> void:
+	var definition: Dictionary = _enemy_types[String(type_id)]
+	var cost: int = definition["send_cost"]
 	var target: int = 1 - slot
 	var count: int = _roll_group(definition, _group_random)
 	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0
@@ -626,7 +662,6 @@ func send_enemy(slot: int, type_id: StringName) -> bool:
 	_sound_events.record(CombatSoundEvents.Cue.SEND, slot, Vector2.ZERO, _death_time)
 	if phase == Phase.WAVE and _next_send_times[target] <= _elapsed:
 		_spawn_send(target)
-	return true
 
 
 func _valid_send_timing() -> bool:

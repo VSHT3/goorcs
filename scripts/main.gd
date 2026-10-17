@@ -210,6 +210,8 @@ func _input(event: InputEvent) -> void:
 					screen.pause_menu.handle_escape()
 				elif not screen.cancel_interaction():
 					MenuAudio.activate(screen.menu_button)
+			elif play_screen.loadout_panel.is_visible_in_tree():
+				MenuAudio.activate(play_screen.loadout_panel.leave_button)
 			else:
 				MenuAudio.activate(play_screen.back_button)
 			get_viewport().set_input_as_handled()

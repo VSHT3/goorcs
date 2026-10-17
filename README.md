@@ -95,6 +95,7 @@ Menu action activation uses a short, muted wood/metal clack; hovering, moving ke
 - Collect six identities: **Arrow tower, Orc ballista, Rune obelisk, Lightning, War Drums, and Gold Mine**. Unlocks provide loadout choices; evolution branches remain within their parent's slot. The original three retain their accepted PixelLab source PNGs; new authored art and branch variants do not imply final art approval.
 - The orc chest uses cleaned user-supplied PixelLab sprites. Its lid transitions between closed/open poses; light and coin effects remain native Godot effects.
 - Provisional reward-count odds are 80% for one, 15% for three, and 5% for five. Draws contain only locked identities and are capped to those remaining. With Arrow already owned, a fresh collection can receive all five other types in one opening.
+- Collection/chest icons fit their visible artwork rather than transparent canvas padding. The catalog scrolls independently so the six-entry roster keeps header and chest actions inside the window.
 - **Skip reveal** changes only the animation. Rewards are saved before it starts; leaving and returning cannot reroll or grant them again.
 - Unlock all six identities to complete the collection; further openings are disabled. Free prototype chests do not implement post-run rewards or permanent stat progression.
 - **Reset progress** confirms a return to Arrow-only ownership, not an empty collection. It does not alter Sandbox state or enemy lifetime records.

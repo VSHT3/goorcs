@@ -43,6 +43,7 @@ auto_enabled_plugin=true
 [gui]
 
 theme/custom_font="res://assets/fonts/PixelifySans.ttf"
+theme/custom_font.editor_hint=""
 
 [rendering]
 

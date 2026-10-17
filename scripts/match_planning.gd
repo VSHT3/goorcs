@@ -472,7 +472,7 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	var mirrored: bool = singleplayer and sender == 1
 	# IDs are globally unique, so resolve the counterpart by cell before a sale.
 	var mirror_id: int = -1
-	if mirrored and command not in ["build", "send", "reroll"]:
+	if mirrored and command not in ["build", "send", "reroll", "upgrade"]:
 		for tower: Dictionary in _host_combat.towers[0]:
 			if tower["id"] == tower_id:
 				for opponent: Dictionary in _host_combat.towers[1]:
@@ -483,7 +483,7 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	var accepted: bool = false
 	match command:
 		"send":
-			accepted = _host_combat.send_enemy(slot, StringName(argument))
+			accepted = _host_combat.send_enemy_mirrored(slot, StringName(argument)) if mirrored else _host_combat.send_enemy(slot, StringName(argument))
 		"build":
 			if not _host_loadout_committed[slot] or not _host_loadouts[slot].has(StringName(argument)):
 				_reject(sender, "This tower is not in your committed run loadout.")
@@ -508,14 +508,14 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 			var archer_index: int = 2 if command == "target_archer_3" else 3
 			accepted = _host_combat.set_archer_targeting(slot, tower_id, archer_index, mode)
 		"upgrade":
-			accepted = _host_combat.upgrade_tower(slot, tower_id, argument)
+			accepted = _host_combat.upgrade_tower_mirrored(slot, tower_id, argument) if mirrored else _host_combat.upgrade_tower(slot, tower_id, argument)
 		"sell":
 			accepted = _host_combat.sell_tower(slot, tower_id)
 	if not accepted:
 		_reject(sender, "Action unavailable: check your tower, currency, prerequisites, and command.")
 		return false
-	# Randomized commands atomically mirror one accepted roll in the model.
-	if mirrored and command not in ["build", "reroll"]:
+	# Paid commands atomically mirror in the model before publishing either board.
+	if mirrored and command not in ["build", "reroll", "upgrade", "send"]:
 		_apply_tower_command(2, command, 1, cell, mirror_id, mode, argument)
 	else:
 		_publish_snapshot()

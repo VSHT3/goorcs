@@ -309,20 +309,9 @@ def main():
             try:
                 if not runner.check("version", ["--version"], timeout=15):
                     return 1
-                config_path = project / "project.godot"
-                imported_config = config_path.read_text(encoding="utf-8")
-                # Godot loads the project GUI font before a clean --import has
-                # generated its fontdata. Omit only that early setting while
-                # importing the font normally, then restore the exact config.
-                bootstrap_config = re.sub(r"(?m)^theme/custom_font(?:\.[^=\r\n]+)?=.*(?:\n|$)",
-                                          "", imported_config)
-                try:
-                    config_path.write_text(bootstrap_config, encoding="utf-8")
-                    if not runner.check("import", ["--headless", "--editor", "--import"],
-                                        timeout=args.import_timeout):
-                        return 1
-                finally:
-                    config_path.write_text(imported_config, encoding="utf-8")
+                if not runner.check("import", ["--headless", "--editor", "--import"],
+                                    timeout=args.import_timeout):
+                    return 1
                 if not runner.check("save-isolation", ["--headless", "--script", "res://_verify_user_dir.gd"], timeout=30):
                     return 1
                 modes = ("headless", "rendered") if args.mode == "all" else (args.mode,)

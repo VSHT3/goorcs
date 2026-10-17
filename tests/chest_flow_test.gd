@@ -34,7 +34,7 @@ func _run() -> void:
 	await process_frame
 	var screen: CollectionScreen = main.collection_screen
 	_check(screen.visible and (main.sandbox_screen == null or not main.sandbox_screen.visible), "Collection navigation opens only the collection screen")
-	_check(root.get_visible_rect().encloses(screen.back_button.get_global_rect()), "The full catalog must not push collection navigation outside the visible window")
+	await _check_layout(screen)
 	await _click(screen.open_button)
 	var granted: int = main.collection_store.unlocked_count()
 	_check(granted > initial_unlocked and granted <= catalog_size, "Opening actually grants previously locked collection types")
@@ -93,6 +93,23 @@ func _run() -> void:
 	if failures == 0:
 		print("PASS: chest grants save before reveal, repeat-click/skip/navigation cannot regrant, completion disables openings")
 	quit(1 if failures > 0 else 0)
+
+
+func _check_layout(screen: CollectionScreen) -> void:
+	for width: int in [1000, 1280]:
+		root.size = Vector2i(width, 720)
+		root.content_scale_size = root.size
+		await process_frame
+		await process_frame
+		var surface := Rect2(Vector2.ZERO, Vector2(root.size))
+		for control: Control in [screen.get_node("Margin/Content/Header"), screen.open_button, screen.reset_button, screen.back_button]:
+			_check(surface.encloses(control.get_global_rect()), "The full collection keeps its header and actions inside the %dpx viewport" % width)
+		var scroll := screen._catalog.get_parent() as ScrollContainer
+		var last: Control = screen._catalog.get_child(screen._catalog.get_child_count() - 1)
+		scroll.ensure_control_visible(last)
+		await process_frame
+		_check(scroll.get_global_rect().encloses(last.get_global_rect()), "The last registered collection entry remains reachable at %dpx width" % width)
+		scroll.scroll_vertical = 0
 
 
 func _click(control: Control) -> void:

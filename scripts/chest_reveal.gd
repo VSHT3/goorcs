@@ -33,22 +33,31 @@ var _coins: float = 0.0
 class RewardIcon extends Control:
 	const DISPLAY_SIZE: float = 52.0
 
-	var reward: TowerReward
+	var _texture_bounds: Rect2
+	var reward: TowerReward:
+		set(value):
+			reward = value
+			_texture_bounds = Rect2()
+			if reward != null and reward.icon_texture != null:
+				# Imported canvas padding is not part of the visible icon frame.
+				var image: Image = reward.icon_texture.get_image()
+				_texture_bounds = Rect2(image.get_used_rect()) if image != null else Rect2(Vector2.ZERO, reward.icon_texture.get_size())
+			queue_redraw()
 	var locked: bool = false
 
 	func _draw() -> void:
-		if reward == null or reward.icon_texture == null:
+		if reward == null or reward.icon_texture == null or not _texture_bounds.has_area():
 			return
 		# Expanding rows/cards must not enlarge one tower's visible artwork.
 		var side: float = minf(DISPLAY_SIZE, minf(size.x, size.y))
 		if side <= 0.0:
 			return
-		var texture_size: Vector2 = reward.icon_texture.get_size()
+		var texture_size: Vector2 = _texture_bounds.size
 		var scale: float = side / maxf(texture_size.x, texture_size.y)
 		var extent: Vector2 = (texture_size * scale).floor()
 		var rect := Rect2(((size - extent) * 0.5).round(), extent)
 		var tint: Color = Color(0.55, 0.55, 0.55) if locked else Color.WHITE
-		draw_texture_rect(reward.icon_texture, rect, false, tint)
+		draw_texture_rect_region(reward.icon_texture, rect, _texture_bounds, tint)
 
 
 func _ready() -> void:

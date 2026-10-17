@@ -107,6 +107,14 @@ func _check_match_music() -> void:
 	await _key(KEY_P)
 	await _click(main.play_screen.singleplayer_button.get_global_rect().get_center())
 	_check(main.planning.selecting_loadout and not main.planning.active and not music.playing, "Selection stays outside the active match soundtrack lifecycle")
+	var leave_cues: int = menu_audio.actions
+	await _key(KEY_ESCAPE)
+	_check(main.menu.visible and not main.play_screen.visible, "Escape leaves the visible loadout chooser for the main menu")
+	_check(not main.planning.selecting_loadout and not main.planning.active and not main.planning.singleplayer and main.session.state == MultiplayerSession.State.IDLE, "Leaving loadout selection tears down the pending solo run")
+	_check(not music.playing and menu_audio.actions == leave_cues + 1, "Loadout Escape emits one action clack without starting match music")
+	await _key(KEY_P)
+	await _click(main.play_screen.singleplayer_button.get_global_rect().get_center())
+	_check(main.planning.selecting_loadout and not main.planning.loadout_committed and main.play_screen.loadout_panel.visible, "A cancelled loadout can reopen as a fresh selection")
 	var browsing_cues: int = menu_audio.actions
 	var loadout: LoadoutPanel = main.play_screen.loadout_panel
 	await _click(loadout.tower_buttons[&"arrow_tower"].get_global_rect().get_center())

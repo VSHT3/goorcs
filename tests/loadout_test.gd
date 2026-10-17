@@ -236,6 +236,16 @@ func _solo(session: MultiplayerSession, rules: CombatRules) -> void:
 	before = planning.combat.duplicate(true)
 	var roll_state: int = planning._host_combat._roll_random.state
 	_check(not planning.reroll_tower(0, id, "rarity") and planning.combat == before and planning._host_combat._roll_random.state == roll_state, "An unaffordable counterpart rejects the whole solo reroll before either charge or RNG consumption")
+	planning._host_combat.coins = [10000, 0]
+	planning._publish_snapshot()
+	for command: String in ["upgrade", "send"]:
+		before = planning.combat.duplicate(true)
+		var authority_before: Dictionary = planning._host_combat.snapshot()
+		var group_state: int = planning._host_combat._group_random.state
+		var argument: String = "damage" if command == "upgrade" else "orcling"
+		var accepted: bool = planning._apply_tower_command(1, command, 0, Vector2i.ZERO, id, -1, argument)
+		_check(not accepted and planning._host_combat.snapshot() == authority_before and planning.combat == before, "An unaffordable counterpart rejects the whole solo %s without charging or changing either board" % command)
+		_check(planning._host_combat._group_random.state == group_state, "A rejected mirrored %s consumes no paid-group roll" % command)
 	planning.start_singleplayer()
 	_check(planning.selecting_loadout and not planning.active and planning.chosen_tower_ids.is_empty() and planning.combat["towers"] == [[], []], "Solo replay coherently returns to selection rather than bypassing admission")
 	planning.stop_singleplayer()
