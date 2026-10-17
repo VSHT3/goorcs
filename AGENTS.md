@@ -29,6 +29,12 @@ A single commit with a lot of work is acceptable. No need to produce multiple hu
 - Commit source resources and Godot UID sidecars; keep generated caches, builds, and credentials out of Git.
 - Keep changes small and playable. Do not build extensive progression before proving the two-player core loop.
 
+## UI presentation
+
+- Keep interfaces terse: actual stats and actions, without filler/helper prose, baseline/ownership disclaimers, or hover popups unless explicitly requested.
+- Use compact X close controls instead of “Back / Esc”; preserve Escape and keyboard navigation. Avoid visible scrollbar chrome while keeping any necessary scrolling accessible.
+- Show tower progression as connected visual tower nodes and evolution branches, not a dropdown or file-explorer-style text tree.
+
 ## Match state ownership
 
 Match planning and combat use host-authoritative state. These ownership constraints also apply to future currency and reward systems; changing that design requires an explicit decision first.

@@ -85,10 +85,19 @@ The corrected roster suite covers admission deep capture, isolated fixture resou
 
 A separate **52.30-second actual-main-scene HEADLESS walkthrough** passed: native input-event control paths, real remote admission and Ready, owned placement/inspection and both rerolls, all newly implemented branches, and exact production/bounty/support/drop accounting. This used the real scene and controls, not just direct model calls, but produced **no pixel proof**. A headless input event is not a graphical desktop interaction.
 
-**The user explicitly stopped graphical testing and forbids windows/desktop interaction for this phase.** The all-mode attempt was interrupted and its workers stopped; one rendered death test timed out. Neither is a green rendered result. No fresh layout/pixel, native GPU, new-art style/approval, sound/feel, performance, or separate-internet verification is claimed. Earlier graphical successes elsewhere in this document are historical evidence for their named changes, not validation of these new surfaces. Do not launch `rendered`/`all`, a desktop game, or screenshots under the current restriction.
+The user stopped graphical testing during the six-role implementation. Its all-mode attempt was interrupted and its workers stopped; one rendered death test timed out. Neither is a green rendered result. That phase claims no fresh layout/pixel, native GPU, new-art style/approval, sound/feel, performance, or separate-internet verification. The user subsequently permitted graphical testing for Towerieary; guide-specific checks do not retroactively validate the battlefield changes.
 
 The oversized new tower families were corrected using resource-only board heights for all ten base/evolution/follow-up sprites. Their opaque foundations now span approximately 0.98–0.99 cells rather than 1.35–1.47, between the existing Rune and Arrow/Ballista widths. Source PNGs, icons, aspect ratios, anchors, projectile origins, and gameplay footprints are unchanged. A headless actual-scene geometry check confirmed branch selection, grounding, and projected opaque widths on both board orientations; this is not pixel or aesthetic approval.
 
+### Towerieary verification
+
+Towerieary derives its baseline upgrade previews from isolated accepted combat state. A compact tower rail selects the identity; connected artwork nodes show parallel stat upgrades, their combined state, evolution splits, and follow-ups. Selecting a node updates the adjacent stats and prices without purchasing upgrades or changing collection ownership or live gameplay. The graph has no hover popups or scrollbar chrome.
+
+The final visual-node implementation passed a **46.44-second actual-main-scene rendered walkthrough** using Wayland Compatibility rendering with Mesa llvmpipe. It exercised native T activation, real pointer selection of every stage, directional navigation through both stat-upgrade paths and their convergence, tower/node/X focus navigation, X/Escape return and resume, and unchanged inactive match/session/collection state. Every stage was captured at **1000×720** and **1280×720**; representative branching layouts and adjacent stats were inspected.
+
+After the final typography/inspector adjustment, the focused headless guide and navigation suites passed in **11.89** and **2.57 seconds**. Their checks retain exact combat-backed stats/costs/art, supported-width bounds, nonoverlapping nodes, and native control behavior. The unchanged main-menu layout also passed its rendered wordmark/geometry suite in **1.19 seconds**. These are guide/menu checks, not native GPU/performance or battlefield artwork approval.
+
+The final isolated `python3 tools/verify.py headless` run passed **49/49 checks**, including clean import, save isolation, startup, the guide provider/UI/navigation suites, and existing gameplay and real-peer regressions.
 
 ## Repository editing rules
 
@@ -96,7 +105,7 @@ Read [AGENTS.md](../AGENTS.md) before editing. It owns implementation convention
 
 ## Verification as the game grows
 
-For a gameplay change, exercise the changed action in the actual scene and use applicable behavioral regressions. Screenshots, graphical input automation, and human playtesting establish different evidence (pixels/feel/balance), only when permitted. The current six-role phase is explicitly **headless only** by user instruction; its [verification record](#six-role-gameplay-verification) does not claim those graphical checks.
+For a gameplay change, exercise the changed action in the actual scene and use applicable behavioral regressions. Screenshots, graphical input automation, and human playtesting establish different evidence (pixels/feel/balance), only when permitted. The [six-role verification record](#six-role-gameplay-verification) remains headless-only evidence; graphical testing was subsequently permitted for Towerieary.
 
 For networking changes, launch separate host and client processes and verify the resulting authoritative state. Before declaring internet support, play a match between separate machines and networks; localhost is not proof of NAT traversal or acceptable latency.
 

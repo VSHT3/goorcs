@@ -6,11 +6,11 @@ A private, desktop-first 2D tower-defense game for friends, developed with AI as
 
 Playable host-authoritative two-player defense through **Play**, local mirrored **Singleplayer**, a free-build **Sandbox**, persistent collection/chests, and the **Orcieary** enemy guide with lifetime records. Six collectible towers—Arrow, Ballista, Rune, Lightning (working name), War Drums, and Gold Mine—support private pre-match loadouts, per-placement rarity/attributes, run-only rerolls, and progression branches. Seven animated enemy types include grouped Orclings, healing Chiefs, and NecOrcmancers raising SkeleOrcs. Matches retain weighted waves, staged paid sends/income, committed readiness, strategy breaks/map growth, persistent health, and results. Permanent stat growth, post-run progression rewards, commanders, and spells remain unimplemented.
 
-The new gameplay's visuals remain unverified per the request for headless-only work; this status is not fresh artwork approval, pixel proof, native-hardware/performance validation, or separate-network internet proof. All authored odds, stat bounds, prices, production/drop amounts, and new branch balance are provisional, not final creator-approved tuning. See the [content pipeline](docs/content-pipeline.md) for detailed resource mechanics.
+The six-role battlefield changes have not received fresh rendered verification; Towerieary checks are separate from battlefield artwork approval, native-hardware/performance validation, and separate-network internet proof. All authored odds, stat bounds, prices, production/drop amounts, and new branch balance are provisional, not final creator-approved tuning. See the [content pipeline](docs/content-pipeline.md) for detailed resource mechanics.
 
 The UI pairs bundled **Pixelify Sans** labels with crisper **Silkscreen** pixel numerals for prices, health, stats, and counts. Small interface text stays at least 16px. Both fonts work offline and include their [Pixelify](assets/fonts/OFL.txt) and [Silkscreen](assets/fonts/silkscreen/OFL.txt) licenses.
 
-The supplied **Orcish Drone** track loops during match planning, combat, wave breaks, and the in-match pause/settings menu. It stops on results or leaving the match; title menus, connection setup, Sandbox, Orcieary, and collection stay silent. Playback is local and does not restart on host snapshots or volume changes.
+The supplied **Orcish Drone** track loops during match planning, combat, wave breaks, and the in-match pause/settings menu. It stops on results or leaving the match; title menus, connection setup, Sandbox, both field guides, and collection stay silent. Playback is local and does not restart on host snapshots or volume changes.
 
 ## Adding game content
 
@@ -28,7 +28,7 @@ Click the orc O to replay just his silent roar. Other letters do not trigger it;
 
 **Play** uses a centered menu with a primary Singleplayer action, paired Host/Join choices, and the same button styling/hover effects as the title screen. Connection forms, waiting rooms, real errors, and Cancel/Leave stay in the compact column rather than spanning the screen.
 
-Menus support mouse hover and visible keyboard focus; arrows/Tab navigate and Enter activates. Main-menu shortcuts are **P** Play, **S** Sandbox, **B** Orcieary, and **C** Collection. Escape returns or resumes the last activity; text fields/dialogs take priority. The gameplay pointer uses the steel variant from [Gauntlet Cursor by itsmars](https://opengameart.org/content/gauntlet-cursor), based on yd's CC0 artwork, at its original 32×32 size. Clickable UI retains the separate hand pointer; text/resize cursors remain native.
+Menus support mouse hover and visible keyboard focus; arrows/Tab navigate and Enter activates. Main-menu shortcuts are **P** Play, **S** Sandbox, **B** Orcieary, **T** Towerieary, and **C** Collection. Escape returns or resumes the last activity; text fields/dialogs take priority. The gameplay pointer uses the steel variant from [Gauntlet Cursor by itsmars](https://opengameart.org/content/gauntlet-cursor), based on yd's CC0 artwork, at its original 32×32 size. Clickable UI retains the separate hand pointer; text/resize cursors remain native.
 
 Main-menu buttons retain their hover/focus highlights without descriptive hover popups.
 
@@ -94,12 +94,13 @@ Main-menu buttons retain their hover/focus highlights without descriptive hover 
 - **Reset progress** confirms a return to Arrow-only ownership, not an empty collection. It does not alter Sandbox state or enemy lifetime records.
 - Collection unlocks and enemy statistics survive restarting. Sandbox layouts last for the running session. See [save ownership and verification](docs/development.md#collection-and-chest-verification).
 
-## Sandbox and Orcieary
+## Sandbox and field guides
 
 - **Sandbox** replaces Workshop: every tower, upgrade branch, enemy, and chosen round is available without collection locks, Coin costs, tile spending, or defeat.
 - Draw paths while stopped, choose a weighted round or an exact enemy/count, pause/resume with **Space**, and test at 1×/2×/4× speed.
 - Resize the map through width/height controls with confirmation. Menu/Escape pauses and preserves the current build, map, and camera; leaving never changes progression.
 - **Orcieary** orders enemies by earliest encounter/send availability and lists their descriptions, portraits, stats, mechanics, and lifetime records. Click a portrait—or focus it and press Enter/Space—to play its action once. Sandbox actions are excluded from records.
+- **Towerieary** includes all six tower identities, their upgrade trees, branch artwork, role-specific stats, and purchase costs. Select a tower, then click a tree node or navigate it with the arrow keys. X/Escape closes the guide; reopening restores each tower's selected stage. Previews use isolated combat state and never purchase upgrades, unlock towers, or modify a match.
 - Full controls, balance rules, save behavior, and verification: [enemy roster and sandbox](docs/enemy-roster.md).
 
 ## Documentation
@@ -121,7 +122,7 @@ Main-menu buttons retain their hover/focus highlights without descriptive hover 
 ```text
 project.godot       Engine settings and main scene
 AGENTS.md          Repository editing instructions
-scenes/            Main navigation, connection lobby, shared defense, sandbox, Orcieary, collection, chest reveal
+scenes/            Main navigation, connection lobby, shared defense, sandbox, field guides, collection, chest reveal
 scripts/           Rule owners, networking, persistence, input, and presentation
 resources/collection/  Tower reward definitions
 resources/combat/  Provisional defense-loop configuration

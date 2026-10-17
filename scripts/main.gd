@@ -11,6 +11,7 @@ var statistics_store: EnemyStatisticsStore
 var collection_screen: CollectionScreen
 var sandbox_screen: SandboxScreen
 var orcieary_screen: OrciearyScreen
+var towerieary_screen: ToweriearyScreen
 var session: MultiplayerSession
 var planning: MatchPlanning
 var play_screen: MultiplayerLobby
@@ -19,6 +20,7 @@ var _last_activity: Control
 @onready var menu: Control = $Menu
 @onready var sandbox_button: Button = $Menu/Center/Panel/Sandbox
 @onready var orcieary_button: Button = $Menu/Center/Panel/Orcieary
+@onready var towerieary_button: Button = $Menu/Center/Panel/Towerieary
 @onready var collection_button: Button = $Menu/Center/Panel/Collection
 @onready var play_button: Button = $Menu/Center/Panel/Play
 @onready var _match_music: AudioStreamPlayer = $MatchMusic
@@ -29,6 +31,7 @@ func _ready() -> void:
 	Input.set_custom_mouse_cursor(preload("res://assets/ui/cursor_hand.png"), Input.CURSOR_POINTING_HAND, Vector2(10, 2))
 	sandbox_button.pressed.connect(_open_sandbox)
 	orcieary_button.pressed.connect(_open_orcieary)
+	towerieary_button.pressed.connect(_open_towerieary)
 	collection_button.pressed.connect(_open_collection)
 	play_button.pressed.connect(_open_play)
 	$Menu/Center/Panel/Quit.pressed.connect(_quit)
@@ -75,6 +78,9 @@ func _hide_activities() -> void:
 	if orcieary_screen != null:
 		orcieary_screen.prepare_to_leave()
 		orcieary_screen.hide()
+	if towerieary_screen != null:
+		towerieary_screen.prepare_to_leave()
+		towerieary_screen.hide()
 	menu.hide()
 
 
@@ -104,6 +110,19 @@ func _open_orcieary() -> void:
 	orcieary_screen.open()
 
 
+func _open_towerieary() -> void:
+	_hide_activities()
+	if towerieary_screen == null:
+		towerieary_screen = preload("res://scenes/towerieary_screen.tscn").instantiate()
+		towerieary_screen.configure(combat_rules.catalog, combat_rules)
+		towerieary_screen.hide()
+		add_child(towerieary_screen)
+		towerieary_screen.back_requested.connect(_show_menu)
+	_last_activity = towerieary_screen
+	towerieary_screen.show()
+	towerieary_screen.open()
+
+
 func _open_collection() -> void:
 	_hide_activities()
 	_last_activity = collection_screen
@@ -125,6 +144,8 @@ func _show_menu() -> void:
 		sandbox_button.grab_focus()
 	elif orcieary_screen != null and _last_activity == orcieary_screen:
 		orcieary_button.grab_focus()
+	elif towerieary_screen != null and _last_activity == towerieary_screen:
+		towerieary_button.grab_focus()
 	elif _last_activity == collection_screen:
 		collection_button.grab_focus()
 	else:
@@ -187,6 +208,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_open_sandbox()
 			KEY_B:
 				_open_orcieary()
+			KEY_T:
+				_open_towerieary()
 			KEY_C:
 				_open_collection()
 			KEY_ESCAPE:
@@ -194,6 +217,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					_open_sandbox()
 				elif orcieary_screen != null and _last_activity == orcieary_screen:
 					_open_orcieary()
+				elif towerieary_screen != null and _last_activity == towerieary_screen:
+					_open_towerieary()
 				elif _last_activity == collection_screen:
 					_open_collection()
 				elif _last_activity == play_screen:
