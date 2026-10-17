@@ -1,6 +1,6 @@
 extends "res://tests/match_branch_test.gd"
 func _run() -> void:
-	success_message = "PASS: real host/client pay captured archer path prices, reject cross-owner/switch commands, replicate four targets, burns and bomb damage"
+	success_message = "PASS: real divergent peers accept host-priced complete archer chains, eight policies, minigun streams and fire-only continuous state"
 	planning_worker_path = "res://tests/archer_advancement_worker.gd"
 	_suite_deadline_msec = Time.get_ticks_msec()+90000
 	_directory = OS.get_temp_dir().path_join("gorcs_archer_peer_%d_%d" % [OS.get_process_id(),Time.get_ticks_usec()])
@@ -21,7 +21,7 @@ func _run() -> void:
 			var tower: Dictionary = await _wait_tower(observer,slot,Vector2i(index*2,3),0)
 			for upgrade: String in ["damage","speed","special",commands[index]]:
 				await _command(lane,{"action":"upgrade","slot":slot,"tower_id":tower["id"],"upgrade":upgrade})
-	await _wait_combat("guest",{"coins":[7040,7040]},"Both lanes pay host-defined prices rather than guest one-Coin overrides")
+	await _wait_combat("guest",{"coins":[47040,47040]},"Both lanes pay host-defined prices rather than guest one-Coin overrides")
 	var accepted: Dictionary = await _agree("Paid archer advancements agree")
 	for slot: int in range(2):
 		for index: int in range(3):
@@ -49,6 +49,28 @@ func _run() -> void:
 			await _command(owner,{"action":action,"slot":slot,"tower_id":id,"mode":MatchCombat.TargetMode.LAST+1})
 	await create_timer(0.15).timeout
 	_check(await _agree("Rejected policy mutations agree")==accepted,"Wrong-owner and out-of-bounds primary, secondary and extra archer requests cannot change accepted Last policies")
+	for slot: int in range(2):
+		var lane: String="host" if slot==0 else "guest"
+		var board: Array=accepted["towers"][slot]
+		await _command(lane,{"action":"upgrade","slot":slot,"tower_id":board[0]["id"],"upgrade":"eight_archers"})
+		for upgrade: String in ["molotov","quick_pitch","flamethrower"]:
+			await _command(lane,{"action":"upgrade","slot":slot,"tower_id":board[1]["id"],"upgrade":upgrade})
+		for upgrade: String in ["bigger_bombs","anti_orc_grenades","aom","aom_speed_1","aom_speed_2"]:
+			await _command(lane,{"action":"upgrade","slot":slot,"tower_id":board[2]["id"],"upgrade":upgrade})
+		await _build(lane,slot,6,3,0)
+		var gun: Dictionary=await _wait_tower("guest" if slot==0 else "host",slot,Vector2i(6,3),0)
+		for upgrade: String in ["damage","speed","special","four_archers","eight_archers","arrow_minigun"]:
+			await _command(lane,{"action":"upgrade","slot":slot,"tower_id":gun["id"],"upgrade":upgrade})
+		for action: String in ["target_archer_5","target_archer_6","target_archer_7","target_archer_8"]:
+			await _command(lane,{"action":action,"slot":slot,"tower_id":board[0]["id"],"mode":MatchCombat.TargetMode.STRONGEST})
+			await _command(lane,{"action":action,"slot":slot,"tower_id":board[0]["id"],"mode":MatchCombat.TargetMode.LAST})
+	await _wait_combat("guest",{"coins":[35120,35120]},"Complete capstone paths debit host prices on both real senders")
+	accepted=await _agree("Full archer chains and eight policies agree")
+	for slot: int in range(2):
+		var board: Array=accepted["towers"][slot]
+		_check(board[0]["extra_archers"].size()==6 and board[0]["advancement_path"]==["four_archers","eight_archers"],"Eight-archer history and six extra stream policies replicate")
+		for extra: Dictionary in board[0]["extra_archers"]: _check(extra["mode"]==MatchCombat.TargetMode.LAST,"All eight independent accepted modes replicate")
+		_check(board[1]["advancement_path"]==["fire_arrows","molotov","quick_pitch","flamethrower"] and board[2]["advancement_path"]==["bomb_arrows","bigger_bombs","anti_orc_grenades","aom","aom_speed_1","aom_speed_2"] and board[3]["advancement_path"]==["four_archers","eight_archers","arrow_minigun"],"Accepted real peers retain every exact prerequisite purchase")
 	await _command("host",{"action":"ready","value":true})
 	await _wait_for("guest",{"flags":[true,false]},"Last-equipped host commits initial planning")
 	accepted = await _agree("Committed Last policies agree")
@@ -68,4 +90,17 @@ func _run() -> void:
 	_check(accepted["enemies"][0].any(func(enemy:Dictionary)->bool:return enemy["burning"]) and accepted["enemies"][0].any(func(enemy:Dictionary)->bool:return enemy["hp"]<390),"Host volleys publish ignition and increased circular bomb damage")
 	await _command("guest",{"action":"step","delta":10.0})
 	_check(await _agree("Client cannot advance burns")==accepted,"Guest cannot independently tick fire or choose targets")
+	for slot: int in range(2):
+		var flame: Dictionary=accepted["towers"][slot][1]
+		var rocket: Dictionary=accepted["towers"][slot][2]
+		var gun: Dictionary=accepted["towers"][slot][3]
+		_check(flame["firing"] and is_equal_approx(float(flame["continuous_fire_time"]),0.01) and flame["shot"]==0 and flame["secondary_shot"]==0,"Continuous fire state reaches divergent clients without local discrete arrows")
+		_check(rocket["shot"]==1 and rocket["secondary_shot"]==0 and gun["shot"]==1 and gun["secondary_shot"]==0,"One-operator weapons publish only primary host shots")
+	await _command("host",{"action":"step","delta":0.1})
+	accepted=await _agree("Fast minigun stream is host-owned")
+	for slot: int in range(2):
+		_check(accepted["towers"][slot][3]["shot"]>=5,"Real accepted minigun emits multiple subinterval shots inside a large host tick")
+	var frozen: Dictionary=accepted.duplicate(true)
+	await _command("guest",{"action":"step","delta":60.0})
+	_check(await _agree("Client cannot consume flame fuel")==frozen,"Divergent local config cannot integrate fuel, burn, targeting or minigun shots")
 	await _finish()

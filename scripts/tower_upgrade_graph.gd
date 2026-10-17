@@ -17,17 +17,23 @@ var _leaf_positions: Dictionary[String, float] = {}
 var _horizontal_positions: Dictionary[String, float] = {}
 var _group := ButtonGroup.new()
 var _max_depth: int = 0
+var scroll: ScrollContainer
+var _canvas: Control
+var _reveal_pending: bool = false
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_PASS
+	clip_contents = true
+	_ensure_canvas()
 	resized.connect(_layout_nodes)
 	_layout_nodes()
 
 
 func configure(record: Dictionary, provider: TowerGuide) -> void:
+	_ensure_canvas()
 	for button: Button in stage_buttons.values():
-		remove_child(button)
+		_canvas.remove_child(button)
 		button.queue_free()
 	stage_buttons.clear()
 	_stages.clear()
@@ -75,7 +81,7 @@ func configure(record: Dictionary, provider: TowerGuide) -> void:
 		var preview: Dictionary = provider.preview(record["id"], stage_id)
 		var button := _make_node(stage, preview)
 		stage_buttons[stage_id] = button
-		add_child(button)
+		_canvas.add_child(button)
 		button.pressed.connect(_activate.bind(stage_id))
 		button.focus_entered.connect(_activate.bind(stage_id))
 		button.gui_input.connect(_node_input.bind(stage_id))
@@ -90,6 +96,7 @@ func select_stage(stage_id: String) -> void:
 	for id: String in stage_buttons:
 		stage_buttons[id].set_pressed_no_signal(id == stage_id)
 	queue_redraw()
+	_reveal_selected.call_deferred()
 
 
 func focus_selected_stage() -> void:
@@ -167,19 +174,13 @@ func _make_node(stage: Dictionary, preview: Dictionary) -> Button:
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	button.add_child(content)
 	if depth != 1:
-		var artwork := TextureRect.new()
-		artwork.custom_minimum_size = Vector2(0, 40 if depth != 2 else 32)
+		var artwork := TowerPortrait.new()
+		artwork.custom_minimum_size = Vector2(0, 44)
 		artwork.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		artwork.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		artwork.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		artwork.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var reward: TowerReward = preview.get("reward", null)
-		if reward != null:
-			var tower: Dictionary = preview["tower"]
-			var variant: Dictionary = reward.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
-			artwork.texture = variant.get("texture", reward.icon_texture)
 		content.add_child(artwork)
+		artwork.configure(preview)
+		# Graph thumbnails stay still; the large portrait owns animation.
+		artwork.set_process(false)
 	var caption := Label.new()
 	caption.text = _caption(stage)
 	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -201,6 +202,8 @@ func _caption(stage: Dictionary) -> String:
 		"Income upgrade I": return "Income I"
 		"Income upgrade II": return "Income II"
 		"Both upgrades": return "III"
+		"A.O.M. Rapid Reload I": return "Rapid Reload I"
+		"A.O.M. Rapid Reload II": return "Rapid Reload II"
 	return String(stage["title"])
 
 
@@ -208,26 +211,29 @@ func _layout_nodes() -> void:
 	if stage_buttons.is_empty() or size.x <= 0.0 or size.y <= 0.0:
 		queue_redraw()
 		return
-	var diagram_height: float = minf(size.y - 16.0, 570.0)
-	var step: float = minf(116.0, (diagram_height - 100.0) / float(maxi(_max_depth, 1)))
-	var top: float = maxf(8.0, (size.y - (step * _max_depth + 96.0)) * 0.5)
+	var canvas_width: float = maxf(size.x, float(_leaf_positions.size()) * 164.0 + 16.0)
+	_canvas.custom_minimum_size = Vector2(canvas_width, float(_max_depth) * 140.0 + 132.0)
+	_canvas.size = _canvas.custom_minimum_size
+	var step: float = 140.0
+	var top: float = 10.0
 	for depth: int in _rows:
 		var row: Array = _rows[depth]
 		for index: int in range(row.size()):
 			var stage_id: String = row[index]
 			var button: Button = stage_buttons[stage_id]
 			var width: float = 144.0 if depth != 1 else 140.0
-			var height: float = 92.0 if depth != 1 else 52.0
+			var height: float = 108.0 if depth != 1 else 52.0
 			if depth == 2:
 				height = 80.0
-			var x: float = _horizontal_positions[stage_id] * size.x
+			var x: float = _horizontal_positions[stage_id] * canvas_width
 			# Parallel stat purchases share every descendant, but must remain
 			# visibly separate arms of the purchase diamond.
 			if depth == 1:
-				x = size.x * 0.5 + (float(index) - float(row.size() - 1) * 0.5) * 184.0
-			button.position = Vector2(clampf(x - width * 0.5, 6.0, size.x - width - 6.0), top + depth * step + (92.0 - height) * 0.5)
+				x = canvas_width * 0.5 + (float(index) - float(row.size() - 1) * 0.5) * 184.0
+			button.position = Vector2(clampf(x - width * 0.5, 6.0, canvas_width - width - 6.0), top + depth * step + (108.0 - height) * 0.5)
 			button.size = Vector2(width, height)
 	queue_redraw()
+	_reveal_selected.call_deferred()
 
 
 func _draw() -> void:
@@ -235,8 +241,9 @@ func _draw() -> void:
 		var parent: Button = stage_buttons[parent_id]
 		for child_id: String in _children[parent_id]:
 			var child: Button = stage_buttons[child_id]
-			var start := Vector2(parent.position.x + parent.size.x * 0.5, parent.position.y + parent.size.y + 2.0)
-			var finish := Vector2(child.position.x + child.size.x * 0.5, child.position.y - 2.0)
+			var scroll_offset := Vector2(scroll.scroll_horizontal, scroll.scroll_vertical)
+			var start := Vector2(parent.position.x + parent.size.x * 0.5, parent.position.y + parent.size.y + 2.0) - scroll_offset
+			var finish := Vector2(child.position.x + child.size.x * 0.5, child.position.y - 2.0) - scroll_offset
 			var middle: float = (start.y + finish.y) * 0.5
 			var color: Color = Color(0.55, 0.65, 0.43) if child_id == selected_stage_id or parent_id == selected_stage_id else LINE
 			draw_polyline(PackedVector2Array([start, Vector2(start.x, middle), Vector2(finish.x, middle), finish]), color, 2.0, false)
@@ -280,3 +287,47 @@ func _nearest(stage_id: String, candidates: Array) -> String:
 			distance = candidate_distance
 			nearest = candidate_id
 	return nearest
+
+
+func _ensure_canvas() -> void:
+	if scroll != null:
+		return
+	scroll = ScrollContainer.new()
+	scroll.name = "GraphScroll"
+	scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	# Selection owns scrolling; native follow_focus can otherwise apply a
+	# second reveal using stale geometry during a catalog/layout replacement.
+	scroll.follow_focus = false
+	add_child(scroll)
+	_canvas = Control.new()
+	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	scroll.add_child(_canvas)
+	scroll.get_v_scroll_bar().value_changed.connect(func(_value: float) -> void: queue_redraw())
+	scroll.get_h_scroll_bar().value_changed.connect(func(_value: float) -> void: queue_redraw())
+
+
+func _reveal_selected() -> void:
+	if not is_inside_tree() or _reveal_pending:
+		return
+	_reveal_pending = true
+	# Scroll ranges are updated by container sorting, after node placement.
+	await get_tree().process_frame
+	_reveal_pending = false
+	if not is_inside_tree() or not stage_buttons.has(selected_stage_id):
+		return
+	var node_rect: Rect2 = stage_buttons[selected_stage_id].get_rect()
+	var horizontal: int = scroll.scroll_horizontal
+	var vertical: int = scroll.scroll_vertical
+	var margin: float = 4.0
+	if node_rect.end.x + margin > horizontal + scroll.size.x:
+		horizontal = ceili(node_rect.end.x + margin - scroll.size.x)
+	if node_rect.position.x - margin < horizontal:
+		horizontal = floori(node_rect.position.x - margin)
+	if node_rect.end.y + margin > vertical + scroll.size.y:
+		vertical = ceili(node_rect.end.y + margin - scroll.size.y)
+	if node_rect.position.y - margin < vertical:
+		vertical = floori(node_rect.position.y - margin)
+	scroll.scroll_horizontal = maxi(0, horizontal)
+	scroll.scroll_vertical = maxi(0, vertical)

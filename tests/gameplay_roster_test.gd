@@ -485,10 +485,7 @@ func _bounty_fractional_damage() -> void:
 				check(enemy["burning"] and is_equal_approx(enemy["burn_remaining"], 2.0), "Marked burn retains authored expiry and status")
 				check(model.sell_tower(0, source["id"]), "Burn source can be sold during marked exposure")
 			else:
-				_advance_exposure(model, 1.75, step)
-				check(enemy["hp"] == 81 and not enemy["slowed"], "Marked Rune has removed nineteen actual HP, still below the twenty-HP Freeze threshold")
-				_advance_exposure(model, 0.05, step)
-				check(enemy["hp"] == 80 and enemy["slowed"], "Marked Rune freezes exactly when accumulated actual HP reaches twenty")
+				check(enemy["slowed"] and is_equal_approx(enemy["slow_remaining"], 1.0), "Bounty damage modifiers neither gate nor lengthen the maximum-HP-based Freeze slow")
 			enemy["hp"] = 1
 			var coins_before: int = model.coins[0]
 			_advance_exposure(model, 1.0 / 6.0, step)

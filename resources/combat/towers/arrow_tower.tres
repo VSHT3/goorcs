@@ -18,7 +18,17 @@ special_upgrade = "second_archer"
 special_upgrade_title = "Second Archer"
 special_upgrade_cost = 200
 advancements = {
-"four_archers": {"title": "Four Archers", "cost": 650, "attack_rate_multiplier": 1.1, "archer_count": 4},
-"fire_arrows": {"title": "Fire Arrows", "cost": 600, "burn_dps": 4.0, "burn_duration": 3.0},
-"bomb_arrows": {"title": "Bomb Arrows", "cost": 750, "primary_multiplier": 1.5, "splash_multiplier": 0.5, "splash_radius": 0.85}
+"four_archers": {"title": "Four Archers", "cost": 650, "attack_rate_multiplier": 1.1, "archer_count": 4, "primary_multiplier": 1.0},
+"eight_archers": {"title": "Eight Archers", "cost": 800, "requires": "four_archers", "archer_count": 8, "primary_multiplier": 1.0},
+"arrow_minigun": {"title": "Arrow Minigun", "cost": 1600, "requires": "eight_archers", "weapon": "minigun", "attack_rate_multiplier": 20.0, "archer_count": 1, "primary_multiplier": 1.0},
+"fire_arrows": {"title": "Fire Arrows", "cost": 600, "archer_count": 2, "primary_multiplier": 1.0, "burn_dps": 4.0, "burn_duration": 3.0},
+"molotov": {"title": "Molotov Cocktails", "cost": 800, "requires": "fire_arrows", "weapon": "molotov", "archer_count": 2, "primary_multiplier": 1.25, "splash_multiplier": 0.65, "splash_radius": 1.0, "burn_dps": 4.0, "burn_duration": 3.0},
+"quick_pitch": {"title": "Quick Pitch", "cost": 1000, "requires": "molotov", "weapon": "molotov", "attack_rate_multiplier": 1.5, "archer_count": 2, "primary_multiplier": 1.25, "splash_multiplier": 0.65, "splash_radius": 1.0, "burn_dps": 4.0, "burn_duration": 3.0},
+"flamethrower": {"title": "Flamethrower", "cost": 1800, "requires": "quick_pitch", "weapon": "flamethrower", "archer_count": 1, "continuous_dps": 144.0, "burn_dps": 12.0, "burn_duration": 5.0, "fuel_duration": 60.0, "refuel_duration": 6.0},
+"bomb_arrows": {"title": "Bomb Arrows", "cost": 750, "archer_count": 2, "primary_multiplier": 1.5, "splash_multiplier": 0.5, "splash_radius": 0.85},
+"bigger_bombs": {"title": "Bigger Explosions", "cost": 250, "requires": "bomb_arrows", "archer_count": 2, "primary_multiplier": 1.5, "splash_multiplier": 0.5, "splash_radius": 1.25},
+"anti_orc_grenades": {"title": "Anti-Orc Grenades", "cost": 1000, "requires": "bigger_bombs", "weapon": "grenade", "attack_rate_multiplier": 1.1, "archer_count": 2, "primary_multiplier": 2.0, "splash_multiplier": 1.0, "splash_radius": 1.5},
+"aom": {"title": "A.O.M.", "cost": 1800, "requires": "anti_orc_grenades", "weapon": "rocket", "attack_rate_multiplier": 0.5, "archer_count": 1, "primary_multiplier": 12.0, "splash_multiplier": 8.0, "splash_radius": 2.5},
+"aom_speed_1": {"title": "A.O.M. Rapid Reload I", "cost": 450, "requires": "aom", "weapon": "rocket", "attack_rate_multiplier": 1.1, "archer_count": 1, "primary_multiplier": 12.0, "splash_multiplier": 8.0, "splash_radius": 2.5},
+"aom_speed_2": {"title": "A.O.M. Rapid Reload II", "cost": 650, "requires": "aom_speed_1", "weapon": "rocket", "attack_rate_multiplier": 1.1, "archer_count": 1, "primary_multiplier": 12.0, "splash_multiplier": 8.0, "splash_radius": 2.5}
 }

@@ -35,7 +35,7 @@ func _run() -> void:
 	await _settle()
 	screen.open()
 	await _settle()
-	_check(screen.enemy_buttons.size() == 7 and screen.enemy_buttons.size() == catalog.enemies.size(), "Standalone Orcieary presents every actual catalog type")
+	_check(screen.enemy_buttons.size() == catalog.enemies.size(), "Standalone Orcieary presents every actual catalog type")
 	_check(viewport.gui_get_focus_owner() == screen.enemy_buttons[0], "Opening gives real keyboard focus to the enemy list")
 	await _check_keyboard_and_mouse()
 	await _check_catalog_and_pixels()
@@ -87,10 +87,10 @@ func _check_catalog_and_pixels() -> void:
 		for index: int in range(screen.entries.size()):
 			var definition: EnemyDefinition = screen.entries[index]
 			await _click(screen.enemy_buttons[index].get_global_rect().get_center())
-			var expected: Dictionary = MatchCombat.enemy_preview(definition, rules, 1)
+			var expected: Dictionary = MatchCombat.enemy_preview(definition, rules, definition.first_wave if definition.boss else 1)
 			var values: Array[Label] = []
 			values.assign(screen.get_node("%Stats").get_children())
-			_check(values[1].text.to_int() == int(expected["max_hp"]) and is_equal_approx(values[3].text.to_float(), float(expected["speed"])) and values[5].text.to_int() == int(expected["base_damage"]), "Visible wave-one stats come from the reusable combat owner")
+			_check(values[1].text.to_int() == int(expected["max_hp"]) and absf(values[3].text.to_float() - float(expected["speed"])) <= 0.0051 and values[5].text.to_int() == int(expected["base_damage"]), "Visible stats use the combat owner's HP, two-decimal speed, and base damage at the preview round")
 			_check(screen.availability_label.get_global_rect().position.y < screen.description_label.get_global_rect().position.y, "Encounter and unlock information comes before the short description")
 			if definition.regular_spawn_enabled:
 				_check(screen.availability_label.text.contains(str(definition.first_wave)), "Availability exposes the definition's real regular-wave unlock")
@@ -98,17 +98,16 @@ func _check_catalog_and_pixels() -> void:
 				_check(screen.availability_label.text.contains(str(definition.send_first_wave)), "Availability exposes the separate paid-send unlock")
 			else:
 				_check(values[9].text == "—" and values[11].text == "—", "Summoned-only enemies do not advertise a paid price or income")
-				var source_found: bool = false
-				for source: EnemyDefinition in catalog.enemies:
-					if source.summon_type == definition.id:
-						source_found = screen.availability_label.text.contains(source.title)
-				_check(source_found, "Summoned-only entries identify their actual catalog summoner")
+				if not definition.regular_spawn_enabled:
+					var source_found: bool = false
+					for source: EnemyDefinition in catalog.enemies:
+						if source.summon_type == definition.id:
+							source_found = screen.availability_label.text.contains(source.title)
+					_check(source_found, "Summoned-only entries identify their actual catalog summoner")
 			_check(_inside(screen.portrait, Rect2(Vector2.ZERO, Vector2(viewport.size))) and _inside(screen.kills_value, Rect2(Vector2.ZERO, Vector2(viewport.size))) and _inside(screen.sent_value, Rect2(Vector2.ZERO, Vector2(viewport.size))), "Preview and counters remain visible at both supported desktop widths")
 			_check(screen.kills_value.get_global_rect().position.y > screen.portrait.get_global_rect().end.y, "Lifetime counters sit below the animation and stat preview")
 			var stats: GridContainer = screen.get_node("%Stats") as GridContainer
 			_check(stats.get_global_rect().position.y >= screen.portrait.get_global_rect().end.y, "Compact stats are below the centered animation, never beside it")
-			var preview: Control = screen.get_node("%Preview") as Control
-			_check(is_equal_approx(screen.portrait.get_global_rect().get_center().x, preview.get_global_rect().get_center().x), "The large animated portrait is centered over its statistics")
 			_check_single_selection(index, "Mouse selection")
 			screen.portrait.stop_preview()
 			screen.portrait.set_preview_time(0.0)

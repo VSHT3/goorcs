@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/necorcmancer_mancer_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/necorcmancer_mancer.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"necorcmancer_mancer"
+title = "NecOrcmancer Mancer"
+description = "Calls NecOrcmancers to raise an army of the dead."
+health_multiplier = 30.0
+speed_multiplier = 0.3
+base_damage = 8
+spawn_weight = 40
+first_wave = 40
+max_per_wave = 1
+max_weight_share = 0.5
+boss = true
+boss_spawn_chance = 0.05
+boss_spawn_chance_growth = 0.005
+boss_spawn_chance_cap = 0.25
+send_enabled = false
+kill_bounty = 40
+reroll_drop_chance = 0.25
+reroll_drop_amount = 3
+summon_interval = 7.0
+summon_cast_duration = 1.15
+summon_type = &"necorcmancer"
+summon_min = 2
+summon_max = 4
+summon_limit = 6
+board_height = 1.05
+board_anchor = Vector2(0.5, 0.875)
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true

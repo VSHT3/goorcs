@@ -34,6 +34,7 @@ A single commit with a lot of work is acceptable. No need to produce multiple hu
 - Keep interfaces terse: actual stats and actions, without filler/helper prose, baseline/ownership disclaimers, or hover popups unless explicitly requested.
 - Use compact X close controls instead of “Back / Esc”; preserve Escape and keyboard navigation. Avoid visible scrollbar chrome while keeping any necessary scrolling accessible.
 - Show tower progression as connected visual tower nodes and evolution branches, not a dropdown or file-explorer-style text tree.
+- Towerieary detail previews must render the selected accepted tower state through the same tower renderer as the battlefield, including archer counts, held-arrow effects, evolution/follow-up artwork, and cosmetic orbits. Do not hard-code tier portraits or substitute the base collection icon: future tower content must inherit its in-game appearance. Verify new branches in both the guide and the running game.
 
 ## Match state ownership
 

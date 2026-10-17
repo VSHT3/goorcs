@@ -76,6 +76,7 @@ func _run() -> void:
 		for selector: TargetingCycle in selectors:
 			for control: Control in [selector.previous_button, selector.mode_label, selector.next_button]:
 				_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "Four labeled sandbox cycles fit inside the compact management panel")
+	await _check_advancement_controls()
 	var header_rect: Rect2 = screen.play_button.get_global_rect()
 	screen.cancel_interaction()
 	_check(not screen._management.visible and screen.play_button.get_global_rect() == header_rect, "Inspector visibility never moves fixed HUD")
@@ -149,6 +150,38 @@ func _run() -> void:
 		print("PASS: sandbox screen controls, compact layout, confirmations, exact spawns, keyboard and menu persistence")
 	quit(1 if failures > 0 else 0)
 
+
+
+func _check_advancement_controls() -> void:
+	await _press_cycle_button(screen.advancement_buttons["eight_archers"])
+	var tower: Dictionary = screen.controller.state["towers"][0][0]
+	_check(tower["advancement"] == "eight_archers" and tower["extra_archers"].size() == 6, "Native Eight Archers control purchases all eight streams")
+	for index: int in range(2, screen.extra_targeting.size()):
+		var selector: TargetingCycle = screen.extra_targeting[index]
+		_check(selector.is_visible_in_tree(), "All eight archer targeting selectors are exposed")
+		await _press_cycle_button(selector.next_button)
+		_check(screen.controller.state["towers"][0][0]["extra_archers"][index]["mode"] == selector.mode, "Additional archer controls dispatch their own accepted stream index")
+	await _press_cycle_button(screen.advancement_buttons["arrow_minigun"])
+	_check(screen.controller.state["towers"][0][0]["advancement"] == "arrow_minigun" and not screen.secondary_targeting.is_visible_in_tree(), "Native minigun purchase collapses targeting to its single stream")
+	for chain: Array in [
+		["fire_arrows", "molotov", "quick_pitch", "flamethrower"],
+		["bomb_arrows", "bigger_bombs", "anti_orc_grenades", "aom", "aom_speed_1", "aom_speed_2"],
+	]:
+		screen._sell()
+		screen.shop_buttons[&"arrow_tower"].pressed.emit()
+		screen._cell_clicked(Vector2i(3, 2), MOUSE_BUTTON_LEFT)
+		for command: String in ["damage", "speed", "special"]:
+			await _press_cycle_button(screen._upgrade_buttons[command])
+		for command: String in chain:
+			var button: Button = screen.advancement_buttons[command]
+			_check(button.is_visible_in_tree() and not button.disabled, "Only eligible next advancement is exposed for native purchase")
+			await _press_cycle_button(button)
+			var accepted: Dictionary = screen.controller.state["towers"][0][0]
+			_check(accepted["advancement"] == command and accepted["advancement_path"].has(command), "Native branch control reaches the accepted advancement and history")
+			_check(screen.advancement_buttons[command].disabled, "Purchased current node is shown as owned")
+		_check(not screen.secondary_targeting.is_visible_in_tree(), "Single-weapon terminal branches hide secondary and extra selectors")
+		for selector: TargetingCycle in screen.extra_targeting:
+			_check(not selector.is_visible_in_tree(), "No obsolete multi-archer selector remains on a terminal operator")
 
 func _key(code: Key) -> InputEventKey:
 	var event := InputEventKey.new()

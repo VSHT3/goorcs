@@ -182,6 +182,34 @@ func _check_behavior_validation() -> void:
 		_check(catalog.validation_errors().is_empty(), "Restored %s behavior, profile, and attributes remain valid" % kind)
 
 
+func _check_variant_geometry_validation() -> void:
+	var catalog: ContentCatalog = _variant_catalog()
+	var art: TowerReward = catalog.towers[0].reward
+	var variant: Dictionary = {
+		"texture": art.icon_texture,
+		"archer_pivot": Vector2(40, 24),
+		"secondary_sprite_offset": Vector2(10, -2),
+		"additional_archer_offsets": PackedVector2Array([Vector2(-12, -30), Vector2(12, -30)]),
+		"portrait_bounds": Rect2(-0.8, -2.4, 1.6, 2.5),
+	}
+	art.board_variants = {"four_archers": variant}
+	_check(catalog.validation_errors().is_empty(), "A branch can frame a taller platform and independently place its crew")
+	var invalid: Array[Dictionary] = [
+		{"archer_pivot": Vector2(NAN, 0)},
+		{"secondary_sprite_offset": "not a position"},
+		{"additional_archer_offsets": PackedVector2Array([Vector2(0, INF)])},
+		{"additional_archer_offsets": [Vector2.ZERO]},
+		{"portrait_bounds": Rect2(0, 0, -1, 2)},
+		{"portrait_bounds": Rect2(0, 0, 1, 0)},
+		{"portrait_bounds": Rect2(INF, 0, 1, 2)},
+	]
+	for change: Dictionary in invalid:
+		var broken: Dictionary = variant.duplicate(true)
+		broken.merge(change, true)
+		art.board_variants = {"four_archers": broken}
+		_check(not catalog.validation_errors().is_empty(), "Malformed branch rig/frame metadata cannot enter a playable catalog")
+
+
 func _check_null_art_scene() -> void:
 	var reward := TowerReward.new()
 	reward.id = &"no_art_fixture"
@@ -220,6 +248,7 @@ func _run() -> void:
 	_check_validation()
 	_check_directional_validation()
 	_check_behavior_validation()
+	_check_variant_geometry_validation()
 	await _check_null_art_scene()
 	var catalog: ContentCatalog = _variant_catalog()
 	var directory: String = OS.get_temp_dir().path_join("gorcs_catalog_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])

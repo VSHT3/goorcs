@@ -28,6 +28,7 @@ RENDERED_TESTS = {
     "orcieary_screen_test.gd",
     "path_board_test.gd",
     "tower_icon_test.gd",
+    "tower_portrait_test.gd",
 }
 # Exact diagnostic bodies and counts only; never exempt an entire negative suite.
 # A new negative test must add its deliberate push_error diagnostics here.

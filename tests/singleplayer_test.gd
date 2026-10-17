@@ -160,6 +160,29 @@ func _solo_last_targeting(planning: MatchPlanning) -> void:
 		planning.set_archer_targeting(1, opponent_id, archer_index, MatchCombat.TargetMode.CLOSEST)
 		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.LAST + 1)
 	_check(planning.combat == frozen, "Read-only solo opponent and invalid extra policies cannot mutate either mirrored tower")
+	var before_eight: Array = planning.combat["coins"].duplicate()
+	planning.upgrade_tower(0, id, "eight_archers")
+	for slot: int in range(2):
+		var eight: Dictionary = planning.combat["towers"][slot][0]
+		_check(eight["advancement"] == "eight_archers" and eight["extra_archers"].size() == 6 and planning.combat["coins"][slot] == before_eight[slot] - 800, "Eight-archer purchase adds six extra streams and charges both mirrored balances atomically")
+	for archer_index: int in range(4, 8):
+		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.STRONGEST)
+		for slot: int in range(2):
+			_check(planning.combat["towers"][slot][0]["extra_archers"][archer_index - 2]["mode"] == MatchCombat.TargetMode.STRONGEST, "Second-floor targeting commands reach the host owner and mirror independently")
+	frozen = planning.combat.duplicate(true)
+	planning.set_archer_targeting(1, opponent_id, 7, MatchCombat.TargetMode.CLOSEST)
+	planning.set_archer_targeting(0, id, 8, MatchCombat.TargetMode.CLOSEST)
+	_check(planning.combat == frozen, "Eighth-archer support grants neither opponent authority nor a ninth stream")
+	var before_minigun: Array = planning.combat["coins"].duplicate()
+	planning.upgrade_tower(0, id, "arrow_minigun")
+	for slot: int in range(2):
+		var minigun: Dictionary = planning.combat["towers"][slot][0]
+		_check(minigun["advancement"] == "arrow_minigun" and minigun["extra_archers"].is_empty() and planning.combat["coins"][slot] == before_minigun[slot] - 1600, "Minigun conversion retires individual extra streams and charges the accepted price on both boards")
+	frozen = planning.combat.duplicate(true)
+	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.LAST)
+	planning.set_archer_targeting(0, id, 7, MatchCombat.TargetMode.CLOSEST)
+	planning.upgrade_tower(0, id, "eight_archers")
+	_check(planning.combat == frozen, "Merged weapon cannot retain hidden archer commands or repurchase its prior tier")
 	planning.stop_singleplayer()
 
 

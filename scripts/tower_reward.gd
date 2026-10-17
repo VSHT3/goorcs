@@ -18,8 +18,9 @@ extends Resource
 # Both arrays are empty for ordinary art, or contain eight aligned layers/tips.
 @export var directional_weapon_textures: Array[Texture2D] = []
 @export var directional_projectile_origins: PackedVector2Array = PackedVector2Array()
-# Optional branch records: {texture: Texture2D, board_height: float,
-# board_anchor: Vector2}. Follow-up keys take precedence over evolution keys.
+# Optional branch records: {texture, board_height, board_anchor, archer_pivot,
+# secondary_sprite_offset, additional_archer_offsets, portrait_bounds}.
+# Advancement keys use the evolution argument; follow-up keys retain precedence.
 @export var board_variants: Dictionary = {}
 @export var mirror_board: bool = false
 @export var archer_head_texture: Texture2D

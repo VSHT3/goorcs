@@ -71,6 +71,7 @@ func _run() -> void:
 	await _check_rune_evolutions(board, viewport)
 	await _check_special_attacks(board, viewport)
 	await _check_archer_advancements(board, viewport)
+	await _check_extended_arrow_branches(board, viewport)
 	await _check_pierce_attacks(board, viewport)
 	await _check_directional_weapons(board, viewport)
 	await _check_typed_enemies(board, viewport)
@@ -474,13 +475,26 @@ func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 		tower["evolution"] = "onyx_ring"
 		tower["special_upgraded"] = true
 		board.combat_towers = [tower]
+		_check(board.is_processing(), "Onyx keeps its local orbit active without enemies or attacks")
 		var onyx_idle: Image = await _board_image(board, viewport)
 		_check(int(_changed_geometry(ordinary, onyx_idle, region)["pixels"]) > 10,
-			"Idle Onyx has a distinct dark stone keystone rather than a permanent range ring")
+			"Idle Onyx has dark orbiting stones rather than a permanent range ring")
 		board._process(0.5)
 		var onyx_waiting: Image = await _board_image(board, viewport)
-		_check(int(_changed_geometry(onyx_idle, onyx_waiting, region)["pixels"]) == 0 and board._shot_traces.is_empty(),
-			"Onyx never pulses merely because local time advances")
+		_check(int(_changed_geometry(onyx_idle, onyx_waiting, region)["pixels"]) > 25 and board._shot_traces.is_empty(),
+			"Onyx stones orbit between snapshots without inventing a damage pulse")
+		board.combat_towers = [tower.duplicate(true)]
+		var onyx_repeated: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(onyx_waiting, onyx_repeated, region)["pixels"]) == 0,
+			"Repeated snapshots preserve Onyx orbit position")
+		var onyx_phase: float = board._boulder_phase
+		board.hide()
+		board._process(0.3)
+		_check(is_equal_approx(board._boulder_phase, onyx_phase) and not board.is_processing(),
+			"Hidden Onyx stops processing without resetting its orbit")
+		board.show()
+		_check(board.is_processing(), "Showing Onyx resumes its orbit without another snapshot")
+		board.set_process(false)
 		tower = tower.duplicate(true)
 		tower["shot"] = 1
 		accepted = tower.duplicate(true)
@@ -500,9 +514,11 @@ func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 		board.set_process(false)
 		_check(board._shot_traces.size() == 1, "Repeated Onyx snapshots cannot duplicate or restart the pulse")
 		board._process(PathBoard.ONYX_PULSE_DURATION)
+		# Compare at the same orbit angle so movement cannot mask pulse expiry.
+		board._boulder_phase = onyx_phase
 		var onyx_expired: Image = await _board_image(board, viewport)
-		_check(board._shot_traces.is_empty() and int(_changed_geometry(onyx_idle, onyx_expired, region)["pixels"]) == 0,
-			"Onyx ring fully disappears between discrete shots instead of becoming a range indicator")
+		_check(board._shot_traces.is_empty() and int(_changed_geometry(onyx_waiting, onyx_expired, region)["pixels"]) == 0,
+			"Onyx pulse fully expires while its cosmetic orbit remains")
 		_check(tower == accepted and board.combat_towers[0] == accepted,
 			"Capturing, rendering and expiring Onyx effects cannot mutate accepted snapshots")
 		board.combat_towers = []
@@ -839,6 +855,115 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 	_check(art.icon_texture.get_image().get_data() == original_pixels, "All branches leave original tower PNG pixels unchanged")
 	await _check_burning_enemies(board, viewport)
 	board.size = old_size
+
+
+func _check_extended_arrow_branches(board: PathBoard, viewport: SubViewport) -> void:
+	var old_size: Vector2 = board.size
+	var old_types: Dictionary = board.tower_types
+	var advancements: Dictionary = {}
+	for definition: TowerDefinition in board.content_catalog.towers:
+		if definition.reward.id == &"arrow_tower":
+			advancements = definition.advancements
+	board.size = Vector2(240, 240)
+	board.layout = PathLayout.new(Vector2i(5, 5), 25, Vector2i(0, 2), Vector2i(4, 2))
+	board.tower_types = {"arrow_tower": {"range": 4.0, "special_upgrade": "second_archer", "advancements": advancements}}
+	board.combat_enemies = []
+	var keys: Array[String] = ["fire_arrows", "molotov", "quick_pitch", "flamethrower", "bomb_arrows", "bigger_bombs",
+		"anti_orc_grenades", "aom", "aom_speed_1", "aom_speed_2", "four_archers", "eight_archers", "arrow_minigun"]
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		var silhouettes: Array[PackedByteArray] = []
+		for branch: String in keys:
+			board.combat_towers = []
+			var config: Dictionary = advancements[branch]
+			var weapon: String = config.get("weapon", "arrow")
+			var tower: Dictionary = _tower(290, Vector2i(2, 3), "arrow_tower")
+			tower.merge({"advancement": branch, "special_upgraded": true, "interval": 0.04 if weapon == "minigun" else 0.8,
+				"secondary_shot": 0, "secondary_aim": Vector2(4, 0), "aim": Vector2(4, 1),
+				"firing": false, "refuel_remaining": 0.0, "refuel_duration": 6.0, "extra_archers": []}, true)
+			for index: int in range(maxi(0, int(config.get("archer_count", 2)) - 2)):
+				tower["extra_archers"].append({"shot": 0, "aim": Vector2(index % 5, 0)})
+			board.combat_towers = [tower]
+			var idle: Image = await _board_image(board, viewport)
+			for earlier: PackedByteArray in silhouettes:
+				_check(idle.get_data() != earlier, "Every Arrow branch tier has distinct native48px equipment, mirrored=%s branch=%s" % [mirrored, branch])
+			silhouettes.append(idle.get_data())
+			_save_arrow_capture(idle, branch + ("_left_idle" if mirrored else "_right_idle"))
+			if branch == "eight_archers":
+				_check(board._archer_poses.size() == 8, "Eight accepted archers own eight independent presentation rigs")
+				for index: int in range(4):
+					var lower: Vector2 = board._archer_geometry(tower, index, 1.0)["pivot"]
+					var upper: Vector2 = board._archer_geometry(tower, index + 4, 1.0)["pivot"]
+					_check(lower.y - upper.y > 25.0, "Four upper shooters stand on a separate second floor, mirrored=%s" % mirrored)
+			if weapon == "flamethrower":
+				tower = tower.duplicate(true)
+				tower["firing"] = true
+				tower["shot"] = 8 # An unrelated counter cannot manufacture flame arrows.
+				board.combat_towers = [tower]
+				var firing: Image = await _board_image(board, viewport)
+				_check(board._shot_traces.is_empty() and firing.get_data() != idle.get_data(),
+					"Accepted continuous fire draws a directional jet and no discrete arrows")
+				_save_arrow_capture(firing, branch + ("_left_firing" if mirrored else "_right_firing"))
+				board._corpse_paused = true
+				board._process(0.20)
+				var paused: Image = await _board_image(board, viewport)
+				_check(paused.get_data() == firing.get_data(), "Paused flame jet freezes without advancing local gameplay")
+				board._corpse_paused = false
+				var last_stage: PackedByteArray = firing.get_data()
+				for remaining: float in [5.8, 3.0, 0.6]:
+					tower = tower.duplicate(true)
+					tower["refuel_remaining"] = remaining
+					# Refuel must win even if a stale firing flag is also present.
+					board.combat_towers = [tower]
+					var refueling: Image = await _board_image(board, viewport)
+					_check(refueling.get_data() != last_stage and board._shot_traces.is_empty(),
+						"Refuel disconnect/exchange/prime stages remain visually distinct with no phantom attacks")
+					last_stage = refueling.get_data()
+					_save_arrow_capture(refueling, "%s_%s_refuel_%s" % [branch, "left" if mirrored else "right", remaining])
+				continue
+			tower = tower.duplicate(true)
+			tower["shot"] = 4 if weapon == "minigun" else 1
+			board.combat_towers = [tower]
+			var count: int = board._shot_traces.size()
+			_check(count == (4 if weapon == "minigun" else 1), "Accepted counters yield a bounded stream, not simultaneous minigun volleys")
+			if weapon == "minigun":
+				_check(float(board._shot_traces[0]["life"]) > float(board._shot_traces[3]["life"]),
+					"Coalesced minigun snapshots spread arrows along the stream instead of stacking them")
+			var trace: Dictionary = board._shot_traces[0]
+			var origin: Vector2 = board._projectile_origin(trace)
+			var aim: Vector2 = trace["aim"]
+			board._process(0.02 if weapon == "minigun" else float(trace["flight_duration"]) * 0.5)
+			var flight: Image = await _board_image(board, viewport)
+			_save_arrow_capture(flight, branch + ("_left_flight" if mirrored else "_right_flight"))
+			if weapon in ["molotov", "grenade"]:
+				var linear: Vector2 = origin.lerp(board._projectile_destination(trace), 0.5)
+				_check(board._projectile_position(trace).y < linear.y - 5.0, "Thrown physical payload follows a raised arc, not a bow ray")
+				_check(trace["weapon"] == weapon, "Payload records retain accepted weapon identity")
+			var changed: Dictionary = tower.duplicate(true)
+			changed["aim"] = Vector2(0, 4)
+			board.combat_towers = [changed]
+			_check(board._shot_traces.size() == count and trace["aim"] == aim and board._projectile_origin(trace).is_equal_approx(origin),
+				"Snapshot deduplication preserves captured launch origins and lethal-hit destinations")
+			if float(config.get("splash_radius", 0.0)) > 0.0:
+				board._process(float(trace["flight_duration"]) * 0.5 + float(trace["impact_duration"]) * 0.25)
+				var impact: Image = await _board_image(board, viewport)
+				_check(impact.get_data() != flight.get_data(), "Molotov flame shatter, grenade shrapnel and rocket blast render at accepted impact")
+				_save_arrow_capture(impact, branch + ("_left_impact" if mirrored else "_right_impact"))
+			board._process(2.0)
+			_check(board._shot_traces.is_empty(), "Every branch retires its bounded shot/effect history")
+		board.combat_towers = []
+	board.size = old_size
+	board.tower_types = old_types
+
+
+func _save_arrow_capture(image: Image, label: String) -> void:
+	var directory: String = OS.get_environment("GORCS_ARROW_CAPTURE_DIR")
+	if directory.is_empty():
+		return
+	var error: Error = DirAccess.make_dir_recursive_absolute(directory)
+	_check(error == OK, "Arrow capture output directory can be created")
+	_check(image.get_region(Rect2i(0, 0, 240, 240)).save_png(directory.path_join(label + ".png")) == OK,
+		"Arrow native48px smoke capture saves: " + label)
 
 
 func _check_burning_enemies(board: PathBoard, viewport: SubViewport) -> void:

@@ -111,7 +111,7 @@ static func _admission_error(content: ContentCatalog, rules: CombatRules) -> Str
 	if rules.wave_weight <= 0 or rules.wave_weight_growth < 0 or not is_finite(rules.spawn_interval) or rules.spawn_interval < 0.0 or not rules.valid_speed_progression():
 		return "Combat wave and speed progression rules are invalid."
 	for enemy: EnemyDefinition in content.enemies:
-		if enemy.regular_spawn_enabled and enemy.spawn_weight == 1 and enemy.first_wave == 1 and enemy.max_per_wave == 0 and enemy.max_weight_share == 1.0:
+		if enemy.regular_spawn_enabled and not enemy.boss and enemy.spawn_weight == 1 and enemy.first_wave == 1 and enemy.max_per_wave == 0 and enemy.max_weight_share == 1.0:
 			return ""
 	return "Combat requires an always-available, unlimited weight-one remainder enemy."
 
@@ -141,6 +141,8 @@ static func _copy_reward(source: TowerReward) -> TowerReward:
 	# Keep immutable artwork shared, but never share editable branch records.
 	reward.board_variants = source.board_variants.duplicate(true)
 	reward.additional_archer_offsets = source.additional_archer_offsets.duplicate()
+	reward.directional_weapon_textures = source.directional_weapon_textures.duplicate()
+	reward.directional_projectile_origins = source.directional_projectile_origins.duplicate()
 	return reward
 
 
@@ -168,8 +170,12 @@ static func _stages(definition: TowerDefinition) -> Array[Dictionary]:
 		parent_id = "/".join(path)
 	for command: String in definition.advancements:
 		var advancement_path: Array[String] = path.duplicate()
-		advancement_path.append(command)
-		stages.append(_stage(advancement_path, definition.advancements[command]["title"], parent_id))
+		var chain: Array[String] = _advancement_chain(definition.advancements, command)
+		advancement_path.append_array(chain)
+		var advancement_parent: String = parent_id
+		if chain.size() > 1:
+			advancement_parent = "/".join(advancement_path.slice(0, advancement_path.size() - 1))
+		stages.append(_stage(advancement_path, definition.advancements[command]["title"], advancement_parent))
 	for command: String in definition.evolutions:
 		var branch: Dictionary = definition.evolutions[command]
 		var branch_path: Array[String] = path.duplicate()
@@ -186,6 +192,15 @@ static func _stages(definition: TowerDefinition) -> Array[Dictionary]:
 			followup_path.append(followup_id)
 			stages.append(_stage(followup_path, branch["followups"][followup_id]["title"], branch_id))
 	return stages
+
+
+static func _advancement_chain(advancements: Dictionary, command: String) -> Array[String]:
+	var chain: Array[String] = []
+	var current: String = command
+	while not current.is_empty() and advancements.has(current) and not chain.has(current):
+		chain.push_front(current)
+		current = String(advancements[current].get("requires", ""))
+	return chain
 
 
 static func _stat_title(definition: TowerDefinition, command: String) -> String:

@@ -19,7 +19,7 @@ var selected_stage_id: String = "base"
 var selected_preview: Dictionary = {}
 var stat_values: Dictionary[StringName, Label] = {}
 var back_button: Button
-var portrait: TextureRect
+var portrait: TowerPortrait
 var title_label: Label
 var stage_label: Label
 var role_label: Label
@@ -168,7 +168,8 @@ func _build_layout() -> void:
 	art_panel.custom_minimum_size = Vector2(108, 128)
 	art_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	hero.add_child(art_panel)
-	portrait = _texture(Vector2(84, 104))
+	portrait = TowerPortrait.new()
+	portrait.custom_minimum_size = Vector2(84, 104)
 	portrait.name = "TowerPortrait"
 	art_panel.add_child(portrait)
 	var introduction := VBoxContainer.new()
@@ -274,19 +275,13 @@ func _refresh_preview() -> void:
 	var record: Dictionary = entries[selected_index]
 	var tower: Dictionary = selected_preview["tower"]
 	var stats: Dictionary = selected_preview["stats"]
-	var reward: TowerReward = selected_preview["reward"]
 	var stage: Dictionary = selected_preview["stage"]
 	title_label.text = record["title"] if selected_stage_id == "base" else String(stage["title"])
 	stage_label.text = String(record["title"])
 	stage_label.visible = selected_stage_id != "base"
 	role_label.text = _role_title(tower.get("behavior_kind", record["role"]))
 	description_label.text = _stage_description(record, tower, stats)
-	if reward != null:
-		var variant: Dictionary = reward.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
-		# Collection artwork includes the original Arrow rig; never show its headless board layer.
-		portrait.texture = variant.get("texture", reward.icon_texture)
-	else:
-		portrait.texture = null
+	portrait.configure(selected_preview)
 	stat_values.clear()
 	_clear(_costs)
 	_clear(_stats)
@@ -324,6 +319,17 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 		"chain":
 			return "Chains through nearby enemies, dealing more damage with each jump." if float(config.get("successive_hit_bonus", 0.0)) > 0.0 else "Chains through nearby enemies at full damage."
 	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
+	match String(advancement.get("weapon", "arrow")):
+		"flamethrower":
+			return "One operator sprays continuous FIRE damage. After 60 uninterrupted firing seconds, refuel for 6 seconds. Losing a target resets the streak; refueling cannot be canceled. Burn refreshes without stacking."
+		"molotov":
+			return "Two throwers lob incendiary bottles: impact, splash, and refreshing burn."
+		"grenade":
+			return "Two throwers lob anti-orc grenades with a wider, heavier blast."
+		"rocket":
+			return "One muscular operator fires slow, heavy rockets with a huge blast."
+		"minigun":
+			return "Three archers crew one rotary arrow gun: a single stream with the output of twenty archers."
 	if advancement.has("burn_dps"):
 		return "Independent archers fire arrows that burn their targets. Burning refreshes without stacking."
 	if advancement.has("splash_multiplier"):
@@ -334,7 +340,7 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 	var branch: Dictionary = stats.get("evolutions", {}).get(evolution, {})
 	if bool(stats.get("area_attack", false)):
 		if bool(tower.get("freeze_upgraded", false)):
-			return "Damages nearby enemies and slows susceptible targets after enough damage."
+			return "Immediately slows nearby ice-susceptible enemies. Higher maximum HP means faster thawing."
 		if bool(branch.get("continuous", false)):
 			return "Deals continuous damage to enemies in the surrounding tile neighborhood."
 		return "Pulses damage through enemies in the surrounding tile neighborhood."
@@ -372,14 +378,22 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 	var continuous: bool = bool(branch.get("continuous", false))
 	var damage: int = int(tower["damage"])
 	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
+	var weapon: String = String(advancement.get("weapon", "arrow"))
+	continuous = continuous or weapon == "flamethrower"
 	if continuous:
-		_add_stat(_stats, &"continuous_dps", "Continuous damage", "%d / s" % damage)
+		var dps: float = float(advancement.get("continuous_dps", damage)) * (float(tower.get("damage_multiplier", 1.0)) * float(tower.get("speed_multiplier", 1.0)) if weapon == "flamethrower" else 1.0)
+		_add_stat(_stats, &"continuous_dps", "Continuous FIRE" if weapon == "flamethrower" else "Continuous damage", "%s / s" % _number(dps))
 	else:
 		var caption: String = "Initial hit damage" if tower.get("behavior_kind", "attack") == "chain" else ("Damage per pulse" if bool(stats.get("area_attack", false)) else "Damage per hit")
 		if advancement.has("primary_multiplier"):
-			caption = "Base projectile damage"
-		_add_stat(_stats, &"damage", caption, str(damage))
+			_add_stat(_stats, &"primary_damage", "Primary hit damage", str(ceili(float(damage) * float(advancement["primary_multiplier"]))))
+		else:
+			_add_stat(_stats, &"damage", caption, str(damage))
 		_add_stat(_stats, &"interval", "Attack interval", "%s s" % _number(float(tower["interval"])))
+		_add_stat(_stats, &"attack_rate", "Stream rate" if weapon == "minigun" else "Attacks / s per weapon", _number(1.0 / maxf(float(tower["interval"]), 0.001)))
+	if weapon == "flamethrower":
+		_add_stat(_stats, &"fuel_duration", "Uninterrupted fire", "%s s" % _number(float(advancement.get("fuel_duration", 60.0))))
+		_add_stat(_stats, &"refuel_duration", "Mandatory refuel", "%s s" % _number(float(advancement.get("refuel_duration", 6.0))))
 	if tower.get("behavior_kind", "attack") == "chain":
 		var config: Dictionary = tower["behavior_config"]
 		_add_stat(_stats, &"chain_hits", "Maximum chain hits", str(int(config["hit_count"])))
@@ -387,15 +401,16 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 		_add_stat(_stats, &"successive_bonus", "Each successive hit", "+%s%% base damage" % _number(float(config["successive_hit_bonus"]) * 100.0))
 	elif bool(stats.get("area_attack", false)):
 		if bool(tower.get("freeze_upgraded", false)):
-			_add_stat(_stats, &"freeze_threshold", "Damage needed to slow", "%s%% max HP" % _number(TowerDefinition.FREEZE_DAMAGE_THRESHOLD * 100.0))
+			_add_stat(_stats, &"freeze_hp_scale", "Thaw HP scale", "%s HP" % _number(TowerDefinition.FREEZE_HP_SCALE))
 			_add_stat(_stats, &"freeze_slow", "Movement reduction", "%s%%" % _number((1.0 - TowerDefinition.FREEZE_SPEED_MULTIPLIER) * 100.0))
-			_add_stat(_stats, &"freeze_duration", "Slow duration", "%s s" % _number(TowerDefinition.FREEZE_DURATION))
+			_add_stat(_stats, &"freeze_duration", "Base slow duration", "%s s" % _number(TowerDefinition.FREEZE_DURATION))
 	else:
 		if stats.get("special_upgrade", "") == "second_archer":
 			var count: int = int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) else 1))
-			_add_stat(_stats, &"archers", "Independent archers", str(count))
-			if advancement.has("primary_multiplier"):
-				_add_stat(_stats, &"primary_damage", "Bomb primary damage", str(ceili(float(damage) * float(advancement["primary_multiplier"]))))
+			if weapon == "minigun":
+				_add_stat(_stats, &"crew", "Crew / arrow streams", "3 / 1")
+			else:
+				_add_stat(_stats, &"archers", "Operators" if weapon in ["flamethrower", "rocket"] else ("Independent throwers" if weapon in ["molotov", "grenade"] else "Independent archers"), str(count))
 			if advancement.has("splash_multiplier"):
 				_add_stat(_stats, &"splash_damage", "Other splash targets", str(ceili(float(damage) * float(advancement["splash_multiplier"]))))
 				_add_stat(_stats, &"splash_radius", "Splash radius", "%s cells" % _number(float(advancement["splash_radius"])))
@@ -444,7 +459,7 @@ func _refresh_focus_chain() -> void:
 func _show_unavailable() -> void:
 	selected_preview = {}
 	stage_graph.configure({}, provider)
-	portrait.texture = null
+	portrait.configure({})
 	title_label.text = "No tower preview available"
 	stage_label.text = ""
 	role_label.text = ""
