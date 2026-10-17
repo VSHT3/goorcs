@@ -731,8 +731,6 @@ func _draw_ranges() -> void:
 						Vector2.ONE * (cell_size - 4.0))
 					draw_rect(rect, Color(0.71, 0.89, 0.72, 0.07))
 					draw_rect(rect, Color(0.71, 0.89, 0.72, 0.25), false, 1.0)
-		var foot: Vector2 = cell_center(tower_cell) + Vector2(0, cell_size * 0.28)
-		draw_arc(foot, cell_size * 0.36, 0.0, TAU, 24, Color(0.79, 0.83, 0.59, 0.8), 1.5)
 
 
 func _draw_hover() -> void:
@@ -777,8 +775,13 @@ func _sprite_rect(texture: Texture2D, height: float, anchor: Vector2, foot: Vect
 	return Rect2(foot - sprite_size * displayed_anchor, sprite_size)
 
 
+func _tower_foot(cell: Vector2i) -> Vector2:
+	# Put the front foundation edge near the tile's bottom, without a floating pad.
+	return cell_center(cell) + Vector2(0, _cell_size() * 0.45)
+
+
 func visual_headroom() -> float:
-	# Camera fitting uses the same opaque-height/anchor geometry as drawing.
+	# Retain conservative top-row clearance even with the lower tower foundations.
 	var foot := Vector2(0.0, _cell_size() * 0.78)
 	var headroom: float = 0.0
 	for reward: TowerReward in _tower_art.values():
@@ -848,7 +851,7 @@ func _update_draw_order() -> void:
 				center = _position_center(_enemy_visual_position(enemy))
 			3:
 				center = _position_center(item["data"]["pos"])
-		item["foot"] = center + Vector2(0, cell_size * 0.28)
+		item["foot"] = _tower_foot(item["data"]["cell"]) if int(item["kind"]) == 1 else center + Vector2(0, cell_size * 0.28)
 	_draw_order.sort_custom(_depth_before)
 
 
@@ -857,8 +860,10 @@ func _draw_combat() -> void:
 	var cell_size: float = _cell_size()
 	for trace: Dictionary in _corpse_traces:
 		_draw_death_blood(trace, _position_center(trace["pos"]) + Vector2(0, cell_size * 0.28))
-	# All contact shadows belong to the ground, not in front of foreground units.
+	# Buildings sit directly on their foundations; only units/endpoints cast ovals.
 	for item: Dictionary in _draw_order:
+		if int(item["kind"]) == 1:
+			continue
 		var width: float = cell_size * 0.35
 		if int(item["kind"]) == 2 or int(item["kind"]) == 3:
 			var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
@@ -866,15 +871,6 @@ func _draw_combat() -> void:
 		draw_set_transform(item["foot"], 0.0, Vector2(1.0, 0.30))
 		var alpha: float = 0.35 * (_corpse_alpha(float(item["data"]["age"])) if int(item["kind"]) == 3 else 1.0)
 		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, alpha))
-	draw_set_transform(Vector2.ZERO)
-	for item: Dictionary in _draw_order:
-		if int(item["kind"]) != 1 or item["data"].get("evolution", "") != "boulders":
-			continue
-		for index: int in range(3):
-			var offset: Vector2 = _boulder_offset(item["data"], index)
-			var shadow: Vector2 = item["foot"] + Vector2(offset.x, offset.y * 0.5)
-			draw_set_transform(shadow, 0.0, Vector2(1.0, 0.3))
-			draw_circle(Vector2.ZERO, cell_size * 0.12, Color(0.06, 0.10, 0.07, 0.24))
 	draw_set_transform(Vector2.ZERO)
 	for item: Dictionary in _draw_order:
 		match int(item["kind"]):
@@ -1070,7 +1066,7 @@ func _draw_attacks() -> void:
 
 
 func _draw_onyx_pulse(trace: Dictionary, remaining: float) -> void:
-	var foot: Vector2 = cell_center(trace["cell"]) + Vector2(0, _cell_size() * 0.28)
+	var foot: Vector2 = _tower_foot(trace["cell"])
 	var radius: float = _cell_size() * lerpf(0.30, 1.25, 1.0 - remaining)
 	# An expanding, fading stone ring exists only for a captured discrete shot.
 	draw_set_transform(foot, 0.0, Vector2(1.0, 0.55))
@@ -1098,11 +1094,11 @@ func _tower_muzzle(tower: Dictionary, archer_index: int) -> Vector2:
 	if artwork != null and artwork.archer_head_texture != null:
 		return _archer_geometry(tower, archer_index, _archer_draw_amount(tower, archer_index))["tip"]
 	if artwork != null and artwork.icon_texture != null and artwork.projectile_origin.x >= 0.0 and artwork.projectile_origin.y >= 0.0:
-		var foot: Vector2 = cell_center(tower["cell"]) + Vector2(0, cell_size * 0.28)
+		var foot: Vector2 = _tower_foot(tower["cell"])
 		var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
 		var muzzle: Vector2 = artwork.projectile_origin + _archer_offset(artwork, archer_index)
 		return rect.position + muzzle * rect.size / artwork.icon_texture.get_size()
-	return cell_center(tower["cell"]) + Vector2(0, -cell_size * 0.30)
+	return _tower_foot(tower["cell"]) + Vector2(0, -cell_size * 0.58)
 
 
 func _projectile_destination(trace: Dictionary) -> Vector2:
@@ -1197,7 +1193,7 @@ func _archer_draw_amount(tower: Dictionary, archer_index: int) -> float:
 
 func _archer_geometry(tower: Dictionary, archer_index: int, tension: float) -> Dictionary:
 	var artwork: TowerReward = _tower_art[tower["type_id"]]
-	var foot: Vector2 = cell_center(tower["cell"]) + Vector2(0, _cell_size() * 0.28)
+	var foot: Vector2 = _tower_foot(tower["cell"])
 	var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
 	var scale: float = rect.size.y / artwork.icon_texture.get_height()
 	var local: Vector2 = artwork.archer_pivot + _archer_offset(artwork, archer_index)

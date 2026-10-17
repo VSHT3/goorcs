@@ -489,7 +489,7 @@ func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 			"A real Onyx shot counter captures exactly one branch-specific pulse")
 		board._process(PathBoard.ONYX_PULSE_DURATION * 0.5)
 		var onyx_attack: Image = await _board_image(board, viewport)
-		var ring_edge: Vector2 = board.cell_center(tower["cell"]) + Vector2(-board._cell_size() * 0.775, board._cell_size() * 0.28)
+		var ring_edge: Vector2 = board._tower_foot(tower["cell"]) + Vector2(-board._cell_size() * 0.775, 0)
 		_check(_region_luminance(onyx_attack, ring_edge) < _region_luminance(onyx_idle, ring_edge) - 0.03,
 			"Onyx's discrete expanding ring visibly uses dark stone, mirrored=%s" % mirrored)
 		_check(_pixels_changed_near(onyx_idle, onyx_attack, board.cell_center(Vector2i(3, 3)))
@@ -669,7 +669,7 @@ func _check_archer_advancements(board: PathBoard, viewport: SubViewport) -> void
 		for index: int in range(3):
 			_check(Vector2(board._archer_geometry(redirected, index, 1.0)["direction"]).is_equal_approx(directions[index]),
 				"Turning one shooter cannot redirect another archer's rig")
-		var foot: Vector2 = board.cell_center(tower["cell"]) + Vector2(0, board._cell_size() * 0.28)
+		var foot: Vector2 = board._tower_foot(tower["cell"])
 		var rect: Rect2 = board._sprite_rect(art.icon_texture, art.board_height, art.board_anchor, foot)
 		var ground_region := Rect2i(rect.position + Vector2(0, 38) * rect.size / art.icon_texture.get_size(),
 			Vector2(rect.size.x, rect.size.y * 0.45))
@@ -972,7 +972,7 @@ func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
 			and not _pixels_changed_near(baseline, flight, redirected),
 			"The same Pierce bolt continues straight beyond its aimed enemy without bouncing, mirrored=%s" % mirrored)
 		var ray: Vector2 = endpoint - origin
-		_check(is_zero_approx(ray.cross(beyond - origin))
+		_check(ray.normalized().is_equal_approx((beyond - origin).normalized())
 			and (beyond - origin).length() > (board._position_center(accepted["aim"]) - board.cell_center(accepted["cell"])).length(),
 			"Pierce stays on the accepted forward ray after passing the primary target")
 		board.combat_towers = [tower.duplicate(true)]
