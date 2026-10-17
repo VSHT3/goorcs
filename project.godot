@@ -22,6 +22,7 @@ buses/default_bus_layout="res://default_bus_layout.tres"
 [autoload]
 
 AudioSettings="*res://scripts/audio_settings.gd"
+DiscordSettings="*res://scripts/discord_settings.gd"
 
 [display]
 

@@ -3,7 +3,11 @@ extends SceneTree
 var failures: int = 0
 
 
-func _init() -> void:
+func _initialize() -> void:
+	_run.call_deferred()
+
+
+func _run() -> void:
 	var planning := MatchPlanning.new()
 	var session := MultiplayerSession.new()
 	var presence := DiscordPresence.new()
@@ -45,12 +49,87 @@ func _init() -> void:
 	planning.selecting_loadout = false
 	presence.activity()
 	_check(planning.combat == captured, "Presence must not mutate accepted gameplay state")
+	_test_party_boundaries(presence, planning, session)
 	presence.free()
 	planning.free()
 	session.free()
+	await _test_match_clock()
 	if failures == 0:
-		print("PASS: Discord presence round boundaries, phase/mode transitions, visible-screen priority, private-data exclusion and gameplay nonmutation")
+		print("PASS: Discord presence round/phase boundaries, private non-joinable party metadata, per-run clock stability/reset, visible-screen priority and gameplay nonmutation")
 	quit(1 if failures > 0 else 0)
+
+
+func _test_party_boundaries(presence: DiscordPresence, planning: MatchPlanning, session: MultiplayerSession) -> void:
+	planning.active = false
+	planning.selecting_loadout = false
+	planning.singleplayer = false
+	session.state = MultiplayerSession.State.HOSTING
+	session.is_host = true
+	session.invite_code = "PRIVATE_ROOM_CREDENTIAL"
+	var hosting: Dictionary = presence.activity()
+	_check(hosting["current_party_size"] == 1 and hosting["max_party_size"] == 2, "Waiting host exposes one occupied slot out of two")
+	_check(not str(hosting).contains(session.invite_code), "Party identity cannot reveal the room credential")
+	for secret: String in ["join_secret", "match_secret", "spectate_secret"]:
+		_check(not hosting.has(secret), "Cosmetic party counts cannot enable Discord admission")
+	session.invite_code = "REPLACEMENT_PRIVATE_CREDENTIAL"
+	_check(presence.activity() == hosting, "Rotating room credentials cannot alter the public party identity")
+	session.state = MultiplayerSession.State.CONNECTED
+	var connected: Dictionary = presence.activity()
+	_check(connected["current_party_size"] == 2 and connected["party_id"] == hosting["party_id"], "Admission fills the same cosmetic party rather than creating another")
+	planning.singleplayer = true
+	_check(_has_no_party(presence.activity()), "Solo removes all stale multiplayer party metadata")
+	planning.singleplayer = false
+	presence.screen = "Main menu"
+	_check(_has_no_party(presence.activity()), "A visible menu cannot retain a hidden room's party")
+	presence.screen = "Play"
+	session.state = MultiplayerSession.State.CONNECTING
+	_check(_has_no_party(presence.activity()), "Unadmitted connection attempts cannot claim an occupied party")
+	session.state = MultiplayerSession.State.ERROR
+	_check(_has_no_party(presence.activity()), "Connection failure removes all party metadata")
+
+
+func _has_no_party(activity: Dictionary) -> bool:
+	return activity["party_id"] == "" and activity["current_party_size"] == 0 and activity["max_party_size"] == 0
+
+
+func _test_match_clock() -> void:
+	var session := MultiplayerSession.new()
+	root.add_child(session)
+	var planning := MatchPlanning.new()
+	planning.session = session
+	root.add_child(planning)
+	var preferences: Node = load("res://scripts/discord_settings.gd").new()
+	preferences.set_enabled(false)
+	var presence := DiscordPresence.new()
+	presence.session = session
+	presence.planning = planning
+	presence.settings = preferences
+	presence.screen = "Play"
+	root.add_child(presence)
+	_check(presence.activity()["start_timestamp"] == 0, "Menus and unstarted matches have no match timer")
+	planning.start_singleplayer()
+	_check(presence.activity()["start_timestamp"] == 0, "Loadout selection does not start the run clock")
+	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Clock fixture admits an actual solo match")
+	var started_at: int = presence.activity()["start_timestamp"]
+	_check(started_at > 0, "The run clock starts when board planning is admitted, even with sharing disabled")
+	# Cross a Unix-second boundary so a clock incorrectly reset on every snapshot fails.
+	await create_timer(1.1).timeout
+	_check(planning.debug_set_values(10, 200, 8), "Clock fixture changes round through the real owner")
+	_check(presence.activity()["start_timestamp"] == started_at, "Round changes cannot reset elapsed match time")
+	preferences.set_enabled(true)
+	_check(presence.activity()["start_timestamp"] == started_at, "Re-enabling sharing during a run retains its original start")
+	planning.combat["phase"] = MatchCombat.Phase.FINISHED
+	planning.changed.emit()
+	_check(presence.activity()["start_timestamp"] == started_at, "Results retain the completed run's start")
+	planning.stop_singleplayer()
+	_check(presence.activity()["start_timestamp"] == 0, "Leaving removes the old run timer")
+	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "A second run is admitted through normal loadout selection")
+	_check(presence.activity()["start_timestamp"] > started_at, "A new run cannot reuse the previous run's elapsed timer")
+	presence.free()
+	preferences.free()
+	planning.free()
+	session.free()
 
 
 func _round(presence: DiscordPresence) -> int:
