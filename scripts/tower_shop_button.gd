@@ -9,6 +9,7 @@ var tower_type: StringName = &""
 var tower_title: String = ""
 var cost: int = 0
 var tower_artwork: Texture2D
+var shortcut_number: int = 0
 
 var _content: MarginContainer
 var _presentation: HBoxContainer
@@ -35,6 +36,9 @@ func _get_minimum_size() -> Vector2:
 
 func refresh_caption(price: String, status: String) -> void:
 	(_presentation.get_node("Caption/Title") as Label).text = tower_title
+	var key_label := _presentation.get_node("Caption/Details/Key") as Label
+	key_label.text = "[%d]" % shortcut_number if shortcut_number > 0 else ""
+	key_label.visible = shortcut_number > 0
 	var price_label := _presentation.get_node("Caption/Details/Price") as Label
 	price_label.text = price
 	price_label.visible = not price.is_empty()
@@ -58,7 +62,7 @@ func _notification(what: int) -> void:
 		BaseButton.DRAW_HOVER_PRESSED:
 			suffix = "_hover_pressed"
 	var color: Color = get_theme_color("font%s_color" % suffix)
-	for path: String in ["Caption/Title", "Caption/Details/Price", "Caption/Details/Status"]:
+	for path: String in ["Caption/Title", "Caption/Details/Key", "Caption/Details/Price", "Caption/Details/Status"]:
 		var caption_label := _presentation.get_node(path) as Label
 		if caption_label.get_theme_color("font_color") != color:
 			caption_label.add_theme_color_override("font_color", color)
@@ -91,12 +95,12 @@ func _create_presentation(artwork_size: int) -> HBoxContainer:
 	details.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	details.add_theme_constant_override("separation", 6)
 	caption.add_child(details)
-	for label_name: String in ["Title", "Price", "Status"]:
+	for label_name: String in ["Title", "Key", "Price", "Status"]:
 		var label := Label.new()
 		label.name = label_name
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		label.add_theme_font_size_override("font_size", 16)
-		if label_name == "Price":
+		if label_name in ["Key", "Price"]:
 			label.add_theme_font_override("font", NUMBER_FONT)
 			details.add_child(label)
 		elif label_name == "Status":
@@ -110,6 +114,8 @@ func _create_presentation(artwork_size: int) -> HBoxContainer:
 	(caption.get_node("Title") as Label).text = tower_title
 	(details.get_node("Price") as Label).text = "%d Coins" % cost
 	(details.get_node("Status") as Label).hide()
+	(details.get_node("Key") as Label).text = "[%d]" % shortcut_number if shortcut_number > 0 else ""
+	(details.get_node("Key") as Label).visible = shortcut_number > 0
 	return row
 
 
@@ -124,3 +130,14 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	set_drag_preview(preview)
 	drag_started.emit(tower_type)
 	return {"tower_type": String(tower_type)}
+
+
+static func shortcut_number_from_event(event: InputEvent) -> int:
+	if not event is InputEventKey or not event.pressed or event.echo or event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
+		return 0
+	var code: Key = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+	if code >= KEY_1 and code <= KEY_9:
+		return code - KEY_1 + 1
+	if code >= KEY_KP_1 and code <= KEY_KP_9:
+		return code - KEY_KP_1 + 1
+	return 0

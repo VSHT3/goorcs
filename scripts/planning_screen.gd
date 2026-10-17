@@ -336,6 +336,26 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not is_visible_in_tree() or planning == null or not planning.active or pause_menu.visible or debug_popup.visible or results_menu.visible or get_viewport().gui_is_dragging():
+		return
+	var focus: Control = get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit:
+		return
+	for popup: PopupMenu in world._hud_popups:
+		if popup.visible:
+			return
+	var number: int = TowerShopButton.shortcut_number_from_event(event)
+	if number == 0:
+		return
+	for id: StringName in shop_buttons:
+		var button: TowerShopButton = shop_buttons[id]
+		if button.shortcut_number == number and button.is_visible_in_tree() and not button.disabled:
+			_select_placement(id)
+			get_viewport().set_input_as_handled()
+			return
+
+
 func cancel_interaction() -> bool:
 	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0:
 		return false
@@ -446,12 +466,16 @@ func _refresh_palette() -> void:
 	var types: Dictionary = planning.combat.get("tower_types", {}) if planning != null else {}
 	var coins: int = _own_coins()
 	var available: bool = planning != null and planning.can_manage_towers(planning.local_slot())
+	var shortcut_number: int = 0
 	for id: StringName in shop_buttons:
 		var button: TowerShopButton = shop_buttons[id]
 		var stats: Dictionary = types.get(String(id), {})
 		var unlocked: bool = planning != null and planning.collection_store != null and planning.collection_store.is_unlocked(id)
 		var equipped: bool = planning != null and planning.is_equipped(id)
 		button.visible = equipped
+		if equipped:
+			shortcut_number += 1
+		button.shortcut_number = shortcut_number if equipped else 0
 		var title: String = String(stats.get("title", button.tower_title))
 		button.tower_title = title
 		button.cost = int(stats.get("cost", 0))

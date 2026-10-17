@@ -17,6 +17,22 @@ func _run() -> void:
 	await _key(KEY_S)
 	var sandbox: SandboxScreen = main.sandbox_screen
 	await _click(sandbox.shop_buttons[&"arrow_tower"].get_global_rect().get_center())
+	await _key(KEY_6)
+	_check(sandbox.placement_id == &"gold_mine" and sandbox.controller.state["towers"][0].is_empty(), "Number keys select the matching Sandbox palette slot without placing a tower")
+	var width_field: LineEdit = sandbox.width_input.get_line_edit()
+	width_field.grab_focus()
+	width_field.select_all()
+	await _key(KEY_2)
+	_check(width_field.text == "2" and sandbox.placement_id == &"gold_mine", "Typing a number edits the focused map field without changing the build tool")
+	width_field.text = "14"
+	width_field.release_focus()
+	sandbox._request_reset()
+	await _settle()
+	await _key(KEY_1)
+	_check(sandbox.placement_id == &"gold_mine" and sandbox.reset_dialog.visible, "A confirmation dialog blocks tower shortcuts")
+	sandbox.reset_dialog.hide()
+	sandbox.cancel_interaction()
+	await _key(KEY_1)
 	await _shift(true)
 	for cell: Vector2i in [Vector2i(2, 2), Vector2i(3, 2)]:
 		await _click(sandbox.cell_screen_position(cell))
@@ -40,6 +56,15 @@ func _run() -> void:
 	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "Real solo run admits the starter loadout")
 	main.planning.debug_set_values(1, 200, 8)
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
+	await _settle()
+	await _key(KEY_1)
+	_check(screen._placement_type() == &"arrow_tower" and main.planning.combat["towers"][0].is_empty(), "Match shortcut numbering uses only equipped visible slots, not collection identities")
+	screen.open_pause_menu()
+	await _settle()
+	screen.cancel_interaction()
+	await _key(KEY_1)
+	_check(screen._placement_type() == &"", "Pause blocks build shortcuts")
+	screen._resume_match()
 	await _settle()
 	await _click(screen.shop_buttons[&"arrow_tower"].get_global_rect().get_center())
 	await _shift(true)
@@ -86,6 +111,8 @@ func _key(code: Key) -> void:
 		var event := InputEventKey.new()
 		event.keycode = code
 		event.physical_keycode = code
+		if code >= KEY_0 and code <= KEY_9:
+			event.unicode = code
 		event.pressed = pressed
 		Input.parse_input_event(event)
 		await process_frame

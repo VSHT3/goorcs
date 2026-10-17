@@ -175,7 +175,7 @@ func _build_interface() -> void:
 	_status = _label(spawn_row, "", true)
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	var footer: VBoxContainer = _panel(Vector4(14, -100, -14, -6), true)
+	var footer: VBoxContainer = _panel(Vector4(14, -120, -14, -6), true)
 	var tools := HBoxContainer.new()
 	footer.add_child(tools)
 	_label(tools, "Map")
@@ -194,11 +194,12 @@ func _build_interface() -> void:
 	for definition: TowerDefinition in catalog.towers:
 		var reward: TowerReward = definition.reward
 		var button := FreeShopButton.new()
+		button.shortcut_number = shop_buttons.size() + 1
 		button.tower_type = reward.id
 		button.tower_title = reward.title
 		button.tower_artwork = reward.icon_texture
 		button.toggle_mode = true
-		button.custom_minimum_size = Vector2(0, 48)
+		button.custom_minimum_size = Vector2(0, 68)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_select_placement.bind(reward.id))
 		button.drag_started.connect(world.boards[0].cancel_stroke.unbind(1))
@@ -656,3 +657,23 @@ func _input(event: InputEvent) -> void:
 		if not cancel_interaction():
 			MenuAudio.activate(menu_button)
 		get_viewport().set_input_as_handled()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not _active or not is_visible_in_tree() or resize_dialog.visible or reset_dialog.visible or get_viewport().gui_is_dragging():
+		return
+	var focus: Control = get_viewport().gui_get_focus_owner()
+	if focus is LineEdit or focus is TextEdit:
+		return
+	for popup: PopupMenu in world._hud_popups:
+		if popup.visible:
+			return
+	var number: int = TowerShopButton.shortcut_number_from_event(event)
+	if number == 0:
+		return
+	for id: StringName in shop_buttons:
+		var button: TowerShopButton = shop_buttons[id]
+		if button.shortcut_number == number and button.is_visible_in_tree() and not button.disabled:
+			_select_placement(id)
+			get_viewport().set_input_as_handled()
+			return
