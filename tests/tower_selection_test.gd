@@ -486,6 +486,7 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	planning.start_singleplayer()
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Debug UI fixture commits its owned starter")
 	planning.set_physics_process(false)
+	_check(planning.debug_set_values(1, int(planning.combat["coins"][0]), 71), "Debug UI fixture starts with an explicitly accepted non-default Shard balance")
 	await create_timer(0.05).timeout
 	_check(screen.debug_button.visible and planning.can_debug(), "Solo exposes the compact authoritative debug control")
 	var original_size: Vector2i = root.size
@@ -497,7 +498,14 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 		var header_rect: Rect2 = header.get_global_rect()
 		screen.debug_button.pressed.emit()
 		await process_frame
-		_check(screen.debug_popup.visible and int(screen.debug_round.value) == 1 and int(screen.debug_money.value) == int(planning.combat["coins"][0]), "Opening debug uses accepted displayed round and own money")
+		_check(screen.debug_popup.visible and int(screen.debug_round.value) == 1 and int(screen.debug_money.value) == int(planning.combat["coins"][0]) and int(screen.debug_shards.value) == int(planning.combat["reroll_currency"][0]), "Opening debug uses accepted displayed round and own Coins/Shards")
+		_check(screen.debug_shards.get_line_edit().get_theme_font("font") == screen.debug_money.get_line_edit().get_theme_font("font"), "Shard input uses the same legible numeric font as money")
+		var popup_rect := Rect2(Vector2.ZERO, Vector2(screen.debug_popup.size))
+		var round_rect: Rect2 = screen.debug_round.get_global_rect()
+		var money_rect: Rect2 = screen.debug_money.get_global_rect()
+		var shards_rect: Rect2 = screen.debug_shards.get_global_rect()
+		var apply_rect: Rect2 = screen.debug_apply.get_global_rect()
+		_check(popup_rect.encloses(round_rect) and popup_rect.encloses(money_rect) and popup_rect.encloses(shards_rect) and popup_rect.encloses(apply_rect) and round_rect.end.y <= money_rect.position.y and money_rect.end.y <= shards_rect.position.y and shards_rect.end.y <= apply_rect.position.y, "All three numeric rows and Apply fit the popup without overlap at width %d" % width)
 		_check(screen.world.get_global_rect() == world_rect and header.get_global_rect() == header_rect, "Opening the debug popup cannot reflow world or HUD at width %d" % width)
 		_check(Rect2(screen.global_position, screen.size).encloses(screen.debug_button.get_global_rect()), "Tiny debug control stays inside the game surface at width %d" % width)
 		var camera_position: Vector2 = screen.world.camera.position
@@ -515,21 +523,41 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 		_check(screen.world.camera.position == camera_position and screen.world.camera.zoom == camera_zoom and screen.world._world_viewport.gui_disable_input, "Popup scroll, typing and board input remain isolated from the world")
 		screen.debug_round.value = 1001
 		screen.debug_money.value = 1000000001
-		_check(int(screen.debug_round.value) == 1000 and int(screen.debug_money.value) == 1000000000, "Popup accepts the full supported upper bounds without overflowing")
+		screen.debug_shards.value = 1000000001
+		_check(int(screen.debug_round.value) == 1000 and int(screen.debug_money.value) == 1000000000 and int(screen.debug_shards.value) == 1000000000, "Popup accepts the full supported upper bounds without overflowing")
 		screen.debug_round.value = 0
 		screen.debug_money.value = -1
-		_check(int(screen.debug_round.value) == 1 and int(screen.debug_money.value) == 0, "Popup keeps both values inside the supported lower bounds")
+		screen.debug_shards.value = -1
+		_check(int(screen.debug_round.value) == 1 and int(screen.debug_money.value) == 0 and int(screen.debug_shards.value) == 0, "Popup keeps all three values inside their supported lower bounds")
+		var before: Dictionary = planning._snapshot().duplicate(true)
+		var escape := InputEventKey.new()
+		escape.keycode = KEY_ESCAPE
+		escape.pressed = true
+		screen.debug_popup.window_input.emit(escape)
+		_check(not screen.debug_popup.visible and not screen.world._world_viewport.gui_disable_input and planning._snapshot() == before, "Escape discards drafts and restores board input without changing accepted balances")
+		screen.debug_button.pressed.emit()
+		await process_frame
+		_check(int(screen.debug_shards.value) == int(planning.combat["reroll_currency"][0]), "Reopening after cancel discards the unaccepted Shard draft at width %d" % width)
+		var next_shards: int = width + 17
+		screen.debug_round.get_line_edit().text = "1"
+		screen.debug_money.get_line_edit().text = str(planning.combat["coins"][0])
+		screen.debug_shards.get_line_edit().text = str(next_shards)
+		screen.debug_apply.pressed.emit()
+		_check(not screen.debug_popup.visible and planning.combat["reroll_currency"] == [next_shards, next_shards] and not screen.world._world_viewport.gui_disable_input, "Typed Shards apply through the solo transaction and release modal input at width %d" % width)
+		screen.debug_button.pressed.emit()
+		await process_frame
+		_check(int(screen.debug_shards.value) == next_shards, "Reopened popup initializes from the new accepted Shards at width %d" % width)
 		screen.debug_popup.hide()
-		_check(not screen.world._world_viewport.gui_disable_input, "Closing debug restores board input")
 	root.size = original_size
 	await process_frame
 	screen.debug_button.pressed.emit()
 	screen.debug_round.get_line_edit().text = "31"
 	screen.debug_money.get_line_edit().text = "123456"
+	screen.debug_shards.get_line_edit().text = "4567"
 	screen.debug_apply.pressed.emit()
-	_check(not screen.debug_popup.visible and int(planning.combat["wave"]) == 30 and planning.combat["coins"] == [123456, 123456], "Apply commits typed values through the real authoritative debug operation and closes")
+	_check(not screen.debug_popup.visible and int(planning.combat["wave"]) == 30 and planning.combat["coins"] == [123456, 123456] and planning.combat["reroll_currency"] == [4567, 4567], "Apply commits typed round, Coins and Shards through the real authoritative operation and closes")
 	screen.debug_button.pressed.emit()
-	_check(int(screen.debug_round.value) == 31 and int(screen.debug_money.value) == 123456, "Reopening reflects the accepted upcoming round rather than a stale draft")
+	_check(int(screen.debug_round.value) == 31 and int(screen.debug_money.value) == 123456 and int(screen.debug_shards.value) == 4567, "Reopening reflects all accepted values rather than a stale draft")
 	screen.debug_popup.hide()
 	planning._host_combat.phase = MatchCombat.Phase.WAVE
 	planning._host_combat.wave = 31

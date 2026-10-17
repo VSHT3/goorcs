@@ -248,8 +248,8 @@ func can_debug() -> bool:
 	return singleplayer or (session != null and session.is_host and session.state == MultiplayerSession.State.CONNECTED and _active_peer_id != 0)
 
 
-func debug_set_values(round_number: int, money: int) -> bool:
-	if not can_debug() or round_number < 1 or round_number > 1000 or money < 0 or money > 1000000000:
+func debug_set_values(round_number: int, money: int, shards: int) -> bool:
+	if not can_debug() or round_number < 1 or round_number > 1000 or money < 0 or money > 1000000000 or shards < 0 or shards > 1000000000:
 		return false
 	var displayed_round: int = _host_combat.wave + 1 if _host_combat.phase == MatchCombat.Phase.PLANNING else _host_combat.wave
 	if round_number != displayed_round:
@@ -261,8 +261,10 @@ func debug_set_values(round_number: int, money: int) -> bool:
 		_host_autoplay_votes = [false, false]
 		_enter_planning()
 	_host_combat.coins[0] = money
+	_host_combat.reroll_currency[0] = shards
 	if singleplayer:
 		_host_combat.coins[1] = money
+		_host_combat.reroll_currency[1] = shards
 	_update_processing()
 	_publish_snapshot()
 	return true

@@ -37,6 +37,7 @@ var _reroll_balance: Label
 @onready var debug_popup: PopupPanel = $DebugPopup
 @onready var debug_round: SpinBox = %DebugRound
 @onready var debug_money: SpinBox = %DebugMoney
+@onready var debug_shards: SpinBox = %DebugShards
 @onready var debug_apply: Button = %DebugApply
 @onready var clear_button: Button = %Clear
 @onready var ready_button: Button = %Ready
@@ -116,7 +117,7 @@ func _ready() -> void:
 	debug_apply.pressed.connect(_apply_debug)
 	debug_popup.popup_hide.connect(_debug_closed)
 	debug_popup.window_input.connect(_debug_window_input)
-	for spin: SpinBox in [debug_round, debug_money]:
+	for spin: SpinBox in [debug_round, debug_money, debug_shards]:
 		spin.get_line_edit().add_theme_font_override("font", _coins.get_theme_font("font"))
 		spin.get_line_edit().add_theme_font_size_override("font_size", 16)
 	pause_menu.resume_requested.connect(_resume_match)
@@ -274,6 +275,7 @@ func _open_debug() -> void:
 	var state: Dictionary = planning.combat
 	debug_round.value = int(state.get("wave", 0)) + (1 if int(state.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.PLANNING else 0)
 	debug_money.value = _own_coins()
+	debug_shards.value = int(planning.combat["reroll_currency"][planning.local_slot()])
 	world.set_input_blocked(true)
 	debug_popup.popup_centered()
 	debug_round.get_line_edit().grab_focus()
@@ -283,7 +285,8 @@ func _open_debug() -> void:
 func _apply_debug() -> void:
 	debug_round.apply()
 	debug_money.apply()
-	if planning != null and planning.debug_set_values(int(debug_round.value), int(debug_money.value)):
+	debug_shards.apply()
+	if planning != null and planning.debug_set_values(int(debug_round.value), int(debug_money.value), int(debug_shards.value)):
 		debug_popup.hide()
 
 

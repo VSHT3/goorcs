@@ -10,13 +10,13 @@ func _initialize() -> void:
 func _run() -> void:
 	_test_authority()
 	_test_planning_transaction()
-	_test_money_only()
+	_test_currency_only()
 	_test_wave_jump()
 	_test_growth_and_retention()
 	_test_bounds_and_terminal()
 	await process_frame
 	if failures == 0:
-		print("PASS: host/solo debug authority, atomic bounds, money-only preservation, round reset without rewards, transient cancellation, milestone growth and permanent-state retention")
+		print("PASS: host/solo debug authority, atomic Coin/Shard bounds, currency-only state/RNG preservation, round reset without rewards, transient cancellation, milestone growth and permanent-state retention")
 	quit(1 if failures > 0 else 0)
 
 
@@ -26,13 +26,16 @@ func _check(condition: bool, description: String) -> void:
 		failures += 1
 
 
-func _new_model(with_route: bool = true) -> MatchPlanning:
+func _new_model(with_route: bool = true, with_rolls: bool = false) -> MatchPlanning:
 	var session := MultiplayerSession.new()
 	root.add_child(session)
 	var planning := MatchPlanning.new()
 	planning.session = session
 	var rules := CombatRules.new()
 	rules.starting_coins = 2000
+	rules.starting_reroll_currency = 200
+	if with_rolls:
+		rules.roll_rules = preload("res://resources/combat/prototype.tres").roll_rules.duplicate(true) as TowerRollRules
 	rules.base_health = 1000
 	rules.wave_weight = 6
 	rules.wave_weight_growth = 0
@@ -90,21 +93,22 @@ func _test_authority() -> void:
 	_check(planning.can_debug(), "An active solo match exposes the local debug API")
 	_make_host(planning)
 	planning._host_combat.coins = [111, 222]
+	planning._host_combat.reroll_currency = [13, 29]
 	planning._publish_snapshot()
-	_check(planning.can_debug() and planning.debug_set_values(4, 777), "An active connected host can change its own round and money")
-	_check(planning.combat["coins"] == [777, 222] and planning.combat["wave"] == 3 and planning.combat["phase"] == MatchCombat.Phase.PLANNING, "A host jump changes only slot zero money and grants no wave reward to the guest")
+	_check(planning.can_debug() and planning.debug_set_values(4, 777, 61), "An active connected host can change its own round, Coins and Shards")
+	_check(planning.combat["coins"] == [777, 222] and planning.combat["reroll_currency"] == [61, 29] and planning.combat["wave"] == 3 and planning.combat["phase"] == MatchCombat.Phase.PLANNING, "A host jump changes only slot zero balances and grants no wave or Shard reward to the guest")
 	planning.session.is_host = false
 	var before: Dictionary = planning._snapshot().duplicate(true)
-	_check(not planning.can_debug() and not planning.debug_set_values(9, 999) and planning._snapshot() == before, "A synthetic connected guest cannot mutate authoritative debug values")
+	_check(not planning.can_debug() and not planning.debug_set_values(9, 999, 999) and planning._snapshot() == before, "A synthetic connected guest cannot mutate authoritative debug values")
 	planning.session.is_host = true
 	planning.active = false
 	planning.selecting_loadout = true
 	before = planning._snapshot().duplicate(true)
-	_check(not planning.can_debug() and not planning.debug_set_values(9, 999) and planning._snapshot() == before, "Inactive hosts cannot use the debug API")
+	_check(not planning.can_debug() and not planning.debug_set_values(9, 999, 999) and planning._snapshot() == before, "Inactive hosts cannot use the debug API")
 	planning.active = true
 	planning.selecting_loadout = false
 	planning.session.state = MultiplayerSession.State.HOSTING
-	_check(not planning.can_debug() and not planning.debug_set_values(9, 999), "A host still waiting for connection cannot alter a match")
+	_check(not planning.can_debug() and not planning.debug_set_values(9, 999, 999), "A host still waiting for connection cannot alter a match")
 	_dispose(planning)
 	planning = _new_model()
 	before = planning._snapshot().duplicate(true)
@@ -134,9 +138,9 @@ func _test_planning_transaction() -> void:
 	var income: Array = planning.combat["income"].duplicate()
 	var publications: Array[int] = [0]
 	planning.changed.connect(func() -> void: publications[0] += 1)
-	_check(planning.debug_set_values(3, 909), "Round changes accept a complete validated debug transaction")
+	_check(planning.debug_set_values(3, 909, 57), "Round changes accept a complete validated debug transaction")
 	_check(publications[0] == 1 and planning._host_combat == core and planning._host_layouts[0] == layout, "A debug jump reuses the real authoritative model and publishes one complete accepted snapshot")
-	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 2 and planning.combat["coins"] == [909, 909], "Solo jumps set the upcoming round and both mirrored money balances")
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 2 and planning.combat["coins"] == [909, 909] and planning.combat["reroll_currency"] == [57, 57], "Solo jumps set the upcoming round and both mirrored Coin/Shard balances without clear grants")
 	_check(planning.combat["health"] == [97, 83] and planning.combat["income"] == income and planning.layouts[0].route == route and planning.layouts[1].route == route, "Planning jumps preserve health, purchased send income and both real paths")
 	for slot: int in range(2):
 		_check(_permanent_tower(planning.combat["towers"][slot][0]) == _permanent_tower(towers[slot][0]), "Planning jumps preserve paid towers, upgrades, targeting, damage and investment")
@@ -146,27 +150,43 @@ func _test_planning_transaction() -> void:
 	_dispose(planning)
 
 
-func _test_money_only() -> void:
-	var planning: MatchPlanning = _new_model()
-	_check(planning.debug_set_values(2, 1000), "Money-only fixture advances to ordinary planning")
+func _random_states(planning: MatchPlanning) -> PackedInt64Array:
+	var core: MatchCombat = planning._host_combat
+	return PackedInt64Array([core._random.state, core._wave_random.state, core._timing_random.state, core._group_random.state, core._roll_random.state, core._drop_random.state])
+
+
+func _test_currency_only() -> void:
+	var planning: MatchPlanning = _new_model(true, true)
+	planning.build_tower(0, Vector2i.ZERO, &"arrow_tower", MatchCombat.TargetMode.CLOSEST)
+	var tower_id: int = planning.combat["towers"][0][0]["id"]
+	_check(planning.reroll_tower(0, tower_id, "rarity") and planning.reroll_tower(0, tower_id, "attributes"), "Currency-only fixture owns accepted rolls and both reroll counters")
+	_check(planning.debug_set_values(2, 1000, int(planning.combat["reroll_currency"][0])), "Currency-only fixture advances to ordinary planning without changing Shards")
 	planning.send_enemy(0, &"grunt")
 	planning._apply_command(2, "ready", 1, Vector2i.ZERO, true)
 	planning.request_pacing("speed", true)
 	var before: Dictionary = planning._snapshot().duplicate(true)
-	_check(planning.debug_set_values(2, 321), "The same upcoming planning round accepts a money-only change")
+	var random_states: PackedInt64Array = _random_states(planning)
+	_check(planning.debug_set_values(2, 321, int(planning.combat["reroll_currency"][0])), "The same upcoming planning round accepts a money-only change")
 	before["combat"]["coins"] = [321, 321]
-	_check(planning._snapshot() == before and planning.is_physics_processing(), "Planning money-only changes retain paths, pending sends, readiness, real-time deadline and pacing")
+	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning.is_physics_processing(), "Planning money-only changes retain paths, pending sends, readiness, deadline, pacing, tower rolls and RNG")
+	_check(planning.debug_set_values(2, 321, 93), "The same upcoming planning round accepts a Shards-only change")
+	before["combat"]["reroll_currency"] = [93, 93]
+	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning.is_physics_processing(), "Planning Shards-only changes retain committed Ready, real-time deadline, queues, pacing, attributes, reroll counters and every RNG stream")
 	planning.submit_ready(true)
 	planning._physics_process(0.1)
 	planning.send_enemy(0, &"grunt")
 	planning.send_enemy(0, &"grunt")
 	planning.request_pacing("autoplay", true)
 	before = planning._snapshot().duplicate(true)
+	random_states = _random_states(planning)
 	var elapsed: float = planning._host_combat._elapsed
-	_check(not planning.combat["enemies"][0].is_empty() and planning.combat["phase"] == MatchCombat.Phase.WAVE, "Money-only wave fixture contains active enemies")
-	_check(planning.debug_set_values(2, 654), "The same displayed active round accepts a money-only change")
+	_check(not planning.combat["enemies"][0].is_empty() and planning.combat["phase"] == MatchCombat.Phase.WAVE, "Currency-only wave fixture contains active enemies")
+	_check(planning.debug_set_values(2, 654, int(planning.combat["reroll_currency"][0])), "The same displayed active round accepts a money-only change")
 	before["combat"]["coins"] = [654, 654]
-	_check(planning._snapshot() == before and planning._host_combat._elapsed == elapsed and planning.is_physics_processing(), "Wave money-only changes preserve phase, enemies, towers, cooldowns, queues, clock, locks and pacing")
+	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed and planning.is_physics_processing(), "Wave money-only changes preserve phase, enemies, towers, cooldowns, queues, clock, locks, pacing and RNG")
+	_check(planning.debug_set_values(2, 654, 147), "The same displayed active round accepts a Shards-only change")
+	before["combat"]["reroll_currency"] = [147, 147]
+	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed and planning.is_physics_processing(), "Wave Shards-only changes preserve live enemies, spawn/send timetables, Ready, cooldowns, pacing, accepted attributes/counters and RNG")
 	_dispose(planning)
 
 
@@ -185,8 +205,14 @@ func _test_wave_jump() -> void:
 	_check(planning.combat["phase"] == MatchCombat.Phase.WAVE and not planning.combat["enemies"][0].is_empty() and planning.combat["queued_sends"][0] > 0, "Wave jump fixture contains regular enemies, live sends, pending deliveries and a real timetable")
 	_make_host(planning)
 	var guest_money: int = planning._host_combat.coins[1]
-	_check(planning.debug_set_values(7, 432), "A host can cancel an active wave into a different upcoming round")
-	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 6 and planning.combat["coins"] == [432, guest_money], "Wave cancellation grants no clear reward, refund or income payout")
+	var guest_shards: int = planning._host_combat.reroll_currency[1]
+	var before: Dictionary = planning._snapshot().duplicate(true)
+	var random_states: PackedInt64Array = _random_states(planning)
+	var elapsed: float = planning._host_combat._elapsed
+	for shards: int in [-1, 1000000001]:
+		_check(not planning.debug_set_values(31, 432, shards) and planning._snapshot() == before and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed, "Invalid third values reject before abandoning live combat or applying growth")
+	_check(planning.debug_set_values(7, 432, 73), "A host can cancel an active wave into a different upcoming round")
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 6 and planning.combat["coins"] == [432, guest_money] and planning.combat["reroll_currency"] == [73, guest_shards] and _random_states(planning) == random_states, "Wave cancellation sets exact host balances without clear rewards, drops, refunds, income payout or RNG")
 	_check(planning.combat["health"] == health and planning.combat["income"] == income and _permanent_tower(planning.combat["towers"][0][0]) == tower, "Wave cancellation retains health, income and upgraded towers")
 	_check(planning.combat["enemies"] == [[], []] and planning.combat["queued_sends"] == [0, 0] and planning.combat["wave_roster"].is_empty() and planning.combat["spawn_times"].is_empty() and planning.combat["spawned"] == [0, 0] and planning.combat["total"] == 0 and planning._host_combat._elapsed == 0.0, "Wave cancellation clears every live enemy, regular timetable, send queue and elapsed wave counter")
 	_check(not planning.locked and planning.locked_routes == [[], []] and not planning.is_physics_processing() and planning.combat["speed_votes"] == [false, false] and planning.combat["autoplay_votes"] == [false, false], "Wave cancellation unlocks planning and removes all consent to resume automatically")
@@ -200,7 +226,7 @@ func _test_growth_and_retention() -> void:
 		var original_route: Array = planning.layouts[0].route.duplicate()
 		var original_towers: Array = planning.combat["towers"].duplicate(true)
 		var expansions: int = target / 10 - 1
-		_check(planning.debug_set_values(target, 1234), "Direct debug jump to round %d succeeds" % target)
+		_check(planning.debug_set_values(target, 1234, int(planning.combat["reroll_currency"][0])), "Direct debug jump to round %d succeeds" % target)
 		_check(planning.combat["board_origin_y"] == -expansions and planning.combat["main_round"] == (target % 10 == 0), "Direct main and non-main targets receive every reached growth milestone")
 		for slot: int in range(2):
 			_check(planning.layouts[slot].dimensions == Vector2i(14 + expansions, 9 + expansions * 2) and planning.layouts[slot].budget == 30 + expansions * 6 and planning.layouts[slot].is_ready(), "Jump growth expands both real boards and preserves legal paths")
@@ -212,27 +238,28 @@ func _test_growth_and_retention() -> void:
 				_check(planning.layouts[slot].route[index] + Vector2i(0, planning.combat["board_origin_y"]) == original_route[index], "Every retained path cell stays stationary in world space")
 		var grown: Dictionary = planning._snapshot().duplicate(true)
 		var grown_routes: Array = [planning.layouts[0].route.duplicate(), planning.layouts[1].route.duplicate()]
-		_check(planning.debug_set_values(1, 1234), "Expanded matches can jump backwards to initial planning")
+		_check(planning.debug_set_values(1, 1234, int(planning.combat["reroll_currency"][0])), "Expanded matches can jump backwards to initial planning")
 		_check(planning.layouts[0].dimensions == grown["dimensions"] and planning.layouts[0].budget == grown["budget"] and planning.combat["board_origin_y"] == -expansions and planning.combat["towers"] == grown["combat"]["towers"] and planning.layouts[0].route == grown_routes[0] and planning.layouts[1].route == grown_routes[1], "Backward jumps never shrink boards or move existing objects")
 		var backwards: Dictionary = planning._snapshot().duplicate(true)
-		_check(planning.debug_set_values(1, 1234) and planning._snapshot() == backwards, "Repeated same-round application cannot reset or grow anything twice")
-		_check(planning.debug_set_values(target, 1234) and planning._snapshot() == grown, "Returning to an already reached milestone is idempotent")
-		_check(planning.debug_set_values(41, 1234) and planning.combat["board_origin_y"] == -3 and planning.layouts[0].dimensions == Vector2i(17, 15), "Later direct jumps add only previously unreached milestones")
+		_check(planning.debug_set_values(1, 1234, int(planning.combat["reroll_currency"][0])) and planning._snapshot() == backwards, "Repeated same-round application cannot reset or grow anything twice")
+		_check(planning.debug_set_values(target, 1234, int(planning.combat["reroll_currency"][0])) and planning._snapshot() == grown, "Returning to an already reached milestone is idempotent")
+		_check(planning.debug_set_values(41, 1234, int(planning.combat["reroll_currency"][0])) and planning.combat["board_origin_y"] == -3 and planning.layouts[0].dimensions == Vector2i(17, 15), "Later direct jumps add only previously unreached milestones")
 		_dispose(planning)
 
 
 func _test_bounds_and_terminal() -> void:
 	var planning: MatchPlanning = _new_model(false)
 	var before: Dictionary = planning._snapshot().duplicate(true)
-	for values: Vector2i in [Vector2i(0, 100), Vector2i(-1, 100), Vector2i(1001, 100), Vector2i(2, -1), Vector2i(2, 1000000001)]:
-		_check(not planning.debug_set_values(values.x, values.y) and planning._snapshot() == before and not planning.is_physics_processing(), "Invalid round/money pairs reject atomically without growth, reset or payment")
-	_check(planning.debug_set_values(1, 0) and planning.combat["coins"] == [0, 0], "Minimum round and zero money are accepted")
-	_check(planning.debug_set_values(1000, 1000000000) and planning.combat["wave"] == 999 and planning.combat["coins"] == [1000000000, 1000000000], "Maximum supported round and money are accepted together")
+	var random_states: PackedInt64Array = _random_states(planning)
+	for values: Vector3i in [Vector3i(0, 100, 7), Vector3i(-1, 100, 7), Vector3i(1001, 100, 7), Vector3i(31, -1, 7), Vector3i(31, 1000000001, 7), Vector3i(31, 100, -1), Vector3i(31, 100, 1000000001)]:
+		_check(not planning.debug_set_values(values.x, values.y, values.z) and planning._snapshot() == before and _random_states(planning) == random_states and not planning.is_physics_processing(), "Invalid round/Coin/Shard triples reject atomically before growth, reset, payment or RNG")
+	_check(planning.debug_set_values(1, 0, 0) and planning.combat["coins"] == [0, 0] and planning.combat["reroll_currency"] == [0, 0], "Minimum round and zero Coins/Shards are accepted")
+	_check(planning.debug_set_values(1000, 1000000000, 1000000000) and planning.combat["wave"] == 999 and planning.combat["coins"] == [1000000000, 1000000000] and planning.combat["reroll_currency"] == [1000000000, 1000000000], "Maximum supported round, Coins and Shards are accepted together")
 	planning._host_combat.phase = MatchCombat.Phase.FINISHED
 	planning._host_combat.base_health = [0, 5]
 	planning._host_combat.winner = 1
 	planning._publish_snapshot()
 	before = planning._snapshot().duplicate(true)
 	planning.combat["phase"] = MatchCombat.Phase.PLANNING
-	_check(not planning.can_debug() and not planning.debug_set_values(1, 1000) and planning._snapshot() == before, "Finished matches cannot be revived even by mutating the public presentation phase")
+	_check(not planning.can_debug() and not planning.debug_set_values(1, 1000, 1000) and planning._snapshot() == before, "Finished matches cannot be revived even by mutating the public presentation phase")
 	_dispose(planning)

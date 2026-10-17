@@ -38,7 +38,7 @@ func _execute_command(command: Dictionary) -> void:
 			_set_owned(command.get("ids", []))
 			_last_result = planning.collection_store.error_message.is_empty()
 		"debug":
-			_last_result = planning.debug_set_values(int(command["round"]), int(command["money"]))
+			_last_result = planning.debug_set_values(int(command["round"]), int(command["money"]), int(command["shards"]))
 		"authenticated_select":
 			if _session.is_host:
 				_last_result = planning._apply_loadout_command(1, "select", command.get("ids", []), command.get("owned", []))

@@ -544,7 +544,7 @@ theme_override_font_sizes/font_size = 16
 autowrap_mode = 2
 
 [node name="DebugPopup" type="PopupPanel" parent="."]
-size = Vector2i(320, 144)
+size = Vector2i(320, 186)
 exclusive = false
 popup_window = true
 theme_override_styles/panel = SubResource("StyleBox_hud")
@@ -553,7 +553,7 @@ theme_override_styles/panel = SubResource("StyleBox_hud")
 offset_left = 12.0
 offset_top = 8.0
 offset_right = 308.0
-offset_bottom = 136.0
+offset_bottom = 178.0
 theme_override_constants/separation = 8
 
 [node name="Values" type="GridContainer" parent="DebugPopup/Content"]
@@ -581,6 +581,18 @@ layout_mode = 2
 text = "Money"
 
 [node name="DebugMoney" type="SpinBox" parent="DebugPopup/Content/Values"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(208, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 1000000000.0
+rounded = true
+
+[node name="ShardsLabel" type="Label" parent="DebugPopup/Content/Values"]
+layout_mode = 2
+text = "Shards"
+
+[node name="DebugShards" type="SpinBox" parent="DebugPopup/Content/Values"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(208, 34)
 layout_mode = 2

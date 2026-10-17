@@ -11,10 +11,10 @@ title = "Lightning"
 description = "A copper-coiled conductor that chains full-damage lightning through nearby enemies."
 icon_texture = ExtResource("2_art")
 accent = Color(0.53, 0.75, 0.95, 1)
-board_height = 1.5
+board_height = 1.05
 board_anchor = Vector2(0.5, 0.928571)
 mirror_board = true
 projectile_origin = Vector2(48, 19)
 board_variants = {
-"longer_reach": {"texture": ExtResource("3_reach"), "board_height": 1.65}
+"longer_reach": {"texture": ExtResource("3_reach"), "board_height": 1.1}
 }

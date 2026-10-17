@@ -309,16 +309,34 @@ func _peer_specials(code: String) -> void:
 	accepted = _snapshot("host")["combat"]
 	_check(_snapshot("guest")["combat"] == accepted and accepted["enemies"][0][0]["slowed"] and not accepted["enemies"][1][0]["slowed"], "Real peers receive the host's damage-gated Freeze effect only from upgraded Boulders")
 	var before_debug: Dictionary = _snapshot("host").duplicate(true)
-	await _command("guest", {"action": "debug", "round": 31, "money": 999999})
+	await _command("guest", {"action": "debug", "round": 31, "money": 999999, "shards": 999999})
 	await create_timer(0.1).timeout
 	for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
 		_check(_snapshot("host")[field] == before_debug[field] and _snapshot("guest")[field] == before_debug[field], "Guest debug API cannot mutate accepted match field: %s" % field)
-	await _command("host", {"action": "debug", "round": 21, "money": 5000})
-	await _wait_combat("guest", {"phase": 0, "wave": 20, "coins": [5000, accepted["coins"][1]], "board_origin_y": -1, "enemies": [[], []], "queued_sends": [0, 0]}, "Host debug jump publishes planning, money and passed growth milestones to its real peer")
-	await _command("host", {"action": "debug", "round": 31, "money": 6000})
-	await _wait_combat("guest", {"phase": 0, "wave": 30, "board_origin_y": -2}, "Second debug jump applies the next growth milestone")
-	await _command("host", {"action": "debug", "round": 1, "money": 7000})
-	await _wait_combat("guest", {"phase": 0, "wave": 0, "board_origin_y": -2}, "Backward debug jump preserves grown layouts instead of deleting built ground")
+	var runtime: Dictionary = _debug_runtime()
+	_check(runtime.has("elapsed") and runtime.get("random_states", []).size() == 6, "The real host publishes all six private RNG streams and its simulation clock for behavioral comparison")
+	for shards: int in [-1, 1000000001]:
+		var rejected: Dictionary = await _command("host", {"action": "debug", "round": 31, "money": 5000, "shards": shards})
+		_check(not rejected["result"], "The real host rejects an out-of-bounds third argument")
+		await create_timer(0.1).timeout
+		for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
+			_check(_snapshot("host")[field] == before_debug[field] and _snapshot("guest")[field] == before_debug[field], "Invalid Shards reject before growth or wave abandonment on both peers: %s" % field)
+		_check(_debug_runtime() == runtime, "Rejected real-peer Shard transactions consume no RNG or elapsed combat time")
+	for shards: int in [0, 1000000000, 43]:
+		var applied: Dictionary = await _command("host", {"action": "debug", "round": accepted["wave"], "money": accepted["coins"][0], "shards": shards})
+		_check(applied["result"], "The real host accepts same-round Shards including both bounds")
+		await _wait_combat("guest", {"reroll_currency": [shards, accepted["reroll_currency"][1]]}, "Accepted host Shards reach the remote display without changing guest Shards")
+		# Worker snapshots are JSON, whose numeric array entries decode as floats.
+		before_debug["combat"]["reroll_currency"][0] = float(shards)
+		for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
+			_check(_snapshot("host")[field] == before_debug[field] and _snapshot("guest")[field] == before_debug[field], "Live Shards-only edits preserve every other accepted field on both peers: %s" % field)
+		_check(_debug_runtime() == runtime, "Live real-peer Shards-only edits preserve the simulation clock and every gameplay RNG stream")
+	await _command("host", {"action": "debug", "round": 21, "money": 5000, "shards": 53})
+	await _wait_combat("guest", {"phase": 0, "wave": 20, "coins": [5000, accepted["coins"][1]], "reroll_currency": [53, accepted["reroll_currency"][1]], "board_origin_y": -1, "enemies": [[], []], "queued_sends": [0, 0]}, "Host debug jump publishes exact Coins/Shards and growth without clear rewards or guest grants")
+	await _command("host", {"action": "debug", "round": 31, "money": 6000, "shards": _snapshot("host")["combat"]["reroll_currency"][0]})
+	await _wait_combat("guest", {"phase": 0, "wave": 30, "reroll_currency": [53, accepted["reroll_currency"][1]], "board_origin_y": -2}, "Second debug jump applies growth without accidentally resetting Shards")
+	await _command("host", {"action": "debug", "round": 1, "money": 7000, "shards": _snapshot("host")["combat"]["reroll_currency"][0]})
+	await _wait_combat("guest", {"phase": 0, "wave": 0, "reroll_currency": [53, accepted["reroll_currency"][1]], "board_origin_y": -2}, "Backward debug jump preserves grown layouts and accepted Shards")
 	var host_debug: Dictionary = _snapshot("host")
 	for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
 		_check(_snapshot("guest")[field] == host_debug[field], "Both peers agree on debug-jumped match field: %s" % field)
@@ -338,11 +356,19 @@ func _peer_specials(code: String) -> void:
 		await _command(lane, {"action": "send", "slot": slot, "type_id": "grunt"})
 	await _both_ready()
 	await _command("host", {"action": "step", "delta": 0.01})
-	await create_timer(0.15).timeout
 	var ballista_state: Dictionary = _snapshot("host")["combat"]
+	await _wait_combat("guest", ballista_state, "Remote peer receives the host's accepted Ballista volley before comparison")
 	_check(_snapshot("guest")["combat"] == ballista_state, "Both real peers replicate identical Ballista branch hits and bolt endpoints")
 	_check(ballista_state["enemies"][0].is_empty() and int(ballista_state["towers"][0].back()["kills"]) == 2 and ballista_state["towers"][0].back()["pierce_active"], "Pierce deals full host-defined damage to both aligned enemies, including lethal first-hit removal")
 	_check(ballista_state["enemies"][1].size() == 1 and int(ballista_state["enemies"][1][0]["hp"]) == 49 and int(ballista_state["towers"][1].back()["kills"]) == 1 and ballista_state["towers"][1].back()["bounce_active"], "Bounce kills its primary and applies one rounded half-damage secondary hit")
+
+
+func _debug_runtime() -> Dictionary:
+	var path: String = _path("host", "debug_runtime")
+	if not FileAccess.file_exists(path):
+		return {}
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return parsed if parsed is Dictionary else {}
 
 
 

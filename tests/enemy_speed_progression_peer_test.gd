@@ -17,7 +17,7 @@ func _run() -> void:
 	for entry: Array in [[6,2.2],[16,2.4],[31,2.6],[51,2.8]]:
 		var number: int = entry[0]
 		var speed: float = entry[1]
-		await _command("host",{"action":"debug","round":number,"money":1000})
+		await _command("host",{"action":"debug","round":number,"money":1000,"shards":_snapshot("host")["combat"]["reroll_currency"][0]})
 		await _wait_combat("guest",{"wave":number-1,"phase":0},"Guest receives selected milestone planning")
 		var preview: Dictionary = await _agree("Host-owned milestone preview agrees")
 		_check(is_equal_approx(float(preview["enemy_types"]["grunt"]["speed"]),speed),"Remote planning preview ignores the guest's faster local curve")

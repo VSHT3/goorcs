@@ -32,7 +32,7 @@ func _execute_command(command: Dictionary) -> void:
 	match String(command.get("action", "")):
 		"round_fixture":
 			if _lane == "host":
-				planning.debug_set_values(int(command["round"]), 1000)
+				planning.debug_set_values(int(command["round"]), 1000, int(planning.combat["reroll_currency"][planning.local_slot()]))
 		"wound_fixture":
 			if _lane == "host":
 				for enemy: Dictionary in planning._host_combat.enemies[1]:

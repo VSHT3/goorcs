@@ -193,7 +193,7 @@ func _admission_and_rolls() -> void:
 	await _reroll("host", 1, ids[1], "attributes")
 	await _reroll("guest", 1, ids[1], "outcome")
 	await _command("guest", {"action": "forged_rewards"})
-	await _command("guest", {"action": "debug", "round": 1, "money": 999999})
+	await _command("guest", {"action": "debug", "round": 1, "money": 999999, "shards": 999999})
 	await _stable("Wrong-owner, invalid-kind and forged currency/drop/outcome commands change no state or resources", before, random_state)
 	await _command("guest", {"action": "mutate_display"})
 	await _stable("Mutating client display copies cannot set accepted currency, enemies or winner", before, random_state)

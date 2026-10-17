@@ -102,10 +102,24 @@ func _execute_command(command: Dictionary) -> void:
 			rules.max_spawn_interval_reduction = 0.5 if _lane == "host" else 0.9
 		planning.combat_rules = rules
 	elif action == "debug":
-		planning.debug_set_values(int(command["round"]), int(command["money"]))
+		_last_result = planning.debug_set_values(int(command["round"]), int(command["money"]), int(command["shards"]))
 	elif action == "step":
 		if _lane == "host":
 			planning._physics_process(float(command["delta"]))
 			planning._publish_snapshot()
 	else:
 		super._execute_command(command)
+
+
+func _publish() -> void:
+	super._publish()
+	if planning == null or planning._host_combat == null or _directory.is_empty() or _executing_command or _lane != "host":
+		return
+	var core: MatchCombat = planning._host_combat
+	var states: Array[String] = []
+	for generator: RandomNumberGenerator in [core._random, core._wave_random, core._timing_random, core._group_random, core._roll_random, core._drop_random]:
+		states.append(str(generator.state))
+	var file := FileAccess.open(_path("debug_runtime") + ".tmp", FileAccess.WRITE)
+	file.store_string(JSON.stringify({"elapsed": core._elapsed, "random_states": states}))
+	file.close()
+	DirAccess.rename_absolute(_path("debug_runtime") + ".tmp", _path("debug_runtime"))
