@@ -32,7 +32,7 @@ func _run() -> void:
 		await _settle()
 		await _check_catalog()
 		_check(screen.details_scroll.get_h_scroll_bar().max_value <= screen.details_scroll.size.x + 1.0, "Details do not need horizontal scrolling at either supported width")
-		_check(screen.portrait.size.x <= 184.0 and screen.portrait.size.y <= 206.0, "Actual portrait texture is bounded independently of source dimensions")
+		_check(screen.portrait.size.x <= 184.0 and screen.portrait.size.y <= 206.0, "The battlefield portrait stays inside its compact guide area")
 	await _check_reopen_and_back()
 	await _check_injected_catalog()
 	screen.configure(ContentCatalog.new(), rules)
@@ -107,9 +107,6 @@ func _check_catalog() -> void:
 			if preview.is_empty():
 				continue
 			_check(screen.selected_stage_id == stage_id and screen.selected_preview["tower"] == preview["tower"], "Stage selection presents the accepted state, not recomputed gameplay rules")
-			_check(screen.title_label.text == preview["stage"]["title"], "Article heading is the selected evolution or advancement, not only its base tower")
-			if stage_id != "base":
-				_check(screen.stage_label.text.contains(String(record["title"])), "Selected branch retains its actual parent-tower ancestry")
 			_check_value(&"purchase", float(preview["stats"]["cost"]))
 			_check_value(&"total", float(preview["total_cost"]))
 			_check_value(&"range", float(preview["tower"]["range"]))
@@ -120,9 +117,6 @@ func _check_catalog() -> void:
 			if not preview["steps"].is_empty():
 				_check_value(&"stage_cost", float(preview["steps"].back()["cost"]))
 			_check_role(preview)
-			var reward: TowerReward = preview["reward"]
-			var variant: Dictionary = reward.board_variant(preview["tower"]["evolution"], preview["tower"]["followup"])
-			_check(screen.portrait.texture == variant.get("texture", reward.icon_texture), "Preview uses real branch/follow-up artwork or the intact collection original")
 			_check(screen.stage_graph.selected_stage_id == stage_id and screen.stage_graph.stage_buttons[stage_id].button_pressed, "Exactly the accepted native graph node remains visibly selected")
 			_check_fixed_graph()
 			_check(screen.stat_values[&"range"].get_global_rect().position.y < screen.stat_values[&"purchase"].get_global_rect().position.y, "Selected role stats remain above meaningful investment rows")

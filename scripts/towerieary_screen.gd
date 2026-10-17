@@ -19,7 +19,7 @@ var selected_stage_id: String = "base"
 var selected_preview: Dictionary = {}
 var stat_values: Dictionary[StringName, Label] = {}
 var back_button: Button
-var portrait: TextureRect
+var portrait: TowerPortrait
 var title_label: Label
 var stage_label: Label
 var role_label: Label
@@ -168,7 +168,8 @@ func _build_layout() -> void:
 	art_panel.custom_minimum_size = Vector2(108, 128)
 	art_panel.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	hero.add_child(art_panel)
-	portrait = _texture(Vector2(84, 104))
+	portrait = TowerPortrait.new()
+	portrait.custom_minimum_size = Vector2(84, 104)
 	portrait.name = "TowerPortrait"
 	art_panel.add_child(portrait)
 	var introduction := VBoxContainer.new()
@@ -274,19 +275,13 @@ func _refresh_preview() -> void:
 	var record: Dictionary = entries[selected_index]
 	var tower: Dictionary = selected_preview["tower"]
 	var stats: Dictionary = selected_preview["stats"]
-	var reward: TowerReward = selected_preview["reward"]
 	var stage: Dictionary = selected_preview["stage"]
 	title_label.text = record["title"] if selected_stage_id == "base" else String(stage["title"])
 	stage_label.text = String(record["title"])
 	stage_label.visible = selected_stage_id != "base"
 	role_label.text = _role_title(tower.get("behavior_kind", record["role"]))
 	description_label.text = _stage_description(record, tower, stats)
-	if reward != null:
-		var variant: Dictionary = reward.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
-		# Collection artwork includes the original Arrow rig; never show its headless board layer.
-		portrait.texture = variant.get("texture", reward.icon_texture)
-	else:
-		portrait.texture = null
+	portrait.configure(selected_preview)
 	stat_values.clear()
 	_clear(_costs)
 	_clear(_stats)
@@ -444,7 +439,7 @@ func _refresh_focus_chain() -> void:
 func _show_unavailable() -> void:
 	selected_preview = {}
 	stage_graph.configure({}, provider)
-	portrait.texture = null
+	portrait.configure({})
 	title_label.text = "No tower preview available"
 	stage_label.text = ""
 	role_label.text = ""

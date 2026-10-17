@@ -473,13 +473,26 @@ func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 		tower["evolution"] = "onyx_ring"
 		tower["special_upgraded"] = true
 		board.combat_towers = [tower]
+		_check(board.is_processing(), "Onyx keeps its local orbit active without enemies or attacks")
 		var onyx_idle: Image = await _board_image(board, viewport)
 		_check(int(_changed_geometry(ordinary, onyx_idle, region)["pixels"]) > 10,
-			"Idle Onyx has a distinct dark stone keystone rather than a permanent range ring")
+			"Idle Onyx has dark orbiting stones rather than a permanent range ring")
 		board._process(0.5)
 		var onyx_waiting: Image = await _board_image(board, viewport)
-		_check(int(_changed_geometry(onyx_idle, onyx_waiting, region)["pixels"]) == 0 and board._shot_traces.is_empty(),
-			"Onyx never pulses merely because local time advances")
+		_check(int(_changed_geometry(onyx_idle, onyx_waiting, region)["pixels"]) > 25 and board._shot_traces.is_empty(),
+			"Onyx stones orbit between snapshots without inventing a damage pulse")
+		board.combat_towers = [tower.duplicate(true)]
+		var onyx_repeated: Image = await _board_image(board, viewport)
+		_check(int(_changed_geometry(onyx_waiting, onyx_repeated, region)["pixels"]) == 0,
+			"Repeated snapshots preserve Onyx orbit position")
+		var onyx_phase: float = board._boulder_phase
+		board.hide()
+		board._process(0.3)
+		_check(is_equal_approx(board._boulder_phase, onyx_phase) and not board.is_processing(),
+			"Hidden Onyx stops processing without resetting its orbit")
+		board.show()
+		_check(board.is_processing(), "Showing Onyx resumes its orbit without another snapshot")
+		board.set_process(false)
 		tower = tower.duplicate(true)
 		tower["shot"] = 1
 		accepted = tower.duplicate(true)
@@ -499,9 +512,11 @@ func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 		board.set_process(false)
 		_check(board._shot_traces.size() == 1, "Repeated Onyx snapshots cannot duplicate or restart the pulse")
 		board._process(PathBoard.ONYX_PULSE_DURATION)
+		# Compare at the same orbit angle so movement cannot mask pulse expiry.
+		board._boulder_phase = onyx_phase
 		var onyx_expired: Image = await _board_image(board, viewport)
-		_check(board._shot_traces.is_empty() and int(_changed_geometry(onyx_idle, onyx_expired, region)["pixels"]) == 0,
-			"Onyx ring fully disappears between discrete shots instead of becoming a range indicator")
+		_check(board._shot_traces.is_empty() and int(_changed_geometry(onyx_waiting, onyx_expired, region)["pixels"]) == 0,
+			"Onyx pulse fully expires while its cosmetic orbit remains")
 		_check(tower == accepted and board.combat_towers[0] == accepted,
 			"Capturing, rendering and expiring Onyx effects cannot mutate accepted snapshots")
 		board.combat_towers = []

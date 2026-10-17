@@ -99,6 +99,13 @@ After the final typography/inspector adjustment, the focused headless guide and 
 
 The final isolated `python3 tools/verify.py headless` run passed **49/49 checks**, including clean import, save isolation, startup, the guide provider/UI/navigation suites, and existing gameplay and real-peer regressions.
 
+The selected-tier portrait now calls the battlefield's shared tower renderer rather than choosing a collection texture. Its isolated accepted state supplies archer counts, held fire/bomb arrows, branch/follow-up artwork, and Rune orbits; framing follows the artwork metadata. Onyx stones share the Boulders orbit/depth layers while damage remains discrete host-owned pulses. `AGENTS.md` requires future detail previews to keep this shared-renderer contract instead of adding per-tier portrait images.
+
+The portrait rendered regression passed every catalog stage, clipping bounds, distinct archer/fire/bomb appearances, Onyx motion, hidden lifecycle, and unchanged guide state (**1.70 seconds**). Guide provider/UI/navigation checks also passed. After correcting the pulse-expiry test to compare the same orbit angle, the rendered board regression passed (**4.64 seconds**). A separate **16.97-second actual-main-scene rendered walkthrough** on macOS Compatibility/OpenGL (Apple M2) exercised T/S, pointer selection of every stage at **1000×720 / 1280×720**, real path/Rune placement and native upgrade purchases, idle Onyx orbit without snapshot mutation, and eight enemy kills from accepted Onyx attacks. Representative guide and Sandbox captures were inspected.
+
+The broader isolated `python3 tools/verify.py all` attempt passed **57/62 checks**, before that board-test correction. Four other suites failed in the concurrent boss/combat/Orcieary work: `enemy_boss_test`, `gameplay_peer_test`, `match_combat_test`, and `orcieary_screen_test`. Those files were not changed by the portrait/orbit fix; this is not a green full-suite claim. Evidence is retained under `.verify-logs/20261017T180823Z-all-a90cdfee/` and `.verify-logs/gorcs-verify-portrait-smoke-33a32c66a17e4d3eacee1c5b59eae13e/`. Private smoke projects/saves are disposable; internet reachability, long-run performance, and blanket artwork approval remain unverified.
+
+
 ### Maintenance verification
 
 The final isolated `python3 tools/verify.py all` run passed **59/59 checks**: all 54 suites plus engine, clean import, actual save isolation, and both startup gates. Coverage includes separate localhost host/client processes, the new loadout-Escape and unequal-balance transaction regressions, collection bounds/last-entry access at both supported widths, and the previously failing rendered tower-icon suite. Logs are retained under ignored `.verify-logs/20261017T171623Z-all-b65dd958/`.

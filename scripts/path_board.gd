@@ -283,7 +283,7 @@ func _capture_shots() -> void:
 	for tower: Dictionary in combat_towers:
 		var definition: Dictionary = tower_types.get(tower["type_id"], {})
 		var boulders: bool = tower.get("evolution", "") == "boulders"
-		_has_boulders = _has_boulders or boulders
+		_has_boulders = _has_boulders or boulders or tower.get("evolution", "") == "onyx_ring"
 		var advancement: Dictionary = _archer_advancement(tower, definition)
 		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0
 		_capture_archer(tower, definition, 0, int(tower.get("shot", 0)), tower.get("aim", Vector2(tower["cell"])), not boulders)
@@ -907,35 +907,7 @@ func _draw_combat() -> void:
 				var texture: Texture2D = _portal_texture if item["cell"] == layout.entrance else _crystal_texture
 				draw_texture_rect(texture, _sprite_rect(texture, 1.05, Vector2(0.5, 0.97), item["foot"]), false)
 			1:
-				var tower: Dictionary = item["data"]
-				var artwork: TowerReward = _tower_art.get(tower["type_id"])
-				if tower.get("evolution", "") == "boulders":
-					_draw_boulders(tower, item["foot"], false)
-				if artwork != null and artwork.icon_texture != null:
-					var variant: Dictionary = artwork.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
-					var texture: Texture2D = variant.get("texture", artwork.board_texture if artwork.board_texture != null else artwork.icon_texture)
-					var flip: bool = artwork.mirror_board and mirror_horizontal
-					var framing: Texture2D = texture if not variant.is_empty() else artwork.icon_texture
-					var rect: Rect2 = _sprite_rect(framing, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), item["foot"], flip)
-					if flip:
-						rect.size.x = -rect.size.x
-					draw_texture_rect(texture, rect, false)
-					_draw_support_context(tower, item["foot"])
-					if artwork.archer_head_texture != null:
-						# Rear shooters are drawn first; no cloned baked bows or roof cutouts.
-						var extras: Array = tower.get("extra_archers", [])
-						for index: int in range(extras.size()):
-							_draw_archer(tower, artwork, index + 2)
-						var definition: Dictionary = tower_types.get(tower["type_id"], {})
-						if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer":
-							_draw_archer(tower, artwork, 1)
-						_draw_archer(tower, artwork, 0)
-				match String(tower.get("evolution", "")):
-					"boulders":
-						_draw_boulders(tower, item["foot"], true)
-					"onyx_ring":
-						# A faceted keystone identifies the branch while its pulse is idle.
-						_draw_rune_stone(item["foot"] + Vector2(0, -cell_size * 0.54), cell_size * 0.13, 0.0, true)
+				_draw_tower(item["data"], item["foot"])
 			2:
 				_draw_enemy(item)
 			3:
@@ -947,6 +919,34 @@ func _draw_combat() -> void:
 				_draw_enemy_selection(item)
 			_draw_enemy_health(item)
 			_draw_bounty_indicator(item)
+
+
+func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
+	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	var orbiting: bool = tower.get("evolution", "") in ["boulders", "onyx_ring"]
+	if orbiting:
+		_draw_boulders(tower, foot, false)
+	if artwork != null and artwork.icon_texture != null:
+		var variant: Dictionary = artwork.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
+		var texture: Texture2D = variant.get("texture", artwork.board_texture if artwork.board_texture != null else artwork.icon_texture)
+		var flip: bool = artwork.mirror_board and mirror_horizontal
+		var framing: Texture2D = texture if not variant.is_empty() else artwork.icon_texture
+		var rect: Rect2 = _sprite_rect(framing, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), foot, flip)
+		if flip:
+			rect.size.x = -rect.size.x
+		draw_texture_rect(texture, rect, false)
+		_draw_support_context(tower, foot)
+		if artwork.archer_head_texture != null:
+			# Rear shooters are drawn first; no cloned baked bows or roof cutouts.
+			var extras: Array = tower.get("extra_archers", [])
+			for index: int in range(extras.size()):
+				_draw_archer(tower, artwork, index + 2)
+			var definition: Dictionary = tower_types.get(tower["type_id"], {})
+			if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer":
+				_draw_archer(tower, artwork, 1)
+			_draw_archer(tower, artwork, 0)
+	if orbiting:
+		_draw_boulders(tower, foot, true)
 
 
 func _draw_support_context(tower: Dictionary, foot: Vector2) -> void:
@@ -1000,7 +1000,7 @@ func _draw_boulders(tower: Dictionary, foot: Vector2, front: bool) -> void:
 		if (offset.y >= 0.0) != front:
 			continue
 		_draw_rune_stone(foot + offset + Vector2(0, -_cell_size() * 0.46),
-			_cell_size() * 0.14, _boulder_phase * 0.35 + index, false, 1.0, bool(tower.get("freeze_upgraded", false)))
+			_cell_size() * 0.14, _boulder_phase * 0.35 + index, tower.get("evolution", "") == "onyx_ring", 1.0, bool(tower.get("freeze_upgraded", false)))
 
 
 func _draw_rune_stone(position: Vector2, radius: float, rotation: float, onyx: bool, alpha: float = 1.0, frozen: bool = false) -> void:
