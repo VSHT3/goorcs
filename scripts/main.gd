@@ -195,6 +195,10 @@ func _quit() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.keycode == KEY_ESCAPE and event.pressed and not event.echo and get_viewport().gui_is_dragging():
+		get_viewport().gui_cancel_drag()
+		get_viewport().set_input_as_handled()
+		return
 	if play_screen.visible and event is InputEventKey:
 		var key := event as InputEventKey
 		if key.keycode == KEY_ESCAPE and key.pressed and not key.echo:

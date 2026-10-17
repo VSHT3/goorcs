@@ -207,7 +207,7 @@ func _build_interface() -> void:
 		button.custom_minimum_size = Vector2(0, 68)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_select_placement.bind(reward.id))
-		button.drag_started.connect(world.boards[0].cancel_stroke.unbind(1))
+		button.drag_started.connect(_tower_drag_started)
 		palette.add_child(button)
 		button.refresh_caption("Free", "")
 		button.tooltip_text = "Click then place on empty ground, or drag onto the board. Hold Shift to keep building. Right-click / Esc cancels."
@@ -531,6 +531,10 @@ func cancel_interaction() -> bool:
 	world.boards[0].cancel_stroke()
 	_refresh()
 	return had_selection
+
+
+func _tower_drag_started(_type_id: StringName) -> void:
+	cancel_interaction()
 
 
 func _sell() -> void:

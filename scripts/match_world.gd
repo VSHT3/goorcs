@@ -52,6 +52,7 @@ func _ready() -> void:
 	_world_viewport.world_2d = World2D.new()
 	_world_viewport.process_mode = Node.PROCESS_MODE_DISABLED
 	resized.connect(_fit_camera)
+	mouse_exited.connect(_clear_drag_previews)
 	for path: String in ["%EnemyType"]:
 		var selector := get_parent().get_node_or_null(path) as OptionButton
 		if selector != null:
@@ -243,6 +244,8 @@ func _hud_at_point(node: Node, point: Vector2) -> bool:
 func _notification(what: int) -> void:
 	if not is_node_ready():
 		return
+	if what == NOTIFICATION_DRAG_END:
+		_clear_drag_previews()
 	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
 		_cancel_motion()
 	elif what == NOTIFICATION_VISIBILITY_CHANGED and _active:
@@ -355,6 +358,11 @@ func _cancel_strokes() -> void:
 		board.cancel_stroke()
 
 
+func _clear_drag_previews() -> void:
+	for board: PathBoard in boards:
+		board.clear_drag_preview()
+
+
 func _cancel_motion() -> void:
 	_left_held = false
 	_right_held = false
@@ -370,7 +378,8 @@ func _drop_position(at_position: Vector2) -> Vector2:
 
 
 func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
-	if not _active or not is_visible_in_tree() or size.x <= 0.0 or size.y <= 0.0:
+	if not _active or _input_blocked or not is_visible_in_tree() or size.x <= 0.0 or size.y <= 0.0:
+		_clear_drag_previews()
 		return false
 	return boards[_own_slot]._can_drop_data(_drop_position(at_position), data)
 

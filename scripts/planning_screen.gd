@@ -226,11 +226,6 @@ func _reroll(kind: String) -> void:
 	if planning != null and button.is_visible_in_tree() and not button.disabled and not _selected_tower().is_empty():
 		planning.reroll_tower(planning.local_slot(), selected_tower_id, kind)
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_DRAG_END and is_node_ready():
-		for board: PathBoard in boards:
-			board.clear_drag_preview()
-
 
 func cancel_strokes() -> void:
 	if not is_node_ready():
@@ -375,7 +370,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func cancel_interaction() -> bool:
-	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0:
+	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0 and _pending_tower_cell == Vector2i(-1, -1):
 		return false
 	cancel_strokes()
 	_placement_id = &""
@@ -383,8 +378,14 @@ func cancel_interaction() -> bool:
 	selected_enemy_id = -1
 	selected_enemy_slot = -1
 	_pending_tower_cell = Vector2i(-1, -1)
+	_repeat_placement = false
 	_refresh()
 	return true
+
+
+func _tower_drag_started(_type_id: StringName) -> void:
+	if not cancel_interaction():
+		cancel_strokes()
 
 
 func _request_edit(cell: Vector2i, place: bool, slot: int) -> void:
@@ -487,7 +488,7 @@ func _create_palette() -> void:
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.toggle_mode = true
 		button.pressed.connect(_select_placement.bind(reward.id))
-		button.drag_started.connect(cancel_strokes.unbind(1))
+		button.drag_started.connect(_tower_drag_started)
 		_palette.add_child(button)
 		shop_buttons[reward.id] = button
 

@@ -79,6 +79,7 @@ The boss entry shows actual round-40 debut stats, weight, later encounter odds, 
 
 - Paint/erase paths with left/right drag while stopped; tiles have no spending budget.
 - Buy, inspect, target, upgrade, and sell the same real tower types/evolutions used in matches. **Build another [B]** selects the inspected tower's base identity, not a copy of its upgrades or traits.
+- Dragging previews the tower's actual base artwork translucently on the hovered tile, with baseline range cells and red invalid-ground feedback. It closes any tower/enemy inspector immediately. Escape cancels only the drag; ordinary accepted drops inspect the new tower, while Shift-drop keeps building.
 - Choose a round and start its weighted wave, or choose any enemy and exact count, including SkeleOrcs.
 - Space starts or toggles pause; choose 1×/2×/4× playback or cycle it with **F**. Stop/clear removes enemies and unlocks editing while retaining the build.
 - **Restart [R]** repeats the last accepted weighted wave or exact Spawn batch, clearing old enemies/queued spawns and running immediately. It keeps towers, upgrades, rolls, targeting, speed, current route, and selected round. Weighted retries roll a new regular roster; exact retries repeat only the last accepted type/count, not a history of mixed additions. Stop and round edits retain the recipe; a disconnected path prevents replay without discarding it. Fields, menus, confirmations, and active drags block keyboard shortcuts.

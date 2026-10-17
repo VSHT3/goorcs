@@ -136,6 +136,8 @@ var _directional_framing: Dictionary[TowerReward, Vector2] = {}
 var _directional_canvas_sizes: Dictionary[TowerReward, Vector2] = {}
 var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
+var _drag_clip: Control
+var _drag_ghost: PathBoard
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
 var _slowed_enemy_textures: Dictionary[Texture2D, Texture2D] = {}
 var _burning_enemy_textures: Dictionary[Texture2D, Texture2D] = {}
@@ -191,6 +193,7 @@ func _sync_endpoint_animation() -> void:
 		_endpoint_timer.start()
 	else:
 		_endpoint_timer.stop()
+		cancel_stroke()
 	_sync_combat_animation()
 
 
@@ -535,21 +538,54 @@ func _cell_at(position: Vector2) -> Vector2i:
 
 func _can_drop_data(at_position: Vector2, data: Variant) -> bool:
 	if not input_enabled or not placement_enabled or layout == null or _cell_size() <= 0.0:
+		clear_drag_preview()
 		return false
 	if not data is Dictionary or not data.get("tower_type") is String:
+		clear_drag_preview()
 		return false
 	var type_id: String = data["tower_type"]
-	if not tower_types.has(type_id):
+	var cell: Vector2i = _cell_at(at_position)
+	if not tower_types.has(type_id) or not layout.contains(cell):
+		clear_drag_preview()
 		return false
-	_drag_placement_id = StringName(type_id)
-	_hover = _cell_at(at_position)
-	queue_redraw()
-	return _placement_is_legal(_hover, type_id)
+	if _drag_placement_id != StringName(type_id) or _hover != cell:
+		_drag_placement_id = StringName(type_id)
+		_hover = cell
+		queue_redraw()
+	return _placement_is_legal(cell, type_id)
 
 
 func clear_drag_preview() -> void:
-	_drag_placement_id = &""
-	queue_redraw()
+	if _drag_placement_id != &"":
+		_drag_placement_id = &""
+		_hover = Vector2i(-1, -1)
+		queue_redraw()
+	if is_instance_valid(_drag_clip):
+		_drag_clip.hide()
+
+
+func _has_drag_preview() -> bool:
+	return input_enabled and placement_enabled and layout != null and layout.contains(_hover) and tower_types.has(String(_drag_placement_id))
+
+
+func _sync_drag_preview() -> void:
+	if not _has_drag_preview() or _cell_size() <= 0.0:
+		if is_instance_valid(_drag_clip):
+			_drag_clip.hide()
+		return
+	if not is_instance_valid(_drag_ghost):
+		_drag_clip = Control.new()
+		_drag_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_drag_clip.clip_contents = true
+		add_child(_drag_clip)
+		# Runtime loading avoids a PathBoard/subclass preload cycle.
+		_drag_ghost = load("res://scripts/tower_drag_ghost.gd").new()
+		_drag_clip.add_child(_drag_ghost)
+	_drag_clip.position = _board_origin()
+	_drag_clip.size = Vector2(layout.dimensions) * _cell_size()
+	_drag_ghost.position = -_drag_clip.position
+	_drag_ghost.call(&"configure", self)
+	_drag_clip.show()
 
 
 func _placement_is_legal(cell: Vector2i, type_id: String) -> bool:
@@ -666,12 +702,14 @@ func _paint(cell: Vector2i) -> void:
 
 
 func _on_mouse_exited() -> void:
+	clear_drag_preview()
 	_hover = Vector2i(-1, -1)
 	_last_painted = Vector2i(-1, -1)
 	queue_redraw()
 
 
 func _draw() -> void:
+	_sync_drag_preview()
 	if layout == null or _cell_size() <= 0.0:
 		return
 	_update_ground()
@@ -780,20 +818,24 @@ func _draw_pavement_piece(rect: Rect2, layer: int) -> void:
 
 
 func _draw_ranges() -> void:
-	var cell_size: float = _cell_size()
+	if _has_drag_preview():
+		_draw_tile_range(_hover, float(tower_types[String(_drag_placement_id)]["range"]))
+		return
 	for tower: Dictionary in combat_towers:
-		if int(tower["id"]) != selected_tower_id:
-			continue
-		var tower_cell: Vector2i = tower["cell"]
-		var tower_range: float = float(tower.get("range", tower_types[tower["type_id"]]["range"]))
-		for y: int in range(layout.dimensions.y):
-			for x: int in range(layout.dimensions.x):
-				var cell := Vector2i(x, y)
-				if MatchCombat.cell_in_range(tower_cell, cell, tower_range):
-					var rect := Rect2(cell_center(cell) - Vector2.ONE * (cell_size * 0.5 - 2.0),
-						Vector2.ONE * (cell_size - 4.0))
-					draw_rect(rect, Color(0.71, 0.89, 0.72, 0.07))
-					draw_rect(rect, Color(0.71, 0.89, 0.72, 0.25), false, 1.0)
+		if int(tower["id"]) == selected_tower_id:
+			_draw_tile_range(tower["cell"], float(tower.get("range", tower_types[tower["type_id"]]["range"])))
+
+
+func _draw_tile_range(tower_cell: Vector2i, tower_range: float) -> void:
+	var cell_size: float = _cell_size()
+	for y: int in range(layout.dimensions.y):
+		for x: int in range(layout.dimensions.x):
+			var cell := Vector2i(x, y)
+			if MatchCombat.cell_in_range(tower_cell, cell, tower_range):
+				var rect := Rect2(cell_center(cell) - Vector2.ONE * (cell_size * 0.5 - 2.0),
+					Vector2.ONE * (cell_size - 4.0))
+				draw_rect(rect, Color(0.71, 0.89, 0.72, 0.07))
+				draw_rect(rect, Color(0.71, 0.89, 0.72, 0.25), false, 1.0)
 
 
 func _draw_hover() -> void:

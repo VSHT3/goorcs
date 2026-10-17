@@ -122,11 +122,9 @@ func _create_presentation(artwork_size: int) -> HBoxContainer:
 func _get_drag_data(_at_position: Vector2) -> Variant:
 	if disabled or tower_type == &"":
 		return null
-	var preview := PanelContainer.new()
+	# The board draws the snapped battlefield artwork and range, not a HUD card.
+	var preview := Control.new()
 	preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var content: HBoxContainer = _create_presentation(52)
-	content.custom_minimum_size.x = 240.0
-	preview.add_child(content)
 	set_drag_preview(preview)
 	drag_started.emit(tower_type)
 	return {"tower_type": String(tower_type)}

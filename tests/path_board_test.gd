@@ -67,6 +67,7 @@ func _run() -> void:
 	await _check_ground_materials()
 	await _check_workshop_materials_and_editing()
 	_check_drop_input(board)
+	await _check_native_drag_art(board, viewport)
 	await _check_ranges_and_attacks(board, viewport)
 	await _check_rune_evolutions(board, viewport)
 	await _check_special_attacks(board, viewport)
@@ -329,6 +330,154 @@ func _check_drop_input(board: PathBoard) -> void:
 	board.input_enabled = false
 	board.combat_towers = []
 	board.size = Vector2(400, 400)
+
+
+func _check_native_drag_art(board: PathBoard, viewport: SubViewport) -> void:
+	var combat := MatchCombat.new(CombatRules.new())
+	var accepted: Dictionary = combat.snapshot()
+	board.layout = PathLayout.new(Vector2i(9, 9), 70, Vector2i(0, 2), Vector2i(8, 2))
+	board.size = Vector2(400, 400)
+	board.tower_types = accepted["tower_types"].duplicate(true)
+	board.tower_types["range_reference"] = {"range": 1.0}
+	board.command_mode = true
+	board.cell_click_mode = true
+	board.input_enabled = true
+	board.placement_enabled = true
+	board.placement_id = &""
+	board.combat_towers = []
+	board.combat_enemies = []
+	board.selected_tower_id = -1
+	var cell := Vector2i(2, 6)
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.cancel_stroke()
+		var idle: Image = await _board_image(board, viewport)
+		for definition: TowerDefinition in board.content_catalog.towers:
+			var type_id: String = String(definition.reward.id)
+			var payload: Dictionary = {"tower_type": type_id}
+			_check(board._can_drop_data(board.cell_center(cell) + Vector2(3, -4), payload),
+				"Every catalog tower accepts a snapped owned-ground preview: %s mirrored=%s" % [type_id, mirrored])
+			var ghost: Image = await _board_image(board, viewport)
+			board._drag_ghost.hide()
+			var underlay: Image = await _board_image(board, viewport)
+			board._drag_ghost.show()
+			board.clear_drag_preview()
+			board.combat_towers = [{"id": 201, "cell": cell, "type_id": "range_reference",
+				"range": board.tower_types[type_id]["range"]}]
+			board.selected_tower_id = 201
+			var range_reference: Image = await _board_image(board, viewport)
+			var range_difference: Dictionary = _changed_geometry(underlay, range_reference, Rect2i(0, 0, 400, 400))
+			var footprint := Rect2i(Vector2i(board.cell_center(cell) - Vector2.ONE * board._cell_size() * 0.5),
+				Vector2i.ONE * ceili(board._cell_size()))
+			_check(footprint.encloses(range_difference["bounds"]),
+				"Native range exactly matches selected-tower accepted tile highlighting: %s mirrored=%s" % [type_id, mirrored])
+			for y: int in range(board.layout.dimensions.y):
+				for x: int in range(board.layout.dimensions.x):
+					var target := Vector2i(x, y)
+					if target == cell or board.layout.is_endpoint(target):
+						continue
+					var in_range: bool = MatchCombat.cell_in_range(cell, target, float(board.tower_types[type_id]["range"]))
+					_check(_pixels_changed_near(idle, underlay, board.cell_center(target)) == in_range,
+						"Drag range follows accepted cell_in_range, %s %s mirrored=%s" % [type_id, target, mirrored])
+			var tower: Dictionary = _tower(201, cell, type_id)
+			var unchanged: Dictionary = tower.duplicate(true)
+			board.combat_towers = [tower]
+			var actual: Image = await _board_image(board, viewport)
+			_check_translucent_art(underlay, ghost, range_reference, actual, "%s mirrored=%s" % [type_id, mirrored])
+			_check(tower == unchanged, "Rendering a comparison tower preserves its accepted dictionary")
+			board.combat_towers = []
+			board.selected_tower_id = -1
+			board.placement_id = &""
+			board.cancel_stroke()
+			var cleared: Image = await _board_image(board, viewport)
+			_check(cleared.get_data() == idle.get_data(), "Clearing a drag removes all artwork and range pixels")
+		var payload: Dictionary = {"tower_type": String(board.content_catalog.towers[0].reward.id)}
+		board.layout.place(cell)
+		var paved: Image = await _board_image(board, viewport)
+		_check(not board._can_drop_data(board.cell_center(cell), payload), "Pavement denies a native drop while retaining a visual preview")
+		var denied: Image = await _board_image(board, viewport)
+		board._drag_ghost.hide()
+		var denied_underlay: Image = await _board_image(board, viewport)
+		board._drag_ghost.show()
+		var red_pixels: int = 0
+		for y: int in range(denied.get_height()):
+			for x: int in range(denied.get_width()):
+				var base: Color = denied_underlay.get_pixel(x, y)
+				var tinted: Color = denied.get_pixel(x, y)
+				if tinted.r - base.r > tinted.g - base.g + 0.02:
+					red_pixels += 1
+		_check(red_pixels > 100 and denied.get_data() != paved.get_data(), "Denied ghosts retain complete artwork with a distinct red tint")
+		board.cancel_stroke()
+		board.layout.erase(cell)
+		for cleanup: String in ["clear", "stroke", "exit", "input", "placement", "outside", "hide", "drop"]:
+			board._can_drop_data(board.cell_center(cell), payload)
+			await _board_image(board, viewport)
+			match cleanup:
+				"clear":
+					board.clear_drag_preview()
+				"stroke":
+					board.cancel_stroke()
+				"exit":
+					board._on_mouse_exited()
+				"input":
+					board.input_enabled = false
+				"placement":
+					board.placement_enabled = false
+				"outside":
+					board._can_drop_data(board._board_origin() - Vector2.ONE, payload)
+				"hide":
+					board.hide()
+					board.show()
+				"drop":
+					board._drop_data(board.cell_center(cell), payload)
+			var cleared: Image = await _board_image(board, viewport)
+			_check(cleared.get_data() == idle.get_data(), "Native preview cleans up after %s, mirrored=%s" % [cleanup, mirrored])
+			board.input_enabled = true
+			board.placement_enabled = true
+		# A top-edge tower is clipped to owned ground, not drawn into the apron.
+		board.size = Vector2(400, 390)
+		board.cancel_stroke()
+		var margin_idle: Image = await _board_image(board, viewport)
+		board._can_drop_data(board.cell_center(Vector2i(2, 0)), payload)
+		var edge: Image = await _board_image(board, viewport)
+		var top: int = floori(board._board_origin().y)
+		if top > 0:
+			_check(int(_changed_geometry(margin_idle, edge, Rect2i(0, 0, 400, top))["pixels"]) == 0,
+				"Ghost layers remain clipped to the board at its top edge")
+		board.cancel_stroke()
+		board.size = Vector2(400, 400)
+	board.cancel_stroke()
+	board.input_enabled = false
+	board.cell_click_mode = false
+
+
+func _check_translucent_art(underlay: Image, ghost: Image, actual_underlay: Image, actual: Image, description: String) -> void:
+	var art_pixels: int = 0
+	var missing: int = 0
+	var unexpected: int = 0
+	var translucent: int = 0
+	for y: int in range(actual.get_height()):
+		for x: int in range(actual.get_width()):
+			var base: Color = underlay.get_pixel(x, y)
+			var actual_base: Color = actual_underlay.get_pixel(x, y)
+			var solid: Color = actual.get_pixel(x, y)
+			var preview: Color = ghost.get_pixel(x, y)
+			var full := Vector3(solid.r - actual_base.r, solid.g - actual_base.g, solid.b - actual_base.b)
+			var faded := Vector3(preview.r - base.r, preview.g - base.g, preview.b - base.b)
+			if full.length_squared() < 0.001:
+				if faded.length_squared() > 0.004:
+					unexpected += 1
+				continue
+			art_pixels += 1
+			if faded.length_squared() < 0.0001:
+				missing += 1
+			var fraction: float = faded.dot(full) / full.length_squared()
+			if fraction > 0.20 and fraction < 0.80:
+				translucent += 1
+	_check(art_pixels > 100 and missing < maxi(10, art_pixels / 25) and unexpected < 10,
+		"Ghost matches complete battlefield silhouette, feet and scale, including operator/weapon layers: %s" % description)
+	_check(translucent > art_pixels * 0.85,
+		"Actual artwork remains see-through rather than opaque or a hover square: %s" % description)
 
 
 func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
