@@ -1,0 +1,42 @@
+Discord RPC Godot 1.3.2
+Copyright (c) 2023 vaporvee
+
+Includes godot-cpp:
+Copyright (c) 2017-present Godot Engine contributors.
+
+MIT License (applies to the Godot binding and godot-cpp, not the Discord SDK)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+The bundled Discord Game SDK binaries are proprietary Discord software,
+not covered by the MIT license above. Use is governed by Discord's terms:
+https://discord.com/developers/docs/policies-and-agreements/developer-terms-of-service
+https://discord.com/terms
+
+Upstream binding and license:
+https://codeberg.org/DiscordGodot/RPC-Legacy/src/tag/1.3.2
+https://codeberg.org/DiscordGodot/RPC-Legacy/raw/tag/1.3.2/LICENSE.md
+https://raw.githubusercontent.com/godotengine/godot-cpp/60b5a4196de8442b43b32ba68ebe1e79cfcb762f/LICENSE.md
+
+Release: ADDON-Discord-RPC-Godot.zip, tag 1.3.2
+SHA-256: 8dc29de1b6fb855be81a59471f6f5b55cb6ccdeab520823a682dd5e14b7828a6
+Only runtime binaries/manifest/UID are included. The unused 32-bit Windows
+SDK, editor plugin, editor-presence loader and debug scenes are omitted.
+The manifest's invalid Linux arm64/rv64 aliases were removed: those files
+are x86-64, not native ARM or RISC-V libraries.

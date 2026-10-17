@@ -22,6 +22,8 @@ Use the standard Godot edition and the [required engine release](docs/developmen
 
 For terminal launches, use `./tools/run.sh` to refresh imports and script classes before starting, including after pulling changes. See the [development commands](docs/development.md#setup) for engine selection and verification.
 
+The app/window icon reuses the title-screen orc face, with native Windows/macOS icon files included. Optional Discord Rich Presence shows the current activity and match mode/round/phase, without sharing private invites or loadouts. It is **disabled until a Gorcs Discord application ID is configured**; see [Discord setup and limits](docs/development.md#discord-rich-presence).
+
 The centered main-menu wordmark uses a green pixel-orc O with pointed ears, heavy brows, a broad jaw, and upward tusks. Its neutral face matches the letters' top and bottom edges, with pixel-snapped rows and matching pointer hit detection. On first load, the logo assembles in crisp pixel blocks, then the orc braces, squeezes its eyes shut, and opens its jaw with a short recorded roar. The tusks descend with the jaw; the face recovers before the finishing light sweep. Buttons work throughout, and neither the entrance nor its sound replays on menu return; occasional blinking/tiny idle lift remain afterward. Leaving early cancels the intro audio. Hover/focus marks stay inside fixed button bounds.
 
 Click the orc O to replay his recorded roar and jaw animation. Every click restarts the current roar rather than stacking voices; clicking during the entrance switches directly to the requested roar. Other letters do not trigger it, and leaving the menu stops it.

@@ -17,6 +17,7 @@ var planning: MatchPlanning
 var play_screen: MultiplayerLobby
 var _last_activity: Control
 var _quitting: bool = false
+var _discord_presence: DiscordPresence
 
 @onready var menu: Control = $Menu
 @onready var sandbox_button: Button = $Menu/Center/Panel/Sandbox
@@ -50,6 +51,10 @@ func _ready() -> void:
 	planning.combat_rules = combat_rules
 	planning.configure(board_dimensions, tile_budget, entrance_cell, base_cell)
 	add_child(planning)
+	_discord_presence = DiscordPresence.new()
+	_discord_presence.planning = planning
+	_discord_presence.session = session
+	add_child(_discord_presence)
 	play_screen = preload("res://scenes/multiplayer_lobby.tscn").instantiate()
 	play_screen.session = session
 	play_screen.planning = planning
@@ -97,6 +102,7 @@ func _open_sandbox() -> void:
 	_last_activity = sandbox_screen
 	sandbox_screen.show()
 	sandbox_screen.open()
+	_discord_presence.screen = "Sandbox"
 
 
 func _open_orcieary() -> void:
@@ -110,6 +116,7 @@ func _open_orcieary() -> void:
 	_last_activity = orcieary_screen
 	orcieary_screen.show()
 	orcieary_screen.open()
+	_discord_presence.screen = "Orcieary"
 
 
 func _open_towerieary() -> void:
@@ -123,6 +130,7 @@ func _open_towerieary() -> void:
 	_last_activity = towerieary_screen
 	towerieary_screen.show()
 	towerieary_screen.open()
+	_discord_presence.screen = "Towerieary"
 
 
 func _open_collection() -> void:
@@ -130,6 +138,7 @@ func _open_collection() -> void:
 	_last_activity = collection_screen
 	collection_screen.show()
 	collection_screen.back_button.grab_focus()
+	_discord_presence.screen = "Collection"
 
 
 func _open_play() -> void:
@@ -137,12 +146,14 @@ func _open_play() -> void:
 	_last_activity = play_screen
 	play_screen.show()
 	play_screen.open()
+	_discord_presence.screen = "Play"
 
 
 func _show_menu() -> void:
 	# Startup must not briefly hide and cancel the wordmark's one-shot entrance.
 	_hide_activities(true)
 	menu.show()
+	_discord_presence.screen = "Main menu"
 	if sandbox_screen != null and _last_activity == sandbox_screen:
 		sandbox_button.grab_focus()
 	elif orcieary_screen != null and _last_activity == orcieary_screen:
