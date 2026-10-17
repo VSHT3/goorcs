@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Original gameplay tower artwork, hand-authored by Gorcs contributors (2026).
+"""Original procedural gameplay tower artwork, authored for Gorcs (2026).
 
 Native 96x112 RGBA pixels; integer polygons/rectangles, hard alpha, no source
 images, sampling, antialiasing, models, or third-party artwork. Upper-left light,
 front-dominant elevated timber/stone forms. Run with Pillow to reproduce only
-these ten new PNGs; established approved tower PNGs are never read or written.
+these nine PNGs; approved Gold Mine and established tower PNGs are never written.
 """
 from pathlib import Path
 
@@ -203,34 +203,6 @@ def command_banner():
     return image
 
 
-def gold_mine():
-    image, d = canvas()
-    footing(d)
-    poly(d, [(15, 83), (18, 58), (27, 49), (35, 43), (55, 45), (70, 56), (77, 81)], "stone_dark")
-    poly(d, [(18, 62), (27, 50), (35, 46), (45, 48), (34, 58), (31, 73)], "stone_light")
-    poly(d, [(55, 47), (67, 56), (71, 74), (59, 68), (52, 55)], "stone")
-    poly(d, [(28, 83), (28, 63), (34, 56), (54, 56), (61, 63), (61, 84)], "ink")
-    timber(d, 26, 59, 7, 26)
-    timber(d, 56, 59, 7, 26)
-    timber(d, 24, 53, 41, 7)
-    line(d, [(34, 81), (40, 65)], "wood_dark", 2)
-    line(d, [(49, 81), (45, 65)], "wood_dark", 2)
-    line(d, [(36, 83), (51, 83)], "iron", 2)
-    line(d, [(33, 88), (55, 88)], "iron", 2)
-    line(d, [(35, 92), (57, 92)], "iron", 2)
-    poly(d, [(57, 78), (76, 78), (72, 90), (60, 90)], "wood", "iron_dark")
-    poly(d, [(57, 78), (62, 73), (74, 73), (76, 78)], "gold_dark")
-    coin(d, 61, 74)
-    coin(d, 68, 79)
-    rect(d, (61, 90, 64, 94), "ink")
-    rect(d, (71, 89, 74, 93), "ink")
-    # Pickaxe embedded in the left stone shoulder.
-    line(d, [(17, 76), (29, 61)], "wood_dark", 4)
-    line(d, [(17, 75), (29, 60)], "wood_top", 2)
-    poly(d, [(20, 57), (28, 55), (36, 61), (31, 60), (27, 58), (20, 60)], "iron_light")
-    return image
-
-
 def royal_mint():
     image, d = canvas()
     footing(d)
@@ -314,7 +286,7 @@ def main():
     authored = {
         "lightning": lightning(), "lightning_longer_reach": lightning(True),
         "war_drums": war_drums(), "forge": forge(),
-        "command_banner": command_banner(), "gold_mine": gold_mine(),
+        "command_banner": command_banner(),
         "royal_mint": royal_mint(), "bounty_board": bounty_board(),
         "greater_bounty": bounty_board(True), "tribute_office": tribute_office(),
     }

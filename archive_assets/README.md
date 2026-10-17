@@ -13,6 +13,7 @@
 | `chests/source_sheets/` | Original 4×4 treasure-chest sheet | 1 |
 | `towers/ballista/source/` | Original PixelLab ballista sprite | 1 |
 | `towers/ballista/manual-master/` | Manual starting pose, source layers, preview and rendered checks | 7 |
+| `towers/gold-mine/gamelab-20261017/` | Approved mine, raw/cutout sources, prior procedural PNG and generation provenance | 4 |
 | `world/idle/` | Approved portal/crystal idle sheets and animated previews | 5 |
 
 Numbers such as `0001` identify downloaded variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared chest pair has derivation links in `assets.json`; the endpoint and manual-ballista manifests record their own source links.
@@ -64,6 +65,12 @@ The [1280×720](towers/ballista/manual-master/godot-review-1280.png) and [1000×
 Regenerate with `python3 archive_assets/world/idle/generate.py` from the project root; authoring was verified with Pillow 12.3.0. This rebuilds archived exports, not the installed runtime copies. Pillow is development-only, not a game dependency. Generation validates source-palette membership, hard alpha, fixed non-magical body pixels, unique frames, and loop boundaries.
 
 Graphical verification played the installed sheets automatically through every frame in the actual workshop and Singleplayer, both match orientations, at 1280×720 and 1000×720, including 2× combat and hide/resume/leave/reopen. Captured frames were inspected; endpoint framing and idle accepted state stayed unchanged. Native clicks still built paths, purchased towers, and started waves. Decoded transparent GIF frames match the PNG sheets exactly.
+
+## Approved Gold Mine still
+
+[`towers/gold-mine/gamelab-20261017/gold_mine_candidate.png`](towers/gold-mine/gamelab-20261017/gold_mine_candidate.png) is the approved runtime Gold Mine, copied byte-for-byte into `assets/towers/gold_mine.png`. GameLab image job `c69e0860-2fc9-4468-b756-1c3f3cd7087e` generated it without reference images, using high quality, a requested 128×128 canvas and 48-color pixel-art processing, at a reported cost of two credits. `generation.json` retains the expanded prompt, settings, job IDs, source hashes, approval and processing. No animation was generated.
+
+The raw chroma image and provider cutout are preserved. The cleaned candidate thresholds cutout alpha at 128 into 0/255 without changing RGB, dimensions or palette; its opaque bounds are `(5, 11)–(125, 115)`. The previous 96×112 procedural mine is preserved as `previous-procedural.png`; the procedural tower tool no longer generates or overwrites Gold Mine. Provider licensing/privacy terms have not been independently verified.
 
 ## Runtime separation
 

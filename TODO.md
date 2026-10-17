@@ -58,6 +58,8 @@ Creator chose **Keep current sprites** for the initial presentation change. Exis
 
 Portable review artifacts: [shared-scene candidate comparison](docs/visual-reference/coherent-candidates.png) and [provenance](docs/visual-reference/coherent-candidates.provenance.json). These are unapproved static proposals, kept outside Godot imports; the updated original-asset lineup uses the corrected terrain palette.
 
+Gold Mine exception (2026-10-17): the creator approved and requested installation of the reference-free GameLab still. The 128×128 hard-alpha candidate now replaces only the base Gold Mine; its original procedural art and generation provenance are archived. Its visible width stays approximately 0.98 cells, and existing evolution anchors/art remain unchanged. An isolated actual-main-scene Wayland/Mesa walkthrough exercised pointer placement/inspection and captured both board orientations at 1280×720 and 1000×720. Rendered board/icon regressions passed. Lightning's new still is a separate approval-gated trial, not an installed replacement or roster-wide art approval.
+
 ### 3. Structure perspective and ballista — starting image delivered; rotations creator-led
 
 The creator preferred the original heavy crossbow over a front-facing masonry base, but rejected that rough composite's quality. The later `swappy-20261014_223240.png` sketch supersedes the completely frontal box in `swappy-20261014_223203.png`: retain a broad front wall, show a narrower right wall, and reveal more roof. The earlier equal-sided corner-facing appearance in `swappy-20261014_215908.png` is not the target. These references are local Desktop screenshots; the geometry description here is the portable direction.
