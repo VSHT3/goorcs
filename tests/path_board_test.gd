@@ -72,6 +72,7 @@ func _run() -> void:
 	await _check_special_attacks(board, viewport)
 	await _check_archer_advancements(board, viewport)
 	await _check_pierce_attacks(board, viewport)
+	await _check_directional_weapons(board, viewport)
 	await _check_typed_enemies(board, viewport)
 	await _check_slowed_enemies(board, viewport)
 	await _check_source_facing(board, viewport)
@@ -561,6 +562,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		tower = _tower(91, Vector2i(2, 3), "orc_ballista")
 		tower["special_upgraded"] = true
 		tower["evolution"] = "bounce"
+		tower["aim"] = Vector2(3, 1)
 		board.combat_towers = [tower]
 		baseline = await _board_image(board, viewport)
 		tower = tower.duplicate(true)
@@ -589,6 +591,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 			"Repeated Bounce snapshots preserve the single redirected projectile without restarting it")
 		_check(tower == accepted and board.combat_towers[0] == accepted,
 			"Rendering both Bounce legs after lethal hits does not mutate accepted tower state")
+		var captured_position: Vector2 = board._projectile_position(board._shot_traces[0])
 		var later: Dictionary = tower.duplicate(true)
 		later["aim"] = Vector2(4, 4)
 		later["bounce_aim"] = Vector2(4, 0)
@@ -597,13 +600,14 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		repeated = await _board_image(board, viewport)
 		_check(board._shot_traces[0]["aim"] == accepted["aim"]
 			and board._shot_traces[0]["bounce_aim"] == accepted["bounce_aim"]
-			and repeated.get_data() == flight.get_data() and board.combat_towers[0] == later,
+			and board._projectile_position(board._shot_traces[0]).is_equal_approx(captured_position)
+			and board.combat_towers[0] == later,
 			"Later accepted aims cannot redirect an already captured Bounce shot")
 		board._process(PathBoard.SHOT_DURATION * 0.49)
 		_check(board._shot_traces.size() == 1, "Bounce remains visible until its full two-leg duration")
 		board._process(PathBoard.SHOT_DURATION * 0.02)
 		var expired: Image = await _board_image(board, viewport)
-		_check(board._shot_traces.is_empty() and expired.get_data() == baseline.get_data(),
+		_check(board._shot_traces.is_empty() and not _pixels_changed_near(baseline, expired, bounce),
 			"Bounce expires at its nominal two-leg lifetime without a new combat snapshot")
 		board.combat_towers = []
 		_check(board._shot_traces.is_empty() and board._seen_shots.is_empty(),
@@ -936,6 +940,7 @@ func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		var tower: Dictionary = _tower(92, Vector2i(0, 3), "orc_ballista")
 		tower["special_upgraded"] = true
 		tower["evolution"] = "pierce"
+		tower["aim"] = Vector2(1, 3)
 		board.combat_towers = [tower]
 		var baseline: Image = await _board_image(board, viewport)
 		tower = tower.duplicate(true)
@@ -981,6 +986,7 @@ func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
 			"Repeated Pierce snapshots cannot duplicate, bend or restart the captured ray")
 		_check(tower == accepted and board.combat_towers[0] == accepted,
 			"Capturing and rendering a lethal Pierce shot preserves the accepted tower snapshot")
+		var captured_position: Vector2 = board._projectile_position(trace)
 		var later: Dictionary = tower.duplicate(true)
 		later["aim"] = Vector2(0, 0)
 		later["pierce_aim"] = Vector2(0, 0)
@@ -989,7 +995,7 @@ func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		board.combat_towers = [later]
 		repeated = await _board_image(board, viewport)
 		_check(trace["aim"] == accepted["aim"] and trace["pierce_aim"] == accepted["pierce_aim"]
-			and repeated.get_data() == flight.get_data() and board.combat_towers[0] == later,
+			and board._projectile_position(trace).is_equal_approx(captured_position) and board.combat_towers[0] == later,
 			"A later snapshot cannot move an accepted Pierce endpoint or require a living target")
 		board._process(PathBoard.PIERCE_SHOT_DURATION * 0.24)
 		var near_end: Image = await _board_image(board, viewport)
@@ -998,11 +1004,143 @@ func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
 			"Pierce remains one visible straight bolt until the full-ray lifetime ends")
 		board._process(PathBoard.PIERCE_SHOT_DURATION * 0.02)
 		var expired: Image = await _board_image(board, viewport)
-		_check(board._shot_traces.is_empty() and expired.get_data() == baseline.get_data(),
+		_check(board._shot_traces.is_empty() and not _pixels_changed_near(baseline, expired, endpoint),
 			"Pierce expires at its nominal full-ray lifetime without waiting for a snapshot")
 		_check(tower == accepted and board.combat_towers[0] == later,
 			"Expiring Pierce presentation never mutates either accepted snapshot")
 		board.combat_towers = []
+
+
+func _check_directional_weapons(board: PathBoard, viewport: SubViewport) -> void:
+	var original_catalog: ContentCatalog = board.content_catalog
+	var original_types: Dictionary = board.tower_types
+	var art: TowerReward = board._tower_art["orc_ballista"]
+	_check(art.directional_weapon_textures.size() == 8 and art.directional_projectile_origins.size() == 8,
+		"Ballista supplies all eight aligned weapon layers and release tips")
+	if art.directional_weapon_textures.size() != 8 or art.directional_projectile_origins.size() != 8:
+		return
+	var catalog := ContentCatalog.new()
+	for definition: TowerDefinition in original_catalog.towers:
+		if definition.reward == art:
+			catalog.towers.append(definition)
+	board.content_catalog = catalog
+	board.tower_types = {"orc_ballista": {"range": 3.0, "area_attack": false}}
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	board.selected_tower_id = -1
+	board.command_mode = true
+	board.combat_enemies = []
+	var directions: Array[Vector2] = [Vector2.UP, Vector2(1, -1), Vector2.RIGHT, Vector2.ONE,
+		Vector2.DOWN, Vector2(-1, 1), Vector2.LEFT, Vector2(-1, -1)]
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_towers = []
+		var tower: Dictionary = _tower(182, Vector2i(2, 3), "orc_ballista")
+		tower["range"] = 3.0
+		board.combat_towers = [tower]
+		_check(board._directional_weapon_index(tower) == 3, "Un-aimed Ballista starts SE on either board")
+		var foot: Vector2 = board._tower_foot(tower["cell"])
+		var rect: Rect2 = board._directional_weapon_rect(art, foot)
+		var scale: Vector2 = rect.size / Vector2(192, 192)
+		_check((rect.position + Vector2(96, 157) * scale).is_equal_approx(foot),
+			"Every directional pose grounds the identical stationary foundation at the tile foot")
+		_check(rect.is_equal_approx(board._sprite_rect(art.icon_texture, art.board_height, art.board_anchor, foot)),
+			"Directional layers reuse one SE-icon framing rather than resizing per pose")
+		var lower_region := Rect2i(rect.position + Vector2(55, 135) * scale, Vector2(85, 22) * scale)
+		var weapon_region := Rect2i(rect.position + Vector2(20, 15) * scale, Vector2(152, 110) * scale)
+		var first: Image
+		var first_lower: PackedByteArray
+		for index: int in range(8):
+			tower["aim"] = Vector2(tower["cell"]) + directions[index]
+			board.combat_towers = [tower]
+			var expected: int = posmod(8 - index, 8) if mirrored else index
+			_check(board._directional_weapon_index(tower) == expected,
+				"Cardinal/diagonal Ballista pose matches displayed direction, mirrored=%s index=%s" % [mirrored, index])
+			var tip: Vector2 = rect.position + art.directional_projectile_origins[expected] * scale
+			_check(board._tower_muzzle(tower, 0, true).is_equal_approx(tip),
+				"Every displayed pose releases at its own authored bolt tip")
+			var pose: Image = await _board_image(board, viewport)
+			if first == null:
+				first = pose
+				first_lower = pose.get_region(lower_region).get_data()
+			else:
+				_check(int(_changed_geometry(first, pose, weapon_region)["pixels"]) > 20,
+					"Each cardinal/diagonal weapon pose visibly changes the upper sprite")
+				_check(pose.get_region(lower_region).get_data() == first_lower,
+					"Turning or mirroring the weapon never rotates, flips, shifts or rescales its lower masonry")
+		for sector: int in range(8):
+			for side: float in [-0.0001, 0.0001]:
+				var angle: float = -PI * 0.5 + float(sector) * PI * 0.25 + PI * 0.125 + side
+				var logical := Vector2(cos(angle), sin(angle))
+				if mirrored:
+					logical.x = -logical.x
+				tower["aim"] = Vector2(tower["cell"]) + logical
+				_check(board._directional_weapon_index(tower, true) == posmod(sector + (1 if side > 0.0 else 0), 8),
+					"Half-sector boundaries select adjacent cardinal/diagonal poses without mirror bias")
+		var accepted_aim := Vector2(0, 3)
+		tower["aim"] = accepted_aim
+		tower["target_id"] = 802
+		var route: Array = [Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0), Vector2i(4, 1), Vector2i(4, 2), Vector2i(4, 3)]
+		var target: Dictionary = _enemy(802, 0.0, Vector2(2, 0), route)
+		var decoy: Dictionary = _enemy(803, 0.0, Vector2(3, 3), [])
+		board.combat_enemies = [decoy, target]
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._directional_weapon_index(tower) == 0,
+			"Exact accepted target wins over a closer decoy without a new shot")
+		target = _enemy(802, 5.0, Vector2(4, 3), route)
+		board.combat_enemies = [decoy, target]
+		board.set_process(false)
+		_check(board._directional_weapon_index(tower) == 0, "A target snapshot cannot snap the directional weapon ahead of interpolation")
+		board._process(PathBoard.ENEMY_BLEND_DURATION * 0.5)
+		_check(board._directional_weapon_index(tower) == (7 if mirrored else 1),
+			"Directional aim follows the accepted target through its interpolated logical route")
+		board._process(PathBoard.ENEMY_BLEND_DURATION * 0.5)
+		_check(board._directional_weapon_index(tower) == (6 if mirrored else 2)
+			and tower["shot"] == 0 and tower["aim"] == accepted_aim,
+			"Live target movement rotates only presentation, never host aim or shot state")
+		var accepted_index: int = 2 if mirrored else 6
+		var released_tip: Vector2 = rect.position + art.directional_projectile_origins[accepted_index] * scale
+		tower["shot"] = 1
+		board.combat_towers = [tower]
+		board.set_process(false)
+		_check(board._shot_traces.size() == 1 and board._directional_weapon_index(tower, true) == accepted_index,
+			"A moving live target cannot change the host-captured release pose")
+		var trace: Dictionary = board._shot_traces[0]
+		_check(board._projectile_origin(trace).is_equal_approx(released_tip)
+			and board._projectile_position(trace).is_equal_approx(released_tip),
+			"The visible bolt begins at the captured pose's exact authored tip")
+		for state: String in ["missing", "dead", "out_of_range"]:
+			var invalid_target: Dictionary = _enemy(802, 0.0, Vector2(4, 3), [])
+			if state == "dead":
+				invalid_target["hp"] = 0
+			elif state == "out_of_range":
+				invalid_target["pos"] = Vector2(20, 3)
+			board.combat_enemies = [decoy] if state == "missing" else [decoy, invalid_target]
+			board.set_process(false)
+			_check(board._directional_weapon_index(tower) == accepted_index,
+				"A %s accepted target holds the last host aim instead of selecting a decoy" % state)
+		tower["aim"] = Vector2(2, 0)
+		board.combat_towers = [tower]
+		_check(board._projectile_origin(trace).is_equal_approx(released_tip)
+			and board._directional_weapon_index(tower) == 0,
+			"Later rotation cannot drag an already released projectile")
+		board.combat_towers = []
+		board.combat_enemies = []
+	var headroom_foot := Vector2(0, board._cell_size() * 0.78)
+	var headroom_rect: Rect2 = board._directional_weapon_rect(art, headroom_foot)
+	var headroom_scale: Vector2 = headroom_rect.size / Vector2(192, 192)
+	var expected_headroom: float = 0.0
+	var layers: Array[Texture2D] = [art.icon_texture, art.board_texture]
+	layers.append_array(art.directional_weapon_textures)
+	for texture: Texture2D in layers:
+		var bounds := Rect2(texture.get_image().get_used_rect())
+		expected_headroom = maxf(expected_headroom, -(headroom_rect.position.y + bounds.position.y * headroom_scale.y))
+	_check(board.visual_headroom() == ceilf(expected_headroom + 6.0),
+		"Camera headroom covers every directional weapon and the fixed base at the one icon scale")
+	_check(art.directional_weapon_textures[0].get_image().get_used_rect().position.y < art.icon_texture.get_image().get_used_rect().position.y,
+		"The regression includes a north pose extending above the SE framing icon")
+	board.content_catalog = original_catalog
+	board.tower_types = original_types
 
 
 func _check_typed_enemies(board: PathBoard, viewport: SubViewport) -> void:

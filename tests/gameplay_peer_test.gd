@@ -2,7 +2,7 @@ extends "res://tests/match_branch_test.gd"
 
 
 func _run() -> void:
-	success_message = "PASS: separate gameplay peers enforce private admitted decks, host rolls and atomic rerolls, chains, support, marks, exact production and per-type killer-owned drops"
+	success_message = "PASS: separate gameplay peers enforce private decks, host-owned combat/rewards and directional Ballista target/release presentation"
 	planning_worker_path = "res://tests/gameplay_peer_scenarios_worker.gd"
 	_suite_deadline_msec = Time.get_ticks_msec() + 140000
 	_directory = OS.get_temp_dir().path_join("gorcs_gameplay_peer_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
@@ -14,6 +14,10 @@ func _run() -> void:
 	var hosted: Dictionary = await _command("host", {"action": "host", "port": port})
 	var code: String = hosted.get("code", "")
 	await _connect_guest("guest", "host", code)
+	if "--ballista-only" in OS.get_cmdline_user_args():
+		await _directional_ballista_scenario(code)
+		await _finish()
+		return
 	await _admission_and_rolls()
 	if failures == 0:
 		await _chain_scenario(code)
@@ -23,6 +27,8 @@ func _run() -> void:
 		await _production_scenario(code)
 	if failures == 0:
 		await _bounty_scenario(code)
+	if failures == 0:
+		await _directional_ballista_scenario(code)
 	await _finish()
 
 
@@ -384,3 +390,65 @@ func _bounty_scenario(code: String) -> void:
 	_check(_matches(state, {"reroll_currency": [16, 5]}), "Killer owns grunt 2 + sent caster 4 + summoned SkeleOrc 7 + clear 3; zero normal bounty does not remove summon drop eligibility")
 	_check(_matches(state["enemy_totals"][0]["kills"], {"grunt": 1, "necorcmancer": 1, "skeleorc": 1}), "All exact rewards are backed by accepted per-type real attack kills")
 	_assert_private_decks(["arrow_tower", "gold_mine"], ["arrow_tower", "gold_mine", "lightning"], [["gold_mine", "gold_mine", "gold_mine", "gold_mine", "arrow_tower"], ["arrow_tower"]])
+
+
+func _ballista_views() -> Dictionary:
+	var result: Dictionary = {}
+	for lane: String in ["host", "guest"]:
+		var response: Dictionary = await _command(lane, {"action": "ballista_probe"})
+		var snapshot: Dictionary = await _wait_for(lane, {"ballista_probe": int(response["id"])}, "Real %s renderer finishes its deterministic Ballista probe" % lane)
+		result[lane] = snapshot.get("ballista_views", [])
+		_check(result[lane].size() == 2, "Real %s process consumes accepted combat on normal and mirrored PathBoards" % lane)
+	return result
+
+
+func _directional_ballista_scenario(code: String) -> void:
+	await _fresh(code, "ballista", ["orc_ballista"], ["orc_ballista"])
+	await _both_ready()
+	await _wait_combat("guest", {"phase": 1}, "Directional fixture starts an authenticated host-owned wave")
+	await _command("host", {"action": "step", "delta": 0.01})
+	await _command("host", {"action": "ballista_formation"})
+	await _place("host", 0, Vector2i(4, 3), "orc_ballista", MatchCombat.TargetMode.STRONGEST)
+	var idle: Dictionary = await _ballista_views()
+	for lane: String in ["host", "guest"]:
+		for view: Dictionary in idle[lane]:
+			_check(_matches(view, {"poses": [3, 3, 3]}) and view["released_pose"] == 3 and view["trace_count"] == 0, "%s has no renderer-selected target before the first host shot; both orientations default to SE" % lane)
+	await _command("host", {"action": "step", "delta": 0.001})
+	var accepted: Dictionary = await _agree("Actual host-selected Ballista shot and victim replicate before presentation")
+	var tower: Dictionary = _tower(accepted, 0, Vector2i(4, 3))
+	var target: Dictionary = accepted["enemies"][0][0]
+	var decoy: Dictionary = accepted["enemies"][0][1]
+	_check(int(tower["shot"]) == 1 and tower["target_id"] == target["id"] and target["hp"] == 290 and decoy["hp"] == 100, "Actual STRONGEST policy shoots the farther living target, not the nearer decoy")
+	var released: Dictionary = await _ballista_views()
+	for lane: String in ["host", "guest"]:
+		for view: Dictionary in released[lane]:
+			var direction: int = 2 if view["mirrored"] else 6
+			_check(view["target_id"] == tower["target_id"] and _matches(view, {"poses": [direction, direction, direction]}) and view["released_pose"] == direction and view["trace_count"] == 1, "%s presents the host's westward shot and flips only its displayed directional choice" % lane)
+			_check(view["trace_aim"] == tower["aim"], "%s released bolt retains the actual accepted shot aim" % lane)
+	# Eight real host simulation seconds move only the accepted victim from west
+	# to east. The closer stationary decoy remains south; no new shot is due.
+	await _command("host", {"action": "step", "delta": 8.0})
+	var moved: Dictionary = await _agree("Moving accepted victim reaches both real presentation consumers")
+	var moved_tower: Dictionary = _tower(moved, 0, Vector2i(4, 3))
+	_check(moved_tower["target_id"] == tower["target_id"] and moved_tower["aim"] == tower["aim"] and moved_tower["shot"] == tower["shot"], "Movement preserves the host's accepted target identity, release aim and shot counter")
+	_check(float(moved["enemies"][0][0]["progress"]) > 8.0 and float(moved["enemies"][0][1]["progress"]) == 4.0, "Actual host simulation moves the farther victim while its closer decoy stays south")
+	var moving: Dictionary = await _ballista_views()
+	for lane: String in ["host", "guest"]:
+		for index: int in range(moving[lane].size()):
+			var view: Dictionary = moving[lane][index]
+			var shot_view: Dictionary = released[lane][index]
+			var expected: Array = [2, 4, 6] if view["mirrored"] else [6, 4, 2]
+			_check(_matches(view, {"poses": expected}) and view["released_pose"] == shot_view["released_pose"], "%s follows only the accepted victim's interpolated logical position across W/S/E, with mirrored E/S/W" % lane)
+			_check(view["trace_count"] == 1 and view["trace_origin"] == shot_view["trace_origin"] and view["trace_aim"] == shot_view["trace_aim"], "%s rotating weapon cannot move the already released bolt origin or destination" % lane)
+			_check(view["live_muzzle"] != view["trace_origin"] and float(view["released_origin_error"]) < 0.00001, "%s live directional muzzle changes while the captured origin remains the accepted release-pose bolt tip" % lane)
+	for state: String in ["out_of_range", "dead", "absent"]:
+		await _command("host", {"action": "ballista_target_state", "state": state})
+		await _agree("Host's %s accepted-target fixture reaches the real client" % state)
+		var fallback: Dictionary = await _ballista_views()
+		for lane: String in ["host", "guest"]:
+			for index: int in range(fallback[lane].size()):
+				var view: Dictionary = fallback[lane][index]
+				var shot_view: Dictionary = released[lane][index]
+				var direction: int = 2 if view["mirrored"] else 6
+				_check(_matches(view, {"poses": [direction, direction, direction]}) and view["target_id"] == tower["target_id"] and view["shot"] == 1, "%s %s accepted victim falls back to the host-captured aim, never to the living closer decoy" % [lane, state])
+				_check(view["trace_count"] == 1 and view["trace_origin"] == shot_view["trace_origin"] and view["trace_aim"] == shot_view["trace_aim"], "%s %s victim cannot rewrite the released projectile" % [lane, state])

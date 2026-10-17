@@ -263,7 +263,7 @@ Verification: the isolated headless suite passed **50/50 checks** before the add
 
 `assets/audio/orcish_drone.mp3` is the unchanged user-supplied `Orcish_Drone_FULL_SONG_musicgpt.mp3` (SHA-256 `fd8ce059f07bc3de311caa7cb8805b7076c5bc286dd888ea97d544cf107ca2df`, approximately 178.57 seconds, stereo 48kHz MP3). The main scene's local `MatchMusic` player loops at −12 dB on the Music bus during active match planning, combat, wave breaks, and the in-match pause/settings menu. Title menus, connection setup, workshop, collection, results, and leaving are silent. Match snapshots and volume changes do not restart playback. This is presentation only; no host audio clock or network messages were added.
 
-`TowerReward` and `EnemyDefinition` own `board_height` (opaque height in cells) and normalized `board_anchor` (base/feet within the texture). Tower heights remain Arrow 1.42, Ballista 1.40, Rune 1.50. Enemy heights are now Grunt 0.50, Runner 0.45, Brute 0.70; the ordinary enemy default is 0.50. PNGs/anchors and collection/chest artwork are unchanged. A shared visual foot combines the interpolated route position, cosmetic sideways offset, and existing 0.28-cell downward anchor. Shadows, depth, sprite, damaged-only bar, hit testing, and selected brackets follow that foot.
+`TowerReward` and `EnemyDefinition` own `board_height` (opaque height in cells) and normalized `board_anchor` (base/feet within the texture). Arrow/Rune retain opaque heights 1.42/1.50 cells; Ballista's taller provisional set uses approximately 1.80 cells while preserving its previous foundation width. Per-role resources own other base/branch heights and anchors. Enemy heights are Grunt 0.50, Runner 0.45, Brute 0.70; the ordinary enemy default is 0.50. A shared visual foot combines interpolated route position, cosmetic sideways offset and the existing 0.28-cell downward anchor. Shadows, depth, sprite, damaged-only bar, hit testing and selected brackets follow that foot.
 
 #### First-pass horde presentation
 
@@ -535,15 +535,28 @@ For the verified local ComfyUI/Klein setup, agent/API generation steps, iterativ
 - Textures are losslessly imported without mipmaps, rendered with nearest filtering, and drawn at integer scale. More than three reward cards use a smaller chest so the open lid does not overlap the cards.
 - Verified the original closed pixels and retained lower-body pixels, then inspected closed, opening, open, compact, and five-card surfaces in the graphical game. The layout regression also rejects reward cards overlapping the chest. Supplied source originals remain untouched.
 
-### Accepted base crossbow tower sprite
+### Original PixelLab Ballista (archived)
 
-`assets/towers/ballista_tower.png` is the accepted 96×96 PixelLab output `pixellab-A-gigantic-orc-siege-ballista--1791921366109.png`, copied byte-for-byte without refinement. It supplies the existing `orc_ballista` reward's base art; the saved ID, title, reward rules, and unlock state are unchanged.
+The original accepted 96×96 PixelLab output `pixellab-A-gigantic-orc-siege-ballista--1791921366109.png` is preserved byte-for-byte as `archive_assets/towers/ballista/gamelab-20261017/previous-runtime.png`. The `orc_ballista` reward ID, title, UID, reward rules and unlock state remain unchanged; its runtime art now uses the provisional directional trial below.
 
-The icon uses an `AtlasTexture` region `Rect2(12, 5, 74, 89)` to exclude its transparent border. The source PNG remains unchanged. Update the region if the sprite changes so its visible bounds remain comparable with the other towers.
+The original icon used an `AtlasTexture` region `Rect2(12, 5, 74, 89)` to exclude its border. That region documents the old source framing, not the new full-canvas icon.
 
-`TowerReward.icon_texture` holds imported icon art. The shared `RewardIcon` renderer fits all three towers without stretching in both the collection archive and chest rewards, with dimming for locked entries. The obsolete procedural tower drawings and their icon selector were removed.
+`TowerReward.icon_texture` holds imported icon art. The shared `RewardIcon` fits visible artwork without stretching in collection and chest rewards, with dimming for locked entries. New runtime artwork retains that shared surface rather than adding identity-specific icon code.
 
-The source/copy checksums match. Graphical verification inspected locked, unlocked reward, and compact collection states, and reloaded the same saved ballista ID. Layout regressions use the real catalog icons. This establishes collection/base artwork, not combat behavior, a board camera angle, or an upgraded tower.
+The original acceptance pass checked source/copy hashes, locked/unlocked collection and compact reward states, layout bounds, and reload of the same saved Ballista ID. Those historical checks are not approval of the new provisional art.
+
+### Directional Ballista game trial
+
+The creator authorized trying the existing approved GameLab master/seven weapon designs after a requested empty-base generation was rejected for insufficient credits. Runtime uses one reconstructed stone roof/base and eight aligned weapon layers, with an SE still icon. Original sources, exact requests, alignment masks/scales, shared palette, tip coordinates and actual captures live in the [Ballista archive](../archive_assets/README.md#provisional-directional-ballista-game-trial). This is an explicit provisional-art cutover, not a newly generated empty base or final creator acceptance of every proportion.
+
+`PathBoard` follows only the living in-range host-selected `target_id` through logical interpolation. It holds the accepted `aim` for missing/dead/out-of-range targets and defaults SE before an aim exists. Mirroring selects another weapon pose, never another base/light direction. Shot capture uses the host's release aim and preserves that tip/trajectory through later rotation. Resources validate complete aligned directional arrays and finite in-canvas tips; framing, ground anchor and all-pose headroom stay fixed.
+
+An isolated two-process actual-main-scene Wayland/Mesa walkthrough completed real ENet admission, private deck commitment, accepted purchases/Ready and normal live combat. A host-authoritative pose fixture rendered all eight directions on each peer at exact 1280×720 and 1000×720 viewports, with a closer decoy, adjacent/top-row towers, and correct mirrored selection. All 32 pose captures plus both live-combat captures were produced and inspected through a crop grid and representative full views. Both processes exited without Godot error diagnostics after occluded-window rendering was disabled only during throwaway teardown. Audio used the Dummy driver, so no sound quality is claimed.
+
+Persistent peer coverage independently exercises actual host STRONGEST selection, interpolation past a closer decoy, absent/dead/out-of-range fallback and immutable release origins/destinations. The new peer assertions use the fixture's existing JSON-safe numeric-array comparison; decoded floats must not be compared by strict Array element type. The enemy-inspection fixture freezes its displayed pose before synthetic input: UI refresh had re-enabled cosmetic interpolation, moving the victim between motion and press. Diagnostic input showed an opaque hit on motion followed by a miss at the same coordinates after the body moved. Click motion/press/release now stay in one input frame after control layout is rendered. No gameplay hit-test exception, handler bypass or retry was added.
+
+The final isolated `python3 tools/verify.py all` run passed **60/60 checks**, including clean import, actual save isolation, both startup modes, the expanded real-peer scenario, catalog/renderer regressions, and native input/inspection coverage. Logs are retained under ignored `.verify-logs/20261017T195643Z-all-8a05a457/`. Working-project editor imports were then refreshed without errors. The graphical walkthrough's throwaway project/scripts and fixture saves were removed; portable rendered evidence remains in the archive. These checks do not establish native GPU/performance or separate-network internet reachability.
+
 
 ### Accepted Rune obelisk sprite
 

@@ -1459,7 +1459,6 @@
         "orc",
         "pixel-art",
         "png",
-        "runtime-exact-match",
         "siege",
         "source-original",
         "stone",
@@ -1467,9 +1466,7 @@
         "transparent",
         "wood"
       ],
-      "runtime_exact_matches": [
-        "assets/towers/ballista_tower.png"
-      ]
+      "runtime_exact_matches": []
     }
   ]
 }

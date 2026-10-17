@@ -1,0 +1,94 @@
+{
+  "frame_count": 8,
+  "canvas": [
+    192,
+    192
+  ],
+  "shared_swivel": [
+    96,
+    84
+  ],
+  "shared_foot": [
+    96,
+    157
+  ],
+  "directions": {
+    "N": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        0.0,
+        -34.453
+      ]
+    },
+    "NE": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        31.469,
+        -20.703
+      ]
+    },
+    "E": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        43.829,
+        0.0
+      ]
+    },
+    "SE": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        38.0,
+        14.0
+      ]
+    },
+    "S": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        0.0,
+        25.187
+      ]
+    },
+    "SW": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        -31.687,
+        16.313
+      ]
+    },
+    "W": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        -41.593,
+        -2.109
+      ]
+    },
+    "NW": {
+      "single_connected_structure": true,
+      "unchanged_foundation": true,
+      "palette_and_alpha_valid": true,
+      "tip_vector": [
+        -30.164,
+        -19.922
+      ]
+    }
+  },
+  "gif": {
+    "frames": 8,
+    "duration_ms_per_frame": 400,
+    "foundation_pixels_stable": true
+  }
+}

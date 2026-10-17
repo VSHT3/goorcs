@@ -13,6 +13,7 @@
 | `chests/source_sheets/` | Original 4×4 treasure-chest sheet | 1 |
 | `towers/ballista/source/` | Original PixelLab ballista sprite | 1 |
 | `towers/ballista/manual-master/` | Manual starting pose, source layers, preview and rendered checks | 7 |
+| `towers/ballista/gamelab-20261017/` | Approved source designs, provisional assembled trial, previous runtime art and actual game captures | 45 |
 | `towers/gold-mine/gamelab-20261017/` | Approved mine, raw/cutout sources, prior procedural PNG and generation provenance | 4 |
 | `towers/lightning/gamelab-20261017/` | Approved Lightning, raw/cutout sources, prior procedural PNG and provenance | 4 |
 | `world/idle/` | Approved portal/crystal idle sheets and animated previews | 5 |
@@ -46,13 +47,23 @@ Source URLs and license terms were not supplied and are explicitly unspecified, 
 
 - `ballista.png`: complete transparent 128×128 starting image, facing south-east.
 - `base.png` and `crossbow.png`: aligned full-canvas layers. Rotate only the weapon if the masonry must remain identical; keep the shared canvas and anchors.
-- `source-crossbow.png`: preserved source extraction and manual saddle repair before the detail pass. The original PixelLab sprite remains unchanged in `assets/towers/ballista_tower.png`.
+- `source-crossbow.png`: preserved source extraction and manual saddle repair before the detail pass. The original PixelLab runtime sprite is now archived at `towers/ballista/gamelab-20261017/previous-runtime.png`; the historical manifest retains its original runtime path and hash.
 - `preview.png`: enlarged nearest-neighbor review, not a game screenshot.
 - `manifest.json`: source provenance, hashes, layer order, foot anchor `(64, 117)`, roof swivel `(64, 52)`, and export checks.
 
 Run `python3 archive_assets/towers/ballista/manual-master/prepare.py` to reproduce the detailed layer, composite and preview; Pillow is authoring-only. No new AI generation is involved in this final master. Export checks preserve the approved base hash, weapon bounds, binary alpha and unclipped margins.
 
 The [1280×720](towers/ballista/manual-master/godot-review-1280.png) and [1000×720](towers/ballista/manual-master/godot-review-1000.png) captures are direct graphical `PathBoard` renders with both board orientations, adjacent candidates, top-row placement, original towers and enemies. The sprite displayed at 67.2px opaque height on 48px cells. This was an isolated in-memory art preview; collection/save identities, gameplay resources and host-selected target tracking were not changed. `verification.json` ties these captures to the checked master PNG.
+
+## Provisional directional Ballista game trial
+
+[`towers/ballista/gamelab-20261017/`](towers/ballista/gamelab-20261017/) preserves the approved reference-free GameLab SE design and seven approved reference-guided weapon views, exact requests/job IDs, raw/cutout/cleaned sources, previous PixelLab runtime image, and reproducible offline alignment. Master generation reported two credits; the seven alternatives reported fourteen. The subsequent request for a proper generated empty base was rejected for insufficient credits. The creator then explicitly authorized an in-game trial of the existing reconstructed-roof assembly; no additional generation was charged by this integration.
+
+`assembled/prepare.py` builds one fixed base/post, eight weapon layers, SE icon/full composites, a strip and rotation preview on shared 192×192 canvases. Processing uses hard alpha, nearest-neighbor perspective normalization, master-palette matching and small detached-support removal; no finished PNG rotates in its image plane. `assembled/manifest.json` records source hashes, masks, transforms, bolt tips, shared swivel `(96, 84)` and foot `(96, 157)`. The masonry never changes or mirrors during aiming. This is a provisional manually repaired roof, not a newly generated empty base or final geometry/style approval.
+
+Runtime copies use `assets/towers/ballista_base.png`, `ballista_weapon_{n,ne,e,se,s,sw,w,nw}.png` and the full SE `ballista_tower.png`; the reward identity/UID and gameplay rules are unchanged. Host-selected target tracking and immutable release tips are described in the [content pipeline](../docs/content-pipeline.md#directional-weapon-artwork).
+
+[`runtime-proof/directions-runtime.png`](towers/ballista/gamelab-20261017/runtime-proof/directions-runtime.png) is a labelled crop grid of actual host/client main-scene captures, not a generated composite study. Full [1280×720 host combat](towers/ballista/gamelab-20261017/runtime-proof/host-1280.png) and [1000×720 guest view](towers/ballista/gamelab-20261017/runtime-proof/guest-1000.png) show the fixed HUD, top-row clearance and placement. `game-trial.json` records runtime geometry and exercised verification. No native GPU/performance, separate-network internet, new animation, or provider licensing/privacy verification is claimed.
 
 ## Approved endpoint idle animations
 
@@ -83,4 +94,4 @@ Runtime `assets/towers/lightning.png` reframes the approved pixels by `(-16, 11)
 
 `.gdignore` keeps this archive out of Godot resource imports. Approved runtime copies live in `../assets/`; the game never loads the archive, GIFs, manifest, or Python authoring script.
 
-The ballista original, prepared open chest, and padded closed reference are byte-identical to the corresponding active game PNGs. Other candidates are archived alternatives, not approved runtime replacements. See [the pixel-art workflow](../docs/development.md#pixel-art-asset-workflow) before replacing game art.
+The prepared open chest and padded closed reference remain byte-identical to their active runtime PNGs. The original PixelLab Ballista is historical source, not the current runtime match; its exact-match tag has been removed from `assets.json`. Gold Mine's approved cleaned still and Ballista's aligned icon/base/weapon layers have corresponding runtime copies; other archived candidates remain alternatives unless explicitly documented above.

@@ -44,6 +44,8 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Tower '%s' has invalid presentation metadata." % id)
 		if not _valid_board_variants(tower):
 			errors.append("Tower '%s' has invalid branch presentation metadata." % id)
+		if not _valid_directional_weapon(art):
+			errors.append("Tower '%s' has invalid directional weapon presentation metadata." % id)
 		for offset: Vector2 in art.additional_archer_offsets:
 			if not offset.is_finite():
 				errors.append("Tower '%s' has invalid additional archer offsets." % id)
@@ -97,6 +99,26 @@ func validation_errors() -> PackedStringArray:
 		if child == null or child.summon_interval > 0.0:
 			errors.append("Enemy '%s' requires a registered, non-summoning child." % enemy.id)
 	return errors
+
+
+static func _valid_directional_weapon(art: TowerReward) -> bool:
+	if art.directional_weapon_textures.is_empty() and art.directional_projectile_origins.is_empty():
+		return true
+	if art.directional_weapon_textures.size() != 8 or art.directional_projectile_origins.size() != 8:
+		return false
+	if art.icon_texture == null or art.board_texture == null:
+		return false
+	var canvas: Vector2 = art.icon_texture.get_size()
+	if canvas.x <= 0.0 or canvas.y <= 0.0 or art.board_texture.get_size() != canvas:
+		return false
+	for index: int in range(8):
+		var texture: Texture2D = art.directional_weapon_textures[index]
+		var origin: Vector2 = art.directional_projectile_origins[index]
+		if texture == null or texture.get_size() != canvas or not origin.is_finite():
+			return false
+		if origin.x < 0.0 or origin.y < 0.0 or origin.x >= canvas.x or origin.y >= canvas.y:
+			return false
+	return true
 
 
 static func _valid_board_variants(tower: TowerDefinition) -> bool:

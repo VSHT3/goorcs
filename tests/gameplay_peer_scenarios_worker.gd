@@ -1,11 +1,15 @@
 extends "res://tests/gameplay_peer_worker.gd"
 
 var _scenario: String = "rolls"
+var _ballista_boards: Array[PathBoard] = []
+var _ballista_probe: Dictionary = {}
 
 
 func _on_planning_changed() -> void:
 	# Only explicit host step commands may advance these real peer matches.
 	planning.set_physics_process(false)
+	if _scenario == "ballista" and planning.active:
+		_update_ballista_boards()
 
 
 func _planning_rules() -> CombatRules:
@@ -17,6 +21,8 @@ func _planning_rules() -> CombatRules:
 	rules.enemy_speed = 0.0
 	rules.speed_growth_fraction = 0.0
 	rules.wave_weight = 4 if _scenario == "chain" else 1
+	if _scenario == "ballista":
+		rules.wave_weight = 2
 	rules.wave_weight_growth = 0
 	rules.spawn_interval = 0.0
 	rules.spawn_jitter_ratio = 0.0
@@ -34,6 +40,9 @@ func _planning_rules() -> CombatRules:
 			tower.interval = 1.0
 			if tower.behavior_kind == "attack":
 				tower.range_cells = 20.0
+		if _scenario == "ballista" and tower.reward.id == &"orc_ballista":
+			tower.range_cells = 4.0
+			tower.interval = 20.0
 		if _scenario == "economy" and tower.behavior_kind == "attack":
 			tower.damage = 100000
 			tower.interval = 0.01
@@ -129,6 +138,40 @@ func _execute_command(command: Dictionary) -> void:
 					enemy["progress"] = float(positions[index])
 					enemy["pos"] = model._position(enemy["route"], enemy["progress"])
 				planning._publish_snapshot()
+		"ballista_formation":
+			if _session.is_host:
+				var model: MatchCombat = planning._host_combat
+				for index: int in range(model.enemies[0].size()):
+					var enemy: Dictionary = model.enemies[0][index]
+					enemy["progress"] = 0.0 if index == 0 else 4.0
+					enemy["pos"] = model._position(enemy["route"], enemy["progress"])
+					enemy["hp"] = 300 if index == 0 else 100
+					enemy["max_hp"] = enemy["hp"]
+					enemy["base_speed"] = 1.0 if index == 0 else 0.0
+					enemy["speed"] = enemy["base_speed"]
+				planning._publish_snapshot()
+		"ballista_target_state":
+			if _session.is_host:
+				var model: MatchCombat = planning._host_combat
+				var target_id: int = int(model.towers[0][0]["target_id"])
+				for index: int in range(model.enemies[0].size()):
+					var enemy: Dictionary = model.enemies[0][index]
+					if int(enemy["id"]) != target_id:
+						continue
+					match String(command["state"]):
+						"out_of_range":
+							enemy["progress"] = 12.0
+							enemy["pos"] = model._position(enemy["route"], enemy["progress"])
+						"dead":
+							enemy["progress"] = 8.001
+							enemy["pos"] = model._position(enemy["route"], enemy["progress"])
+							enemy["hp"] = 0
+						"absent":
+							model.enemies[0].remove_at(index)
+					break
+				planning._publish_snapshot()
+		"ballista_probe":
+			_ballista_probe = {"ballista_probe": int(command["id"]), "ballista_views": _observe_ballista_boards()}
 		"authenticated_ready":
 			if _session.is_host:
 				planning._apply_command(1, "ready", 0, Vector2i.ZERO, true)
@@ -157,6 +200,7 @@ func _publish() -> void:
 	if planning == null or _directory.is_empty() or _executing_command:
 		return
 	var extra: Dictionary = {}
+	extra.merge(_ballista_probe)
 	if _session.is_host and planning._host_combat != null:
 		extra["roll_state"] = str(planning._host_combat._roll_random.state)
 		extra["drop_state"] = str(planning._host_combat._drop_random.state)
@@ -209,3 +253,48 @@ func _deck_paths(value: Variant, registered_ids: Dictionary, prefix: String = ""
 		for index: int in range(value.size()):
 			found.merge(_deck_paths(value[index], registered_ids, prefix + "[%d]" % index))
 	return found
+
+
+func _update_ballista_boards() -> void:
+	if _ballista_boards.is_empty():
+		for mirrored: bool in [false, true]:
+			var board := PathBoard.new()
+			board.hide()
+			board.size = Vector2(900, 600)
+			board.mirror_horizontal = mirrored
+			board.content_catalog = planning.combat_rules.catalog
+			_main.add_child(board)
+			_ballista_boards.append(board)
+	for board: PathBoard in _ballista_boards:
+		board.layout = planning.layouts[0]
+		board.tower_types = planning.combat.get("tower_types", {})
+		board.combat_enemies = planning.combat.get("enemies", [[], []])[0]
+		board.combat_towers = planning.combat.get("towers", [[], []])[0]
+		# Advance presentation time only at the deterministic probe samples below.
+		board.set_process(false)
+
+
+func _observe_ballista_boards() -> Array:
+	var views: Array = []
+	for board: PathBoard in _ballista_boards:
+		if board.combat_towers.is_empty():
+			continue
+		var tower: Dictionary = board.combat_towers[0]
+		var poses: Array[int] = []
+		for fraction: float in [0.0, 0.5, 1.0]:
+			board._enemy_blend_elapsed = PathBoard.ENEMY_BLEND_DURATION * fraction
+			poses.append(board._directional_weapon_index(tower))
+		var traces: Array = board._shot_traces
+		views.append({
+			"mirrored": board.mirror_horizontal,
+			"poses": poses,
+			"released_pose": board._directional_weapon_index(tower, true),
+			"live_muzzle": str(board._tower_muzzle(tower, 0)),
+			"released_origin_error": board._projectile_origin(traces[0]).distance_to(board._tower_muzzle(tower, 0, true)) / board._cell_size() if not traces.is_empty() else 0.0,
+			"trace_count": traces.size(),
+			"trace_origin": str(board._projectile_origin(traces[0])) if not traces.is_empty() else "",
+			"trace_aim": str(traces[0]["aim"]) if not traces.is_empty() else "",
+			"target_id": tower["target_id"],
+			"shot": tower["shot"],
+		})
+	return views

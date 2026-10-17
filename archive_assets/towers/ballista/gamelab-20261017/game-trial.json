@@ -1,0 +1,37 @@
+{
+  "status": "Verified creator-authorized provisional game trial; full isolated checks 60/60 passed",
+  "approval": "After approving the master and all seven other directional designs, the creator authorized trying the existing assembled artwork in-game rather than waiting for additional generation credits.",
+  "empty_base": "Requested generated empty base was rejected with HTTP 402 insufficient credits. This trial uses the existing manually reconstructed roof and shared fixed post, not a newly generated base.",
+  "source": "assembled/manifest.json",
+  "credits": {"master": 2, "seven_directions": 14, "this_integration": 0},
+  "runtime": {
+    "icon": "assets/towers/ballista_tower.png",
+    "base": "assets/towers/ballista_base.png",
+    "weapon_pattern": "assets/towers/ballista_weapon_{n,ne,e,se,s,sw,w,nw}.png",
+    "canvas": [192, 192],
+    "foot": [96, 157],
+    "swivel": [96, 84],
+    "board_height": 1.79657008,
+    "board_anchor": [0.5, 0.81770833],
+    "foundation_width_cells": 1.1011235955,
+    "rendering": "Fixed, unmirrored base plus one of eight aligned weapon layers. Displayed target direction selects the layer; logical x reverses on mirrored boards, not artwork lighting or masonry.",
+    "authority": "Use only accepted host target_id and interpolated position of that living in-range enemy; otherwise hold host-captured aim, with SE before the first aim. Released bolts capture the accepted shot's directional tip and aim. No target policy, damage, footprint or save ID changes."
+  },
+  "verification": {
+    "renderer": "Godot Compatibility/OpenGL, Wayland, Mesa llvmpipe software rendering; audio Dummy",
+    "real_game_processes": ["host", "guest"],
+    "viewports": [[1280, 720], [1000, 720]],
+    "directional_pose_captures": 32,
+    "live_combat_captures": 2,
+    "rendered_trial_logs": ".verify-logs/ballista-rendered-peers-594d447c/",
+    "observed": "Authenticated ENet admission, private loadouts, accepted builds/Ready, host-authoritative eight-pose fixture with closer decoy, normal/mirrored direction choice, top-row clearance and actual live shots. Both processes exited zero with no Godot errors.",
+    "focused_checks": "Directional real-peer and rendered enemy-inspection regressions passed; board, icon, catalog, camera and all existing suites passed in the final full run.",
+    "full_suite": {
+      "command": "WAYLAND_DISPLAY=wayland-1 LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe python3 tools/verify.py all",
+      "passed": 60,
+      "total": 60,
+      "logs": ".verify-logs/20261017T195643Z-all-8a05a457/"
+    },
+    "limits": "No native GPU/performance, separate-network internet, generated empty-base, final aesthetic approval or new animation proof."
+  }
+}

@@ -14,6 +14,10 @@ extends Resource
 # Board-only layers leave collection/source artwork intact. Rig coordinates share
 # the icon's texture-local space, so inherited tower variants need no ID switches.
 @export var board_texture: Texture2D
+# Optional fixed-canvas weapon poses, ordered N, NE, E, SE, S, SW, W, NW.
+# Both arrays are empty for ordinary art, or contain eight aligned layers/tips.
+@export var directional_weapon_textures: Array[Texture2D] = []
+@export var directional_projectile_origins: PackedVector2Array = PackedVector2Array()
 # Optional branch records: {texture: Texture2D, board_height: float,
 # board_anchor: Vector2}. Follow-up keys take precedence over evolution keys.
 @export var board_variants: Dictionary = {}

@@ -82,10 +82,20 @@ var content_catalog: ContentCatalog = preload("res://resources/content_catalog.t
 		content_catalog = value
 		_tower_art.clear()
 		_enemy_art.clear()
+		_directional_framing.clear()
+		_directional_canvas_sizes.clear()
 		for definition: TowerDefinition in value.towers:
 			var reward: TowerReward = definition.reward
 			_tower_art[String(reward.id)] = reward
 			_cache_texture_bounds(reward.icon_texture)
+			if not reward.directional_weapon_textures.is_empty():
+				_cache_texture_bounds(reward.board_texture)
+				for texture: Texture2D in reward.directional_weapon_textures:
+					_cache_texture_bounds(texture)
+				# All layers share the icon's one framing, never their own alpha bounds.
+				var canvas: Vector2 = reward.icon_texture.get_size()
+				_directional_canvas_sizes[reward] = canvas
+				_directional_framing[reward] = canvas / maxf(1.0, _texture_bounds[reward.icon_texture].size.y)
 			for variant: Dictionary in reward.board_variants.values():
 				_cache_texture_bounds(variant.get("texture"))
 		for definition: EnemyDefinition in value.enemies:
@@ -122,11 +132,14 @@ var _has_idle_flames: bool = false
 var _flame_elapsed: float = 0.0
 var _boulder_phase: float = 0.0
 var _enemy_progress: Dictionary[int, Vector2] = {}
+var _enemies_by_id: Dictionary[int, Dictionary] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 var _bounty_health: Dictionary[int, float] = {}
 var _bounty_hit_life: Dictionary[int, float] = {}
 var _tower_art: Dictionary[String, TowerReward] = {}
 var _texture_bounds: Dictionary[Texture2D, Rect2] = {}
+var _directional_framing: Dictionary[TowerReward, Vector2] = {}
+var _directional_canvas_sizes: Dictionary[TowerReward, Vector2] = {}
 var _draw_order: Array[Dictionary] = []
 var _drag_placement_id: StringName = &""
 var _enemy_art: Dictionary[String, EnemyDefinition] = {}
@@ -351,9 +364,10 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 			if MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), float(tower.get("range", definition.get("range", 0.0)))):
 				hits.append(enemy["pos"])
 	# Copy accepted positions, including lethal hits whose enemies already disappeared.
-	var origin: Vector2 = _tower_muzzle(tower, archer_index)
 	var artwork: TowerReward = _tower_art.get(tower["type_id"])
-	if artwork != null and artwork.archer_head_texture != null:
+	var directional: bool = artwork != null and not artwork.directional_weapon_textures.is_empty()
+	var origin: Vector2 = _tower_muzzle(tower, archer_index, directional)
+	if not directional and artwork != null and artwork.archer_head_texture != null:
 		origin = _archer_geometry(tower, archer_index, 1.0)["tip"]
 	var origin_offset: Vector2 = (origin - cell_center(tower["cell"])) / _cell_size()
 	if mirror_horizontal:
@@ -385,8 +399,10 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 func _blend_enemies() -> void:
 	var next_progress: Dictionary[int, Vector2] = {}
 	var next_health: Dictionary[int, float] = {}
+	_enemies_by_id.clear()
 	for enemy: Dictionary in combat_enemies:
 		var id: int = int(enemy["id"])
+		_enemies_by_id[id] = enemy
 		var hp: float = float(enemy["hp"])
 		if int(enemy.get("bounty_tower_id", -1)) >= 0 and float(enemy.get("bounty_damage_bonus", 0.0)) > 0.0 and hp < _bounty_health.get(id, hp):
 			_bounty_hit_life[id] = 0.18
@@ -796,6 +812,33 @@ func _sprite_rect(texture: Texture2D, height: float, anchor: Vector2, foot: Vect
 	return Rect2(foot - sprite_size * displayed_anchor, sprite_size)
 
 
+func _directional_weapon_rect(artwork: TowerReward, foot: Vector2) -> Rect2:
+	var sprite_size: Vector2 = _directional_framing[artwork] * (_cell_size() * artwork.board_height)
+	return Rect2(foot - sprite_size * artwork.board_anchor, sprite_size)
+
+
+func _directional_weapon_index(tower: Dictionary, released: bool = false) -> int:
+	var cell := Vector2(tower["cell"])
+	var aim: Vector2 = tower.get("aim", cell)
+	if not released:
+		var target_id: int = int(tower.get("target_id", -1))
+		if _enemies_by_id.has(target_id):
+			var enemy: Dictionary = _enemies_by_id[target_id]
+			var range_cells: float = float(tower.get("range", 0.0))
+			if not tower.has("range") and tower_types.has(tower["type_id"]):
+				range_cells = float(tower_types[tower["type_id"]].get("range", 0.0))
+			if float(enemy["hp"]) > 0.0 and MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), range_cells):
+				# Logical interpolation deliberately excludes cosmetic lane jitter.
+				aim = _enemy_position(enemy)
+	var direction: Vector2 = aim - cell
+	if direction.is_zero_approx():
+		return 3 # No accepted aim yet: authored SE, on either board.
+	if mirror_horizontal:
+		direction.x = -direction.x
+	# Clockwise sectors from north; exact half-sector boundaries turn clockwise.
+	return posmod(floori((direction.angle() + PI * 0.5 + PI * 0.125) / (PI * 0.25)), 8)
+
+
 func _tower_foot(cell: Vector2i) -> Vector2:
 	# Put the front foundation edge near the tile's bottom, without a floating pad.
 	return cell_center(cell) + Vector2(0, _cell_size() * 0.45)
@@ -813,6 +856,14 @@ func visual_headroom() -> float:
 		var top: float = rect.position.y + bounds.position.y * rect.size.y / reward.icon_texture.get_height()
 		headroom = maxf(headroom, -top)
 		var scale: Vector2 = rect.size / reward.icon_texture.get_size()
+		if not reward.directional_weapon_textures.is_empty():
+			rect = _directional_weapon_rect(reward, foot)
+			# Include the fixed base and every pose at the same icon-derived scale.
+			var base_bounds: Rect2 = _texture_bounds[reward.board_texture]
+			headroom = maxf(headroom, -(rect.position.y + base_bounds.position.y * scale.y))
+			for texture: Texture2D in reward.directional_weapon_textures:
+				var weapon_bounds: Rect2 = _texture_bounds[texture]
+				headroom = maxf(headroom, -(rect.position.y + weapon_bounds.position.y * scale.y))
 		if reward.archer_head_texture != null:
 			# Upright heads and a fully vertical bow, including held fire/bomb tips.
 			var offsets: Array[Vector2] = [Vector2.ZERO, reward.secondary_sprite_offset]
@@ -914,12 +965,15 @@ func _draw_combat() -> void:
 				if artwork != null and artwork.icon_texture != null:
 					var variant: Dictionary = artwork.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
 					var texture: Texture2D = variant.get("texture", artwork.board_texture if artwork.board_texture != null else artwork.icon_texture)
-					var flip: bool = artwork.mirror_board and mirror_horizontal
+					var directional: bool = not artwork.directional_weapon_textures.is_empty()
+					var flip: bool = not directional and artwork.mirror_board and mirror_horizontal
 					var framing: Texture2D = texture if not variant.is_empty() else artwork.icon_texture
-					var rect: Rect2 = _sprite_rect(framing, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), item["foot"], flip)
+					var rect: Rect2 = _directional_weapon_rect(artwork, item["foot"]) if directional else _sprite_rect(framing, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), item["foot"], flip)
 					if flip:
 						rect.size.x = -rect.size.x
 					draw_texture_rect(texture, rect, false)
+					if directional:
+						draw_texture_rect(artwork.directional_weapon_textures[_directional_weapon_index(tower)], rect, false)
 					_draw_support_context(tower, item["foot"])
 					if artwork.archer_head_texture != null:
 						# Rear shooters are drawn first; no cloned baked bows or roof cutouts.
@@ -1190,9 +1244,13 @@ func _projectile_origin(trace: Dictionary) -> Vector2:
 	return _tower_muzzle(trace, int(trace["archer_index"]))
 
 
-func _tower_muzzle(tower: Dictionary, archer_index: int) -> Vector2:
+func _tower_muzzle(tower: Dictionary, archer_index: int, released: bool = false) -> Vector2:
 	var cell_size: float = _cell_size()
 	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	if artwork != null and not artwork.directional_weapon_textures.is_empty():
+		var rect: Rect2 = _directional_weapon_rect(artwork, _tower_foot(tower["cell"]))
+		var origin: Vector2 = artwork.directional_projectile_origins[_directional_weapon_index(tower, released)]
+		return rect.position + origin * (rect.size / _directional_canvas_sizes[artwork])
 	if artwork != null and artwork.archer_head_texture != null:
 		return _archer_geometry(tower, archer_index, _archer_draw_amount(tower, archer_index))["tip"]
 	if artwork != null and artwork.icon_texture != null and artwork.projectile_origin.x >= 0.0 and artwork.projectile_origin.y >= 0.0:

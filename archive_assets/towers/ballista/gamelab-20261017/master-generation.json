@@ -1,0 +1,114 @@
+{
+  "request": {
+    "project_id": 32513,
+    "asset_name": "Ballista \u2014 reference-free oblique starting pose 01",
+    "prompt": "One complete native 128 x 128 pixel-art BALLISTA TOWER building sprite for a medieval fantasy tower-defense game. Create a new design from scratch, not a modern gun turret. A massive recognizable working siege crossbow of warm dark oak and steel sits on a short centered vertical swivel mount atop a tall sturdy pale-gray stone tower. The crossbow is the clear focal silhouette: one solid timber stock, two substantial curved bow limbs, a single taut bowstring correctly joining both limb tips to the nocked position, and one thick steel-tipped bolt lying straight along the stock. A compact winding winch and restrained iron bands suggest a heavy mechanical weapon. Keep all parts physically connected, with the swivel supported by the roof. Aim the BOLT toward screen LOWER RIGHT (south-east): stock runs from upper-left rear to lower-right muzzle, limbs spread across that stock, and the bolt tip projects visibly beyond the front. The underlying MASONRY DOES NOT TURN with the weapon: fixed front-dominant elevated oblique orthographic view, broad front wall about three quarters of the visible width, narrower visible right wall about one quarter, nearly horizontal front foundation edge, enough roof visible to understand the weapon mount. Four chunky corner buttresses, readable large masonry blocks, a recessed front wall with a small dark opening, and a compact stepped stone footing give the tower real architectural weight. No huge plinth. Entire crossbow remains within the canvas with a generous margin; weapon width substantial but not wildly larger than tower footprint. Shared fantasy strategy-game pixel-art direction: dark charcoal-green readable outlines, deliberate chunky pixel clusters, three or four value groups per material, upper-left warm light, cool pale stone, warm timber, muted steel highlights. Clear restrained construction that survives reduction to about 56 pixels wide, rather than a noisy miniature illustration. No antialiasing, gradients, photorealism, glossy 3D rendering, decorative pixel speckle, magical glow, text, UI, banners, soldiers, characters, loose weapons, terrain tile or surrounding scenery. One isolated centered upright building with its complete footing, crossbow tips and bolt visible. Not an equal-sided diamond-isometric base, not a flat side-view cutout. This is one still pose, not a contact sheet or rotation grid.",
+    "transparent_bg": true,
+    "width": 128,
+    "height": 128,
+    "centered": true,
+    "isometric": false,
+    "three_quarter_top_down": true,
+    "two_d": true,
+    "subject_orientation_in_frame": "south-east",
+    "pixel_art": true,
+    "pixel_art_colors": 48,
+    "edge_cleanup": true,
+    "quality": "high"
+  },
+  "submission": {
+    "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+    "status": "queued",
+    "type": "image",
+    "credits_debited": 2,
+    "project_id": 32513,
+    "asset_id": 69685
+  },
+  "completed_status": {
+    "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+    "status": "completed",
+    "type": "image",
+    "prompt": "One complete native 128 x 128 pixel-art BALLISTA TOWER building sprite for a medieval fantasy tower-defense game. Create a new design from scratch, not a modern gun turret. A massive recognizable working siege crossbow of warm dark oak and steel sits on a short centered vertical swivel mount atop a tall sturdy pale-gray stone tower. The crossbow is the clear focal silhouette: one solid timber stock, two substantial curved bow limbs, a single taut bowstring correctly joining both limb tips to the nocked position, and one thick steel-tipped bolt lying straight along the stock. A compact winding winch and restrained iron bands suggest a heavy mechanical weapon. Keep all parts physically connected, with the swivel supported by the roof. Aim the BOLT toward screen LOWER RIGHT (south-east): stock runs from upper-left rear to lower-right muzzle, limbs spread across that stock, and the bolt tip projects visibly beyond the front. The underlying MASONRY DOES NOT TURN with the weapon: fixed front-dominant elevated oblique orthographic view, broad front wall about three quarters of the visible width, narrower visible right wall about one quarter, nearly horizontal front foundation edge, enough roof visible to understand the weapon mount. Four chunky corner buttresses, readable large masonry blocks, a recessed front wall with a small dark opening, and a compact stepped stone footing give the tower real architectural weight. No huge plinth. Entire crossbow remains within the canvas with a generous margin; weapon width substantial but not wildly larger than tower footprint. Shared fantasy strategy-game pixel-art direction: dark charcoal-green readable outlines, deliberate chunky pixel clusters, three or four value groups per material, upper-left warm light, cool pale stone, warm timber, muted steel highlights. Clear restrained construction that survives reduction to about 56 pixels wide, rather than a noisy miniature illustration. No antialiasing, gradients, photorealism, glossy 3D rendering, decorative pixel speckle, magical glow, text, UI, banners, soldiers, characters, loose weapons, terrain tile or surrounding scenery. One isolated centered upright building with its complete footing, crossbow tips and bolt visible. Not an equal-sided diamond-isometric base, not a flat side-view cutout. This is one still pose, not a contact sheet or rotation grid. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south east (down-right), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+    "error": null,
+    "created_at": "2026-10-17T19:05:29",
+    "updated_at": "2026-10-17T19:06:39",
+    "artifacts": [
+      {
+        "kind": "output",
+        "sequence": 0,
+        "filename": "image_000.png",
+        "content_type": "image/png"
+      }
+    ],
+    "transparent_bg_downloads": {
+      "chroma_key": {
+        "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+        "sequence": 0,
+        "download_url": "/v1/jobs/04a49b9f-9b6f-4038-9d2a-47266ec36e9d/artifacts/0"
+      },
+      "background_removed": {
+        "job_id": "5e7e5ec1-47f7-4b1a-a24a-466cf3076098",
+        "status": "completed",
+        "sequence": 0,
+        "download_url": "/v1/jobs/5e7e5ec1-47f7-4b1a-a24a-466cf3076098/artifacts/0",
+        "artifacts": [
+          {
+            "kind": "output",
+            "sequence": 0,
+            "filename": "image_000.png",
+            "content_type": "image/png"
+          }
+        ]
+      }
+    },
+    "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+  },
+  "artifacts": {
+    "raw": {
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "sha256": "32f6b5d39ba77886e6511e74a49755e27d84cebcf2f3b09e8cfcc4dd5e66a7b5"
+    },
+    "cutout": {
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        24,
+        0,
+        104,
+        128
+      ],
+      "sha256": "c6a9d3767043e1d0ef8863eebd6579ca791858b6562ebafd2e0e299fc0c85390"
+    },
+    "candidate": {
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        25,
+        1,
+        103,
+        125
+      ],
+      "opaque_colors": 48,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "73b7eed5e9c6f455e4769d4c5664005a5ffe6ecc242b5a556630f3a8ee7dbeb5"
+    }
+  },
+  "processing": "Provider cutout alpha >=128 becomes255; otherwise0. RGB and canvas unchanged. Review uses nearest-neighbor scaling.",
+  "approval": "Creator approved the new design as a still-image design master on 2026-10-17. Not imported; directional generation and animation remain separate steps."
+}
