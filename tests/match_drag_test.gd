@@ -80,7 +80,16 @@ func _run() -> void:
 			await _finish()
 			return
 
+	var shift := InputEventKey.new()
+	shift.keycode = KEY_SHIFT
+	shift.physical_keycode = KEY_SHIFT
+	shift.pressed = true
+	Input.parse_input_event(shift)
 	await _purchase(first_cell, "Native HUD drag onto visible owned ground purchases a tower")
+	_check(screen._placement_type() == TOWER_TYPE and screen.selected_tower_id < 0, "Shift-drop retains the purchased identity for the next build without opening inspection")
+	shift = shift.duplicate() as InputEventKey
+	shift.pressed = false
+	Input.parse_input_event(shift)
 	screen.cancel_interaction()
 	await _settle()
 	var original_position: Vector2 = world.camera.position
@@ -91,6 +100,7 @@ func _run() -> void:
 	await _settle()
 	_check(world.camera.position.x > original_position.x and not world.camera.zoom.is_equal_approx(original_zoom), "Second native drop uses an actually translated and scaled camera")
 	await _purchase(transformed_cell, "Native HUD drag purchases the exact owned cell after pan and zoom")
+	_check(screen._placement_type() == &"" and screen.selected_tower_id > 0, "An ordinary drop still selects the newly purchased tower after releasing Shift")
 	screen.cancel_interaction()
 	await _settle()
 	await _rejected(world.cell_screen_position(0, transformed_cell), "Native drop onto occupied ground is rejected without changing accepted state")

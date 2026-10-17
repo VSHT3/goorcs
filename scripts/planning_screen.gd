@@ -12,6 +12,7 @@ var selected_enemy_id: int = -1
 var selected_enemy_slot: int = -1
 var _default_targeting: int = 0
 var _pending_tower_cell := Vector2i(-1, -1)
+var _repeat_placement: bool = false
 var _placement_id: StringName = &""
 var _selected_enemy_type: StringName = &""
 var shop_buttons: Dictionary[StringName, TowerShopButton] = {}
@@ -400,6 +401,10 @@ func _buy_tower(cell: Vector2i, type_id: StringName, slot: int) -> void:
 	if not planning.can_manage_towers(slot):
 		return
 	_pending_tower_cell = cell
+	# Capture at submission: remote acknowledgement may arrive after key release.
+	_repeat_placement = Input.is_key_pressed(KEY_SHIFT)
+	if _repeat_placement:
+		_placement_id = type_id
 	planning.build_tower(slot, cell, type_id, _default_targeting)
 	_refresh()
 
@@ -460,6 +465,8 @@ func _refresh_palette() -> void:
 		var price: String = str(button.cost) if not stats.is_empty() else ""
 		button.refresh_caption(price, status)
 		button.tooltip_text = "%d Coins\n%s" % [button.cost, behavior_summary(stats)] if not stats.is_empty() else "This tower is unavailable in the host's match catalog."
+		if not button.disabled:
+			button.tooltip_text += "\nHold Shift when placing or dropping to keep building."
 		if coins < button.cost:
 			button.tooltip_text += "\nNeed %d more Coins." % (button.cost - coins)
 		if not unlocked:
@@ -1121,8 +1128,9 @@ func _refresh() -> void:
 	if _pending_tower_cell != Vector2i(-1, -1):
 		for tower: Dictionary in all_towers[own_slot]:
 			if tower["cell"] == _pending_tower_cell:
-				selected_tower_id = int(tower["id"])
-				_placement_id = &""
+				if not _repeat_placement:
+					selected_tower_id = int(tower["id"])
+					_placement_id = &""
 				_pending_tower_cell = Vector2i(-1, -1)
 				break
 	_refresh_palette()

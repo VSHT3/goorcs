@@ -204,7 +204,7 @@ func _build_interface() -> void:
 		button.drag_started.connect(world.boards[0].cancel_stroke.unbind(1))
 		palette.add_child(button)
 		button.refresh_caption("Free", "")
-		button.tooltip_text = "Click then place on empty ground, or drag onto the board. Right-click / Esc cancels."
+		button.tooltip_text = "Click then place on empty ground, or drag onto the board. Hold Shift to keep building. Right-click / Esc cancels."
 		shop_buttons[reward.id] = button
 	_notice = Label.new()
 	_notice.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
@@ -450,9 +450,13 @@ func _select_placement(type_id: StringName) -> void:
 
 
 func _tower_dropped(cell: Vector2i, type_id: StringName) -> void:
+	var repeat_placement: bool = Input.is_key_pressed(KEY_SHIFT)
 	if controller.build(cell, type_id):
 		cancel_interaction()
-		_cell_clicked(cell, MOUSE_BUTTON_LEFT)
+		if repeat_placement:
+			_select_placement(type_id)
+		else:
+			_cell_clicked(cell, MOUSE_BUTTON_LEFT)
 
 
 func _cell_clicked(cell: Vector2i, button: MouseButton) -> void:
@@ -469,9 +473,13 @@ func _cell_clicked(cell: Vector2i, button: MouseButton) -> void:
 			return
 	selected_tower_id = -1
 	if placement_id != &"":
+		var repeat_placement: bool = Input.is_key_pressed(KEY_SHIFT)
 		if controller.build(cell, placement_id):
-			placement_id = &""
-			_cell_clicked(cell, button)
+			if not repeat_placement:
+				placement_id = &""
+				_cell_clicked(cell, button)
+			else:
+				_refresh()
 			return
 		_show_notice("Place towers on empty, non-path ground.")
 	_refresh()
