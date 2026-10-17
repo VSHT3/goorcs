@@ -13,6 +13,10 @@ func _init() -> void:
 		_test_roll_boundaries()
 		_test_persistence_and_exhaustion()
 		_test_expanded_catalog_and_capping()
+		_test_shipped_starter()
+		_test_starter_persistence_and_reset()
+		_test_starter_migration()
+		_test_starter_write_failure()
 		_test_write_failure()
 		_test_reset_progress()
 		_test_reset_failure()
@@ -22,7 +26,7 @@ func _init() -> void:
 		_test_invalid_catalog()
 	_cleanup()
 	if failures == 0:
-		print("PASS: collection persistence, unique grants, exhaustion, 80/15/5 boundaries, capping, expanded catalog, and save failures")
+		print("PASS: collection starter migration/reset, persistence, unique grants, exhaustion, 80/15/5 boundaries, capping, expanded catalog, and save failures")
 	quit(1 if failures > 0 else 0)
 
 
@@ -153,6 +157,82 @@ func _test_expanded_catalog_and_capping() -> void:
 		_check(reward.id != &"test_tower_0" and reward.id != &"test_tower_1", "Capped rewards exclude prior unlocks")
 
 
+func _test_shipped_starter() -> void:
+	var path: String = _path("shipped_starter.json")
+	var store := CollectionStore.new(path)
+	_check(store.content_catalog.starter_tower_id == &"arrow_tower", "Shipped collection authors Arrow as its guaranteed starter")
+	_check(store.error_message.is_empty() and store.is_unlocked(&"arrow_tower"), "Fresh shipped collection grants its saved Arrow starter")
+	_check(store.unlocked_count() == 1 and FileAccess.file_exists(path), "Fresh starter is saved without opening a chest")
+	var restored := CollectionStore.new(path)
+	_check(restored.is_unlocked(&"arrow_tower"), "Shipped starter survives restarting")
+	_check(restored.reset_progress(), "Shipped starter collection can reset")
+	var reset := CollectionStore.new(path)
+	_check(reset.unlocked_count() == 1 and reset.is_unlocked(&"arrow_tower"), "Reset keeps the saved Arrow starter")
+
+
+func _test_starter_persistence_and_reset() -> void:
+	var path: String = _path("custom_starter.json")
+	var catalog: ContentCatalog = _catalog(4)
+	catalog.starter_tower_id = catalog.towers[2].reward.id
+	var store := CollectionStore.new(path, catalog, _rng_for_roll(95))
+	_check(store.error_message.is_empty() and store.unlocked_count() == 1 and store.is_unlocked(catalog.starter_tower_id), "Injected catalog grants its authored starter, regardless of identity or position")
+	var restored := CollectionStore.new(path, catalog, _rng_for_roll(95))
+	_check(restored.unlocked_count() == 1 and restored.is_unlocked(catalog.starter_tower_id), "Authored starter survives reconstruction")
+	var result: ChestResult = restored.open_chest()
+	_check_grant(result, catalog.towers.size() - 1, "Starter is excluded from chest grants")
+	for reward: TowerReward in result.rewards:
+		_check(reward.id != catalog.starter_tower_id, "Chest never regrants the guaranteed starter")
+	_check(restored.reset_progress(), "Authored starter collection resets successfully")
+	var reset := CollectionStore.new(path, catalog)
+	for reward: TowerReward in catalog.tower_rewards():
+		_check(reset.is_unlocked(reward.id) == (reward.id == catalog.starter_tower_id), "Reset persists only the catalog's starter")
+	_check(reset.can_open(), "Reset starter leaves the remaining collection openable")
+
+
+func _test_starter_migration() -> void:
+	var path: String = _path("starter_migration.json")
+	var catalog: ContentCatalog = _catalog(4)
+	catalog.starter_tower_id = catalog.towers[2].reward.id
+	_write_fixture(path, '{"version":1,"unlocked":["test_tower_0","test_tower_1"]}')
+	var store := CollectionStore.new(path, catalog)
+	_check(store.error_message.is_empty() and store.unlocked_count() == 3, "Version-one saves migrate without changing their schema")
+	for id: StringName in [&"test_tower_0", &"test_tower_1", catalog.starter_tower_id]:
+		_check(store.is_unlocked(id), "Starter migration preserves every legacy unlock")
+	var restored := CollectionStore.new(path, catalog)
+	_check(restored.unlocked_count() == 3 and restored.is_unlocked(catalog.starter_tower_id), "Migrated starter is persisted before construction returns")
+	var saved: String = FileAccess.get_file_as_string(path)
+	_check(DirAccess.make_dir_absolute(path + ".tmp") == OK, "Block unnecessary migration writes")
+	var unchanged := CollectionStore.new(path, catalog)
+	_check(unchanged.error_message.is_empty() and unchanged.unlocked_count() == 3, "Already migrated saves load without requiring another write")
+	_check(FileAccess.get_file_as_string(path) == saved, "Already migrated save bytes are unchanged")
+
+
+func _test_starter_write_failure() -> void:
+	var catalog: ContentCatalog = _catalog(3)
+	catalog.starter_tower_id = catalog.towers[1].reward.id
+	var fresh_path: String = _path("blocked_starter.json")
+	_check(DirAccess.make_dir_absolute(fresh_path + ".tmp") == OK, "Block first starter save")
+	var fresh := CollectionStore.new(fresh_path, catalog)
+	_check(not fresh.error_message.is_empty() and fresh.unlocked_count() == 0 and not fresh.can_open(), "Failed first save grants no unpersisted starter")
+	_check(not FileAccess.file_exists(fresh_path) and fresh.open_chest().rewards.is_empty(), "Failed starter initialization creates no save or chest rewards")
+	var path: String = _path("blocked_starter_migration.json")
+	var legacy: String = '{"version":1,"unlocked":["test_tower_0"]}'
+	_write_fixture(path, legacy)
+	_check(DirAccess.make_dir_absolute(path + ".tmp") == OK, "Block legacy starter migration")
+	var store := CollectionStore.new(path, catalog)
+	_check(not store.error_message.is_empty() and store.error_message.contains(path + ".tmp"), "Failed starter migration exposes its write error")
+	_check(store.unlocked_count() == 1 and store.is_unlocked(&"test_tower_0") and not store.is_unlocked(catalog.starter_tower_id), "Failed migration preserves legacy unlocks without granting an unpersisted starter")
+	_check(not store.can_open() and store.open_chest().rewards.is_empty() and not store.reset_progress(), "Failed migration disables collection mutations")
+	_check(FileAccess.get_file_as_string(path) == legacy, "Failed migration preserves original save bytes")
+	_check(DirAccess.remove_absolute(path + ".tmp") == OK, "Restore migration save access")
+	var restored := CollectionStore.new(path, catalog)
+	_check(restored.error_message.is_empty() and restored.unlocked_count() == 2 and restored.is_unlocked(catalog.starter_tower_id), "Reopening after restoring writes safely migrates the legacy collection")
+	var saved: String = FileAccess.get_file_as_string(path)
+	_check(DirAccess.make_dir_absolute(path + ".tmp") == OK, "Block starter-preserving reset")
+	_check(not restored.reset_progress() and restored.unlocked_count() == 2 and restored.is_unlocked(&"test_tower_0") and restored.is_unlocked(catalog.starter_tower_id), "Failed reset retains both starter and legacy unlocks")
+	_check(FileAccess.get_file_as_string(path) == saved, "Failed starter reset preserves saved bytes")
+
+
 func _test_reset_progress() -> void:
 	var path: String = _path("reset.json")
 	var catalog: ContentCatalog = _catalog(3)
@@ -228,10 +308,12 @@ func _test_invalid_saves() -> void:
 		'{"version":1,"unlocked":["test_tower_0",12]}',
 		'{"version":1,"unlocked":[""]}',
 	]
+	var catalog: ContentCatalog = _catalog(3)
+	catalog.starter_tower_id = catalog.towers[1].reward.id
 	for index: int in range(fixtures.size()):
 		var path: String = _path("invalid_%d.json" % index)
 		_write_fixture(path, fixtures[index])
-		var store := CollectionStore.new(path, _catalog(3))
+		var store := CollectionStore.new(path, catalog)
 		_check(not store.error_message.is_empty() and store.error_message.contains(path), "Invalid save %d has an actionable path-specific error" % index)
 		_check(not store.can_open() and store.unlocked_count() == 0, "Invalid save %d disables openings without partial loading" % index)
 		var result: ChestResult = store.open_chest()
@@ -244,7 +326,9 @@ func _test_invalid_saves() -> void:
 func _test_unreadable_save() -> void:
 	var path: String = _path("directory_instead_of_save.json")
 	_check(DirAccess.make_dir_absolute(path) == OK, "Create an unreadable save destination")
-	var store := CollectionStore.new(path, _catalog(3))
+	var catalog: ContentCatalog = _catalog(3)
+	catalog.starter_tower_id = catalog.towers[1].reward.id
+	var store := CollectionStore.new(path, catalog)
 	_check(not store.error_message.is_empty() and not store.can_open(), "An existing unreadable save disables openings")
 	_check(store.open_chest().rewards.is_empty(), "Unreadable save grants nothing")
 	_check(DirAccess.dir_exists_absolute(path), "Unreadable save is not removed or replaced")
@@ -257,6 +341,12 @@ func _test_invalid_catalog() -> void:
 	var store := CollectionStore.new(path, catalog)
 	_check(not store.can_open() and not store.error_message.is_empty(), "Duplicate catalog IDs are rejected before granting")
 	_check(store.open_chest().rewards.is_empty() and not FileAccess.file_exists(path), "Invalid catalog cannot create a collection save")
+	var missing_starter: ContentCatalog = _catalog(2)
+	missing_starter.starter_tower_id = &"unregistered_starter"
+	var starter_path: String = _path("invalid_starter_catalog.json")
+	var invalid := CollectionStore.new(starter_path, missing_starter)
+	_check(not invalid.error_message.is_empty() and invalid.unlocked_count() == 0, "Unregistered starter is rejected before granting")
+	_check(not FileAccess.file_exists(starter_path), "Invalid starter catalog cannot create a save")
 
 
 func _cleanup() -> void:

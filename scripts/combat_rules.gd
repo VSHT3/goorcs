@@ -14,6 +14,9 @@ extends Resource
 @export_range(0.0, 1.0, 0.001) var spawn_interval_reduction_per_wave: float = 0.005
 @export_range(0.0, 0.999, 0.001) var max_spawn_interval_reduction: float = 0.5
 @export var catalog: ContentCatalog = preload("res://resources/content_catalog.tres")
+@export var roll_rules: TowerRollRules
+@export var starting_reroll_currency: int = 0
+@export var clear_reroll_currency: int = 3
 @export var health_growth: int = 2
 # Each milestone adds a fraction of original speed; spans grow 5, 10, 15... rounds.
 @export_range(0.0, 1.0, 0.01, "or_greater") var speed_growth_fraction: float = 0.1

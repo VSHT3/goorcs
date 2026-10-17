@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="TowerDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/tower_definition.gd" id="1_definition"]
+[ext_resource type="Resource" path="res://resources/collection/gold_mine.tres" id="2_reward"]
+
+[resource]
+script = ExtResource("1_definition")
+reward = ExtResource("2_reward")
+; All production, percentages, branch names, and prices are provisional.
+damage = 0
+range_cells = 3.0
+interval = 1.0
+cost = 100
+upgrade_base_cost = 50
+behavior_kind = "economy"
+; periodic_interval is combat simulation time, never wall-clock time or interest.
+behavior_config = {"clear_income": 15, "periodic_income": 0, "periodic_interval": 0.0}
+; Existing purchase actions become production/efficiency bonuses for all branches.
+upgrade_effects = {"damage": {"income_bonus": 0.25}, "speed": {"income_bonus": 0.2}}
+roll_profile = "economy"
+roll_attributes = PackedStringArray("economy_production")
+evolutions = {
+"royal_mint": {
+"title": "Royal Mint",
+"cost": 350,
+"behavior_kind": "economy",
+"behavior_config": {"clear_income": 15, "periodic_income": 3, "periodic_interval": 5.0}
+},
+"bounty_board": {
+"title": "Bounty Board",
+"cost": 300,
+"behavior_kind": "bounty",
+; Replaces clear and periodic production. One exclusive persistent max-HP mark.
+"behavior_config": {"mark_damage_bonus": 0.2, "mark_income_bonus": 0.5},
+"followups": {
+"stronger_mark": {
+"title": "Greater Bounty",
+"cost": 500,
+"behavior_kind": "bounty",
+"behavior_config": {"mark_damage_bonus": 0.4, "mark_income_bonus": 1.0}
+},
+"income_aura": {
+"title": "Tribute Office",
+"cost": 500,
+"behavior_kind": "income_aura",
+; Buying this permanent branch clears this Board's active mark immediately.
+; Eligibility follows the killing tower, not the enemy. Strongest duplicate wins.
+"behavior_config": {"stack_group": "bounty_income", "kill_income_bonus": 0.35}
+}
+}
+}
+}

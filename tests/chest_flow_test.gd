@@ -21,6 +21,10 @@ func _run() -> void:
 	random.seed = 42
 	main = load("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(SAVE_PATH, preload("res://resources/content_catalog.tres"), random)
+	var catalog_size: int = main.collection_store.catalog.size()
+	var starter_id: StringName = main.collection_store.content_catalog.starter_tower_id
+	var initial_unlocked: int = main.collection_store.unlocked_count()
+	_check(main.collection_store.is_unlocked(starter_id), "Collection navigation starts with its guaranteed starter")
 	root.add_child(main)
 	await process_frame
 	await process_frame
@@ -32,7 +36,7 @@ func _run() -> void:
 	_check(screen.visible and (main.sandbox_screen == null or not main.sandbox_screen.visible), "Collection navigation opens only the collection screen")
 	await _click(screen.open_button)
 	var granted: int = main.collection_store.unlocked_count()
-	_check(granted > 0 and granted <= 3, "Opening actually grants eligible collection types")
+	_check(granted > initial_unlocked and granted <= catalog_size, "Opening actually grants previously locked collection types")
 	_check(screen.reveal.is_revealing(), "Grant starts the chest reveal")
 	var reloaded := CollectionStore.new(SAVE_PATH)
 	_check(reloaded.unlocked_count() == granted, "Grant is saved before reveal finishes")
@@ -54,7 +58,7 @@ func _run() -> void:
 		_check(not screen.reveal.is_revealing(), "Skip completes the reveal")
 		if main.collection_store.unlocked_count() == previous:
 			break
-	_check(main.collection_store.unlocked_count() == 3 and screen.open_button.disabled, "Exhausting the catalog disables further chests")
+	_check(main.collection_store.unlocked_count() == catalog_size and screen.open_button.disabled, "Exhausting the catalog disables further chests")
 	reloaded = CollectionStore.new(SAVE_PATH)
 	for reward: TowerReward in reloaded.catalog:
 		_check(reloaded.is_unlocked(reward.id), "Final save contains every unlocked identity")
@@ -64,19 +68,21 @@ func _run() -> void:
 	var before_reset: String = FileAccess.get_file_as_string(SAVE_PATH)
 	await _click(screen.reset_button)
 	await process_frame
-	_check(screen.reset_confirmation.visible and main.collection_store.unlocked_count() == 3, "Reset requires confirmation before changing progress")
+	_check(screen.reset_confirmation.visible and main.collection_store.unlocked_count() == catalog_size, "Reset requires confirmation before changing progress")
 	await _dialog_click(screen.reset_confirmation.get_cancel_button())
-	_check(main.collection_store.unlocked_count() == 3 and FileAccess.get_file_as_string(SAVE_PATH) == before_reset, "Cancel preserves unlocks and saved bytes")
+	_check(main.collection_store.unlocked_count() == catalog_size and FileAccess.get_file_as_string(SAVE_PATH) == before_reset, "Cancel preserves unlocks and saved bytes")
 	await _click(screen.reset_button)
 	await process_frame
 	await _dialog_click(screen.reset_confirmation.get_ok_button())
-	_check(main.collection_store.unlocked_count() == 0 and not screen.open_button.disabled, "Confirmed reset clears progress and enables chests")
+	_check(main.collection_store.unlocked_count() == initial_unlocked and main.collection_store.is_unlocked(starter_id) and not screen.open_button.disabled, "Confirmed reset retains the starter and enables chests")
 	_check(screen.reveal.get_node("Results").get_child_count() == 0, "Reset clears old reward cards")
 	_check(main.sandbox_screen.layout.has_path(Vector2i(1, 4)), "Collection reset preserves the sandbox layout")
 	reloaded = CollectionStore.new(SAVE_PATH)
-	_check(reloaded.unlocked_count() == 0 and reloaded.can_open(), "The empty collection persists after reset")
+	_check(reloaded.unlocked_count() == initial_unlocked and reloaded.is_unlocked(starter_id) and reloaded.can_open(), "Starter-only collection persists after reset")
+	for reward: TowerReward in reloaded.catalog:
+		_check(reloaded.is_unlocked(reward.id) == (reward.id == starter_id), "Reset removes every nonstarter unlock")
 	await _click(screen.open_button)
-	_check(main.collection_store.unlocked_count() > 0 and screen.reset_button.disabled, "A fresh chest grants rewards and reset is disabled during its reveal")
+	_check(main.collection_store.unlocked_count() > initial_unlocked and screen.reset_button.disabled, "A fresh chest grants rewards beyond the starter and reset is disabled during its reveal")
 	await _click(screen.skip_button)
 	main.queue_free()
 	await process_frame

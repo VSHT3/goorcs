@@ -1,9 +1,14 @@
-[gd_resource type="Resource" script_class="CombatRules" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CombatRules" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/combat_rules.gd" id="1_rules"]
+[ext_resource type="Resource" path="res://resources/combat/tower_rolls.tres" id="2_rolls"]
 
 [resource]
 script = ExtResource("1_rules")
+roll_rules = ExtResource("2_rolls")
+; Provisional run-only grants; independent from Coins and collection progress.
+starting_reroll_currency = 8
+clear_reroll_currency = 3
 base_health = 10
 enemy_health = 8
 enemy_speed = 2.0

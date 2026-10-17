@@ -25,10 +25,12 @@ func _run() -> void:
 	audio.save_path = save_path
 	main = load("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(collection_path)
+	main.combat_rules = CombatRules.new()
 	root.add_child(main)
 	await _settle()
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "Pause fixture commits its owned starter")
 	await _settle()
 	screen = main.play_screen.planning_screen
 	for x: int in range(1, 13):
@@ -86,6 +88,7 @@ func _run() -> void:
 	_check(not paused and main.menu.visible and not main.planning.active, "Quit returns to title and releases pause")
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "New pause run requires a fresh committed deck")
 	await _settle()
 	_check(main.planning.active and not screen.pause_menu.visible and not paused, "New run cannot inherit the previous pause")
 	await _key(KEY_ESCAPE)

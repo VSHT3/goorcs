@@ -52,6 +52,9 @@ var _inspector: EnemyInspector
 var _pending_dimensions := Vector2i.ZERO
 var _active: bool = false
 var sound_player: GameSoundPlayer
+var _roll_details: Label
+var rarity_reroll: Button
+var attribute_reroll: Button
 
 @onready var world: SandboxWorld = $World
 @onready var board: PathBoard = world.boards[0]
@@ -246,7 +249,7 @@ func _build_management() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_management.add_child(scroll)
 	var content := VBoxContainer.new()
-	content.custom_minimum_size.x = 286
+	content.custom_minimum_size.x = 0
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(content)
 	var heading := HBoxContainer.new()
@@ -256,6 +259,16 @@ func _build_management() -> void:
 	_tower_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_button(heading, "×", cancel_interaction)
 	_tower_stats = _label(content, "", true)
+	_tower_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_roll_details = _label(content, "", true)
+	_roll_details.name = "TowerRoll"
+	_roll_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rarity_reroll = _button(content, "Reroll rarity · Free", _reroll.bind("rarity"))
+	rarity_reroll.name = "RerollRarity"
+	rarity_reroll.tooltip_text = MatchPlanningScreen.reroll_tooltip("rarity") + "\nFree in Sandbox."
+	attribute_reroll = _button(content, "Reroll attributes · Free", _reroll.bind("attributes"))
+	attribute_reroll.name = "RerollAttributes"
+	attribute_reroll.tooltip_text = MatchPlanningScreen.reroll_tooltip("attributes") + "\nFree in Sandbox."
 	targeting = _target_selector(content, 0)
 	secondary_targeting = _target_selector(content, 1)
 	third_targeting = _target_selector(content, 2)
@@ -269,6 +282,8 @@ func _build_management() -> void:
 		button.custom_minimum_size = Vector2(0, 76)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_override("font", NUMBERS)
+		button.add_theme_font_size_override("font_size", 16)
 		advancement_buttons[command] = button
 	_button(content, "Sell tower", _sell)
 
@@ -525,11 +540,12 @@ func _refresh_management(state: Dictionary) -> void:
 		selected_tower_id = -1
 		return
 	var stats: Dictionary = state["tower_types"][tower["type_id"]]
-	_tower_title.text = "%s · %s" % [stats["title"], MatchPlanningScreen.TOWER_LEVEL_NUMERALS[MatchCombat.tower_level(tower) - 1]]
-	if tower.get("evolution", "") == "boulders":
-		_tower_stats.text = "Kills %d · %d DPS\nContinuous" % [int(tower["kills"]), int(tower["damage"])]
-	else:
-		_tower_stats.text = "Kills %d · Damage %d\nEvery %.2fs" % [int(tower["kills"]), int(tower["damage"]), float(tower["interval"])]
+	_tower_title.text = MatchPlanningScreen.tower_display_title(tower, stats)
+	_tower_stats.text = MatchPlanningScreen.tower_stats_text(tower, stats)
+	_roll_details.text = MatchPlanningScreen.roll_details_text(tower)
+	rarity_reroll.disabled = not _active or int(tower.get("rarity_reroll_cost", -1)) < 0
+	attribute_reroll.disabled = not _active or int(tower.get("attribute_reroll_cost", -1)) < 0
+	targeting.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
 	targeting.mode = int(tower["mode"])
 	targeting.disabled = not _active
 	secondary_targeting.get_parent_control().visible = bool(tower["special_upgraded"]) and stats.get("special_upgrade", "") == "second_archer"
@@ -552,38 +568,35 @@ func _refresh_management(state: Dictionary) -> void:
 		var locked: bool = not chosen.is_empty() and not purchased
 		var button: Button = advancement_buttons[command]
 		button.text = "%s\n%s" % [String(definition.get("title", command)), "Owned" if purchased else ("Locked" if locked else "Free")]
-		button.disabled = not _advancement_row.visible or definition.is_empty() or purchased or locked
+		button.disabled = not _active or not _advancement_row.visible or definition.is_empty() or purchased or locked
 		button.tooltip_text = MatchPlanningScreen.advancement_tooltip(command, definition) + "\nFree in sandbox; sell and rebuild to choose another path."
-	var commands: Dictionary[String, Dictionary] = {
-		"damage": {"title": "+%d damage" % int(stats["damage_upgrade_bonus"]), "purchased": bool(tower["damage_upgraded"]), "locked": false},
-		"speed": {"title": "%.0f%% faster" % ((1.0 / float(stats["speed_upgrade_multiplier"]) - 1.0) * 100.0), "purchased": bool(tower["speed_upgraded"]), "locked": false},
-	}
-	var ready_special: bool = bool(tower["damage_upgraded"]) and bool(tower["speed_upgraded"])
-	if not String(stats.get("special_upgrade", "")).is_empty() and not _advancement_row.visible:
-		commands["special"] = {"title": stats["special_upgrade_title"], "purchased": bool(tower["special_upgraded"]), "locked": not ready_special}
-	var evolutions: Dictionary = stats.get("evolutions", {})
-	for branch: String in evolutions:
-		commands[branch] = {"title": evolutions[branch]["title"], "purchased": tower["evolution"] == branch, "locked": not ready_special or (tower["evolution"] != "" and tower["evolution"] != branch)}
-		var followup: Dictionary = evolutions[branch].get("followup", {})
-		if not followup.is_empty():
-			commands["freeze_runes"] = {"title": followup["title"], "purchased": bool(tower["freeze_upgraded"]), "locked": tower["evolution"] != branch}
+	var commands: Dictionary = MatchPlanningScreen.tower_upgrade_actions(tower, stats)
 	for command: String in _upgrade_buttons:
 		_upgrade_buttons[command].visible = commands.has(command)
 	for command: String in commands:
 		if not _upgrade_buttons.has(command):
 			_upgrade_buttons[command] = _button(_upgrade_list, "", _upgrade.bind(command))
+			_upgrade_buttons[command].autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_upgrade_buttons[command].add_theme_font_override("font", NUMBERS)
+			_upgrade_buttons[command].add_theme_font_size_override("font_size", 16)
 		var details: Dictionary = commands[command]
 		var button: Button = _upgrade_buttons[command]
 		button.show()
 		button.text = "%s · %s" % [details["title"], "Purchased" if details["purchased"] else ("Locked" if details["locked"] else "Free")]
-		button.disabled = details["purchased"] or details["locked"]
-		button.tooltip_text = "Choose either evolution after damage and speed. Sell and rebuild freely to try another branch." if evolutions.has(command) else "Free sandbox upgrade; normal tower prerequisites apply."
+		button.disabled = not _active or details["purchased"] or details["locked"]
+		button.tooltip_text = String(details["description"]) + "\nFree in Sandbox; normal prerequisites apply. Sell and rebuild to choose another permanent branch."
 
 
 func _upgrade(command: String) -> void:
 	var button: Button = advancement_buttons.get(command, _upgrade_buttons.get(command))
 	if button != null and button.is_visible_in_tree() and not button.disabled:
 		controller.upgrade(selected_tower_id, command)
+
+
+func _reroll(kind: String) -> void:
+	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
+	if button.is_visible_in_tree() and not button.disabled:
+		controller.reroll_tower(selected_tower_id, kind)
 
 
 func _show_notice(message: String) -> void:

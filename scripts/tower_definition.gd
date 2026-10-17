@@ -16,17 +16,30 @@ const FREEZE_DURATION: float = 2.0
 @export var damage_upgrade_bonus: int = 1
 @export var speed_upgrade_multiplier: float = 0.8
 @export var area_attack: bool = false
+# "attack" retains the original direct/area attack rules. Other kinds are
+# mechanics, never collection identities; configs are captured by the host.
+@export_enum("attack", "chain", "support", "economy") var behavior_kind: String = "attack"
+@export var behavior_config: Dictionary = {}
+# Passive buildings use role-specific effects for the existing damage/speed
+# purchase actions; attack kinds retain the ordinary numerical stat upgrades.
+@export var upgrade_effects: Dictionary = {}
+# Explicit eligible effects, including effects compatible with future branches.
+# Empty is valid for injected catalogs that do not opt into placement rolls.
+@export var roll_attributes: PackedStringArray = PackedStringArray()
+# Rarity rules resolve authored rarity-specific slot overrides by profile.
+@export_enum("attack", "support", "economy") var roll_profile: String = "attack"
 # Presentation family, not a targeting or damage rule.
 @export_enum("Bow", "Ballista", "Rune") var attack_sound: int = CombatSoundEvents.Cue.BOW
 @export var special_upgrade: String = ""
 @export var special_upgrade_title: String = ""
 @export var special_upgrade_cost: int = 0
+@export var special_upgrade_config: Dictionary = {}
 @export var evolutions: Dictionary = {}
 @export var advancements: Dictionary = {}
 
 
 static func valid_advancements(definition: TowerDefinition) -> bool:
-	if not definition.advancements.is_empty() and (definition.special_upgrade != "second_archer" or definition.area_attack or not definition.evolutions.is_empty()):
+	if not definition.advancements.is_empty() and (definition.behavior_kind != "attack" or definition.special_upgrade != "second_archer" or definition.area_attack or not definition.evolutions.is_empty()):
 		return false
 	for branch: Variant in definition.advancements:
 		if not branch is String or branch not in ["four_archers", "fire_arrows", "bomb_arrows"] or not definition.advancements[branch] is Dictionary:
@@ -55,6 +68,8 @@ static func valid_advancements(definition: TowerDefinition) -> bool:
 
 
 static func valid_evolutions(definition: TowerDefinition) -> bool:
+	if definition.behavior_kind != "attack":
+		return _valid_role_evolutions(definition)
 	if not definition.evolutions.is_empty() and not definition.special_upgrade.is_empty():
 		return false
 	for branch: Variant in definition.evolutions:
@@ -88,3 +103,140 @@ static func valid_evolutions(definition: TowerDefinition) -> bool:
 			if followup.get("id") != "freeze_runes" or not followup.get("title") is String or String(followup["title"]).is_empty() or not followup.get("cost") is int or int(followup["cost"]) <= 0:
 				return false
 	return true
+
+
+static func valid_behavior(definition: TowerDefinition) -> bool:
+	if definition.behavior_kind == "attack":
+		return definition.behavior_config.is_empty() and definition.upgrade_effects.is_empty()
+	if definition.area_attack or not _valid_behavior_config(definition.behavior_kind, definition.behavior_config):
+		return false
+	if definition.behavior_kind == "chain":
+		return definition.upgrade_effects.is_empty()
+	if definition.behavior_kind not in ["support", "economy"] or definition.upgrade_effects.size() != 2:
+		return false
+	var damage_effect: Variant = definition.upgrade_effects.get("damage")
+	var speed_effect: Variant = definition.upgrade_effects.get("speed")
+	if not damage_effect is Dictionary or not speed_effect is Dictionary:
+		return false
+	if definition.behavior_kind == "support":
+		return _positive_effect(damage_effect, "damage_bonus") and _positive_effect(speed_effect, "attack_speed_bonus")
+	return _positive_effect(damage_effect, "income_bonus") and _positive_effect(speed_effect, "income_bonus")
+
+
+static func valid_special_upgrade(definition: TowerDefinition) -> bool:
+	match definition.special_upgrade:
+		"":
+			# Old injected catalogs may retain unused title/cost metadata.
+			return definition.special_upgrade_config.is_empty()
+		"second_archer":
+			return definition.behavior_kind == "attack" and not definition.area_attack and not definition.special_upgrade_title.is_empty() and definition.special_upgrade_cost > 0 and definition.special_upgrade_config.is_empty()
+		"escalating_chain":
+			return definition.behavior_kind == "chain" and not definition.special_upgrade_title.is_empty() and definition.special_upgrade_cost > 0 and _positive_effect(definition.special_upgrade_config, "successive_hit_bonus")
+	return false
+
+
+static func valid_roll_attributes(definition: TowerDefinition) -> bool:
+	if definition.roll_profile != ("support" if definition.behavior_kind == "support" else ("economy" if definition.behavior_kind == "economy" else "attack")):
+		return false
+	var allowed: PackedStringArray = PackedStringArray()
+	match definition.behavior_kind:
+		"attack":
+			allowed = PackedStringArray(["damage", "attack_speed", "range"])
+			if not definition.area_attack:
+				allowed.append_array(PackedStringArray(["pierce", "bounce"]))
+		"chain":
+			allowed = PackedStringArray(["damage", "attack_speed", "range", "chain_jumps"])
+		"support":
+			allowed = PackedStringArray(["range", "support_buff"])
+		"economy":
+			allowed = PackedStringArray(["economy_production"])
+	var seen: Dictionary[String, bool] = {}
+	for effect: String in definition.roll_attributes:
+		if effect not in allowed or seen.has(effect):
+			return false
+		seen[effect] = true
+	return true
+
+
+static func _valid_behavior_config(kind: String, config: Dictionary) -> bool:
+	match kind:
+		"chain":
+			return config.size() == 3 and config.get("hit_count") is int and int(config["hit_count"]) > 0 and _positive_number(config.get("jump_distance")) and _nonnegative_number(config.get("successive_hit_bonus"))
+		"support":
+			return config.size() == 3 and config.get("stack_group") is String and not String(config["stack_group"]).is_empty() and _nonnegative_number(config.get("damage_bonus")) and _nonnegative_number(config.get("attack_speed_bonus")) and (float(config["damage_bonus"]) > 0.0 or float(config["attack_speed_bonus"]) > 0.0)
+		"economy":
+			if config.size() != 3 or not config.get("clear_income") is int or int(config["clear_income"]) <= 0 or not config.get("periodic_income") is int or int(config["periodic_income"]) < 0 or not _nonnegative_number(config.get("periodic_interval")):
+				return false
+			return (int(config["periodic_income"]) == 0) == (float(config["periodic_interval"]) == 0.0)
+		"bounty":
+			return config.size() == 2 and _positive_number(config.get("mark_damage_bonus")) and _positive_number(config.get("mark_income_bonus"))
+		"income_aura":
+			return config.size() == 2 and config.get("stack_group") is String and not String(config["stack_group"]).is_empty() and _positive_number(config.get("kill_income_bonus"))
+	return false
+
+
+static func _valid_role_evolutions(definition: TowerDefinition) -> bool:
+	if definition.behavior_kind not in ["chain", "support", "economy"] or not _valid_behavior_config(definition.behavior_kind, definition.behavior_config):
+		return false
+	if definition.behavior_kind != "chain" and not definition.special_upgrade.is_empty():
+		return false
+	for branch: Variant in definition.evolutions:
+		if not branch is String or not definition.evolutions[branch] is Dictionary:
+			return false
+		var config: Dictionary = definition.evolutions[branch]
+		if not _valid_role_branch(config):
+			return false
+		match definition.behavior_kind:
+			"chain":
+				if branch != "longer_reach" or definition.special_upgrade != "escalating_chain" or config.size() != 5 or config["behavior_kind"] != "chain" or not _positive_number(config.get("range_cells")) or float(config["range_cells"]) <= definition.range_cells or float(config["behavior_config"]["jump_distance"]) <= float(definition.behavior_config.get("jump_distance", INF)):
+					return false
+			"support":
+				if branch not in ["forge", "command_banner"] or config.size() != 4 or config["behavior_kind"] != "support":
+					return false
+				var effect: Dictionary = config["behavior_config"]
+				if branch == "forge" and (float(effect["damage_bonus"]) <= 0.0 or float(effect["attack_speed_bonus"]) != 0.0):
+					return false
+				if branch == "command_banner" and (float(effect["attack_speed_bonus"]) <= 0.0 or float(effect["damage_bonus"]) != 0.0):
+					return false
+			"economy":
+				if branch == "royal_mint":
+					if config.size() != 4 or config["behavior_kind"] != "economy" or int(config["behavior_config"]["clear_income"]) < int(definition.behavior_config.get("clear_income", 0)) or int(config["behavior_config"]["periodic_income"]) <= 0:
+						return false
+				elif branch == "bounty_board":
+					if config.size() != 5 or config["behavior_kind"] != "bounty" or not config.get("followups") is Dictionary or not _valid_bounty_followups(config["followups"], config["behavior_config"]):
+						return false
+				else:
+					return false
+	return true
+
+
+static func _valid_role_branch(config: Dictionary) -> bool:
+	return config.get("title") is String and not String(config["title"]).is_empty() and config.get("cost") is int and int(config["cost"]) > 0 and config.get("behavior_kind") is String and config.get("behavior_config") is Dictionary and _valid_behavior_config(String(config["behavior_kind"]), config["behavior_config"])
+
+
+static func _valid_bounty_followups(followups: Dictionary, base: Dictionary) -> bool:
+	if followups.is_empty():
+		return false
+	for branch: Variant in followups:
+		if branch not in ["stronger_mark", "income_aura"] or not followups[branch] is Dictionary:
+			return false
+		var config: Dictionary = followups[branch]
+		if config.size() != 4 or not _valid_role_branch(config):
+			return false
+		if config["behavior_kind"] != ("bounty" if branch == "stronger_mark" else "income_aura"):
+			return false
+		if branch == "stronger_mark" and (float(config["behavior_config"]["mark_damage_bonus"]) <= float(base["mark_damage_bonus"]) or float(config["behavior_config"]["mark_income_bonus"]) <= float(base["mark_income_bonus"])):
+			return false
+	return true
+
+
+static func _positive_effect(effect: Dictionary, key: String) -> bool:
+	return effect.size() == 1 and _positive_number(effect.get(key))
+
+
+static func _positive_number(value: Variant) -> bool:
+	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) > 0.0
+
+
+static func _nonnegative_number(value: Variant) -> bool:
+	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) >= 0.0

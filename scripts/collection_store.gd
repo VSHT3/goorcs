@@ -31,6 +31,8 @@ func _init(save_path: String = "user://collection.json",
 	for reward: TowerReward in catalog:
 		known_ids[reward.id] = true
 	_load(known_ids)
+	if error_message.is_empty():
+		_ensure_starter()
 
 
 func is_unlocked(id: StringName) -> bool:
@@ -92,11 +94,13 @@ func open_chest() -> ChestResult:
 func reset_progress() -> bool:
 	if not error_message.is_empty():
 		return false
-	var empty: Dictionary[StringName, bool] = {}
-	error_message = _persist(empty)
+	var next_unlocked: Dictionary[StringName, bool] = {}
+	if content_catalog.starter_tower_id != &"":
+		next_unlocked[content_catalog.starter_tower_id] = true
+	error_message = _persist(next_unlocked)
 	if not error_message.is_empty():
 		return false
-	_unlocked = empty
+	_unlocked = next_unlocked
 	return true
 
 
@@ -147,6 +151,17 @@ func _load(known_ids: Dictionary[StringName, bool]) -> void:
 			return
 		loaded[id] = true
 	_unlocked = loaded
+
+
+func _ensure_starter() -> void:
+	var starter_id: StringName = content_catalog.starter_tower_id
+	if starter_id == &"" or _unlocked.has(starter_id):
+		return
+	var next_unlocked: Dictionary[StringName, bool] = _unlocked.duplicate()
+	next_unlocked[starter_id] = true
+	error_message = _persist(next_unlocked)
+	if error_message.is_empty():
+		_unlocked = next_unlocked
 
 
 func _invalid_save(reason: String) -> void:

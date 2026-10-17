@@ -6,6 +6,9 @@
 
 [resource]
 script = ExtResource("1_enemy")
+; Provisional run-only rarity-currency drop.
+reroll_drop_chance = 0.25
+reroll_drop_amount = 3
 id = &"necorcmancer"
 title = "NecOrcmancer"
 description = "A dark caster who raises fallen orcs to march again."

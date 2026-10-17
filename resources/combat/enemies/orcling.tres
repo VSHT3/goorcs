@@ -6,6 +6,9 @@
 
 [resource]
 script = ExtResource("1_enemy")
+; Provisional run-only rarity-currency drop, per killed group member.
+reroll_drop_chance = 0.025
+reroll_drop_amount = 1
 id = &"orcling"
 title = "Orcling"
 description = "Small, fragile orcs that crowd the path in tight packs."

@@ -15,14 +15,31 @@ func _run() -> void:
 	FileAccess.open(save_path, FileAccess.WRITE).store_string(JSON.stringify({"version": 1, "unlocked": ["orc_ballista"]}))
 	var main = preload("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(save_path)
+	main.combat_rules = CombatRules.new()
+	main.combat_rules.roll_rules = null
 	root.add_child(main)
 	await process_frame
-	main.session.is_host = true
-	main.planning.active = true
+	main.play_button.pressed.emit()
+	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.selecting_loadout and not main.planning.active, "Tower UI starts with explicit collection-backed selection")
+	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista"]) and main.planning.commit_loadout(), "Tower UI commits the migrated starter and saved Ballista")
+	var palette_funds: int = 0
+	for tower_definition: TowerDefinition in main.collection_store.content_catalog.towers:
+		palette_funds = maxi(palette_funds, tower_definition.cost)
+	main.planning.combat["coins"] = [palette_funds, palette_funds]
 	main.planning.changed.emit()
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
-	_check(screen.shop_buttons.size() == 3, "All three collection towers remain visible")
-	_check(screen.shop_buttons[&"arrow_tower"].disabled and screen.shop_buttons[&"rune_obelisk"].disabled, "Locked towers are visible but cannot be purchased")
+	var catalog_ids: Array[StringName] = []
+	for reward: TowerReward in main.collection_store.catalog:
+		catalog_ids.append(reward.id)
+	_check(screen.shop_buttons.size() == catalog_ids.size(), "Every registered collection tower remains visible")
+	for id: StringName in catalog_ids:
+		_check(screen.shop_buttons.has(id), "Palette includes registered tower '%s'" % id)
+		if screen.shop_buttons.has(id) and not main.collection_store.is_unlocked(id):
+			_check(not screen.shop_buttons[id].visible, "Unowned and unequipped towers stay outside the purchase palette")
+			_check(screen.shop_buttons[id].disabled, "Locked registered tower cannot be purchased")
+	var starter_id: StringName = main.collection_store.content_catalog.starter_tower_id
+	_check(not screen.shop_buttons[starter_id].disabled, "Migrated starter is affordable and selectable without a chest")
 	_check(not screen.shop_buttons[&"orc_ballista"].disabled, "Saved unlocked tower is affordable and selectable")
 	screen.shop_buttons[&"orc_ballista"].pressed.emit()
 	main.planning.changed.emit()
@@ -32,13 +49,21 @@ func _run() -> void:
 	var opened: ChestResult = main.collection_store.open_chest()
 	_check(opened.error_message.is_empty(), "Real chest grant succeeds in isolated save")
 	main.planning.changed.emit()
-	_check(not screen.shop_buttons[opened.rewards[0].id].disabled, "Chest grant enables its previously visible locked tower")
+	_check(not screen.shop_buttons[opened.rewards[0].id].visible and screen.shop_buttons[opened.rewards[0].id].disabled, "Chest ownership cannot change an already committed run deck")
+	main.planning.start_singleplayer()
+	_check(main.planning.select_loadout([starter_id, &"orc_ballista", opened.rewards[0].id]) and main.planning.commit_loadout(), "A fresh run can explicitly equip the earned reward")
+	main.planning._host_combat.coins[0] = palette_funds
+	main.planning._host_combat.coins[1] = palette_funds
+	main.planning._publish_snapshot()
+	_check(screen.shop_buttons[opened.rewards[0].id].visible and not screen.shop_buttons[opened.rewards[0].id].disabled, "Equipping an actually earned reward enables its purchase")
 	screen.shop_buttons[&"orc_ballista"].pressed.emit()
-	main.collection_store.reset_progress()
+	_check(main.collection_store.reset_progress(), "Collection resets successfully")
 	main.planning.changed.emit()
-	_check(screen.shop_buttons.size() == 3 and screen._placement_type() == &"", "Reset cancels placement without hiding the catalog")
-	for button: TowerShopButton in screen.shop_buttons.values():
-		_check(button.disabled, "Reset disables every locked purchase")
+	_check(screen.shop_buttons.size() == catalog_ids.size() and screen._placement_type() == &"", "Reset cancels placement without hiding the catalog")
+	for id: StringName in catalog_ids:
+		_check(screen.shop_buttons.has(id), "Reset keeps every registered tower visible")
+		if screen.shop_buttons.has(id):
+			_check(screen.shop_buttons[id].disabled == (id != starter_id), "Reset keeps the starter selectable and disables nonstarter purchases")
 
 	# Real model snapshots exercise owned selection, effective upgrades and stale sales.
 	var model := MatchCombat.new(main.combat_rules)
@@ -113,6 +138,7 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 	planning.collection_store = CollectionStore.new(save_path)
 	for evolution: String in ["pierce", "bounce"]:
 		planning.start_singleplayer()
+		_check(planning.select_loadout([&"arrow_tower", &"orc_ballista"]) and planning.commit_loadout(), "Ballista UI fixture commits only its owned towers")
 		planning.set_physics_process(false)
 		await create_timer(0.05).timeout
 		var model: MatchCombat = planning._host_combat
@@ -192,12 +218,13 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 		_check(screen._tower_stats.text == stats_before, "Ballista evolutions preserve ordinary attack-stat presentation")
 		model.coins = [2000, 2000]
 		planning._publish_snapshot()
+		_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
 		frozen = planning.combat.duplicate(true)
 		chosen.pressed.emit()
 		other.pressed.emit()
 		for command: String in ["pierce", "bounce", "special", "boulders", "onyx_ring", "freeze_runes"]:
 			planning.upgrade_tower(0, id, command)
-		_check(planning.combat == frozen, "Purchased Ballista rejects repeated purchases, the other branch, and unrelated commands even with funds")
+		_check(planning.combat == frozen and screen.selected_tower_id == id and screen.boards[0].selected_tower_id == id, "Purchased Ballista preserves the selected tower and rejects repeated purchases, the other branch, and unrelated commands even with funds")
 		planning.stop_singleplayer()
 		await create_timer(0.2).timeout
 
@@ -210,6 +237,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 	planning.collection_store = CollectionStore.new(save_path)
 	for evolution: String in ["boulders", "onyx_ring"]:
 		planning.start_singleplayer()
+		_check(planning.select_loadout([&"arrow_tower", &"rune_obelisk"]) and planning.commit_loadout(), "Rune UI fixture commits only its owned towers")
 		planning.set_physics_process(false)
 		await create_timer(0.05).timeout
 		var model: MatchCombat = planning._host_combat
@@ -267,13 +295,28 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		for slot: int in range(2):
 			var evolved: Dictionary = model.towers[slot][0]
 			_check(evolved.get("evolution", "") == evolution and evolved["special_upgraded"] and MatchCombat.tower_level(evolved) == 4 and model.coins[slot] == 0, "Button command purchases the chosen evolution with exact funds on both real boards")
-		_check(chosen.disabled and other.disabled, "Purchased evolution disables both exclusive choices")
+		if evolution == "boulders":
+			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes", "Purchased Boulders replaces branch purchases with its reachable follow-up")
+		else:
+			_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Purchased Onyx leaves both exclusive branch purchases visibly unavailable")
 		frozen = planning.combat.duplicate(true)
 		chosen.pressed.emit()
 		other.pressed.emit()
 		for command: String in ["boulders", "onyx_ring", "special", "freeze_runes"]:
 			planning.upgrade_tower(0, id, command)
 		_check(planning.combat == frozen, "Purchased UI and real commands reject repeats, the other branch, and obsolete generic special")
+		model.coins = [2000, 2000]
+		planning._publish_snapshot()
+		frozen = planning.combat.duplicate(true)
+		if evolution == "boulders":
+			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes" and not screen.special_upgrade.disabled, "Funded Boulders exposes only its legitimate follow-up, not a repeat or branch switch")
+		else:
+			_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Funded Onyx exposes no enabled repeat or alternate branch purchase")
+			chosen.pressed.emit()
+			other.pressed.emit()
+		for command: String in ["boulders", "onyx_ring", "special"]:
+			planning.upgrade_tower(0, id, command)
+		_check(planning.combat == frozen and screen.selected_tower_id == id and screen.boards[0].selected_tower_id == id, "Funded Rune branch attempts preserve the accepted selection and both boards")
 		if evolution == "boulders":
 			_check(screen.special_upgrade.visible and not screen.alternate_upgrade.visible, "Boulders replaces the exclusive choices with its follow-up control")
 			var followup: Dictionary = planning.combat["tower_types"]["rune_obelisk"]["evolutions"]["boulders"]["followup"]
@@ -332,6 +375,7 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 	var original_size: Vector2i = root.size
 	for branch: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
 		planning.start_singleplayer()
+		_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Archer UI fixture commits its owned starter")
 		planning.set_physics_process(false)
 		await create_timer(0.05).timeout
 		var model: MatchCombat = planning._host_combat
@@ -440,6 +484,7 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	var planning: MatchPlanning = main.planning
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Debug UI fixture commits its owned starter")
 	planning.set_physics_process(false)
 	await create_timer(0.05).timeout
 	_check(screen.debug_button.visible and planning.can_debug(), "Solo exposes the compact authoritative debug control")
@@ -502,6 +547,7 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	_check(not screen.debug_popup.visible, "Leaving the play screen closes the debug window")
 	main.play_screen.show()
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Reopened debug UI fixture commits a fresh deck")
 	planning.set_physics_process(false)
 	await create_timer(0.05).timeout
 	var was_host: bool = main.session.is_host

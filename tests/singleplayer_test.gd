@@ -13,19 +13,32 @@ func _check(condition: bool, description: String) -> void:
 		failures += 1
 
 
+func _classic_rules() -> CombatRules:
+	var rules := CombatRules.new()
+	rules.roll_rules = null
+	rules.catalog.towers = [
+		preload("res://resources/combat/towers/arrow_tower.tres").duplicate(true) as TowerDefinition,
+		preload("res://resources/combat/towers/orc_ballista.tres").duplicate(true) as TowerDefinition,
+		preload("res://resources/combat/towers/rune_obelisk.tres").duplicate(true) as TowerDefinition,
+	]
+	return rules
+
+
 func _run() -> void:
 	var session := MultiplayerSession.new()
 	root.add_child(session)
 	var planning := MatchPlanning.new()
 	planning.session = session
 	# Isolate mirrored lifecycle from the shipped randomized horde composition.
-	var rules := CombatRules.new()
+	var rules: CombatRules = _classic_rules()
 	var grunt: EnemyDefinition = preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
 	grunt.send_first_wave = 1
 	rules.catalog.enemies = [grunt]
 	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.start_singleplayer()
+	_check(planning.selecting_loadout and not planning.active, "Singleplayer opens explicit loadout selection before board admission")
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Solo fixture commits its three tested identities")
 	_check(planning.active and planning.local_slot() == 0 and session.state == MultiplayerSession.State.IDLE and not root.multiplayer.multiplayer_peer is ENetMultiplayerPeer, "Singleplayer starts locally without installing a network peer")
 	var notices: Array[String] = []
 	planning.feedback.connect(func(message: String) -> void: notices.append(message))
@@ -96,6 +109,7 @@ func _run() -> void:
 	planning.stop_singleplayer()
 	_check(not planning.active and not planning.singleplayer and not planning.is_physics_processing(), "Leaving clears solo mode and stops simulation")
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Reopening requires a fresh chosen loadout")
 	_check(planning.layouts[0].used_tiles() == 0 and planning.combat["wave"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["coins"] == initial_coins and planning.combat["income"] == [0, 0] and planning.combat["queued_sends"] == [0, 0], "Reopening starts a fresh match")
 	planning.stop_singleplayer()
 	_solo_sends(planning)
@@ -111,10 +125,11 @@ func _run() -> void:
 
 
 func _solo_last_targeting(planning: MatchPlanning) -> void:
-	var rules := CombatRules.new()
+	var rules: CombatRules = _classic_rules()
 	rules.starting_coins = 10000
 	planning.combat_rules = rules
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Targeting fixture commits its tested identities")
 	planning.build_tower(0, Vector2i(2, 3), &"arrow_tower", MatchCombat.TargetMode.LAST)
 	var id: int = planning.combat["towers"][0][0]["id"]
 	for slot: int in range(2):
@@ -149,10 +164,11 @@ func _solo_last_targeting(planning: MatchPlanning) -> void:
 
 
 func _solo_specials(planning: MatchPlanning) -> void:
-	var rules := CombatRules.new()
+	var rules: CombatRules = _classic_rules()
 	rules.starting_coins = 3000
 	planning.combat_rules = rules
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Special-upgrade fixture commits its tested identities")
 	var x: int = 2
 	for choice: Dictionary in [
 		{"type": &"arrow_tower", "upgrade": "special"},
@@ -212,7 +228,7 @@ func _solo_specials(planning: MatchPlanning) -> void:
 
 func _solo_sends(planning: MatchPlanning) -> void:
 	# Keep send balances isolated from the preceding tower/mirroring scenario.
-	var rules := CombatRules.new()
+	var rules: CombatRules = _classic_rules()
 	rules.base_health = 7
 	rules.starting_coins = 45
 	rules.wave_weight = 1
@@ -230,6 +246,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	rules.send_spawn_interval = 0.35
 	planning.combat_rules = rules
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Send fixture commits its loadout before board commands")
 	var before: Dictionary = planning.combat.duplicate(true)
 	for slot: int in [1, -1, 2]:
 		planning.send_enemy(slot, &"grunt")
@@ -276,6 +293,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	_check(planning.combat == before, "Finished solo sends cannot spend remaining affordable Coins, gain income, create enemies or reroll")
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Send restart commits a fresh deck")
 	_check(planning.combat["wave"] == 0 and planning.combat["health"] == [7, 7] and planning.combat["coins"] == [45, 45] and planning.combat["income"] == [0, 0] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []] and planning.layouts[0].used_tiles() == 0 and planning.layouts[1].used_tiles() == 0, "Restart clears mirrored send income, deliveries, enemies, health, routes and currency")
 	planning.stop_singleplayer()
 
@@ -288,7 +306,7 @@ func _advance_send_wave(planning: MatchPlanning) -> void:
 
 
 func _solo_typed_sends(planning: MatchPlanning) -> void:
-	var rules := CombatRules.new()
+	var rules: CombatRules = _classic_rules()
 	rules.base_health = 16
 	rules.starting_coins = 200
 	rules.wave_weight = 1
@@ -308,6 +326,7 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	rules.catalog.enemies = definitions
 	planning.combat_rules = rules
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Typed-send fixture commits its tested identities")
 	var before: Dictionary = planning.combat.duplicate(true)
 	for type_id: StringName in [&"runner", &"brute"]:
 		for slot: int in [1, -1, 2]:
@@ -361,6 +380,7 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	_check(planning.combat == before, "Terminal typed sends cannot spend affordable Coins, create enemies, grow income or mirror")
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Typed-send restart commits a fresh deck")
 	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 0 and planning.combat["health"] == [16, 16] and planning.combat["coins"] == [200, 200] and planning.combat["income"] == [0, 0] and planning.combat["send_queues"] == [[], []] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []], "Solo restart clears both typed queues, income, enemies and health")
 	for type_id: StringName in [&"brute", &"brute", &"brute", &"brute", &"runner"]:
 		planning.send_enemy(0, type_id)

@@ -18,6 +18,7 @@ func _variant_catalog() -> ContentCatalog:
 	var catalog := ContentCatalog.new()
 	for index: int in range(source.towers.size()):
 		var tower: TowerDefinition = source.towers[index].duplicate(true) as TowerDefinition
+		tower.reward = source.towers[index].reward.duplicate() as TowerReward
 		tower.reward.id = StringName("catalog_tower_%d" % index)
 		tower.reward.title = "Catalog tower %d" % index
 		catalog.towers.append(tower)
@@ -32,6 +33,12 @@ func _variant_catalog() -> ContentCatalog:
 func _check_validation() -> void:
 	var catalog: ContentCatalog = _variant_catalog()
 	_check(catalog.validation_errors().is_empty(), "Unknown stable IDs are valid without shipped identities")
+	catalog.starter_tower_id = catalog.towers[0].reward.id
+	_check(catalog.validation_errors().is_empty(), "A custom registered tower can be the guaranteed starter")
+	catalog.starter_tower_id = &"unregistered_starter"
+	_check(not catalog.validation_errors().is_empty(), "A guaranteed starter must resolve within its injected catalog")
+	catalog.starter_tower_id = &""
+	_check(catalog.validation_errors().is_empty(), "Injected catalogs may omit a guaranteed starter")
 	catalog.towers.append(catalog.towers[0])
 	_check(not catalog.validation_errors().is_empty(), "Duplicate tower IDs are rejected")
 	catalog.towers.pop_back()
@@ -59,8 +66,98 @@ func _check_validation() -> void:
 	_check(second_rules.catalog.towers == registered, "Injected registration edits do not mutate another rules instance")
 
 
+func _check_behavior_validation() -> void:
+	var catalog: ContentCatalog = _variant_catalog()
+	for tower: TowerDefinition in catalog.towers:
+		var kind: String = tower.behavior_kind
+		var config: Dictionary = tower.behavior_config.duplicate(true)
+		var effects: Dictionary = tower.upgrade_effects.duplicate(true)
+		var attributes: PackedStringArray = tower.roll_attributes.duplicate()
+		var profile: String = tower.roll_profile
+		tower.behavior_kind = "unimplemented_behavior"
+		_check(not catalog.validation_errors().is_empty(), "Unknown behavior kinds are rejected for %s" % kind)
+		tower.behavior_kind = kind
+		tower.roll_profile = "economy" if profile != "economy" else "attack"
+		_check(not catalog.validation_errors().is_empty(), "Roll profiles must match the %s role" % kind)
+		tower.roll_profile = profile
+		tower.roll_attributes.append("damage" if kind in ["support", "economy"] else "economy_production")
+		_check(not catalog.validation_errors().is_empty(), "Cross-role roll attributes are rejected for %s" % kind)
+		tower.roll_attributes = attributes.duplicate()
+		if not attributes.is_empty():
+			tower.roll_attributes.append(attributes[0])
+			_check(not catalog.validation_errors().is_empty(), "Duplicate roll attributes are rejected for %s" % kind)
+			tower.roll_attributes = attributes.duplicate()
+		tower.behavior_config["unimplemented_effect"] = 1
+		_check(not catalog.validation_errors().is_empty(), "Unknown behavior configuration fields are rejected for %s" % kind)
+		tower.behavior_config = config.duplicate(true)
+		match kind:
+			"chain":
+				tower.behavior_config["hit_count"] = 0
+				_check(not catalog.validation_errors().is_empty(), "Chain behavior requires a positive total hit count")
+				tower.behavior_config = config.duplicate(true)
+				tower.behavior_config["jump_distance"] = NAN
+				_check(not catalog.validation_errors().is_empty(), "Chain jump distance must be finite")
+			"support":
+				tower.behavior_config["stack_group"] = ""
+				_check(not catalog.validation_errors().is_empty(), "Support behavior requires an explicit stacking group")
+				tower.behavior_config = config.duplicate(true)
+				tower.behavior_config["damage_bonus"] = 0.0
+				tower.behavior_config["attack_speed_bonus"] = 0.0
+				_check(not catalog.validation_errors().is_empty(), "Support behavior cannot provide an empty aura")
+				tower.upgrade_effects["damage"] = {"income_bonus": 0.1}
+			"economy":
+				tower.behavior_config["periodic_income"] = 1
+				tower.behavior_config["periodic_interval"] = 0.0
+				_check(not catalog.validation_errors().is_empty(), "Periodic income requires a positive simulation interval")
+				tower.behavior_config = config.duplicate(true)
+				tower.behavior_config["clear_income"] = 0
+				_check(not catalog.validation_errors().is_empty(), "Economy behavior requires positive clear income")
+				tower.upgrade_effects["speed"] = {"attack_speed_bonus": 0.1}
+		tower.behavior_config = config
+		if kind in ["support", "economy"]:
+			_check(not catalog.validation_errors().is_empty(), "Passive upgrade effects must match the %s role" % kind)
+		tower.upgrade_effects = effects
+		_check(catalog.validation_errors().is_empty(), "Restored %s behavior, profile, and attributes remain valid" % kind)
+
+
+func _check_null_art_scene() -> void:
+	var reward := TowerReward.new()
+	reward.id = &"no_art_fixture"
+	reward.title = "Rule fixture"
+	var tower := TowerDefinition.new()
+	tower.reward = reward
+	var catalog := ContentCatalog.new()
+	catalog.towers = [tower]
+	_check(catalog.validation_errors().is_empty(), "Non-rendered rule fixtures may omit tower artwork")
+	var board := PathBoard.new()
+	board.content_catalog = catalog
+	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
+	board.size = Vector2(400, 400)
+	board.command_mode = true
+	board.tower_types = {"no_art_fixture": {"range": 3.0, "interval": 0.75, "area_attack": false}}
+	root.add_child(board)
+	var drops: Array = []
+	board.tower_dropped.connect(func(cell: Vector2i, type_id: StringName) -> void: drops.append([cell, type_id]))
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		board.combat_towers = []
+		var cell := Vector2i(1, 1)
+		board._drop_data(board.cell_center(cell), {"tower_type": "no_art_fixture"})
+		_check(drops.size() == 1 and drops[0] == [cell, &"no_art_fixture"], "A registered no-art fixture remains placeable in either orientation")
+		drops.clear()
+		board._drop_data(board.cell_center(cell), {"tower_type": "unregistered_fixture"})
+		_check(drops.is_empty(), "Null-art support does not admit unregistered tower identities")
+		board.combat_towers = [{"id": 1, "cell": cell, "type_id": "no_art_fixture"}]
+		await process_frame
+		_check(is_finite(board.visual_headroom()), "An active board can frame registered no-art fixtures")
+	board.queue_free()
+	await process_frame
+
+
 func _run() -> void:
 	_check_validation()
+	_check_behavior_validation()
+	await _check_null_art_scene()
 	var catalog: ContentCatalog = _variant_catalog()
 	var directory: String = OS.get_temp_dir().path_join("gorcs_catalog_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	DirAccess.make_dir_recursive_absolute(directory)
@@ -91,8 +188,12 @@ func _run() -> void:
 	main.play_screen.singleplayer_button.pressed.emit()
 	main.planning.set_physics_process(false)
 	var planning: MatchPlanning = main.planning
+	var loadout: Array[StringName] = []
+	for definition: TowerDefinition in catalog.towers.slice(0, 4):
+		loadout.append(definition.reward.id)
+	_check(planning.select_loadout(loadout) and planning.commit_loadout(), "Injected six-type catalog admits an owned first-four deck")
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
-	_check(screen.shop_buttons.size() == catalog.towers.size() and screen.shop_buttons.has(&"catalog_tower_0"), "Actual placement palette uses the injected catalog, not default rewards")
+	_check(screen.shop_buttons.size() == catalog.towers.size() and screen.shop_buttons.has(&"catalog_tower_0") and screen.shop_buttons[&"catalog_tower_0"].visible, "Actual placement palette uses the injected catalog and committed deck, not default rewards")
 	_check(screen.enemy_selector.item_count == 1 and screen.enemy_selector.get_item_metadata(0) == "catalog_scout", "Send menu accepts a catalog with no shipped enemy IDs")
 	for board: PathBoard in screen.boards:
 		_check(board.content_catalog == catalog and board._tower_art.has("catalog_tower_0") and board._enemy_art.has("catalog_scout"), "Both board renderers use the same injected registry")

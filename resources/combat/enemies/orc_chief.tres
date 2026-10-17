@@ -6,6 +6,9 @@
 
 [resource]
 script = ExtResource("1_enemy")
+; Provisional run-only rarity-currency drop.
+reroll_drop_chance = 0.2
+reroll_drop_amount = 2
 id = &"orc_chief"
 title = "Orc Chief"
 description = "A towering leader whose rally keeps the horde fighting."

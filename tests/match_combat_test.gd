@@ -61,6 +61,12 @@ func _check(condition: bool, description: String) -> void:
 # Shipped progression, groups and abilities are covered by enemy_mechanics_test.
 func _catalog_rules() -> CombatRules:
 	var rules := CombatRules.new()
+	rules.roll_rules = null
+	rules.catalog.towers = [
+		preload("res://resources/combat/towers/arrow_tower.tres").duplicate(true) as TowerDefinition,
+		preload("res://resources/combat/towers/orc_ballista.tres").duplicate(true) as TowerDefinition,
+		preload("res://resources/combat/towers/rune_obelisk.tres").duplicate(true) as TowerDefinition,
+	]
 	rules.catalog.enemies = [
 		preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition,
 		preload("res://resources/combat/enemies/runner.tres").duplicate() as EnemyDefinition,
@@ -488,6 +494,7 @@ func _test_area_kills_and_bounties() -> void:
 	var area := _definition(&"test_area", 2, 1.0, 0.5)
 	area.area_attack = true
 	rules.catalog.towers = [area]
+	rules.catalog.starter_tower_id = &""
 	var combat := MatchCombat.new(rules)
 	combat.start_wave(_routes())
 	combat.advance(0.1)
@@ -697,6 +704,7 @@ func _test_typed_enemy_defense() -> void:
 	var area := _definition(&"test_area", 5, 1.0, 0.1)
 	area.area_attack = true
 	rules.catalog.towers = [area]
+	rules.catalog.starter_tower_id = &""
 	combat = MatchCombat.new(rules)
 	combat.send_enemy(0, &"runner")
 	combat.send_enemy(0, &"brute")
@@ -1026,6 +1034,7 @@ func _special_rules(type_id: StringName, hp: int = 100, count: int = 3) -> Comba
 	rules.spawn_interval_reduction_per_wave = 0.0
 	var definition: TowerDefinition = load("res://resources/combat/towers/%s.tres" % type_id).duplicate(true)
 	rules.catalog.towers = [definition]
+	rules.catalog.starter_tower_id = &""
 	return rules
 
 

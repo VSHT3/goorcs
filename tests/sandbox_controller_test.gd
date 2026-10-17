@@ -20,18 +20,31 @@ func _run() -> void:
 	_check(sandbox.layout.is_ready(), "Sandbox accepts a normal connected PathLayout")
 	var initial_coins: Array[int] = sandbox.combat.coins.duplicate()
 	for definition: TowerDefinition in catalog.towers:
-		var branches: Array = definition.evolutions.keys()
-		if branches.is_empty():
-			branches.append("special" if not definition.special_upgrade.is_empty() else "")
-		for branch: String in branches:
+		var choices: Array[Dictionary] = []
+		if definition.evolutions.is_empty():
+			choices.append({"branch": "", "followup": ""})
+		for branch: String in definition.evolutions:
+			choices.append({"branch": branch, "followup": ""})
+			for followup: String in definition.evolutions[branch].get("followups", {}):
+				choices.append({"branch": branch, "followup": followup})
+		for choice: Dictionary in choices:
+			var branch: String = choice["branch"]
+			var followup: String = choice["followup"]
 			_check(sandbox.build(Vector2i(3, 1), definition.reward.id), "All tower types build with zero Coins and no collection")
 			var tower: Dictionary = sandbox.combat.towers[0].back()
 			var id: int = int(tower["id"])
 			_check(sandbox.upgrade(id, "damage") and sandbox.upgrade(id, "speed"), "Both normal upgrades are truly free")
+			_check(tower["damage_upgraded"] and tower["speed_upgraded"], "Accepted sandbox stat upgrades are retained on the actual instance")
+			if not definition.special_upgrade.is_empty():
+				if not branch.is_empty():
+					_check(not sandbox.upgrade(id, branch) and tower["evolution"] == "", "Chain evolution cannot bypass its shared special prerequisite")
+				_check(sandbox.upgrade(id, "special") and tower["special_upgraded"], "Authored shared specials are accepted before dependent evolution")
 			if not branch.is_empty():
-				_check(sandbox.upgrade(id, branch), "Every authored special/evolution branch is available")
+				_check(sandbox.upgrade(id, branch) and tower["evolution"] == branch, "Every authored evolution is accepted and retained")
+			if not followup.is_empty():
+				_check(sandbox.upgrade(id, followup) and tower["followup"] == followup, "Every authored economy follow-up is accepted on its own fresh tower")
 			if definition.evolutions.get(branch, {}).has("followup"):
-				_check(sandbox.upgrade(id, "freeze_runes"), "Boulders follow-up is free and owned by normal combat rules")
+				_check(sandbox.upgrade(id, "freeze_runes") and tower["freeze_upgraded"], "Boulders follow-up is free and owned by normal combat rules")
 			_check(sandbox.set_targeting(id, MatchCombat.TargetMode.STRONGEST), "Sandbox targeting uses combat owner")
 			if definition.special_upgrade == "second_archer":
 				_check(sandbox.set_targeting(id, MatchCombat.TargetMode.CLOSEST, true), "Second archer has independent targeting")
@@ -71,9 +84,9 @@ func _run() -> void:
 	_check(sandbox.layout.dimensions == Vector2i(80, 40) and sandbox.layout.budget == 3198, "Resize gives the whole new map unlimited path capacity")
 	_check(sandbox.layout.used_tiles() == 0 and sandbox.round_number == 46, "Destructive resize clears paths while retaining round")
 	_check(not sandbox.resize_map(Vector2i(1, 4)) and sandbox.layout.dimensions == Vector2i(80, 40), "Invalid resize leaves map intact")
-	sandbox.resize_map(Vector2i(2, 1))
+	_check(sandbox.resize_map(Vector2i(2, 1)), "Minimal-map resize is accepted")
 	_check(sandbox.layout.is_ready(), "Adjacent endpoints form a legal minimal playground")
-	sandbox.spawn(&"grunt", 20)
+	_check(sandbox.spawn(&"grunt", 20), "Minimal-map fixture accepts its actual leak horde")
 	var initial_health: Array[int] = sandbox.combat.base_health.duplicate()
 	sandbox.set_active(true)
 	sandbox.toggle_play()
@@ -89,7 +102,7 @@ func _run() -> void:
 
 func _connect_path(sandbox: SandboxController) -> void:
 	for x: int in range(1, sandbox.layout.dimensions.x - 1):
-		sandbox.edit_path(Vector2i(x, sandbox.layout.entrance.y), true)
+		_check(sandbox.edit_path(Vector2i(x, sandbox.layout.entrance.y), true), "Sandbox accepts each route tile")
 
 
 func _check(condition: bool, message: String) -> void:

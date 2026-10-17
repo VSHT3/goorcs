@@ -18,6 +18,7 @@ func _new_session() -> void:
 	planning.name = "Planning"
 	planning.session = _session
 	planning.combat_rules = _planning_rules()
+	planning.changed.connect(_on_planning_changed)
 	if _lane == "host":
 		planning.configure(Vector2i(6, 5), 30, Vector2i(0, 2), Vector2i(5, 2))
 	_main.add_child(planning)

@@ -47,11 +47,14 @@ func _run() -> void:
 	root.add_child(fixture_viewport)
 	main = load("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(save_path)
+	main.combat_rules = CombatRules.new()
 	fixture_viewport.add_child(main)
 	await _settle()
 	main.play_button.pressed.emit()
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.selecting_loadout and not main.planning.active, "Native drag fixture first opens loadout selection")
+	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "Native drag fixture commits its owned tested towers")
 	await _settle()
 	screen = main.play_screen.planning_screen
 	world = screen.world

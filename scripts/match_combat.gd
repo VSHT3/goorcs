@@ -10,6 +10,7 @@ var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
 var coins: Array[int] = []
+var reroll_currency: Array[int] = [0, 0]
 # Recurring bonus on each surviving wave clear; queues belong to the target board.
 var income: Array[int] = [0, 0]
 var queued_sends: Array[int]:
@@ -52,6 +53,9 @@ var _random: RandomNumberGenerator
 var _wave_random: RandomNumberGenerator
 var _timing_random: RandomNumberGenerator
 var _group_random: RandomNumberGenerator = RandomNumberGenerator.new()
+var _roll_random := RandomNumberGenerator.new()
+var _drop_random := RandomNumberGenerator.new()
+var _roll_rules: TowerRollRules
 var _roster_configuration_valid: bool = true
 var _routes: Array[Array] = [[], []]
 var _routing_next: Array[Dictionary] = [{}, {}]
@@ -77,7 +81,7 @@ var _current_wave_speed: float = 0.0
 var _next_wave_speed: float = 0.0
 
 
-func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null) -> void:
+func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null, roll_random: RandomNumberGenerator = null, drop_random: RandomNumberGenerator = null) -> void:
 	# Freeze admitted rules; resource edits cannot enable a match bypass.
 	_rules = rules.duplicate() as CombatRules
 	_sandbox_mode = rules.sandbox_mode
@@ -98,6 +102,18 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		_timing_random.randomize()
 	# Paid groups/rituals never perturb regular composition, timing or tie rolls.
 	_group_random.seed = _wave_random.seed ^ 0x534b454c
+	_roll_random = roll_random if roll_random != null else RandomNumberGenerator.new()
+	if roll_random == null:
+		_roll_random.seed = _wave_random.seed ^ 0x524f4c4c
+	_drop_random = drop_random if drop_random != null else RandomNumberGenerator.new()
+	if drop_random == null:
+		_drop_random.seed = _wave_random.seed ^ 0x44524f50
+	reroll_currency = [rules.starting_reroll_currency, rules.starting_reroll_currency]
+	if rules.starting_reroll_currency < 0 or rules.clear_reroll_currency < 0:
+		push_error("Reroll currency grants must be nonnegative")
+		_roster_configuration_valid = false
+	if rules.roll_rules != null:
+		_roll_rules = rules.roll_rules.duplicate(true) as TowerRollRules
 	if rules.wave_weight <= 0 or rules.wave_weight_growth < 0 or not is_finite(rules.spawn_interval) or rules.spawn_interval < 0.0:
 		push_error("Combat waves require positive weight, nonnegative growth and a finite nonnegative spawn interval")
 		_roster_configuration_valid = false
@@ -134,6 +150,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"send_enabled": definition.send_enabled,
 			"group_weights": definition.group_weights.duplicate(),
 			"group_interval": definition.group_interval, "kill_bounty": definition.kill_bounty,
+			"reroll_drop_chance": definition.reroll_drop_chance,
+			"reroll_drop_amount": definition.reroll_drop_amount,
 			"heal_interval": definition.heal_interval, "heal_radius": definition.heal_radius,
 			"heal_fraction": definition.heal_fraction,
 			"summon_interval": definition.summon_interval,
@@ -164,18 +182,51 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"special_upgrade_cost": definition.special_upgrade_cost,
 			"evolutions": definition.evolutions.duplicate(true),
 			"advancements": definition.advancements.duplicate(true),
+			"behavior_kind": definition.behavior_kind,
+			"behavior_config": definition.behavior_config.duplicate(true),
+			"upgrade_effects": definition.upgrade_effects.duplicate(true),
+			"special_upgrade_config": definition.special_upgrade_config.duplicate(true),
+			"roll_attributes": definition.roll_attributes.duplicate(),
+			"roll_profile": definition.roll_profile,
 		}
+		if _roll_rules != null:
+			var roll_errors: PackedStringArray = _roll_rules.validation_errors(definition.roll_attributes, definition.roll_profile)
+			if not roll_errors.is_empty():
+				push_error("Invalid tower rolls for %s: %s" % [type_id, " ".join(roll_errors)])
+				_roster_configuration_valid = false
 
 
+
+
+func _can_build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
+	return _roster_configuration_valid and phase != Phase.FINISHED and _valid_slot(slot) and _valid_mode(mode) and _tower_types.has(String(type_id)) and not has_tower(slot, cell) and (_sandbox_mode or coins[slot] >= int(_tower_types[String(type_id)]["cost"]))
 
 
 func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode) or not _tower_types.has(String(type_id)) or has_tower(slot, cell):
+	if not _can_build(slot, cell, type_id, mode):
 		return false
+	_build_accepted(slot, cell, type_id, mode, _placement_roll(_tower_types[String(type_id)]))
+	return true
+
+
+func build_mirrored(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
+	if not _can_build(slot, cell, type_id, mode) or not _can_build(1 - slot, cell, type_id, mode):
+		return false
+	var rolled: Dictionary = _placement_roll(_tower_types[String(type_id)])
+	_build_accepted(slot, cell, type_id, mode, rolled)
+	_build_accepted(1 - slot, cell, type_id, mode, rolled)
+	return true
+
+
+func _placement_roll(definition: Dictionary) -> Dictionary:
+	if _roll_rules == null:
+		return {"rarity": "", "attributes": [] as Array[Dictionary]}
+	return _roll_rules.generate_admitted(_roll_random, definition["roll_attributes"], "", definition["roll_profile"])
+
+
+func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, rolled: Dictionary) -> void:
 	var definition: Dictionary = _tower_types[String(type_id)]
 	var cost: int = definition["cost"]
-	if not _sandbox_mode and coins[slot] < cost:
-		return false
 	towers[slot].append({
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
@@ -186,13 +237,180 @@ func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
 		"bounce_active": false, "bounce_aim": Vector2(cell),
 		"pierce_active": false, "pierce_aim": Vector2(cell),
 		"damage": definition["damage"], "interval": definition["interval"],
+		"range": definition["range"], "base_damage": definition["damage"], "base_interval": definition["interval"],
+		"behavior_kind": definition["behavior_kind"], "behavior_config": definition["behavior_config"].duplicate(true),
+		"followup": "", "bounty_target_id": -1, "production_elapsed": 0.0,
+		"chain_points": [] as Array[Vector2],
+		"rarity": rolled["rarity"], "attributes": rolled["attributes"].duplicate(true),
+		"rarity_rerolls": 0, "attribute_rerolls": 0,
+		"rarity_reroll_cost": -1, "attribute_reroll_cost": -1,
+		"support_damage_bonus": 0.0, "support_speed_bonus": 0.0,
 		"invested": 0 if _sandbox_mode else cost, "sell_value": 0 if _sandbox_mode else _sell_value(cost),
 	})
 	if not _sandbox_mode:
 		coins[slot] -= cost
 	_next_tower_id += 1
+	_refresh_board(slot)
 	_sound_events.record(CombatSoundEvents.Cue.PURCHASE, slot, Vector2(cell), _death_time)
+
+
+func _find_tower(slot: int, tower_id: int) -> Dictionary:
+	for tower: Dictionary in towers[slot]:
+		if int(tower["id"]) == tower_id:
+			return tower
+	return {}
+
+
+func _can_reroll(slot: int, tower_id: int, kind: String) -> bool:
+	if phase == Phase.FINISHED or not _valid_slot(slot) or _roll_rules == null or kind not in ["rarity", "attributes"]:
+		return false
+	var tower: Dictionary = _find_tower(slot, tower_id)
+	if tower.is_empty():
+		return false
+	var cost: int = tower["rarity_reroll_cost" if kind == "rarity" else "attribute_reroll_cost"]
+	return cost >= 0 and (_sandbox_mode or (reroll_currency[slot] if kind == "rarity" else coins[slot]) >= cost)
+
+
+func reroll_tower(slot: int, tower_id: int, kind: String) -> bool:
+	if not _can_reroll(slot, tower_id, kind):
+		return false
+	var tower: Dictionary = _find_tower(slot, tower_id)
+	_apply_reroll(slot, tower, kind, _reroll_result(tower, kind))
 	return true
+
+
+func reroll_tower_mirrored(slot: int, tower_id: int, kind: String) -> bool:
+	if not _can_reroll(slot, tower_id, kind):
+		return false
+	var tower: Dictionary = _find_tower(slot, tower_id)
+	var counterpart: Dictionary = {}
+	for other: Dictionary in towers[1 - slot]:
+		if other["cell"] == tower["cell"] and other["type_id"] == tower["type_id"]:
+			counterpart = other
+			break
+	if counterpart.is_empty() or not _can_reroll(1 - slot, counterpart["id"], kind) or counterpart["rarity"] != tower["rarity"]:
+		return false
+	var rolled: Dictionary = _reroll_result(tower, kind)
+	_apply_reroll(slot, tower, kind, rolled)
+	_apply_reroll(1 - slot, counterpart, kind, rolled)
+	return true
+
+
+func _reroll_result(tower: Dictionary, kind: String) -> Dictionary:
+	var definition: Dictionary = _tower_types[tower["type_id"]]
+	if kind == "rarity":
+		return _roll_rules.generate_admitted(_roll_random, definition["roll_attributes"], tower["rarity"], definition["roll_profile"])
+	return _roll_rules.regenerate_attributes_admitted(tower["rarity"], _roll_random, definition["roll_attributes"], definition["roll_profile"])
+
+
+func _apply_reroll(slot: int, tower: Dictionary, kind: String, rolled: Dictionary) -> void:
+	if kind == "rarity":
+		if not _sandbox_mode:
+			reroll_currency[slot] -= int(tower["rarity_reroll_cost"])
+		tower["rarity_rerolls"] += 1
+		tower["attribute_rerolls"] = 0
+	else:
+		if not _sandbox_mode:
+			coins[slot] -= int(tower["attribute_reroll_cost"])
+		tower["attribute_rerolls"] += 1
+	tower["rarity"] = rolled["rarity"]
+	tower["attributes"] = rolled["attributes"].duplicate(true)
+	_refresh_board(slot)
+
+
+# Derive effective values from purchased baselines, never from prior rolled stats.
+# Recompute only when the board changes, not for each target/attack.
+func _refresh_board(slot: int) -> void:
+	for tower: Dictionary in towers[slot]:
+		var definition: Dictionary = _tower_types[tower["type_id"]]
+		var branch: Dictionary = definition["evolutions"].get(tower["evolution"], {})
+		var config: Dictionary = branch.get("followups", {}).get(tower["followup"], branch)
+		var kind: String = config.get("behavior_kind", definition["behavior_kind"])
+		var behavior: Dictionary = config.get("behavior_config", definition["behavior_config"]).duplicate(true)
+		var modifiers: Dictionary = TowerRollRules.modifiers(tower["attributes"])
+		tower["modifiers"] = modifiers
+		tower["behavior_kind"] = kind
+		var base_range: float = float(config.get("range_cells", definition["range"]))
+		var range_bonus: float = float(modifiers.get("range", 0.0))
+		tower["range"] = base_range
+		# A signed range roll must change usable tiles, not just a fractional label.
+		# Zero preserves authored geometry; drawbacks floor at one cell or a smaller base.
+		if range_bonus > 0.0:
+			tower["range"] = ceilf(base_range * (1.0 + range_bonus))
+		elif range_bonus < 0.0:
+			tower["range"] = maxf(minf(1.0, base_range), floorf(base_range * (1.0 + range_bonus)))
+		tower["behavior_config"] = behavior
+		tower["support_damage_bonus"] = 0.0
+		tower["support_speed_bonus"] = 0.0
+		var damage_bonus: float = 0.0
+		var speed_bonus: float = 0.0
+		var income_bonus: float = float(modifiers.get("economy_production", 0.0))
+		for action: String in ["damage", "speed"]:
+			if not tower[action + "_upgraded"]:
+				continue
+			var effect: Dictionary = definition["upgrade_effects"].get(action, {})
+			damage_bonus += float(effect.get("damage_bonus", 0.0))
+			speed_bonus += float(effect.get("attack_speed_bonus", 0.0))
+			income_bonus += float(effect.get("income_bonus", 0.0))
+		if kind == "support":
+			var strength: float = 1.0 + float(modifiers.get("support_buff", 0.0))
+			var damage: float = float(behavior["damage_bonus"])
+			var speed: float = float(behavior["attack_speed_bonus"])
+			behavior["damage_bonus"] = (damage + (damage_bonus + speed_bonus if speed == 0.0 else damage_bonus)) * strength if damage > 0.0 else 0.0
+			behavior["attack_speed_bonus"] = (speed + (damage_bonus + speed_bonus if damage == 0.0 else speed_bonus)) * strength if speed > 0.0 else 0.0
+		elif kind == "economy":
+			behavior["clear_income"] = ceili(float(behavior["clear_income"]) * (1.0 + income_bonus))
+			behavior["periodic_income"] = ceili(float(behavior["periodic_income"]) * (1.0 + income_bonus))
+		elif kind == "bounty":
+			behavior["mark_income_bonus"] = float(behavior["mark_income_bonus"]) * (1.0 + income_bonus)
+		elif kind == "income_aura":
+			behavior["kill_income_bonus"] = float(behavior["kill_income_bonus"]) * (1.0 + income_bonus)
+		elif kind == "chain":
+			behavior["hit_count"] += int(modifiers.get("chain_jumps", 0.0))
+			if tower["special_upgraded"]:
+				behavior["successive_hit_bonus"] += float(definition["special_upgrade_config"].get("successive_hit_bonus", 0.0))
+		tower["rarity_reroll_cost"] = -1 if _roll_rules == null else (0 if _sandbox_mode else _roll_rules.rarity_reroll_cost(tower["rarity_rerolls"]))
+		tower["attribute_reroll_cost"] = -1 if _roll_rules == null else (0 if _sandbox_mode else _roll_rules.attribute_reroll_cost(tower["attribute_rerolls"]))
+	for tower: Dictionary in towers[slot]:
+		# Keep bonuses as 64-bit floats; Vector2 components narrow them to 32-bit.
+		var damage_groups: Dictionary[String, float] = {}
+		var speed_groups: Dictionary[String, float] = {}
+		for support: Dictionary in towers[slot]:
+			if support["behavior_kind"] != "support" or not cell_in_range(support["cell"], tower["cell"], support["range"]):
+				continue
+			var config: Dictionary = support["behavior_config"]
+			var group: String = config["stack_group"]
+			damage_groups[group] = maxf(damage_groups.get(group, 0.0), float(config["damage_bonus"]))
+			speed_groups[group] = maxf(speed_groups.get(group, 0.0), float(config["attack_speed_bonus"]))
+		for bonus: float in damage_groups.values():
+			tower["support_damage_bonus"] += bonus
+		for bonus: float in speed_groups.values():
+			tower["support_speed_bonus"] += bonus
+		var modifiers: Dictionary = tower["modifiers"]
+		var damage_multiplier: float = (1.0 + float(modifiers.get("damage", 0.0))) * (1.0 + float(tower["support_damage_bonus"]))
+		var speed_multiplier: float = (1.0 + float(modifiers.get("attack_speed", 0.0))) * (1.0 + float(tower["support_speed_bonus"]))
+		var old_interval: float = tower["interval"]
+		tower["damage_multiplier"] = damage_multiplier
+		tower["speed_multiplier"] = speed_multiplier
+		# Preserve ceil for fractional damage without adding HP for arithmetic noise.
+		tower["damage"] = ceili(float(tower["base_damage"]) * damage_multiplier - 0.000000001)
+		tower["interval"] = float(tower["base_interval"]) / speed_multiplier
+		if old_interval > 0.0:
+			tower["cooldown"] *= float(tower["interval"]) / old_interval
+		if tower["behavior_kind"] == "bounty" and int(tower["bounty_target_id"]) >= 0:
+			var index: int = _enemy_index(slot, tower["bounty_target_id"])
+			if index >= 0:
+				enemies[slot][index]["bounty_damage_bonus"] = tower["behavior_config"]["mark_damage_bonus"]
+				enemies[slot][index]["bounty_income_bonus"] = tower["behavior_config"]["mark_income_bonus"]
+
+
+func _clear_tower_mark(slot: int, tower: Dictionary) -> void:
+	var index: int = _enemy_index(slot, tower["bounty_target_id"])
+	if index >= 0 and int(enemies[slot][index]["bounty_tower_id"]) == int(tower["id"]):
+		enemies[slot][index]["bounty_tower_id"] = -1
+		enemies[slot][index]["bounty_damage_bonus"] = 0.0
+		enemies[slot][index]["bounty_income_bonus"] = 0.0
+	tower["bounty_target_id"] = -1
 
 
 func set_targeting(slot: int, tower_id: int, mode: int) -> bool:
@@ -237,71 +455,88 @@ func set_archer_targeting(slot: int, tower_id: int, archer_index: int, mode: int
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 	if phase == Phase.FINISHED or not _valid_slot(slot):
 		return false
-	for tower: Dictionary in towers[slot]:
-		if tower["id"] != tower_id:
-			continue
-		var definition: Dictionary = _tower_types[tower["type_id"]]
-		var evolution: bool = definition["evolutions"].has(upgrade)
-		var advancement: bool = definition["advancements"].has(upgrade)
-		if advancement:
-			if not tower["damage_upgraded"] or not tower["speed_upgraded"] or not tower["special_upgraded"] or not String(tower["advancement"]).is_empty():
-				return false
-			var config: Dictionary = definition["advancements"][upgrade]
-			var price: int = config["cost"]
-			if not _sandbox_mode and coins[slot] < price:
-				return false
-			if not _sandbox_mode:
-				coins[slot] -= price
-				tower["invested"] += price
-				tower["sell_value"] = _sell_value(tower["invested"])
-			tower["advancement"] = upgrade
-			if config.has("archer_count"):
-				for index: int in range(2):
-					tower["extra_archers"].append({"mode": tower["mode"], "shot": 0, "aim": Vector2(tower["cell"]), "target_id": -1})
-				tower["interval"] /= float(config["attack_rate_multiplier"])
-				tower["cooldown"] /= float(config["attack_rate_multiplier"])
-			_sound_events.record(CombatSoundEvents.Cue.UPGRADE, slot, Vector2(tower["cell"]), _death_time)
-			return true
-		var freeze: bool = upgrade == "freeze_runes"
-		if upgrade not in ["damage", "speed", "special"] and not evolution and not freeze:
+	var tower: Dictionary = _find_tower(slot, tower_id)
+	if tower.is_empty():
+		return false
+	var definition: Dictionary = _tower_types[tower["type_id"]]
+	var branches: Dictionary = definition["evolutions"]
+	var current: Dictionary = branches.get(tower["evolution"], {})
+	var followups: Dictionary = current.get("followups", {})
+	var evolution: bool = branches.has(upgrade)
+	var followup: bool = followups.has(upgrade)
+	var advancement: bool = definition["advancements"].has(upgrade)
+	var freeze: bool = upgrade == "freeze_runes" and current.get("followup", {}).get("id", "") == upgrade
+	var config: Dictionary = {}
+	var flag: String = ""
+	if upgrade in ["damage", "speed"]:
+		flag = upgrade + "_upgraded"
+		if tower[flag]:
 			return false
-		if freeze and (tower["evolution"] != "boulders" or not definition["evolutions"].get("boulders", {}).has("followup")):
+	elif upgrade == "special":
+		flag = "special_upgraded"
+		if definition["special_upgrade"].is_empty() or tower[flag] or not tower["damage_upgraded"] or not tower["speed_upgraded"]:
 			return false
-		var flag: String = "freeze_upgraded" if freeze else ("special_upgraded" if evolution else upgrade + "_upgraded")
-		if (evolution or upgrade == "special") and (not tower["damage_upgraded"] or not tower["speed_upgraded"]):
+	elif evolution:
+		if not String(tower["evolution"]).is_empty() or not tower["damage_upgraded"] or not tower["speed_upgraded"]:
 			return false
-		if upgrade == "special" and definition["special_upgrade"].is_empty():
+		if not String(definition["special_upgrade"]).is_empty() and not tower["special_upgraded"]:
 			return false
-		var cost: int = int(definition["evolutions"]["boulders"]["followup"]["cost"]) if freeze else (int(definition["evolutions"][upgrade]["cost"]) if evolution else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition)))
-		if tower[flag] or (not _sandbox_mode and coins[slot] < cost):
+		config = branches[upgrade]
+	elif followup:
+		if not String(tower["followup"]).is_empty():
 			return false
-		if not _sandbox_mode:
-			coins[slot] -= cost
+		config = followups[upgrade]
+	elif advancement:
+		if not tower["special_upgraded"] or not String(tower["advancement"]).is_empty():
+			return false
+		config = definition["advancements"][upgrade]
+	elif freeze:
+		if tower["freeze_upgraded"]:
+			return false
+		flag = "freeze_upgraded"
+		config = current["followup"]
+	else:
+		return false
+	var cost: int = int(config["cost"]) if not config.is_empty() else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition))
+	if not _sandbox_mode and coins[slot] < cost:
+		return false
+	if not _sandbox_mode:
+		coins[slot] -= cost
+		tower["invested"] += cost
+		tower["sell_value"] = _sell_value(tower["invested"])
+	if not flag.is_empty():
 		tower[flag] = true
-		if not _sandbox_mode:
-			tower["invested"] += cost
-			tower["sell_value"] = _sell_value(tower["invested"])
-		if evolution:
-			var config: Dictionary = definition["evolutions"][upgrade]
-			tower["evolution"] = upgrade
-			if upgrade in ["boulders", "onyx_ring"]:
-				tower["damage"] = config["damage"]
-				tower["interval"] = config["interval"]
-				# A new pulse requires a full reload; continuous damage starts accruing
-				# only in future simulation time, without an immediate hit or old credit.
-				tower["cooldown"] = config["interval"]
-		elif upgrade == "damage":
-			tower["damage"] += definition["damage_upgrade_bonus"]
-		elif upgrade == "speed":
-			tower["interval"] *= definition["speed_upgrade_multiplier"]
-			# Accelerate the current reload, but never grant an immediate extra shot.
-			tower["cooldown"] *= definition["speed_upgrade_multiplier"]
-		elif upgrade == "special" and definition["special_upgrade"] == "second_archer":
-			tower["interval"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
-			tower["cooldown"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
-		_sound_events.record(CombatSoundEvents.Cue.UPGRADE, slot, Vector2(tower["cell"]), _death_time)
-		return true
-	return false
+	if evolution:
+		tower["evolution"] = upgrade
+		tower["special_upgraded"] = true
+		tower["production_elapsed"] = 0.0
+		if config.has("damage"):
+			# Authored Rune evolution stats are its upgraded branch baseline.
+			tower["base_damage"] = config["damage"]
+			tower["base_interval"] = config["interval"]
+	elif followup:
+		if config["behavior_kind"] != "bounty":
+			_clear_tower_mark(slot, tower)
+		tower["followup"] = upgrade
+		tower["production_elapsed"] = 0.0
+	elif advancement:
+		tower["advancement"] = upgrade
+		if config.has("archer_count"):
+			for index: int in range(2):
+				tower["extra_archers"].append({"mode": tower["mode"], "shot": 0, "aim": Vector2(tower["cell"]), "target_id": -1})
+	elif upgrade == "damage" and definition["upgrade_effects"].is_empty():
+		tower["base_damage"] += definition["damage_upgrade_bonus"]
+	elif upgrade == "speed" and definition["upgrade_effects"].is_empty():
+		tower["base_interval"] *= definition["speed_upgrade_multiplier"]
+	elif upgrade == "special" and definition["special_upgrade"] == "second_archer":
+		tower["base_interval"] /= TowerDefinition.SECOND_ARCHER_ATTACK_RATE_MULTIPLIER
+	if advancement and config.has("attack_rate_multiplier"):
+		tower["base_interval"] /= float(config["attack_rate_multiplier"])
+	_refresh_board(slot)
+	if evolution and config.has("interval"):
+		tower["cooldown"] = tower["interval"]
+	_sound_events.record(CombatSoundEvents.Cue.UPGRADE, slot, Vector2(tower["cell"]), _death_time)
+	return true
 
 
 func sell_tower(slot: int, tower_id: int) -> bool:
@@ -315,14 +550,20 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 			coins[slot] += _sell_value(tower["invested"])
 		_continuous_damage.erase(tower_id)
 		_rune_damage.erase(tower_id)
+		_clear_tower_mark(slot, tower)
 		towers[slot].remove_at(index)
+		_refresh_board(slot)
 		return true
 	return false
 
 
 # Level is derived from accepted upgrades, never a second mutable copy of tower state.
 static func tower_level(tower: Dictionary) -> int:
-	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"])) + int(bool(tower.get("special_upgraded", false))) + int(bool(tower.get("freeze_upgraded", false))) + int(not String(tower.get("advancement", "")).is_empty())
+	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"])) + int(bool(tower.get("special_upgraded", false))) + int(bool(tower.get("freeze_upgraded", false))) + int(not String(tower.get("advancement", "")).is_empty()) + int(not String(tower.get("followup", "")).is_empty()) + int(not String(tower.get("evolution", "")).is_empty() and _tower_has_separate_special(tower))
+
+
+static func _tower_has_separate_special(tower: Dictionary) -> bool:
+	return tower.get("behavior_kind", "") == "chain"
 
 
 static func tower_upgrade_cost(tower: Dictionary, definition: Dictionary) -> int:
@@ -355,6 +596,7 @@ func grow_for_main_round() -> void:
 			tower["cell"] += Vector2i.DOWN
 			tower["aim"] += Vector2.DOWN
 			tower["secondary_aim"] += Vector2.DOWN
+			tower["chain_points"].clear()
 			for archer: Dictionary in tower["extra_archers"]:
 				archer["aim"] += Vector2.DOWN
 			tower["bounce_aim"] += Vector2.DOWN
@@ -428,6 +670,9 @@ func debug_set_round(round_number: int) -> bool:
 	_slow_motion.clear()
 	for board: Array in towers:
 		for tower: Dictionary in board:
+			tower["bounty_target_id"] = -1
+			tower["production_elapsed"] = 0.0
+			tower["chain_points"].clear()
 			tower["cooldown"] = tower["interval"] if tower["evolution"] == "onyx_ring" else 0.0
 			tower["target_id"] = -1
 			tower["secondary_target_id"] = -1
@@ -632,23 +877,29 @@ func advance(delta: float) -> bool:
 	if phase != Phase.WAVE or not is_finite(delta) or delta <= 0.0:
 		return false
 	var remaining: float = delta
-	if _special_stream:
+	var periodic: bool = _has_periodic_production()
+	if _special_stream or periodic:
 		for slot: int in range(2):
 			_spawn_enemies(slot)
 	while remaining > 0.000000001:
-		var step: float = _next_event_step(remaining) if _special_stream else remaining
+		var step: float = _next_event_step(remaining, periodic) if _special_stream or periodic else remaining
 		_step_start_time = _elapsed
 		_elapsed += step
 		_death_time += step
 		for slot: int in range(2):
 			_move_enemies(slot, step)
 			_spawn_enemies(slot)
+			_update_bounties(slot)
 			_apply_burns(slot)
 			_attack(slot, step)
 			# A dead caster never resolves its due ritual.
 			_enemy_abilities(slot)
 			_apply_leaks(slot)
 		remaining -= step
+		if periodic and base_health[0] > 0 and base_health[1] > 0:
+			_produce_periodic(step)
+		if periodic and (base_health[0] == 0 or base_health[1] == 0 or _wave_cleared()):
+			break
 	for slot: int in range(2):
 		var events: Array = _death_events[slot]
 		var first: int = _death_heads[slot]
@@ -666,23 +917,37 @@ func advance(delta: float) -> bool:
 		phase = Phase.FINISHED
 		coin_flip = base_health[0] == 0 and base_health[1] == 0
 		winner = _random.randi_range(0, 1) if coin_flip else (1 if base_health[0] == 0 else 0)
-	elif _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and _pending_sends(0) == 0 and _pending_sends(1) == 0 and enemies[0].is_empty() and enemies[1].is_empty():
+		for slot: int in range(2):
+			for tower: Dictionary in towers[slot]:
+				_clear_tower_mark(slot, tower)
+				tower["production_elapsed"] = 0.0
+	elif _wave_cleared():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
-		coins[0] += reward + income[0]
-		coins[1] += reward + income[1]
+		for slot: int in range(2):
+			coins[slot] += reward + income[slot]
+			reroll_currency[slot] += _rules.clear_reroll_currency
+			for tower: Dictionary in towers[slot]:
+				if tower["behavior_kind"] == "economy":
+					coins[slot] += int(tower["behavior_config"]["clear_income"])
 		phase = Phase.PLANNING
 	return true
 
 
-func _next_event_step(maximum: float) -> float:
+func _next_event_step(maximum: float, periodic: bool = false) -> float:
 	var duration: float = maximum
 	for slot: int in range(2):
 		if _spawned[slot] < spawn_times.size():
 			duration = minf(duration, spawn_times[_spawned[slot]] - _elapsed)
 		if _pending_sends(slot) > 0:
 			duration = minf(duration, _next_send_times[slot] - _elapsed)
+		if periodic:
+			for tower: Dictionary in towers[slot]:
+				if tower["behavior_kind"] == "economy" and int(tower["behavior_config"]["periodic_income"]) > 0:
+					duration = minf(duration, float(tower["behavior_config"]["periodic_interval"]) - float(tower["production_elapsed"]))
 		for enemy: Dictionary in enemies[slot]:
 			var definition: Dictionary = _enemy_types[enemy["type_id"]]
+			if periodic and float(enemy["speed"]) > 0.0:
+				duration = minf(duration, maxf(0.0, float(enemy["route"].size() - 1) - float(enemy["progress"])) / float(enemy["speed"]))
 			if float(enemy["cast_remaining"]) > 0.0:
 				duration = minf(duration, float(enemy["cast_remaining"]))
 			elif float(definition["summon_interval"]) > 0.0:
@@ -690,6 +955,59 @@ func _next_event_step(maximum: float) -> float:
 			if float(definition["heal_interval"]) > 0.0:
 				duration = minf(duration, float(enemy["next_heal"]) - float(enemy["age"]))
 	return maxf(0.000000001, duration)
+
+
+func _wave_cleared() -> bool:
+	return _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and _pending_sends(0) == 0 and _pending_sends(1) == 0 and enemies[0].is_empty() and enemies[1].is_empty()
+
+
+func _has_periodic_production() -> bool:
+	for board: Array in towers:
+		for tower: Dictionary in board:
+			if tower["behavior_kind"] == "economy" and int(tower["behavior_config"]["periodic_income"]) > 0:
+				return true
+	return false
+
+
+func _produce_periodic(delta: float) -> void:
+	for slot: int in range(2):
+		for tower: Dictionary in towers[slot]:
+			if tower["behavior_kind"] != "economy":
+				continue
+			var config: Dictionary = tower["behavior_config"]
+			if int(config["periodic_income"]) <= 0:
+				continue
+			tower["production_elapsed"] += delta
+			var count: int = floori((float(tower["production_elapsed"]) + 0.000000001) / float(config["periodic_interval"]))
+			if count > 0:
+				tower["production_elapsed"] = maxf(0.0, float(tower["production_elapsed"]) - count * float(config["periodic_interval"]))
+				coins[slot] += count * int(config["periodic_income"])
+
+
+func _update_bounties(slot: int) -> void:
+	for tower: Dictionary in towers[slot]:
+		if tower["behavior_kind"] != "bounty" or int(tower["bounty_target_id"]) >= 0:
+			continue
+		var selected: Dictionary = {}
+		for enemy: Dictionary in enemies[slot]:
+			if int(enemy["hp"]) <= 0 or int(enemy["bounty_tower_id"]) >= 0 or not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), tower["range"]):
+				continue
+			if selected.is_empty() or int(enemy["max_hp"]) > int(selected["max_hp"]) or (int(enemy["max_hp"]) == int(selected["max_hp"]) and int(enemy["id"]) < int(selected["id"])):
+				selected = enemy
+		if not selected.is_empty():
+			tower["bounty_target_id"] = selected["id"]
+			selected["bounty_tower_id"] = tower["id"]
+			selected["bounty_damage_bonus"] = tower["behavior_config"]["mark_damage_bonus"]
+			selected["bounty_income_bonus"] = tower["behavior_config"]["mark_income_bonus"]
+
+
+func _income_aura_bonus(slot: int, tower: Dictionary) -> float:
+	# Income auras never stack, including independently authored duplicate groups.
+	var strongest: float = 0.0
+	for source: Dictionary in towers[slot]:
+		if source["behavior_kind"] == "income_aura" and cell_in_range(source["cell"], tower["cell"], source["range"]):
+			strongest = maxf(strongest, float(source["behavior_config"]["kill_income_bonus"]))
+	return strongest
 
 
 func _enemy_abilities(slot: int) -> void:
@@ -749,6 +1067,7 @@ func snapshot() -> Dictionary:
 		"wave_groups": wave_groups.duplicate(true),
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
+		"reroll_currency": reroll_currency.duplicate(),
 		"income": income.duplicate(), "queued_sends": queued_sends,
 		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
 		"enemy_types": _enemy_types_snapshot(),
@@ -763,6 +1082,8 @@ func snapshot() -> Dictionary:
 		"rules": {
 			"enemy_speed": _wave_speed(wave), "enemy_health": _wave_health(wave),
 			"sandbox_mode": _sandbox_mode,
+			"roll_rules_enabled": _roll_rules != null,
+			"clear_reroll_currency": _rules.clear_reroll_currency,
 			"starting_coins": _rules.starting_coins, "kill_bounty": _rules.kill_bounty,
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
@@ -977,6 +1298,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"slowed": false, "slow_remaining": 0.0,
 		"fire_immune": _enemy_types[type_id]["fire_immune"], "ice_immune": _enemy_types[type_id]["ice_immune"],
 		"burning": false, "burn_remaining": 0.0,
+		"bounty_tower_id": -1, "bounty_damage_bonus": 0.0, "bounty_income_bonus": 0.0,
 		"damage": _enemy_types[type_id]["base_damage"],
 		"route": route, "progress": progress, "pos": _position(route, progress),
 		"animation": "walk", "animation_elapsed": maxf(0.0, _elapsed - spawn_time),
@@ -1000,16 +1322,18 @@ func _position(route: Array, progress: float) -> Vector2:
 func _attack(slot: int, delta: float) -> void:
 	for tower: Dictionary in towers[slot]:
 		var definition: Dictionary = _tower_types[tower["type_id"]]
+		if tower["behavior_kind"] not in ["attack", "chain"]:
+			continue
 		if tower["evolution"] == "boulders" or tower["evolution"] == "onyx_ring":
 			if definition["evolutions"][tower["evolution"]]["continuous"]:
-				_attack_continuous(slot, tower, definition["range"], delta)
+				_attack_continuous(slot, tower, tower["range"], delta)
 			else:
-				_attack_pulses(slot, tower, definition["range"], delta)
+				_attack_pulses(slot, tower, tower["range"], delta)
 			continue
 		tower["cooldown"] = maxf(0.0, tower["cooldown"] - delta)
 		if tower["cooldown"] > 0.0:
 			continue
-		var target_index: int = _target(slot, tower, definition["range"])
+		var target_index: int = _target(slot, tower, tower["range"])
 		if target_index < 0:
 			continue
 		var enemy: Dictionary = enemies[slot][target_index]
@@ -1021,32 +1345,26 @@ func _attack(slot: int, delta: float) -> void:
 		tower["bounce_active"] = false
 		tower["pierce_active"] = false
 		tower["secondary_target_id"] = -1
-		if tower["evolution"] == "pierce":
-			_attack_pierce(slot, tower, definition["range"], target_index)
+		if tower["behavior_kind"] == "chain":
+			_attack_chain(slot, tower, target_index)
 		elif definition["area_attack"]:
 			# Reverse traversal permits removal in place without missing a victim.
 			for index: int in range(enemies[slot].size() - 1, -1, -1):
-				if cell_in_range(tower["cell"], Vector2i(enemies[slot][index]["pos"].round()), definition["range"]):
+				if cell_in_range(tower["cell"], Vector2i(enemies[slot][index]["pos"].round()), tower["range"]):
 					_hit(slot, tower, index)
 		else:
 			if tower["special_upgraded"] and definition["special_upgrade"] == "second_archer":
 				_attack_archers(slot, tower, definition)
 			else:
-				_hit(slot, tower, target_index)
-				if tower["evolution"] == "bounce":
-					var bounce_index: int = _bounce_target(slot, tower["aim"], tower["target_id"])
-					if bounce_index >= 0:
-						tower["bounce_active"] = true
-						tower["bounce_aim"] = enemies[slot][bounce_index]["pos"]
-						_hit(slot, tower, bounce_index, ceili(float(tower["damage"]) * TowerDefinition.BOUNCE_DAMAGE_MULTIPLIER))
+				_attack_pierce(slot, tower, tower["range"], target_index)
 
 
 # Capture every stream before applying any damage: a bomb may retire another
 # archer's victim, but its accepted aim and projectile still belong to this volley.
 func _attack_archers(slot: int, tower: Dictionary, definition: Dictionary) -> void:
-	var secondary: int = _target(slot, tower, definition["range"], tower["secondary_mode"], tower["target_id"])
+	var secondary: int = _target(slot, tower, tower["range"], tower["secondary_mode"], tower["target_id"])
 	if secondary < 0:
-		secondary = _target(slot, tower, definition["range"], tower["secondary_mode"])
+		secondary = _target(slot, tower, tower["range"], tower["secondary_mode"])
 	if secondary >= 0:
 		tower["secondary_target_id"] = enemies[slot][secondary]["id"]
 		tower["secondary_aim"] = enemies[slot][secondary]["pos"]
@@ -1055,9 +1373,9 @@ func _attack_archers(slot: int, tower: Dictionary, definition: Dictionary) -> vo
 	for index: int in range(tower["extra_archers"].size()):
 		var archer: Dictionary = tower["extra_archers"][index]
 		archer["target_id"] = -1
-		var selected: int = _target(slot, tower, definition["range"], archer["mode"], tower["target_id"], tower["secondary_target_id"], third_id)
+		var selected: int = _target(slot, tower, tower["range"], archer["mode"], tower["target_id"], tower["secondary_target_id"], third_id)
 		if selected < 0:
-			selected = _target(slot, tower, definition["range"], archer["mode"])
+			selected = _target(slot, tower, tower["range"], archer["mode"])
 		if selected >= 0:
 			archer["target_id"] = enemies[slot][selected]["id"]
 			archer["aim"] = enemies[slot][selected]["pos"]
@@ -1103,7 +1421,7 @@ func _ignite(enemy: Dictionary, tower: Dictionary, config: Dictionary) -> void:
 	if bool(enemy["fire_immune"]):
 		return
 	var id: int = enemy["id"]
-	var dps: float = config["burn_dps"]
+	var dps: float = float(config["burn_dps"]) * float(tower["damage_multiplier"])
 	var burn: Dictionary
 	if _burns.has(id):
 		burn = _burns[id]
@@ -1130,65 +1448,108 @@ func _apply_burns(slot: int) -> void:
 			continue
 		var burn: Dictionary = _burns[id]
 		var exposure: float = maxf(0.0, minf(_elapsed, float(burn["end_time"])) - maxf(float(burn["last_time"]), float(_enemy_spawn_times[id])))
-		var total: float = float(burn["fraction"]) + float(burn["dps"]) * exposure
+		var total: float = float(burn["fraction"]) + float(burn["dps"]) * exposure * (1.0 + float(enemy["bounty_damage_bonus"]))
 		var damage: int = floori(total + 0.000000001)
 		burn["fraction"] = maxf(0.0, total - damage)
 		burn["last_time"] = _elapsed
 		enemy["burn_remaining"] = maxf(0.0, float(burn["end_time"]) - _elapsed)
 		enemy["burning"] = float(enemy["burn_remaining"]) > 0.000000001
 		if damage > 0:
-			_hit(slot, burn["source"], index, damage)
+			_hit(slot, burn["source"], index, damage, true)
 		if not enemy["burning"]:
 			enemy["burn_remaining"] = 0.0
 			_burns.erase(id)
 
 
+# Rolled pierce/bounce and purchased branches are independent additive capacities.
+# A bolt hits straight-through victims first, then redirects from its final hit.
 func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_index: int) -> void:
-	var center := Vector2(tower["cell"])
-	var direction: Vector2 = Vector2(tower["aim"]) - center
-	tower["pierce_active"] = true
-	tower["pierce_aim"] = tower["aim"]
-	if direction == Vector2.ZERO:
+	var modifiers: Dictionary = tower["modifiers"]
+	var pierce: int = int(modifiers.get("pierce", 0.0)) + int(tower["evolution"] == "pierce")
+	var bounces: int = int(modifiers.get("bounce", 0.0)) + int(tower["evolution"] == "bounce")
+	if pierce == 0 and bounces == 0:
 		_hit(slot, tower, primary_index)
 		return
-	direction = direction.normalized()
-	# Stay just inside the half-cell boundary so the endpoint rounds to a valid tile.
-	var radius: float = floorf(range_cells) + 0.5 - 0.000001
-	tower["pierce_aim"] = center + direction * (radius / maxf(absf(direction.x), absf(direction.y)))
-	var first: int = -1
-	var second: int = -1
-	var first_distance: float = INF
-	var second_distance: float = INF
-	var first_id: int = 0
-	var second_id: int = 0
-	# Capture both indices before damage can remove a victim. No candidate allocation/sort.
+	var hit_ids: Dictionary = {}
+	var origin := Vector2(tower["cell"])
+	var direction: Vector2 = Vector2(tower["aim"]) - origin
+	var position: Vector2 = tower["aim"]
+	if pierce > 0:
+		tower["pierce_active"] = true
+		tower["pierce_aim"] = tower["aim"]
+	if pierce == 0 or direction == Vector2.ZERO:
+		hit_ids[int(enemies[slot][primary_index]["id"])] = true
+		_hit(slot, tower, primary_index)
+	else:
+		direction = direction.normalized()
+		tower["pierce_active"] = true
+		var radius: float = floorf(range_cells) + 0.5 - 0.000001
+		tower["pierce_aim"] = origin + direction * (radius / maxf(absf(direction.x), absf(direction.y)))
+		for contact: int in range(1 + pierce):
+			var selected: int = -1
+			var best_distance: float = INF
+			var best_id: int = 0
+			for index: int in range(enemies[slot].size()):
+				var enemy: Dictionary = enemies[slot][index]
+				if int(enemy["hp"]) <= 0 or hit_ids.has(int(enemy["id"])) or not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), range_cells):
+					continue
+				var offset: Vector2 = Vector2(enemy["pos"]) - origin
+				var distance: float = offset.dot(direction)
+				if distance <= 0.0 or absf(offset.cross(direction)) > 0.25:
+					continue
+				if selected < 0 or distance < best_distance or (distance == best_distance and int(enemy["id"]) < best_id):
+					selected = index
+					best_distance = distance
+					best_id = enemy["id"]
+			if selected < 0:
+				break
+			position = enemies[slot][selected]["pos"]
+			hit_ids[int(enemies[slot][selected]["id"])] = true
+			_hit(slot, tower, selected)
+	for jump: int in range(bounces):
+		var selected: int = _nearest_unhit(slot, position, hit_ids)
+		if selected < 0:
+			break
+		position = enemies[slot][selected]["pos"]
+		hit_ids[int(enemies[slot][selected]["id"])] = true
+		tower["bounce_active"] = true
+		tower["bounce_aim"] = position
+		_hit(slot, tower, selected, ceili(float(tower["damage"]) * TowerDefinition.BOUNCE_DAMAGE_MULTIPLIER))
+
+
+func _attack_chain(slot: int, tower: Dictionary, primary_index: int) -> void:
+	var config: Dictionary = tower["behavior_config"]
+	var hit_ids: Dictionary = {}
+	var points: Array[Vector2] = tower["chain_points"]
+	points.clear()
+	var selected: int = primary_index
+	for contact: int in range(int(config["hit_count"])):
+		if selected < 0:
+			break
+		var enemy: Dictionary = enemies[slot][selected]
+		var position: Vector2 = enemy["pos"]
+		hit_ids[int(enemy["id"])] = true
+		points.append(position)
+		_hit(slot, tower, selected, ceili(float(tower["damage"]) * (1.0 + contact * float(config["successive_hit_bonus"]))))
+		selected = _nearest_unhit(slot, position, hit_ids, float(config["jump_distance"]))
+
+
+func _nearest_unhit(slot: int, origin: Vector2, excluded: Dictionary, radius: float = INF) -> int:
+	var best: int = -1
+	var distance: float = radius * radius
+	var best_id: int = 0
 	for index: int in range(enemies[slot].size()):
 		var enemy: Dictionary = enemies[slot][index]
-		if int(enemy["hp"]) <= 0 or not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), range_cells):
+		if int(enemy["hp"]) <= 0 or excluded.has(int(enemy["id"])):
 			continue
-		var offset: Vector2 = Vector2(enemy["pos"]) - center
-		var distance: float = offset.dot(direction)
-		if distance <= 0.0 or absf(offset.cross(direction)) > 0.25:
+		var candidate: float = origin.distance_squared_to(enemy["pos"])
+		if candidate > distance:
 			continue
-		var id: int = enemy["id"]
-		if first < 0 or distance < first_distance or (distance == first_distance and id < first_id):
-			second = first
-			second_distance = first_distance
-			second_id = first_id
-			first = index
-			first_distance = distance
-			first_id = id
-		elif second < 0 or distance < second_distance or (distance == second_distance and id < second_id):
-			second = index
-			second_distance = distance
-			second_id = id
-	if first >= 0:
-		var previous_size: int = enemies[slot].size()
-		_hit(slot, tower, first)
-		if second > first and enemies[slot].size() < previous_size:
-			second -= 1
-		if second >= 0:
-			_hit(slot, tower, second)
+		if best < 0 or candidate < distance or (candidate == distance and int(enemy["id"]) < best_id):
+			best = index
+			distance = candidate
+			best_id = enemy["id"]
+	return best
 
 
 func _attack_pulses(slot: int, tower: Dictionary, range_cells: float, delta: float) -> void:
@@ -1226,13 +1587,13 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 		var exposure: float = _continuous_exposure(tower["cell"], range_cells, enemy, minf(delta, _elapsed - float(_enemy_spawn_times[enemy["id"]])))
 		if exposure <= 0.0:
 			continue
-		var total: float = float(fractions.get(enemy["id"], 0.0)) + float(tower["damage"]) * exposure
-		# Only whole HP reaches replicated state; retain sub-HP credit for this
-		# exact pair. The epsilon corrects floating-point addition at whole HP.
+		var total: float = float(fractions.get(enemy["id"], 0.0)) + float(tower["base_damage"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * exposure * (1.0 + float(enemy["bounty_damage_bonus"]))
+		# Credit is already vulnerability-adjusted HP: mark changes affect only
+		# new exposure, not saved fractions. The epsilon corrects whole-HP sums.
 		var damage: int = floori(total + 0.000000001)
 		fractions[enemy["id"]] = maxf(0.0, total - damage)
 		if damage > 0:
-			_hit(slot, tower, index, damage)
+			_hit(slot, tower, index, damage, true)
 
 
 # Read the motion captured before attacks, not a slow refreshed by an earlier
@@ -1336,11 +1697,18 @@ func _retire_enemy(enemy_id: int) -> void:
 		_rune_damage[tower_id].erase(enemy_id)
 	for tower_id: int in _continuous_damage:
 		_continuous_damage[tower_id].erase(enemy_id)
+	for board: Array in towers:
+		for tower: Dictionary in board:
+			if int(tower["bounty_target_id"]) == enemy_id:
+				tower["bounty_target_id"] = -1
 
 
-func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> void:
+func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, bounty_applied: bool = false) -> void:
 	var enemy: Dictionary = enemies[slot][enemy_index]
-	var hit_damage: int = mini(int(enemy["hp"]), int(tower["damage"]) if damage < 0 else damage)
+	var incoming_damage: int = int(tower["damage"]) if damage < 0 else damage
+	if not bounty_applied:
+		incoming_damage = ceili(float(incoming_damage) * (1.0 + float(enemy["bounty_damage_bonus"])))
+	var hit_damage: int = mini(int(enemy["hp"]), incoming_damage)
 	enemy["hp"] -= hit_damage
 	if hit_damage > 0:
 		_sound_events.record(CombatSoundEvents.Cue.HIT, slot, enemy["pos"], _death_time)
@@ -1356,29 +1724,18 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1) -> v
 			enemy["speed"] = 0.0 if enemy["animation"] == "cast" else float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1
-		var bounty: int = _enemy_types[enemy["type_id"]]["kill_bounty"]
-		coins[slot] += _rules.kill_bounty if bounty < 0 else bounty
+		var definition: Dictionary = _enemy_types[enemy["type_id"]]
+		var bounty: int = int(definition["kill_bounty"])
+		var normal: int = _rules.kill_bounty if bounty < 0 else bounty
+		coins[slot] += ceili(normal * (1.0 + float(enemy["bounty_income_bonus"]) + _income_aura_bonus(slot, tower)))
+		if int(definition["reroll_drop_amount"]) > 0 and float(definition["reroll_drop_chance"]) > 0.0 and _drop_random.randf() < float(definition["reroll_drop_chance"]):
+			reroll_currency[slot] += int(definition["reroll_drop_amount"])
 		_add_total(slot, "kills", enemy["type_id"])
 		_record_death(slot, enemy)
 		_retire_enemy(enemy["id"])
 		enemies[slot].remove_at(enemy_index)
 
 
-func _bounce_target(slot: int, origin: Vector2, excluded_id: int) -> int:
-	var best: int = -1
-	var best_distance: float = INF
-	var best_id: int = 0
-	for index: int in range(enemies[slot].size()):
-		var enemy: Dictionary = enemies[slot][index]
-		if enemy["id"] == excluded_id or int(enemy["hp"]) <= 0:
-			continue
-		var distance: float = origin.distance_squared_to(enemy["pos"])
-		var id: int = enemy["id"]
-		if best < 0 or distance < best_distance or (distance == best_distance and id < best_id):
-			best = index
-			best_distance = distance
-			best_id = id
-	return best
 
 
 # Scan in place rather than allocating or sorting candidates for each tower.

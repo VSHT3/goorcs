@@ -6,6 +6,9 @@
 
 [resource]
 script = ExtResource("1_enemy")
+; Summon farming intentionally retains this separate drop despite zero Coin bounty.
+reroll_drop_chance = 0.04
+reroll_drop_amount = 1
 id = &"skeleorc"
 title = "SkeleOrc"
 description = "A brittle undead fighter, restless even beyond the grave."

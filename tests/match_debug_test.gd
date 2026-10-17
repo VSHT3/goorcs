@@ -47,6 +47,7 @@ func _new_model(with_route: bool = true) -> MatchPlanning:
 	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Debug fixture explicitly admits its authored tower")
 	planning.set_physics_process(false)
 	if with_route:
 		for x: int in range(1, 13):
@@ -97,8 +98,11 @@ func _test_authority() -> void:
 	_check(not planning.can_debug() and not planning.debug_set_values(9, 999) and planning._snapshot() == before, "A synthetic connected guest cannot mutate authoritative debug values")
 	planning.session.is_host = true
 	planning.active = false
+	planning.selecting_loadout = true
+	before = planning._snapshot().duplicate(true)
 	_check(not planning.can_debug() and not planning.debug_set_values(9, 999) and planning._snapshot() == before, "Inactive hosts cannot use the debug API")
 	planning.active = true
+	planning.selecting_loadout = false
 	planning.session.state = MultiplayerSession.State.HOSTING
 	_check(not planning.can_debug() and not planning.debug_set_values(9, 999), "A host still waiting for connection cannot alter a match")
 	_dispose(planning)

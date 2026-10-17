@@ -13,6 +13,12 @@ func _new_session() -> void:
 
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
+	rules.roll_rules = null
+	rules.catalog.towers = [
+		preload("res://resources/combat/towers/arrow_tower.tres").duplicate(true) as TowerDefinition,
+		preload("res://resources/combat/towers/orc_ballista.tres").duplicate(true) as TowerDefinition,
+		preload("res://resources/combat/towers/rune_obelisk.tres").duplicate(true) as TowerDefinition,
+	]
 	rules.base_health = 2
 	rules.enemy_health = 4
 	rules.health_growth = 0
@@ -24,20 +30,13 @@ func _planning_rules() -> CombatRules:
 	rules.spawn_interval_reduction_per_wave = 0.0
 	var definitions: Array[TowerDefinition] = []
 	for source: TowerDefinition in rules.catalog.towers:
-		var definition := TowerDefinition.new()
-		definition.reward = source.reward
-		definition.damage = 1 if _lane == "guest" else 99
-		definition.range_cells = 0.5 if _lane == "guest" else 1.5
-		definition.interval = 5.0 if _lane == "guest" else 0.05
-		definition.cost = source.cost
-		definition.upgrade_base_cost = source.upgrade_base_cost
-		definition.damage_upgrade_bonus = source.damage_upgrade_bonus
-		definition.speed_upgrade_multiplier = source.speed_upgrade_multiplier
-		definition.area_attack = source.area_attack
-		definition.special_upgrade = source.special_upgrade
-		definition.special_upgrade_title = source.special_upgrade_title
+		var definition := source.duplicate(true) as TowerDefinition
+		# Preserve authored roles and metadata while isolating attacking scenario stats.
+		if definition.behavior_kind in ["attack", "chain"]:
+			definition.damage = 1 if _lane == "guest" else 99
+			definition.range_cells = 0.5 if _lane == "guest" else 1.5
+			definition.interval = 5.0 if _lane == "guest" else 0.05
 		definition.special_upgrade_cost = 1 if _lane == "guest" else source.special_upgrade_cost
-		definition.evolutions = source.evolutions.duplicate(true)
 		if _lane == "guest":
 			for branch: Dictionary in definition.evolutions.values():
 				branch["cost"] = 1

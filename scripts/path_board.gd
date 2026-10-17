@@ -86,6 +86,8 @@ var content_catalog: ContentCatalog = preload("res://resources/content_catalog.t
 			var reward: TowerReward = definition.reward
 			_tower_art[String(reward.id)] = reward
 			_cache_texture_bounds(reward.icon_texture)
+			for variant: Dictionary in reward.board_variants.values():
+				_cache_texture_bounds(variant.get("texture"))
 		for definition: EnemyDefinition in value.enemies:
 			_enemy_art[String(definition.id)] = definition
 			_cache_texture_bounds(definition.texture)
@@ -121,6 +123,8 @@ var _flame_elapsed: float = 0.0
 var _boulder_phase: float = 0.0
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
+var _bounty_health: Dictionary[int, float] = {}
+var _bounty_hit_life: Dictionary[int, float] = {}
 var _tower_art: Dictionary[String, TowerReward] = {}
 var _texture_bounds: Dictionary[Texture2D, Rect2] = {}
 var _draw_order: Array[Dictionary] = []
@@ -208,6 +212,12 @@ func _process(delta: float) -> void:
 		pose["age"] = minf(float(pose["age"]) + visual_delta, interval)
 		_has_archer_motion = _has_archer_motion or float(pose["age"]) < interval
 	_enemy_blend_elapsed = minf(_enemy_blend_elapsed + delta, ENEMY_BLEND_DURATION)
+	for id: int in _bounty_hit_life.keys():
+		var life: float = _bounty_hit_life[id] - visual_delta
+		if life <= 0.0:
+			_bounty_hit_life.erase(id)
+		else:
+			_bounty_hit_life[id] = life
 	for index: int in range(_shot_traces.size() - 1, -1, -1):
 		_shot_traces[index]["life"] -= visual_delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
@@ -324,6 +334,7 @@ func _capture_archer(tower: Dictionary, definition: Dictionary, archer_index: in
 
 func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: int, aim: Vector2) -> void:
 	var area_attack: bool = bool(definition.get("area_attack", false))
+	var chain: bool = tower.get("behavior_kind", definition.get("behavior_kind", "attack")) == "chain"
 	var pierce: bool = archer_index == 0 and bool(tower.get("pierce_active", false))
 	var bounce: bool = archer_index == 0 and not pierce and bool(tower.get("bounce_active", false))
 	var evolution: String = tower.get("evolution", "")
@@ -337,7 +348,7 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 	var hits: Array[Vector2] = []
 	if area_attack:
 		for enemy: Dictionary in combat_enemies:
-			if MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), float(definition.get("range", 0.0))):
+			if MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), float(tower.get("range", definition.get("range", 0.0)))):
 				hits.append(enemy["pos"])
 	# Copy accepted positions, including lethal hits whose enemies already disappeared.
 	var origin: Vector2 = _tower_muzzle(tower, archer_index)
@@ -363,7 +374,9 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 		"life": duration,
 		"duration": duration,
 		"area_attack": area_attack,
-		"range": float(definition.get("range", 0.0)),
+		"chain": chain,
+		"chain_points": tower.get("chain_points", []).duplicate(),
+		"range": float(tower.get("range", definition.get("range", 0.0))),
 		"hits": hits,
 	})
 	_sync_combat_animation()
@@ -371,13 +384,19 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 
 func _blend_enemies() -> void:
 	var next_progress: Dictionary[int, Vector2] = {}
+	var next_health: Dictionary[int, float] = {}
 	for enemy: Dictionary in combat_enemies:
 		var id: int = int(enemy["id"])
+		var hp: float = float(enemy["hp"])
+		if int(enemy.get("bounty_tower_id", -1)) >= 0 and float(enemy.get("bounty_damage_bonus", 0.0)) > 0.0 and hp < _bounty_health.get(id, hp):
+			_bounty_hit_life[id] = 0.18
+		next_health[id] = hp
 		var target: float = float(enemy["progress"])
 		var previous: Vector2 = _enemy_progress.get(id, Vector2(target, target))
 		var displayed: float = lerpf(previous.x, previous.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION)
 		next_progress[id] = Vector2(displayed, target)
 	_enemy_progress = next_progress
+	_bounty_health = next_health
 	_enemy_blend_elapsed = 0.0
 
 
@@ -722,7 +741,7 @@ func _draw_ranges() -> void:
 		if int(tower["id"]) != selected_tower_id:
 			continue
 		var tower_cell: Vector2i = tower["cell"]
-		var tower_range: float = float(tower_types[tower["type_id"]]["range"])
+		var tower_range: float = float(tower.get("range", tower_types[tower["type_id"]]["range"]))
 		for y: int in range(layout.dimensions.y):
 			for x: int in range(layout.dimensions.x):
 				var cell := Vector2i(x, y)
@@ -768,6 +787,8 @@ func _cache_status_textures(texture: Texture2D) -> void:
 
 
 func _sprite_rect(texture: Texture2D, height: float, anchor: Vector2, foot: Vector2, flip: bool = false) -> Rect2:
+	if texture == null:
+		return Rect2(foot, Vector2.ZERO)
 	_cache_texture_bounds(texture)
 	var bounds: Rect2 = _texture_bounds[texture]
 	var sprite_size: Vector2 = texture.get_size() * (_cell_size() * height / maxf(1.0, bounds.size.y))
@@ -799,6 +820,14 @@ func visual_headroom() -> float:
 				offsets.append(offset)
 			for offset: Vector2 in offsets:
 				headroom = maxf(headroom, -(rect.position.y + (reward.archer_pivot.y + offset.y - 25.0) * scale.y - 6.0))
+		for variant: Dictionary in reward.board_variants.values():
+			var texture: Texture2D = variant.get("texture")
+			if texture == null:
+				continue
+			var variant_rect: Rect2 = _sprite_rect(texture, float(variant.get("board_height", reward.board_height)), variant.get("board_anchor", reward.board_anchor), foot)
+			var variant_bounds: Rect2 = _texture_bounds[texture]
+			var variant_top: float = variant_rect.position.y + variant_bounds.position.y * variant_rect.size.y / texture.get_height()
+			headroom = maxf(headroom, -variant_top)
 	for artwork: EnemyDefinition in _enemy_art.values():
 		var texture: Texture2D = EnemyVisuals.frame_texture(artwork)
 		var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, texture, _cell_size() * artwork.board_height, foot)
@@ -883,8 +912,15 @@ func _draw_combat() -> void:
 				if tower.get("evolution", "") == "boulders":
 					_draw_boulders(tower, item["foot"], false)
 				if artwork != null and artwork.icon_texture != null:
-					var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, item["foot"])
-					draw_texture_rect(artwork.board_texture if artwork.board_texture != null else artwork.icon_texture, rect, false)
+					var variant: Dictionary = artwork.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
+					var texture: Texture2D = variant.get("texture", artwork.board_texture if artwork.board_texture != null else artwork.icon_texture)
+					var flip: bool = artwork.mirror_board and mirror_horizontal
+					var framing: Texture2D = texture if not variant.is_empty() else artwork.icon_texture
+					var rect: Rect2 = _sprite_rect(framing, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), item["foot"], flip)
+					if flip:
+						rect.size.x = -rect.size.x
+					draw_texture_rect(texture, rect, false)
+					_draw_support_context(tower, item["foot"])
 					if artwork.archer_head_texture != null:
 						# Rear shooters are drawn first; no cloned baked bows or roof cutouts.
 						var extras: Array = tower.get("extra_archers", [])
@@ -910,6 +946,46 @@ func _draw_combat() -> void:
 			if int(item["data"]["id"]) == selected_enemy_id:
 				_draw_enemy_selection(item)
 			_draw_enemy_health(item)
+			_draw_bounty_indicator(item)
+
+
+func _draw_support_context(tower: Dictionary, foot: Vector2) -> void:
+	# Only accepted bonuses on the inspected recipient; never recompute an aura.
+	if int(tower["id"]) != selected_tower_id:
+		return
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
+	var base: Vector2 = (foot + Vector2(-pixel * 5.0, -pixel * 4.0)).floor()
+	if float(tower.get("support_damage_bonus", 0.0)) > 0.0:
+		draw_line(base, base + Vector2(pixel * 4.0, -pixel * 4.0), Color("d8b472"), pixel * 2.0)
+		draw_line(base + Vector2(0, -pixel * 2.0), base + Vector2(pixel * 2.0, 0), Color("f1d6a0"), pixel)
+	if float(tower.get("support_speed_bonus", 0.0)) > 0.0:
+		for index: int in range(2):
+			var point: Vector2 = base + Vector2(pixel * float(7 + index * 3), -pixel * 2.0)
+			draw_line(point + Vector2(-pixel, pixel), point, Color("86bec6"), pixel)
+			draw_line(point, point + Vector2(pixel, pixel), Color("86bec6"), pixel)
+
+
+func _draw_bounty_indicator(item: Dictionary) -> void:
+	var enemy: Dictionary = item["data"]
+	if int(enemy.get("bounty_tower_id", -1)) < 0:
+		return
+	var bounds: Rect2 = _enemy_sprite_bounds(enemy, item["foot"], item["progress"])
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
+	# A gold coin with a red warrant ribbon remains distinct from selection/bar.
+	var center: Vector2 = Vector2(bounds.position.x - pixel * 3.0, bounds.position.y + pixel * 2.0).floor()
+	draw_rect(Rect2(center - Vector2.ONE * pixel * 3.0, Vector2.ONE * pixel * 6.0), Color("252a29"))
+	draw_rect(Rect2(center - Vector2.ONE * pixel * 2.0, Vector2.ONE * pixel * 4.0), Color("d6a647"))
+	draw_line(center + Vector2(-pixel, -pixel), center + Vector2(pixel, -pixel), Color("f7d982"), pixel)
+	if float(enemy.get("bounty_income_bonus", 0.0)) > 0.0:
+		draw_line(center + Vector2(0, -pixel), center + Vector2(0, pixel), Color("86602c"), pixel)
+	if float(enemy.get("bounty_damage_bonus", 0.0)) > 0.0:
+		draw_line(center + Vector2(-pixel * 2.0, pixel * 3.0), center + Vector2(0, pixel * 5.0), Color("cf7352"), pixel)
+		draw_line(center + Vector2(0, pixel * 5.0), center + Vector2(pixel * 2.0, pixel * 3.0), Color("cf7352"), pixel)
+	if _bounty_hit_life.has(int(enemy["id"])):
+		var fade: float = _bounty_hit_life[int(enemy["id"])] / 0.18
+		var hit: Vector2 = bounds.get_center()
+		for side: float in [-1.0, 1.0]:
+			draw_line(hit + Vector2(pixel * 3.0 * side, pixel * 2.0), hit + Vector2(pixel * 6.0 * side, -pixel * 3.0), Color(1.0, 0.58, 0.32, fade), pixel * 2.0)
 
 
 func _boulder_offset(tower: Dictionary, index: int) -> Vector2:
@@ -1046,6 +1122,9 @@ func _draw_attacks() -> void:
 	var cell_size: float = _cell_size()
 	for trace: Dictionary in _shot_traces:
 		var remaining: float = clampf(float(trace["life"]) / float(trace["duration"]), 0.0, 1.0)
+		if bool(trace.get("chain", false)):
+			_draw_chain(trace, remaining)
+			continue
 		if bool(trace["area_attack"]):
 			var onyx: bool = trace.get("evolution", "") == "onyx_ring"
 			if onyx:
@@ -1063,6 +1142,29 @@ func _draw_attacks() -> void:
 				var foot: Vector2 = _position_center(hit) + Vector2(0, cell_size * 0.28)
 				draw_line(foot + Vector2(-cell_size * 0.10, 2), foot + Vector2(cell_size * 0.10, -4),
 					Color(0.85, 0.75, 0.95, remaining) if onyx else Color(0.73, 0.79, 0.96, remaining), 2.0)
+
+
+func _draw_chain(trace: Dictionary, remaining: float) -> void:
+	# Ordered accepted strike positions include lethal hits. No local target search.
+	var start: Vector2 = _projectile_origin(trace)
+	var segment: int = 0
+	for point: Vector2 in trace["chain_points"]:
+		var end: Vector2 = _position_center(point) + Vector2(0, _cell_size() * 0.12)
+		var direction: Vector2 = end - start
+		var normal := Vector2(-direction.y, direction.x).normalized()
+		var bend: float = minf(_cell_size() * 0.10, direction.length() * 0.14)
+		var handedness: float = -1.0 if mirror_horizontal else 1.0
+		var zig: float = (1.0 if segment % 2 == 0 else -1.0) * handedness
+		var points := PackedVector2Array([start.floor(),
+			(start.lerp(end, 0.28) + normal * bend * zig).floor(),
+			(start.lerp(end, 0.55) - normal * bend * zig).floor(),
+			(start.lerp(end, 0.76) + normal * bend * 0.6 * zig).floor(), end.floor()])
+		draw_polyline(points, Color(0.18, 0.45, 0.62, remaining * 0.75), 4.0)
+		draw_polyline(points, Color(0.68, 0.94, 0.98, remaining), 2.0)
+		draw_line(end + Vector2(-3, -3), end + Vector2(3, 3), Color(0.86, 1.0, 0.97, remaining), 2.0)
+		draw_line(end + Vector2(-3, 3), end + Vector2(3, -3), Color(0.86, 1.0, 0.97, remaining), 2.0)
+		start = end
+		segment += 1
 
 
 func _draw_onyx_pulse(trace: Dictionary, remaining: float) -> void:
@@ -1095,9 +1197,14 @@ func _tower_muzzle(tower: Dictionary, archer_index: int) -> Vector2:
 		return _archer_geometry(tower, archer_index, _archer_draw_amount(tower, archer_index))["tip"]
 	if artwork != null and artwork.icon_texture != null and artwork.projectile_origin.x >= 0.0 and artwork.projectile_origin.y >= 0.0:
 		var foot: Vector2 = _tower_foot(tower["cell"])
-		var rect: Rect2 = _sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor, foot)
+		var variant: Dictionary = artwork.board_variant(tower.get("evolution", ""), tower.get("followup", ""))
+		var texture: Texture2D = variant.get("texture", artwork.icon_texture)
+		var flip: bool = artwork.mirror_board and mirror_horizontal
+		var rect: Rect2 = _sprite_rect(texture, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), foot, flip)
 		var muzzle: Vector2 = artwork.projectile_origin + _archer_offset(artwork, archer_index)
-		return rect.position + muzzle * rect.size / artwork.icon_texture.get_size()
+		if flip:
+			muzzle.x = texture.get_width() - muzzle.x
+		return rect.position + muzzle * rect.size / texture.get_size()
 	return _tower_foot(tower["cell"]) + Vector2(0, -cell_size * 0.58)
 
 
@@ -1122,7 +1229,7 @@ func _projectile_position(trace: Dictionary) -> Vector2:
 func _draw_projectiles() -> void:
 	var cell_size: float = _cell_size()
 	for trace: Dictionary in _shot_traces:
-		if bool(trace["area_attack"]):
+		if bool(trace["area_attack"]) or bool(trace.get("chain", false)):
 			continue
 		var position: Vector2 = _projectile_position(trace)
 		var elapsed: float = float(trace["duration"]) - float(trace["life"])

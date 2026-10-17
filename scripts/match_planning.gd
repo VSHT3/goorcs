@@ -14,6 +14,10 @@ var locked_routes: Array[Array] = [[], []]
 var locked: bool = false
 var active: bool = false
 var singleplayer: bool = false
+var selecting_loadout: bool = false
+var chosen_tower_ids: Array[StringName] = []
+var loadout_committed: bool = false
+var opponent_committed: bool = false
 var combat: Dictionary = {}
 
 var _dimensions: Vector2i = Vector2i(14, 9)
@@ -32,6 +36,10 @@ var _synced_guest_id: int = 0
 var _pending_snapshot_peer: int = 0
 var _host_combat: MatchCombat
 var _combat_publish_elapsed: float = 0.0
+# Private authority state: never send both decks in one peer snapshot.
+var _host_loadouts: Array[Array] = [[], []]
+var _host_loadout_committed: Array[bool] = [false, false]
+var _host_owned_claims: Array[Array] = [[], []]
 
 var _ready_seconds_left: float = -1.0
 var _expansion_count: int = 0
@@ -98,7 +106,7 @@ func start_singleplayer() -> void:
 	session.leave()
 	_reset_match()
 	singleplayer = true
-	active = true
+	selecting_loadout = true
 	_publish_snapshot()
 
 
@@ -106,6 +114,116 @@ func stop_singleplayer() -> void:
 	if singleplayer:
 		_reset_match()
 		changed.emit()
+
+
+func is_equipped(type_id: StringName) -> bool:
+	return chosen_tower_ids.has(type_id)
+
+
+func select_loadout(ids: Array) -> bool:
+	if not selecting_loadout or loadout_committed:
+		return false
+	var owned: Array = _local_owned_ids()
+	var validated: Array[StringName] = _validated_loadout(ids, owned)
+	if validated.is_empty():
+		feedback.emit("Choose one to four distinct unlocked tower types.")
+		return false
+	return _request_loadout_command("select", validated, owned)
+
+
+func commit_loadout() -> bool:
+	if not selecting_loadout or loadout_committed or chosen_tower_ids.is_empty():
+		return false
+	return _request_loadout_command("commit", [], [])
+
+
+func _local_owned_ids() -> Array:
+	var result: Array = []
+	for definition: TowerDefinition in combat_rules.catalog.towers:
+		if definition != null and definition.reward != null and (collection_store == null or (collection_store.error_message.is_empty() and collection_store.is_unlocked(definition.reward.id))):
+			result.append(definition.reward.id)
+	return result
+
+
+func _catalog_has_tower(id: StringName) -> bool:
+	for definition: TowerDefinition in combat_rules.catalog.towers:
+		if definition != null and definition.reward != null and definition.reward.id == id:
+			return true
+	return false
+
+
+func _validated_loadout(ids: Array, owned: Array) -> Array[StringName]:
+	var result: Array[StringName] = []
+	if ids.is_empty() or ids.size() > 4:
+		return result
+	for value: Variant in ids:
+		if not value is String and not value is StringName:
+			return []
+		var id := StringName(value)
+		if id == &"" or result.has(id) or not owned.has(id) or not _catalog_has_tower(id):
+			return []
+		result.append(id)
+	return result
+
+
+func _request_loadout_command(command: String, ids: Array, owned: Array) -> bool:
+	if singleplayer:
+		return _apply_loadout_command(1, command, ids, owned)
+	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
+		return false
+	if session.is_host:
+		return _apply_loadout_command(1, command, ids, owned)
+	_receive_loadout_command.rpc_id(1, command, ids, owned)
+	return true
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _receive_loadout_command(command: String, ids: Array, owned: Array) -> void:
+	_apply_loadout_command(multiplayer.get_remote_sender_id(), command, ids, owned)
+
+
+func _apply_loadout_command(sender: int, command: String, ids: Array, owned: Array) -> bool:
+	if not _can_accept(sender) or not selecting_loadout:
+		return false
+	var slot: int = 0 if sender == 1 else 1
+	if _host_loadout_committed[slot]:
+		_reject(sender, "Your run loadout is already committed.")
+		return false
+	if command == "select":
+		# There are no accounts: remote ownership is a trusted local-save claim.
+		# Validate its shape/catalog, never substitute the host's own collection.
+		var claim: Array = _local_owned_ids() if slot == 0 else owned
+		var known: Array = []
+		for value: Variant in claim:
+			if (not value is String and not value is StringName) or StringName(value) == &"":
+				return false
+			var id := StringName(value)
+			if known.has(id) or not _catalog_has_tower(id):
+				return false
+			known.append(id)
+		var validated: Array[StringName] = _validated_loadout(ids, known)
+		if validated.is_empty():
+			_reject(sender, "Choose one to four distinct unlocked tower types.")
+			return false
+		_host_loadouts[slot] = validated
+		_host_owned_claims[slot] = known
+	elif command == "commit":
+		var claim: Array = _local_owned_ids() if slot == 0 else _host_owned_claims[slot]
+		if _validated_loadout(_host_loadouts[slot], claim).is_empty():
+			_reject(sender, "Select your unlocked tower types before committing.")
+			return false
+		_host_loadout_committed[slot] = true
+		if singleplayer:
+			_host_loadouts[1] = _host_loadouts[0].duplicate()
+			_host_owned_claims[1] = _host_owned_claims[0].duplicate()
+			_host_loadout_committed[1] = true
+		if _host_loadout_committed[0] and _host_loadout_committed[1]:
+			selecting_loadout = false
+			active = true
+	else:
+		return false
+	_publish_snapshot()
+	return true
 
 
 
@@ -204,24 +322,28 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> void:
 
 func sell_tower(slot: int, tower_id: int) -> void:
 	_request_tower_command("sell", slot, Vector2i.ZERO, tower_id, -1, "")
+func reroll_tower(slot: int, tower_id: int, kind: String) -> bool:
+	if kind not in ["rarity", "attributes"]:
+		return false
+	return _request_tower_command("reroll", slot, Vector2i.ZERO, tower_id, -1, kind)
+
+
 
 
 func send_enemy(slot: int, type_id: StringName) -> void:
 	_request_tower_command("send", slot, Vector2i.ZERO, -1, -1, String(type_id))
 
 
-func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
+func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> bool:
 	if singleplayer:
-		_apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
-		return
+		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
 	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
 		feedback.emit("Wait for both players to connect and synchronize their boards.")
-		return
+		return false
 	if session.is_host:
-		_apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
-	else:
-		_receive_tower_command.rpc_id(1, command, slot, cell, tower_id, mode, argument)
-
+		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
+	_receive_tower_command.rpc_id(1, command, slot, cell, tower_id, mode, argument)
+	return true
 
 func _request_command(command: String, slot: int, cell: Vector2i, value: bool) -> void:
 	if singleplayer:
@@ -253,7 +375,7 @@ func _on_session_changed() -> void:
 		var requested_snapshot: bool = _pending_snapshot_peer == guest_id
 		_reset_match()
 		_active_peer_id = guest_id
-		active = true
+		selecting_loadout = true
 		_publish_snapshot()
 		if requested_snapshot:
 			_sync_guest(guest_id)
@@ -283,6 +405,13 @@ func _reset_match() -> void:
 	locked = false
 	active = false
 	singleplayer = false
+	selecting_loadout = false
+	chosen_tower_ids = []
+	loadout_committed = false
+	opponent_committed = false
+	_host_loadouts = [[], []]
+	_host_loadout_committed = [false, false]
+	_host_owned_claims = [[], []]
 	_active_peer_id = 0
 	_synced_guest_id = 0
 	_pending_snapshot_peer = 0
@@ -312,7 +441,7 @@ func _sync_guest(guest_id: int) -> void:
 	if not _can_accept(guest_id):
 		return
 	_synced_guest_id = guest_id
-	_receive_snapshot.rpc_id(guest_id, _snapshot())
+	_receive_snapshot.rpc_id(guest_id, _snapshot(1))
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -325,22 +454,23 @@ func _receive_tower_command(command: String, slot: int, cell: Vector2i, tower_id
 	_apply_tower_command(multiplayer.get_remote_sender_id(), command, slot, cell, tower_id, mode, argument)
 
 
-func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
-	if not _can_accept(sender):
-		return
+func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> bool:
+	if not _can_accept(sender) or not active:
+		return false
 	var permitted_slot: int = 0 if sender == 1 else 1
 	if slot != permitted_slot:
 		_reject(sender, "Only your own Coins and towers can be changed.")
-		return
+		return false
 	if _host_combat.phase == MatchCombat.Phase.FINISHED:
 		_reject(sender, "The run has ended. Leave to start another room.")
-		return
+		return false
 	if not _host_can_manage_towers(slot):
 		_reject(sender, "Ready commits your planning actions until combat starts.")
-		return
+		return false
+	var mirrored: bool = singleplayer and sender == 1
 	# IDs are globally unique, so resolve the counterpart by cell before a sale.
 	var mirror_id: int = -1
-	if singleplayer and sender == 1 and command not in ["build", "send"]:
+	if mirrored and command not in ["build", "send", "reroll"]:
 		for tower: Dictionary in _host_combat.towers[0]:
 			if tower["id"] == tower_id:
 				for opponent: Dictionary in _host_combat.towers[1]:
@@ -348,51 +478,51 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 						mirror_id = opponent["id"]
 						break
 				break
-	if command == "send":
-		if not _host_combat.send_enemy(slot, StringName(argument)):
-			_reject(sender, "Not enough Coins or this enemy type is unavailable.")
-			return
-	elif command == "build":
-		var layout: PathLayout = _host_layouts[slot]
-		if not layout.contains(cell) or layout.has_path(cell):
-			_reject(sender, "Build towers on empty ground, never on a path or endpoint.")
-			return
-		if not _host_combat.build(slot, cell, StringName(argument), mode):
-			_reject(sender, "Not enough Coins, this cell is occupied, the tower type is unavailable, or the targeting mode is invalid.")
-			return
-	elif command == "target":
-		if not _host_combat.set_targeting(slot, tower_id, mode):
-			_reject(sender, "Choose an existing own tower and a different valid targeting mode.")
-			return
-	elif command == "target_secondary":
-		if not _host_combat.set_secondary_targeting(slot, tower_id, mode):
-			_reject(sender, "Choose an upgraded own Arrow tower and a different valid second-archer targeting mode.")
-			return
-	elif command in ["target_archer_3", "target_archer_4"]:
-		var archer_index: int = 2 if command == "target_archer_3" else 3
-		if not _host_combat.set_archer_targeting(slot, tower_id, archer_index, mode):
-			_reject(sender, "Choose a Four Archers tower you own and a different valid archer targeting mode.")
-			return
-	elif command == "upgrade":
-		if not _host_combat.upgrade_tower(slot, tower_id, argument):
-			_reject(sender, "Not enough Coins, this upgrade was already bought, or the tower/upgrade is invalid.")
-			return
-	elif command == "sell":
-		if not _host_combat.sell_tower(slot, tower_id):
-			_reject(sender, "Only an existing own tower can be sold.")
-			return
-	else:
-		_reject(sender, "Unknown tower command.")
-		return
-	if singleplayer and sender == 1:
+	var accepted: bool = false
+	match command:
+		"send":
+			accepted = _host_combat.send_enemy(slot, StringName(argument))
+		"build":
+			if not _host_loadout_committed[slot] or not _host_loadouts[slot].has(StringName(argument)):
+				_reject(sender, "This tower is not in your committed run loadout.")
+				return false
+			var layout: PathLayout = _host_layouts[slot]
+			if not layout.contains(cell) or layout.has_path(cell):
+				_reject(sender, "Build towers on empty ground, never on a path or endpoint.")
+				return false
+			if mirrored:
+				if _host_layouts[1].has_path(cell):
+					return false
+				accepted = _host_combat.build_mirrored(slot, cell, StringName(argument), mode)
+			else:
+				accepted = _host_combat.build(slot, cell, StringName(argument), mode)
+		"reroll":
+			accepted = _host_combat.reroll_tower_mirrored(slot, tower_id, argument) if mirrored else _host_combat.reroll_tower(slot, tower_id, argument)
+		"target":
+			accepted = _host_combat.set_targeting(slot, tower_id, mode)
+		"target_secondary":
+			accepted = _host_combat.set_secondary_targeting(slot, tower_id, mode)
+		"target_archer_3", "target_archer_4":
+			var archer_index: int = 2 if command == "target_archer_3" else 3
+			accepted = _host_combat.set_archer_targeting(slot, tower_id, archer_index, mode)
+		"upgrade":
+			accepted = _host_combat.upgrade_tower(slot, tower_id, argument)
+		"sell":
+			accepted = _host_combat.sell_tower(slot, tower_id)
+	if not accepted:
+		_reject(sender, "Action unavailable: check your tower, currency, prerequisites, and command.")
+		return false
+	# Randomized commands atomically mirror one accepted roll in the model.
+	if mirrored and command not in ["build", "reroll"]:
 		_apply_tower_command(2, command, 1, cell, mirror_id, mode, argument)
-		return
-	_publish_snapshot()
+	else:
+		_publish_snapshot()
+	return true
 
 
 func _can_accept(sender: int) -> bool:
 	if singleplayer:
-		return active and sender in [1, 2]
+		return (active or selecting_loadout) and sender in [1, 2]
 	if not session.is_host or session.state != MultiplayerSession.State.CONNECTED:
 		return false
 	var guest_id: int = _admitted_guest()
@@ -400,7 +530,7 @@ func _can_accept(sender: int) -> bool:
 
 
 func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, value: bool) -> void:
-	if not _can_accept(sender):
+	if not _can_accept(sender) or not active:
 		return
 	var permitted_slot: int = 0 if sender == 1 else 1
 	if slot != permitted_slot:
@@ -587,7 +717,7 @@ func _receive_feedback(message: String) -> void:
 		feedback.emit(message)
 
 
-func _snapshot() -> Dictionary:
+func _snapshot(recipient_slot: int = 0) -> Dictionary:
 	var tiles: Array[Array] = [[], []]
 	for slot: int in range(2):
 		var layout: PathLayout = _host_layouts[slot]
@@ -597,6 +727,11 @@ func _snapshot() -> Dictionary:
 				if not layout.is_endpoint(cell) and layout.has_path(cell):
 					tiles[slot].append(cell)
 	return {
+		"active": active,
+		"selecting_loadout": selecting_loadout,
+		"chosen_tower_ids": _host_loadouts[recipient_slot].duplicate(),
+		"loadout_committed": _host_loadout_committed[recipient_slot],
+		"opponent_committed": _host_loadout_committed[1 - recipient_slot],
 		"dimensions": _host_layouts[0].dimensions,
 		"budget": _host_layouts[0].budget,
 		"entrance": _host_layouts[0].entrance,
@@ -614,7 +749,7 @@ func _publish_snapshot() -> void:
 	_mirror_snapshot(snapshot)
 	changed.emit()
 	if _synced_guest_id != 0 and _can_accept(_synced_guest_id):
-		_receive_snapshot.rpc_id(_synced_guest_id, snapshot)
+		_receive_snapshot.rpc_id(_synced_guest_id, _snapshot(1))
 
 
 
@@ -637,12 +772,16 @@ func _receive_snapshot(snapshot: Dictionary) -> void:
 	if session.is_host or session.state != MultiplayerSession.State.CONNECTED or multiplayer.get_remote_sender_id() != 1:
 		return
 	_active_peer_id = 1
-	active = true
 	_mirror_snapshot(snapshot)
 	changed.emit()
 
 
 func _mirror_snapshot(snapshot: Dictionary) -> void:
+	active = snapshot["active"]
+	selecting_loadout = snapshot["selecting_loadout"]
+	chosen_tower_ids.assign(snapshot["chosen_tower_ids"])
+	loadout_committed = snapshot["loadout_committed"]
+	opponent_committed = snapshot["opponent_committed"]
 	var next_layouts: Array[PathLayout] = []
 	for slot: int in range(2):
 		var layout := PathLayout.new(snapshot["dimensions"], snapshot["budget"], snapshot["entrance"], snapshot["base"])

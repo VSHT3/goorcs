@@ -1,4 +1,4 @@
-# TODO — Match visual direction
+# TODO — Visual direction and gameplay roadmap
 
 ## Status and reference
 
@@ -106,4 +106,89 @@ Current corrected runtime evidence: [1280×720 empty board separation](docs/visu
 
 ## Scope boundaries
 
-This is a presentation/art-direction task. It does not authorize balance changes, extra regular enemies, different spawn spacing, new gameplay footprints, a larger map, more path budget, new enemy mechanics, or replacing the approved HUD wholesale. Visual size is not simulation size. Generated artwork remains subject to the existing approval/provenance workflow.
+The visual-direction work above does not authorize balance changes, extra regular enemies, different spawn spacing, new gameplay footprints, a larger map, more path budget, new enemy mechanics, or replacing the approved HUD wholesale. Visual size is not simulation size. Generated artwork remains subject to the existing approval/provenance workflow. The separately agreed gameplay roadmap below has its own scope.
+
+## Gameplay roadmap — loadouts, tower rolls, and roster expansion
+
+Agreed design from the planning discussion, now implemented with authored **provisional** parameters except the two explicit boundaries below: undecided final Lightning identity/additional evolutions, and actual visual surface verification forbidden by the user. Existing Arrow, Ballista, and Rune behavior is preserved except where these systems explicitly extend it. Checked mechanics are supported by source and headless behavior/control/real-peer proof, **not** new pixel or final-balance approval. See [current verification](docs/development.md#six-role-gameplay-verification) and [authoring contracts](docs/content-pipeline.md#six-role-schemas-and-evolution-data).
+
+### Loadouts and collection
+
+- [x] Expand the roster to six collectible tower identities: Arrow, Ballista, Rune, Lightning (working name), War Drums, and Gold Mine.
+- [x] Let each player equip up to four distinct tower types from their collection. Allow empty slots, but require a nonempty loadout.
+- [x] Give fresh collections Arrow as a guaranteed starter. Atomically migrate existing saves without losing unlocks; reset also retains the starter guarantee.
+- [x] Add loadout selection together in the connected lobby, before initial board planning. Do not expose the opponent's loadout list; recipient-targeted snapshots reveal only their own original deck and opponent commitment status, while placed towers remain scoutable.
+- [x] Make the committed loadout constrain host-validated purchases, not just the palette. Singleplayer selects/commits before boards and returns to selection on replay. Guest local-save ownership remains a trusted-friends claim, not account/save attestation; host-enforced admitted IDs are frozen.
+- [x] Keep evolution branches within their parent tower's loadout slot.
+
+### Per-placement rarity and attributes
+
+- [x] Roll each individual tower's rarity and attributes when its paid placement succeeds. The player chooses the tower identity, not an unknown tower summon.
+- [x] Use this rarity ladder: Broken → Shoddy → Common → Uncommon → Rare → Epic → Legendary → Mythic.
+- [x] Author placement rarity weights and, for every rarity/profile, positive-slot count, drawback-slot count, eligible pools, and attribute value bounds. Lowest tiers have only drawbacks; all authored values remain provisional.
+- [x] Restrict pools to tower-compatible effects. No duplicate attributes on one tower and no opposing positive/negative modifiers to the same stat.
+- [x] Support numerical modifiers and mechanical effects. Illustrative outcomes remain Common Rune with +5% attack speed and −3% damage; Legendary Ballista with +33% damage and +1 bounce; Mythic Rune with increased range. These examples are not approved odds, bounds, or slot counts.
+- [x] Preserve all rolled attributes through purchased evolutions. Pools/effect definitions are compatible with each implemented future branch; effective stats rederive from purchased baselines rather than compounding previous rolls.
+- [x] Stack rolled mechanics additively with purchased mechanics: extra Pierce adds capacity to Pierce; extra Bounce grants bouncing independently and adds to Bounce. Rune cannot roll Ballista-specific Pierce/Bounce.
+- [x] Apply the result immediately and show rarity/attributes in inspection. No pre-purchase roll preview, choice-of-offers flow, or reveal modal. Signed range rolls change usable tiles with positive ceil/negative floor rounding, zero preserving authored range.
+- [x] Keep rarity, attributes, and reroll state run-specific; placed towers are not permanent collection items.
+
+### Rerolls and run-only currency
+
+- [x] Add two separate tower actions: reroll rarity and reroll attributes.
+- [x] Rarity rerolls spend run-only Shards, exclude the current tier, renormalize the same placement weights, roll a different tier, and regenerate all attributes. Downgrades are allowed.
+- [x] Attribute rerolls cost match Coins, retain rarity, and regenerate every attribute and value, not a selected attribute or values alone.
+- [x] Give each tower independent rarity/attribute counters. Costs use `ceil(base + linear*n + quadratic*n²)`, not stepped brackets; provisional curves are `(8,4,2)` Shards and `(20,10,5)` Coins.
+- [x] Every rarity reroll resets the attribute cost counter but never its own rarity counter.
+- [x] Permit rerolls during planning/combat wherever tower management is allowed. Committed Ready locks rerolls until combat starts.
+- [x] Award Shards on round clears and random enemy drops; enemy resources define chance/payout. Prototype starting/clear grants are provisionally 8/3, separate from Coins.
+- [x] Allow every enemy type, sent enemies, and summoned SkeleOrcs to drop Shards for the defending player whose towers killed them. All seven resource drop pairs are authored; summon farming is intentionally eligible.
+
+### Lightning tower
+
+- [x] Implement direct chain damage, not charge buildup or damage amplification.
+- [x] Each jump chooses the nearest eligible enemy within jump distance that this chain has not hit. Stable IDs break ties; each individual is hit at most once per chain.
+- [x] Deal full damage on every jump by default.
+- [x] Add a shared purchasable upgrade, before evolution, that increases damage on each successive chained hit.
+- [x] Implement the specified provisional Longer Reach direction, increasing initial targeting range and jump distance after the shared escalation upgrade; preserve purchased escalation and rolled effects.
+- [ ] Decide final identity/name and additional evolution choices. These were **never decided**, so no invented final tree is claimed. Base stats, chain count/distance, upgrade prices/values, and Longer Reach are already authored/implemented provisionally, not missing mechanics or creator-approved final balance.
+
+### War Drums
+
+- [x] Make base War Drums buff both damage and attack speed of nearby towers.
+- [x] Add permanent Forge evolution: pure damage support, replacing the mixed base buff.
+- [x] Add permanent Command Banner evolution: pure attack-speed support, replacing the mixed base buff.
+- [x] Let different support types/branches stack additively by group, but use the strongest duplicate per component within a group rather than summing duplicates.
+- [x] Author provisional ranges/strengths/prices, role-specific upgrades, and support roll pools. Paid mixed upgrades transfer into the surviving pure component; rolled range/strength survives evolution.
+
+### Gold Mine and Royal Mint
+
+- [x] Make base Gold Mine grant Coins on round clear.
+- [x] Add permanent Royal Mint: retain round-clear production and add periodic Coins during combat simulation time, never interest on unspent Coins.
+- [x] Add permanent Bounty Board: replace production with the kill rewards below.
+- [x] Author provisional production amounts, simulation-time cadence, prices, upgrades, and economy roll pools; preserve paid/rolled income modifiers through every branch.
+
+### Bounty Board and its further branches
+
+- [x] Make unevolved Bounty Board automatically mark the highest-maximum-HP eligible enemy within range (stable-ID ties), increasing Coin payout and damage taken.
+- [x] Hold one active target per Board. Marks persist outside range until death/crystal arrival; no new target while the old one remains active.
+- [x] Allow only one bounty per enemy. Other Boards choose another eligible target instead of stacking marks.
+- [x] Calculate marked-kill bonus Coins as a percentage of normal bounty. Zero-normal-bounty summons get no extra percentage Coins, but retain independent Shard eligibility.
+- [x] Add two permanent exclusive further branches: Greater Bounty (stronger marking) or Tribute Office (nearby-tower income aura replacing marking). Names/values are authored provisional choices, not final creator-approved names.
+- [x] Make aura eligibility follow the killing tower's location, not the dead enemy's location.
+- [x] Prevent duplicate income auras stacking (strongest applicable wins). Allow both another Board's mark and a killer-location aura on one kill.
+- [x] Author provisional marking/aura strengths/ranges/prices and exact payout rule: `ceil(normal*(1 + scaled mark + strongest applicable aura))`. Buying the aura immediately removes that Board's active mark. Vulnerability is integrated inside continuous/Burn fractional accumulation, without step-cadence amplification.
+
+### Authority and acceptance
+
+- [x] Keep the host authoritative over admitted decks, purchase rolls, rerolls, Shards, drops, marks, buffs, damage, and payouts; local inspection/cosmetics display accepted state only.
+- [x] Apply costs/results atomically. Rejection spends nothing, consumes no gameplay roll, and changes no attributes/counters. Host/guest share validation. Isolate roll/drop RNG from composition/timing/groups/results; Singleplayer samples once and charges/applies both mirrored counterparts.
+- [x] Reuse existing resources, combat owners, collection persistence, and upgrade conventions. Extend authoring via behavior-kind schemas, role profiles, and validated resource branch artwork—not collectible-ID rule switches.
+- [x] Cover rarity exclusion/renormalization, attribute compatibility/conflicts, evolution stacking, counter resets, Ready locks, drop ownership, support overlap, chain hits, bounty exclusivity/persistence, and exact payouts with headless regressions.
+- [x] Exercise actual-scene placement, inspection, upgrades, rerolls, chain/support/economy controls **headlessly**; a 52.30-second real-scene smoke and authenticated separate-process peer checks passed accepted rolls, currencies, marks, payouts, Singleplayer, and Sandbox integration. Final isolated headless verification passed **47/47 checks**. No visual verification is implied.
+- [ ] Verify the actual **VISUAL** loadout/HUD/inspection/branch surfaces and new artwork. The user explicitly stopped/forbids graphical tests, windows, desktop interaction, and pixel captures for this phase. The actual-scene/control/real-peer headless checks passed but cannot establish pixels/layout/native GPU/art approval; the interrupted all-mode attempt and timed-out rendered death check are **not** a green rendered run.
+- [x] Update current-state/content-authoring documentation after source and applicable headless proof; record provisional values and the explicit visual prohibition without claiming approval or fresh pixel verification.
+
+### Parameters still open
+
+The implementation now authors editable provisional values for rarity weights, profile slots/pools/bounds, reroll curves, starting/clear/drop Shards, tower/evolution stats/prices, branch names, support/payout composition, and loadout commitment/validation. These are concrete implemented rules, **not user-approved final balance decisions**; tune through resources after permitted playtesting rather than treating the examples as approvals. Final Lightning identity/additional evolution choices remain genuinely undecided; actual visual surface verification remains explicitly forbidden/unrun. Permanent stat progression and post-run rewards are not added by this run-specific system. The original visual/art/creator-led Ballista tasks above are unchanged.

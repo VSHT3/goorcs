@@ -50,6 +50,7 @@ func _new_model() -> MatchPlanning:
 	planning.combat_rules = _rules()
 	root.add_child(planning)
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Progression fixture commits its authored tower")
 	planning.set_physics_process(false)
 	_route(planning)
 	return planning
@@ -219,6 +220,7 @@ func _test_strategy_growth_and_reset() -> void:
 			_clear_wave(planning)
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
+	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Expanded-match restart chooses a fresh loadout")
 	_check(planning.combat["board_origin_y"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["ready_seconds_left"] == -1.0, "Leaving an expanded match restores initial combat and origin state for a fresh run")
 	for slot: int in range(2):
 		_check(planning.layouts[slot].dimensions == Vector2i(14, 9) and planning.layouts[slot].budget == 30 and planning.layouts[slot].entrance == Vector2i(0, 4) and planning.layouts[slot].base == Vector2i(13, 4) and planning.layouts[slot].used_tiles() == 0 and planning.layouts[slot].route.is_empty(), "A fresh run restores the captured initial grid, endpoints, budget and empty path on both boards")

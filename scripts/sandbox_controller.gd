@@ -145,6 +145,13 @@ func upgrade(tower_id: int, command: String) -> bool:
 	return accepted
 
 
+func reroll_tower(tower_id: int, kind: String) -> bool:
+	var accepted: bool = combat.reroll_tower(0, tower_id, kind)
+	if accepted:
+		_publish()
+	return accepted
+
+
 func sell(tower_id: int) -> bool:
 	var accepted: bool = combat.sell_tower(0, tower_id)
 	if accepted:

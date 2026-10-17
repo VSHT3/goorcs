@@ -69,6 +69,7 @@ func _open_match() -> void:
 	main.play_button.pressed.emit()
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "Inspection fixture commits its owned tested identities")
 	screen = main.play_screen.planning_screen
 	world = screen.world
 	_freeze()

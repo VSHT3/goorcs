@@ -27,6 +27,9 @@ extends Resource
 @export var group_weights: PackedInt32Array = PackedInt32Array([1])
 @export var group_interval: float = 0.065
 @export var kill_bounty: int = -1
+# Separate run-only rarity currency, including zero-bounty summoned enemies.
+@export_range(0.0, 1.0) var reroll_drop_chance: float = 0.0
+@export var reroll_drop_amount: int = 0
 @export var heal_interval: float = 0.0
 @export var heal_radius: float = 0.0
 @export var heal_fraction: float = 0.0

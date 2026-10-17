@@ -8,10 +8,12 @@ enum Form { CHOOSE, HOST, JOIN }
 var session: MultiplayerSession
 var planning: MatchPlanning
 var planning_screen: MatchPlanningScreen
+var loadout_panel: LoadoutPanel
 var _form: Form = Form.CHOOSE
 var _submitting: bool = false
 var _last_state: int = -1
 var _planning_was_active: bool = false
+var _loadout_was_selecting: bool = false
 
 @onready var host_button: Button = %Host
 @onready var join_button: Button = %Join
@@ -44,6 +46,12 @@ func _ready() -> void:
 	add_child(planning_screen)
 	planning_screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	planning_screen.leave_requested.connect(_request_back)
+	loadout_panel = LoadoutPanel.new()
+	loadout_panel.planning = planning
+	loadout_panel.hide()
+	add_child(loadout_panel)
+	loadout_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	loadout_panel.leave_requested.connect(_request_back)
 	if planning != null:
 		planning.changed.connect(_planning_changed)
 	host_button.pressed.connect(_show_host)
@@ -176,8 +184,10 @@ func _planning_changed() -> void:
 	if not is_node_ready():
 		return
 	var planning_active: bool = planning != null and planning.active
-	var activity_changed: bool = planning_active != _planning_was_active
+	var selecting: bool = planning != null and planning.selecting_loadout
+	var activity_changed: bool = planning_active != _planning_was_active or selecting != _loadout_was_selecting
 	_planning_was_active = planning_active
+	_loadout_was_selecting = selecting
 	_refresh()
 	if activity_changed and is_visible_in_tree():
 		_focus_action.call_deferred()
@@ -185,10 +195,12 @@ func _planning_changed() -> void:
 
 func _refresh() -> void:
 	var planning_active: bool = planning != null and planning.active
-	_margin.visible = not planning_active
+	var selecting: bool = planning != null and planning.selecting_loadout
+	_margin.visible = not planning_active and not selecting
 	_background.visible = not planning_active
-	_scroll.visible = not planning_active
+	_scroll.visible = not planning_active and not selecting
 	planning_screen.visible = planning_active
+	loadout_panel.visible = selecting
 	var available: bool = _can_start()
 	var active: bool = session != null and session.state in [MultiplayerSession.State.HOSTING, MultiplayerSession.State.CONNECTING, MultiplayerSession.State.CONNECTED]
 	var editable: bool = session != null and not active
@@ -246,6 +258,14 @@ func _focus_action() -> void:
 		back_button.grab_focus()
 	elif planning != null and planning.active:
 		planning_screen.menu_button.grab_focus()
+	elif planning != null and planning.selecting_loadout:
+		if not loadout_panel.commit_button.disabled:
+			loadout_panel.commit_button.grab_focus()
+		else:
+			for button: Button in loadout_panel.tower_buttons.values():
+				if not button.disabled:
+					button.grab_focus()
+					break
 	elif session.state in [MultiplayerSession.State.HOSTING, MultiplayerSession.State.CONNECTED]:
 		if _invitation.visible:
 			copy_button.grab_focus()

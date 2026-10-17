@@ -1,0 +1,161 @@
+[gd_resource type="Resource" script_class="TowerRollRules" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/tower_roll_rules.gd" id="1_rules"]
+
+; PROVISIONAL playtest weights, bounds, slots and costs; not user-approved balance.
+; Explicit opt-in: this resource is not automatically enabled by new CombatRules.
+[resource]
+script = ExtResource("1_rules")
+rarity_reroll_cost_curve = Vector3(8, 4, 2)
+attribute_reroll_cost_curve = Vector3(20, 10, 5)
+slot_profiles = {
+"attack": {},
+"support": {},
+"economy": {
+"broken": Vector2i(0, 1),
+"shoddy": Vector2i(0, 1),
+"common": Vector2i(1, 0),
+"uncommon": Vector2i(1, 0),
+"rare": Vector2i(1, 0),
+"epic": Vector2i(1, 0),
+"legendary": Vector2i(1, 0),
+"mythic": Vector2i(1, 0)
+}
+}
+rarities = Array[Dictionary]([{
+"id": "broken",
+"title": "Broken",
+"weight": 8.0,
+"positive_slots": 0,
+"drawback_slots": 1,
+"positive_pool": {},
+"drawback_pool": {
+"damage": Vector2(-0.35, -0.2),
+"attack_speed": Vector2(-0.35, -0.2),
+"range": Vector2(-0.25, -0.1),
+"support_buff": Vector2(-0.35, -0.2),
+"economy_production": Vector2(-0.35, -0.2)
+}
+}, {
+"id": "shoddy",
+"title": "Shoddy",
+"weight": 15.0,
+"positive_slots": 0,
+"drawback_slots": 2,
+"positive_pool": {},
+"drawback_pool": {
+"damage": Vector2(-0.2, -0.1),
+"attack_speed": Vector2(-0.2, -0.1),
+"range": Vector2(-0.12, -0.05),
+"support_buff": Vector2(-0.2, -0.1),
+"economy_production": Vector2(-0.2, -0.1)
+}
+}, {
+"id": "common",
+"title": "Common",
+"weight": 38.0,
+"positive_slots": 1,
+"drawback_slots": 1,
+"positive_pool": {
+"damage": Vector2(0.03, 0.08),
+"attack_speed": Vector2(0.03, 0.08),
+"range": Vector2(0.03, 0.06),
+"support_buff": Vector2(0.03, 0.08),
+"economy_production": Vector2(0.03, 0.08)
+},
+"drawback_pool": {
+"damage": Vector2(-0.08, -0.03),
+"attack_speed": Vector2(-0.08, -0.03),
+"range": Vector2(-0.06, -0.02),
+"support_buff": Vector2(-0.08, -0.03),
+"economy_production": Vector2(-0.08, -0.03)
+}
+}, {
+"id": "uncommon",
+"title": "Uncommon",
+"weight": 23.0,
+"positive_slots": 1,
+"drawback_slots": 1,
+"positive_pool": {
+"damage": Vector2(0.08, 0.15),
+"attack_speed": Vector2(0.08, 0.15),
+"range": Vector2(0.05, 0.1),
+"support_buff": Vector2(0.08, 0.15),
+"economy_production": Vector2(0.08, 0.15)
+},
+"drawback_pool": {
+"damage": Vector2(-0.04, -0.01),
+"attack_speed": Vector2(-0.04, -0.01),
+"range": Vector2(-0.03, -0.01),
+"support_buff": Vector2(-0.04, -0.01),
+"economy_production": Vector2(-0.04, -0.01)
+}
+}, {
+"id": "rare",
+"title": "Rare",
+"weight": 10.0,
+"positive_slots": 2,
+"drawback_slots": 0,
+"positive_pool": {
+"damage": Vector2(0.12, 0.22),
+"attack_speed": Vector2(0.12, 0.22),
+"range": Vector2(0.08, 0.15),
+"pierce": Vector2(1, 1),
+"bounce": Vector2(1, 1),
+"chain_jumps": Vector2(1, 1),
+"support_buff": Vector2(0.12, 0.22),
+"economy_production": Vector2(0.12, 0.22)
+},
+"drawback_pool": {}
+}, {
+"id": "epic",
+"title": "Epic",
+"weight": 4.5,
+"positive_slots": 2,
+"drawback_slots": 0,
+"positive_pool": {
+"damage": Vector2(0.2, 0.35),
+"attack_speed": Vector2(0.2, 0.35),
+"range": Vector2(0.12, 0.22),
+"pierce": Vector2(1, 2),
+"bounce": Vector2(1, 1),
+"chain_jumps": Vector2(1, 2),
+"support_buff": Vector2(0.2, 0.35),
+"economy_production": Vector2(0.2, 0.35)
+},
+"drawback_pool": {}
+}, {
+"id": "legendary",
+"title": "Legendary",
+"weight": 1.3,
+"positive_slots": 2,
+"drawback_slots": 0,
+"positive_pool": {
+"damage": Vector2(0.3, 0.5),
+"attack_speed": Vector2(0.3, 0.5),
+"range": Vector2(0.2, 0.35),
+"pierce": Vector2(1, 3),
+"bounce": Vector2(1, 2),
+"chain_jumps": Vector2(2, 3),
+"support_buff": Vector2(0.3, 0.5),
+"economy_production": Vector2(0.3, 0.5)
+},
+"drawback_pool": {}
+}, {
+"id": "mythic",
+"title": "Mythic",
+"weight": 0.2,
+"positive_slots": 2,
+"drawback_slots": 0,
+"positive_pool": {
+"damage": Vector2(0.45, 0.75),
+"attack_speed": Vector2(0.45, 0.75),
+"range": Vector2(0.3, 0.5),
+"pierce": Vector2(2, 4),
+"bounce": Vector2(2, 3),
+"chain_jumps": Vector2(3, 5),
+"support_buff": Vector2(0.45, 0.75),
+"economy_production": Vector2(0.45, 0.75)
+},
+"drawback_pool": {}
+}])

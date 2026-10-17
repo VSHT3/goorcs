@@ -13,6 +13,7 @@ cost = 85
 upgrade_base_cost = 55
 damage_upgrade_bonus = 3
 speed_upgrade_multiplier = 0.75
+roll_attributes = PackedStringArray("damage", "attack_speed", "range", "pierce", "bounce")
 attack_sound = 1
 evolutions = {
 "pierce": {

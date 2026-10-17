@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="TowerReward" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
+[ext_resource type="Texture2D" path="res://assets/towers/gold_mine.png" id="2_art"]
+[ext_resource type="Texture2D" path="res://assets/towers/royal_mint.png" id="3_mint"]
+[ext_resource type="Texture2D" path="res://assets/towers/bounty_board.png" id="4_bounty"]
+[ext_resource type="Texture2D" path="res://assets/towers/greater_bounty.png" id="5_greater"]
+[ext_resource type="Texture2D" path="res://assets/towers/tribute_office.png" id="6_tribute"]
+
+[resource]
+script = ExtResource("1_reward")
+id = &"gold_mine"
+title = "Gold Mine"
+description = "A timber-braced mine produces Coins when a round clears. Evolve into a Royal Mint or a Bounty Board."
+icon_texture = ExtResource("2_art")
+accent = Color(0.88, 0.71, 0.28, 1)
+board_height = 1.12
+board_anchor = Vector2(0.5, 0.928571)
+mirror_board = true
+board_variants = {
+"royal_mint": {"texture": ExtResource("3_mint"), "board_height": 1.6},
+"bounty_board": {"texture": ExtResource("4_bounty"), "board_height": 1.5},
+"stronger_mark": {"texture": ExtResource("5_greater"), "board_height": 1.65},
+"income_aura": {"texture": ExtResource("6_tribute"), "board_height": 1.55}
+}

@@ -22,6 +22,12 @@ var advancement_buttons: Dictionary[String, Button] = {}
 var results_menu: MatchResultsMenu
 var _results_run_id: String = ""
 var sound_player: GameSoundPlayer
+var _roll_details: Label
+var rarity_reroll: Button
+var attribute_reroll: Button
+var _extra_upgrades: VBoxContainer
+var _extra_upgrade_buttons: Dictionary[String, Button] = {}
+var _reroll_balance: Label
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -82,6 +88,7 @@ func _ready() -> void:
 		if planning != null:
 			boards[slot].content_catalog = planning.combat_rules.catalog
 	_create_palette()
+	_build_tower_management()
 	_cancel_placement.pressed.connect(cancel_interaction)
 	close_button.pressed.connect(cancel_interaction)
 	_enemy_inspector.close_requested.connect(cancel_interaction)
@@ -126,6 +133,57 @@ func _ready() -> void:
 		planning.feedback.connect(_show_feedback)
 	_refresh()
 
+
+func _build_tower_management() -> void:
+	var content: VBoxContainer = _management.get_node("Content") as VBoxContainer
+	var scroll := ScrollContainer.new()
+	scroll.name = "InspectionScroll"
+	scroll.follow_focus = true
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_management.add_child(scroll)
+	content.reparent(scroll, false)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_roll_details = Label.new()
+	_roll_details.name = "TowerRoll"
+	_roll_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_roll_details.add_theme_font_override("font", _coins.get_theme_font("font"))
+	_roll_details.add_theme_font_size_override("font_size", 16)
+	content.add_child(_roll_details)
+	content.move_child(_roll_details, 1)
+	var rerolls := VBoxContainer.new()
+	rerolls.name = "Rerolls"
+	content.add_child(rerolls)
+	content.move_child(rerolls, 3)
+	for kind: String in ["rarity", "attributes"]:
+		var button := Button.new()
+		button.name = "RerollRarity" if kind == "rarity" else "RerollAttributes"
+		button.custom_minimum_size.y = 36
+		button.add_theme_font_override("font", _coins.get_theme_font("font"))
+		button.add_theme_font_size_override("font_size", 16)
+		button.pressed.connect(_reroll.bind(kind))
+		rerolls.add_child(button)
+		if kind == "rarity":
+			rarity_reroll = button
+		else:
+			attribute_reroll = button
+	_extra_upgrades = VBoxContainer.new()
+	content.add_child(_extra_upgrades)
+	content.move_child(_extra_upgrades, content.get_child_count() - 2)
+	for button: Button in [special_upgrade, alternate_upgrade]:
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_reroll_balance = Label.new()
+	_reroll_balance.name = "RerollCurrency"
+	_reroll_balance.add_theme_font_override("font", _coins.get_theme_font("font"))
+	_reroll_balance.add_theme_font_size_override("font_size", 16)
+	_reroll_balance.tooltip_text = "Run-only rarity currency. Earned from round clears and enemy drops; spent on rarity rerolls."
+	_income.get_parent().add_child(_reroll_balance)
+	_income.get_parent().move_child(_reroll_balance, _income.get_index())
+
+
+func _reroll(kind: String) -> void:
+	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
+	if planning != null and button.is_visible_in_tree() and not button.disabled and not _selected_tower().is_empty():
+		planning.reroll_tower(planning.local_slot(), selected_tower_id, kind)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_DRAG_END and is_node_ready():
@@ -357,6 +415,8 @@ func _refresh_palette() -> void:
 		var button: TowerShopButton = shop_buttons[id]
 		var stats: Dictionary = types.get(String(id), {})
 		var unlocked: bool = planning != null and planning.collection_store != null and planning.collection_store.is_unlocked(id)
+		var equipped: bool = planning != null and planning.is_equipped(id)
+		button.visible = equipped
 		var title: String = String(stats.get("title", button.tower_title))
 		button.tower_title = title
 		button.cost = int(stats.get("cost", 0))
@@ -365,11 +425,11 @@ func _refresh_palette() -> void:
 			status = "Locked"
 		elif stats.is_empty():
 			status = "Unavailable"
-		button.disabled = not available or not unlocked or stats.is_empty() or coins < button.cost
+		button.disabled = not available or not equipped or not unlocked or stats.is_empty() or coins < button.cost
 		button.set_pressed_no_signal(id == _placement_id)
 		var price: String = str(button.cost) if not stats.is_empty() else ""
 		button.refresh_caption(price, status)
-		button.tooltip_text = "%d Coins · %d damage · %.2fs · %d tile range" % [button.cost, int(stats.get("damage", 0)), float(stats.get("interval", 0.0)), int(stats.get("range", 0))] if not stats.is_empty() else "This tower is unavailable in the host's match catalog."
+		button.tooltip_text = "%d Coins\n%s" % [button.cost, behavior_summary(stats)] if not stats.is_empty() else "This tower is unavailable in the host's match catalog."
 		if coins < button.cost:
 			button.tooltip_text += "\nNeed %d more Coins." % (button.cost - coins)
 		if not unlocked:
@@ -383,6 +443,8 @@ func _refresh_palette() -> void:
 			_placement_id = &""
 			button.set_pressed_no_signal(false)
 	_coins.text = "Coins %d" % coins
+	var currency: Array = planning.combat.get("reroll_currency", [0, 0]) if planning != null else [0, 0]
+	_reroll_balance.text = "Shards %d" % int(currency[planning.local_slot() if planning != null else 0])
 	_refresh_sends()
 	_cancel_placement.visible = _placement_id != &""
 
@@ -613,49 +675,49 @@ func _refresh_targeting() -> void:
 		return
 	var types: Dictionary = planning.combat.get("tower_types", {})
 	var stats: Dictionary = types.get(String(tower["type_id"]), {})
-	var interval: float = float(tower.get("interval", stats.get("interval", 1.0)))
-	_tower_title.text = "%s · Level %s" % [String(stats.get("title", "Tower")), TOWER_LEVEL_NUMERALS[MatchCombat.tower_level(tower) - 1]]
-	var evolution: String = String(tower.get("evolution", ""))
-	var damage: int = int(tower.get("damage", stats.get("damage", 0)))
-	if evolution == "boulders":
-		_tower_stats.text = "Kills %d · %d DPS\nContinuous" % [int(tower.get("kills", 0)), damage]
-	elif evolution == "onyx_ring":
-		_tower_stats.text = "Kills %d · Damage %d\nEvery %.2fs" % [int(tower.get("kills", 0)), damage, interval]
-	else:
-		_tower_stats.text = "Kills %d · Damage %d\n%.2f attacks/s" % [
-			int(tower.get("kills", 0)), damage, 1.0 / interval,
-		]
+	_tower_title.text = tower_display_title(tower, stats)
+	_tower_stats.text = tower_stats_text(tower, stats)
+	_roll_details.text = roll_details_text(tower)
+	targeting_button.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
 	targeting_button.mode = int(tower["mode"])
 	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
-	_refresh_upgrade(damage_upgrade, tower, stats, "damage")
-	_refresh_upgrade(speed_upgrade, tower, stats, "speed")
-	var evolutions: Dictionary = stats.get("evolutions", {})
-	var unlocked_special: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false)) and (not evolutions.is_empty() or not String(stats.get("special_upgrade", "")).is_empty())
-	damage_upgrade.visible = not unlocked_special
-	speed_upgrade.visible = not unlocked_special
-	special_upgrade.visible = unlocked_special
-	var boulders: bool = evolution == "boulders"
-	var ballista_choices: bool = evolutions.has("pierce")
-	alternate_upgrade.visible = unlocked_special and not evolutions.is_empty() and not boulders
-	if not alternate_upgrade.visible:
-		alternate_upgrade.disabled = true
+	var currency: Array = planning.combat.get("reroll_currency", [0, 0])
+	_refresh_reroll(rarity_reroll, tower, "rarity", int(currency[planning.local_slot()]))
+	_refresh_reroll(attribute_reroll, tower, "attributes", _own_coins())
+	var actions: Dictionary = tower_upgrade_actions(tower, stats)
+	var base_ready: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false))
+	damage_upgrade.visible = not base_ready or actions.size() == 2
+	speed_upgrade.visible = damage_upgrade.visible
+	for command: String in ["damage", "speed"]:
+		_refresh_action(damage_upgrade if command == "damage" else speed_upgrade, actions[command])
+	var choices: Array[String] = []
+	for command: String in actions:
+		if base_ready and command not in ["damage", "speed"]:
+			choices.append(command)
+	_special_upgrade_command = choices[0] if not choices.is_empty() else ""
+	_alternate_upgrade_command = choices[1] if choices.size() > 1 else ""
+	special_upgrade.visible = not _special_upgrade_command.is_empty()
+	alternate_upgrade.visible = not _alternate_upgrade_command.is_empty()
 	special_upgrade.custom_minimum_size.x = 140.0 if alternate_upgrade.visible else 288.0
-	_special_upgrade_command = ""
-	_alternate_upgrade_command = ""
-	if evolutions.is_empty():
-		_special_upgrade_command = "special" if unlocked_special else ""
-		_refresh_special_upgrade(tower, stats)
-	elif boulders:
-		_special_upgrade_command = "freeze_runes" if unlocked_special else ""
-		var boulder_definition: Dictionary = evolutions.get("boulders", {})
-		_refresh_freeze_upgrade(tower, boulder_definition.get("followup", {}))
-	else:
-		var primary: String = "pierce" if ballista_choices else "boulders"
-		var alternate: String = "bounce" if ballista_choices else "onyx_ring"
-		_special_upgrade_command = primary if unlocked_special else ""
-		_alternate_upgrade_command = alternate if unlocked_special else ""
-		_refresh_evolution(special_upgrade, tower, evolutions, primary)
-		_refresh_evolution(alternate_upgrade, tower, evolutions, alternate)
+	if special_upgrade.visible:
+		_refresh_action(special_upgrade, actions[_special_upgrade_command])
+	if alternate_upgrade.visible:
+		_refresh_action(alternate_upgrade, actions[_alternate_upgrade_command])
+	for button: Button in _extra_upgrade_buttons.values():
+		button.hide()
+	for index: int in range(2, choices.size()):
+		var command: String = choices[index]
+		if not _extra_upgrade_buttons.has(command):
+			var button := Button.new()
+			button.custom_minimum_size.y = 56
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.add_theme_font_override("font", _coins.get_theme_font("font"))
+			button.add_theme_font_size_override("font_size", 16)
+			button.pressed.connect(_upgrade.bind(command))
+			_extra_upgrades.add_child(button)
+			_extra_upgrade_buttons[command] = button
+		_extra_upgrade_buttons[command].show()
+		_refresh_action(_extra_upgrade_buttons[command], actions[command])
 	var second_archer: bool = bool(tower.get("special_upgraded", false)) and String(stats.get("special_upgrade", "")) == "second_archer"
 	_secondary_target_row.visible = second_archer
 	secondary_targeting.disabled = targeting_button.disabled or not second_archer
@@ -695,71 +757,178 @@ func _refresh_targeting() -> void:
 	sell_button.disabled = targeting_button.disabled
 
 
-func _refresh_upgrade(button: Button, tower: Dictionary, stats: Dictionary, upgrade: String) -> void:
-	var purchased: bool = bool(tower.get(upgrade + "_upgraded", false))
-	var price: int = MatchCombat.tower_upgrade_cost(tower, stats)
-	var benefit: String = "+%d damage" % int(stats.get("damage_upgrade_bonus", 0)) if upgrade == "damage" else "%.0f%% faster" % ((1.0 / float(stats.get("speed_upgrade_multiplier", 1.0)) - 1.0) * 100.0)
-	button.text = "%s\nPurchased" % benefit if purchased else "%s\n%d" % [benefit, price]
-	button.disabled = purchased or targeting_button.disabled or _own_coins() < price
-	button.tooltip_text = "One-time upgrade"
-	if not purchased and _own_coins() < price:
-		button.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
-
-
-func _refresh_special_upgrade(tower: Dictionary, stats: Dictionary) -> void:
-	var purchased: bool = bool(tower.get("special_upgraded", false))
-	var price: int = int(stats.get("special_upgrade_cost", 0))
-	var title: String = String(stats.get("special_upgrade_title", "Special upgrade"))
-	special_upgrade.text = "%s\nPurchased" % title if purchased else "%s\n%d" % [title, price]
-	special_upgrade.disabled = not special_upgrade.visible or purchased or targeting_button.disabled or _own_coins() < price
-	match String(stats.get("special_upgrade", "")):
-		"second_archer":
-			special_upgrade.tooltip_text = "Adds a second archer with independent targeting and 10% more attacks per second. Prefers a different enemy; shares a target when no unused enemy is in range."
-		_:
-			special_upgrade.tooltip_text = ""
-	special_upgrade.tooltip_text += "\nFixed price; unaffected by level pricing."
-	if not purchased and _own_coins() < price:
-		special_upgrade.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
-
-
-func _refresh_freeze_upgrade(tower: Dictionary, definition: Dictionary) -> void:
-	var purchased: bool = bool(tower.get("freeze_upgraded", false))
-	var price: int = int(definition.get("cost", 0))
-	var title: String = String(definition.get("title", "Freeze Runes"))
-	special_upgrade.text = "%s\nPurchased" % title if purchased else "%s\n%d" % [title, price]
-	special_upgrade.disabled = definition.is_empty() or purchased or targeting_button.disabled or _own_coins() < price
-	special_upgrade.tooltip_text = ""
-
-
-func _refresh_evolution(button: Button, tower: Dictionary, evolutions: Dictionary, evolution: String) -> void:
-	var definition: Dictionary = evolutions.get(evolution, {})
-	var chosen: String = String(tower.get("evolution", ""))
-	var purchased: bool = chosen == evolution
-	var locked: bool = not chosen.is_empty() and not purchased
-	var price: int = int(definition.get("cost", 0))
-	var title: String = String(definition.get("title", evolution))
-	var status: String = "Purchased" if purchased else ("Locked" if locked else str(price))
-	button.text = "%s\n%s" % [title, status]
-	button.disabled = not button.visible or purchased or locked or targeting_button.disabled or _own_coins() < price
-	match evolution:
-		"pierce":
-			button.tooltip_text = "Each bolt hits the first two enemies total along one forward straight ray within tower range, at full current upgraded damage. Enemies must be within 0.25 cells of the ray; intervening enemies can intercept."
-		"bounce":
-			button.tooltip_text = "Each bolt hits its target, then bounces once to the nearest other enemy for 50% of current upgraded damage, rounded up. The bounce can reach beyond tower range."
-		_:
-			if bool(definition.get("continuous", false)):
-				button.tooltip_text = "Deals %d damage per simulation second to every enemy in the surrounding 3x3 neighborhood. Orbiting boulders are cosmetic." % int(definition.get("damage", 0))
-			else:
-				button.tooltip_text = "Deals %d damage to every enemy in the surrounding 3x3 neighborhood every %.2f simulation seconds." % [int(definition.get("damage", 0)), float(definition.get("interval", 0.0))]
-	var branch: String = "Ballista" if evolution in ["pierce", "bounce"] else "Rune"
-	button.tooltip_text += "\nChoose one %s evolution. Fixed price; unaffected by level pricing." % branch
+func _refresh_action(button: Button, action: Dictionary) -> void:
+	var purchased: bool = bool(action["purchased"])
+	var locked: bool = bool(action["locked"])
+	var price: int = int(action["cost"])
+	button.text = "%s\n%s" % [action["title"], "Owned" if purchased else ("Locked" if locked else str(price))]
+	button.disabled = purchased or locked or targeting_button.disabled or _own_coins() < price
+	button.tooltip_text = String(action["description"])
 	if locked:
-		var chosen_definition: Dictionary = evolutions.get(chosen, {})
-		button.tooltip_text += "\nLocked: %s was purchased." % String(chosen_definition.get("title", chosen))
-	elif not purchased and _own_coins() < price:
+		button.tooltip_text += "\nRequires the preceding upgrades; permanent branches are exclusive."
+	if not purchased and _own_coins() < price:
 		button.tooltip_text += "\nNeed %d more Coins." % (price - _own_coins())
-	if targeting_button.disabled and planning.ready_flags[planning.local_slot()] and int(planning.combat.get("phase", MatchCombat.Phase.FINISHED)) == MatchCombat.Phase.PLANNING:
-		button.tooltip_text += "\nReady commits planning purchases until combat starts."
+	if targeting_button.disabled:
+		button.tooltip_text += "\nUnavailable while Ready or after the run ends."
+
+
+func _refresh_reroll(button: Button, tower: Dictionary, kind: String, balance: int) -> void:
+	var price: int = int(tower.get("rarity_reroll_cost" if kind == "rarity" else "attribute_reroll_cost", -1))
+	button.text = "%s · %s" % ["Reroll rarity" if kind == "rarity" else "Reroll attributes", ("%d Shards" if kind == "rarity" else "%d Coins") % price if price >= 0 else "Unavailable"]
+	button.disabled = targeting_button.disabled or price < 0 or balance < price
+	button.tooltip_text = reroll_tooltip(kind)
+	if balance < price:
+		button.tooltip_text += "\nNeed %d more %s." % [price - balance, "Shards" if kind == "rarity" else "Coins"]
+	if targeting_button.disabled:
+		button.tooltip_text += "\nReady commits planning actions until combat starts; finished runs cannot reroll."
+
+
+static func reroll_tooltip(kind: String) -> String:
+	if kind == "rarity":
+		return "Roll a different rarity using the placement odds, then replace every attribute. Downgrades are possible. Resets only the attribute-reroll price counter; purchased upgrades and evolutions remain."
+	return "Keep the current rarity and replace every attribute and value. Purchased upgrades and evolutions remain."
+
+
+static func tower_display_title(tower: Dictionary, stats: Dictionary) -> String:
+	var evolutions: Dictionary = stats.get("evolutions", {})
+	var branch: Dictionary = evolutions.get(String(tower.get("evolution", "")), {})
+	var followups: Dictionary = branch.get("followups", {})
+	var followup: Dictionary = followups.get(String(tower.get("followup", "")), {})
+	var title: String = String(followup.get("title", branch.get("title", stats.get("title", "Tower"))))
+	var level: int = MatchCombat.tower_level(tower)
+	return "%s · %s" % [title, TOWER_LEVEL_NUMERALS[level - 1] if level <= TOWER_LEVEL_NUMERALS.size() else str(level)]
+
+
+static func roll_details_text(tower: Dictionary) -> String:
+	var rarity: String = String(tower.get("rarity", ""))
+	var lines := PackedStringArray()
+	if not rarity.is_empty():
+		lines.append(rarity.capitalize())
+	for attribute: Dictionary in tower.get("attributes", []):
+		var effect: String = String(attribute.get("effect", ""))
+		var value: float = float(attribute.get("value", 0.0))
+		var amount: String = "%+d" % int(value) if effect in ["pierce", "bounce", "chain_jumps"] else "%+.1f%%" % (value * 100.0)
+		var title: String = effect.replace("_", " ").capitalize()
+		match effect:
+			"support_buff":
+				title = "Support strength"
+			"economy_production":
+				title = "Income"
+			"chain_jumps":
+				title = "Chain hits"
+		lines.append("%s %s" % [amount, title])
+	if lines.size() == 1:
+		lines.append("No attributes")
+	return "\n".join(lines)
+
+
+static func tower_stats_text(tower: Dictionary, stats: Dictionary) -> String:
+	var result: String = behavior_summary(tower, stats)
+	if tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]:
+		result = "Kills %d\n%s" % [int(tower.get("kills", 0)), result]
+		var damage_buff: float = float(tower.get("support_damage_bonus", 0.0))
+		var speed_buff: float = float(tower.get("support_speed_bonus", 0.0))
+		if damage_buff > 0.0 or speed_buff > 0.0:
+			result += "\nSupport: +%.0f%% damage / +%.0f%% speed" % [damage_buff * 100.0, speed_buff * 100.0]
+	return result
+
+
+static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> String:
+	var kind: String = String(state.get("behavior_kind", fallback.get("behavior_kind", "attack")))
+	var config: Dictionary = state.get("behavior_config", fallback.get("behavior_config", {}))
+	var range_cells: float = float(state.get("range", fallback.get("range", 0.0)))
+	var result: String
+	match kind:
+		"support":
+			result = "Nearby towers:\n+%.1f%% damage · +%.1f%% attack speed\nStrongest duplicate only" % [float(config.get("damage_bonus", 0.0)) * 100.0, float(config.get("attack_speed_bonus", 0.0)) * 100.0]
+		"economy":
+			result = "%s Coins / round clear" % String.num(float(config.get("clear_income", 0.0)), 1)
+			if float(config.get("periodic_income", 0.0)) > 0.0:
+				result += "\n%s Coins / %.2fs combat" % [String.num(float(config["periodic_income"]), 1), float(config.get("periodic_interval", 0.0))]
+		"bounty":
+			result = "Auto mark: highest max HP\n+%.1f%% damage taken\n+%.1f%% normal kill Coins\nOne persistent, exclusive target" % [float(config.get("mark_damage_bonus", 0.0)) * 100.0, float(config.get("mark_income_bonus", 0.0)) * 100.0]
+		"income_aura":
+			result = "Nearby killing towers:\n+%.1f%% kill Coins\nStrongest duplicate only" % (float(config.get("kill_income_bonus", 0.0)) * 100.0)
+		_:
+			var damage: int = int(state.get("damage", fallback.get("damage", 0)))
+			var interval: float = float(state.get("interval", fallback.get("interval", 1.0)))
+			if state.get("evolution", "") == "boulders":
+				result = "%d DPS · Continuous" % damage
+			else:
+				result = "Damage %d · %.2f attacks/s\nEvery %.2fs" % [damage, 1.0 / interval, interval]
+			if kind == "chain":
+				result += "\n%d chain hits · %.2f jump reach\n+%.0f%% damage / successive hit" % [int(config.get("hit_count", 1)), float(config.get("jump_distance", 0.0)), float(config.get("successive_hit_bonus", 0.0)) * 100.0]
+	return result + "\nRange %.2f cells" % range_cells
+
+
+static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dictionary:
+	var actions: Dictionary = {}
+	var base_ready: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false))
+	var effects: Dictionary = stats.get("upgrade_effects", {})
+	for command: String in ["damage", "speed"]:
+		var benefit: String
+		if effects.has(command):
+			benefit = effect_description(effects[command])
+		else:
+			benefit = "+%d damage" % int(stats.get("damage_upgrade_bonus", 0)) if command == "damage" else "%.0f%% faster" % ((1.0 / float(stats.get("speed_upgrade_multiplier", 1.0)) - 1.0) * 100.0)
+		actions[command] = {"title": benefit, "cost": MatchCombat.tower_upgrade_cost(tower, stats), "purchased": bool(tower.get(command + "_upgraded", false)), "locked": false, "description": "One-time upgrade: " + benefit + ". Preserved through evolutions."}
+	var special: String = String(stats.get("special_upgrade", ""))
+	if not special.is_empty() and not (special == "second_archer" and bool(tower.get("special_upgraded", false))):
+		var description: String = "Adds a second archer with independent targeting and 10% more attacks per second. Prefers distinct enemies, sharing when necessary." if special == "second_archer" else "Each successive chain hit gains +%.0f%% damage. Preserved through evolution." % (float(stats.get("special_upgrade_config", {}).get("successive_hit_bonus", 0.0)) * 100.0)
+		actions["special"] = {"title": stats.get("special_upgrade_title", special.capitalize()), "cost": int(stats.get("special_upgrade_cost", 0)), "purchased": bool(tower.get("special_upgraded", false)), "locked": not base_ready, "description": description}
+	var evolutions: Dictionary = stats.get("evolutions", {})
+	var chosen: String = String(tower.get("evolution", ""))
+	var chosen_definition: Dictionary = evolutions.get(chosen, {})
+	var has_followups: bool = not chosen_definition.get("followup", {}).is_empty() or not chosen_definition.get("followups", {}).is_empty()
+	for command: String in evolutions:
+		if has_followups:
+			continue
+		var definition: Dictionary = evolutions[command]
+		var locked: bool = not base_ready or (not chosen.is_empty() and chosen != command) or (special == "escalating_chain" and not bool(tower.get("special_upgraded", false)))
+		actions[command] = {"title": definition.get("title", command.capitalize()), "cost": int(definition.get("cost", 0)), "purchased": chosen == command, "locked": locked, "description": upgrade_description(command, definition) + "\nPermanent evolution; rolled attributes and purchased bonuses remain."}
+	if not chosen_definition.get("followup", {}).is_empty():
+		var definition: Dictionary = chosen_definition["followup"]
+		actions["freeze_runes"] = {"title": definition.get("title", "Freeze Runes"), "cost": int(definition.get("cost", 0)), "purchased": bool(tower.get("freeze_upgraded", false)), "locked": false, "description": upgrade_description("freeze_runes", definition)}
+	var followups: Dictionary = chosen_definition.get("followups", {})
+	var followup: String = String(tower.get("followup", ""))
+	for command: String in followups:
+		var definition: Dictionary = followups[command]
+		actions[command] = {"title": definition.get("title", command.capitalize()), "cost": int(definition.get("cost", 0)), "purchased": followup == command, "locked": not followup.is_empty() and followup != command, "description": upgrade_description(command, definition) + "\nChoose one permanent specialization."}
+	return actions
+
+
+static func effect_description(effects: Dictionary) -> String:
+	var parts := PackedStringArray()
+	for effect: String in effects:
+		var title: String = "Income" if effect == "income_bonus" else ("Damage buff" if effect == "damage_bonus" else "Speed buff")
+		parts.append("+%.0f%% %s" % [float(effects[effect]) * 100.0, title])
+	return " / ".join(parts)
+
+
+static func upgrade_description(command: String, definition: Dictionary) -> String:
+	if definition.has("description"):
+		return String(definition["description"])
+	if definition.get("behavior_kind", "") == "chain":
+		var config: Dictionary = definition.get("behavior_config", {})
+		return "Initial range %.2f cells; jumps reach %.2f cells. Keeps current damage, attack speed, purchased escalation, and all rolled modifiers." % [float(definition.get("range_cells", 0.0)), float(config.get("jump_distance", 0.0))]
+	if definition.has("behavior_kind"):
+		var state: Dictionary = definition.duplicate()
+		state["range"] = float(definition.get("range_cells", 0.0))
+		var description: String = behavior_summary(state)
+		if not definition.has("range_cells"):
+			description = description.get_slice("\nRange", 0)
+		if command == "income_aura":
+			description += "\nReplaces marking and immediately releases the current mark. Rewards follow the killing tower's location."
+		return description
+	match command:
+		"pierce":
+			return "A straight bolt hits the first two enemies along its forward ray at full damage. Rolled extra Pierce adds more hits."
+		"bounce":
+			return "A bolt redirects to the nearest other enemy for 50% damage, rounded up. Rolled extra Bounce adds more redirects."
+		"freeze_runes":
+			return "Boulders also slow eligible enemies, following the authored freeze duration and strength. Ice-immune enemies ignore the slow."
+		_:
+			return "Deals %d %s to every enemy in the surrounding neighborhood%s." % [int(definition.get("damage", 0)), "damage per second" if bool(definition.get("continuous", false)) else "damage", "" if bool(definition.get("continuous", false)) else " every %.2fs" % float(definition.get("interval", 1.0))]
 
 
 
@@ -779,24 +948,20 @@ func _choice_upgrade_pressed(alternate: bool) -> void:
 
 
 func _upgrade(upgrade: String) -> void:
-	var button: Button
-	match upgrade:
-		"four_archers", "fire_arrows", "bomb_arrows":
-			button = advancement_buttons[upgrade]
-		"special", "boulders", "freeze_runes", "pierce", "bounce", "onyx_ring":
-			if upgrade == _special_upgrade_command:
-				button = special_upgrade
-			elif upgrade == _alternate_upgrade_command:
-				button = alternate_upgrade
-			else:
-				return
-		"damage":
-			button = damage_upgrade
-		"speed":
-			button = speed_upgrade
-		_:
-			return
-	if planning != null and button.is_visible_in_tree() and not button.disabled and not _selected_tower().is_empty():
+	var button: Button = null
+	if upgrade == "damage":
+		button = damage_upgrade
+	elif upgrade == "speed":
+		button = speed_upgrade
+	elif advancement_buttons.has(upgrade):
+		button = advancement_buttons[upgrade]
+	elif upgrade == _special_upgrade_command:
+		button = special_upgrade
+	elif upgrade == _alternate_upgrade_command:
+		button = alternate_upgrade
+	else:
+		button = _extra_upgrade_buttons.get(upgrade)
+	if planning != null and button != null and button.is_visible_in_tree() and not button.disabled and not _selected_tower().is_empty():
 		planning.upgrade_tower(planning.local_slot(), selected_tower_id, upgrade)
 
 

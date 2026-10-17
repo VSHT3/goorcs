@@ -12,11 +12,14 @@ func _run() -> void:
 	var main = load("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(directory.path_join("collection.json"))
 	main.statistics_store = EnemyStatisticsStore.new(directory.path_join("statistics.json"))
+	main.combat_rules = CombatRules.new()
 	root.add_child(main)
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
 	var planning: MatchPlanning = main.planning
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
+	check(planning.selecting_loadout and not planning.active and not screen.is_visible_in_tree(),"Singleplayer presents loadout selection before the battlefield")
+	check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(),"Result fixture commits its owned starter")
 	var run_id: String = planning.combat["statistics_id"]
 	screen.enemy_selector.get_popup().popup()
 	planning._host_combat.base_health = [0,5]
@@ -44,6 +47,8 @@ func _run() -> void:
 	screen.ready_button.pressed.emit()
 	check(screen.results_menu.visible,"Results HUD action reopens terminal details")
 	screen.results_menu.replay_button.pressed.emit()
+	check(planning.selecting_loadout and not planning.active and not screen.results_menu.visible,"Play again returns to fresh loadout selection instead of bypassing admission")
+	check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(),"Replay explicitly chooses and commits again")
 	check(planning.singleplayer and planning.active and planning.combat["phase"]==MatchCombat.Phase.PLANNING and planning.combat["wave"]==0 and planning.combat["statistics_id"]!=run_id and not screen.results_menu.visible,"Play again creates a fresh solo model and clears results lifecycle")
 	check(planning.combat["speed_multiplier"]==1.0 and planning.layouts[0].used_tiles()==0,"Replay resets speed and maze rather than restarting the finished instance")
 	planning._host_combat.base_health = [5,0]

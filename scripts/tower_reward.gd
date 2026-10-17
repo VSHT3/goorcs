@@ -14,6 +14,10 @@ extends Resource
 # Board-only layers leave collection/source artwork intact. Rig coordinates share
 # the icon's texture-local space, so inherited tower variants need no ID switches.
 @export var board_texture: Texture2D
+# Optional branch records: {texture: Texture2D, board_height: float,
+# board_anchor: Vector2}. Follow-up keys take precedence over evolution keys.
+@export var board_variants: Dictionary = {}
+@export var mirror_board: bool = false
 @export var archer_head_texture: Texture2D
 @export var archer_body_texture: Texture2D
 @export var archer_pivot: Vector2 = Vector2.ZERO
@@ -24,3 +28,14 @@ extends Resource
 @export var secondary_sprite_offset: Vector2
 # Rear archers reuse the same layered rig with these texture-local offsets.
 @export var additional_archer_offsets: PackedVector2Array = PackedVector2Array()
+
+
+func board_variant(evolution: String, followup: String = "") -> Dictionary:
+	if board_variants.has(followup):
+		return board_variants[followup]
+	if board_variants.has(evolution):
+		return board_variants[evolution]
+	return EMPTY_BOARD_VARIANT
+
+
+const EMPTY_BOARD_VARIANT: Dictionary = {}

@@ -17,6 +17,7 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(directory)
 	main = load("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(directory.path_join("collection.json"))
+	main.combat_rules = CombatRules.new()
 	main.statistics_store = EnemyStatisticsStore.new(directory.path_join("statistics.json"))
 	root.add_child(main)
 	await process_frame
@@ -76,6 +77,8 @@ func _check_match_music() -> void:
 	_check(not music.playing, "Sandbox stays silent")
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.selecting_loadout and not main.planning.active and not music.playing, "Selection stays outside the active match soundtrack lifecycle")
+	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "Navigation fixture commits its owned starter")
 	await process_frame
 	_check(music.playing, "Match starts local soundtrack")
 	music.seek(5.0)

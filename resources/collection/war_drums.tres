@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="TowerReward" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
+[ext_resource type="Texture2D" path="res://assets/towers/war_drums.png" id="2_art"]
+[ext_resource type="Texture2D" path="res://assets/towers/forge.png" id="3_forge"]
+[ext_resource type="Texture2D" path="res://assets/towers/command_banner.png" id="4_banner"]
+
+[resource]
+script = ExtResource("1_reward")
+id = &"war_drums"
+title = "War Drums"
+description = "Paired war drums strengthen the damage and attack speed of nearby towers. Evolve into a Forge or Command Banner."
+icon_texture = ExtResource("2_art")
+accent = Color(0.76, 0.40, 0.28, 1)
+board_height = 1.15
+board_anchor = Vector2(0.5, 0.928571)
+mirror_board = true
+board_variants = {
+"forge": {"texture": ExtResource("3_forge"), "board_height": 1.45},
+"command_banner": {"texture": ExtResource("4_banner"), "board_height": 1.65}
+}

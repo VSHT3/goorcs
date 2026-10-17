@@ -19,6 +19,7 @@ func _run() -> void:
 	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.start_singleplayer()
+	check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(),"Solo speed fixture commits its loadout")
 	for expected: int in [2,3,1,2,3]:
 		check(planning.cycle_singleplayer_speed() and planning.combat["speed_multiplier"]==float(expected),"Solo cycles through all three accepted speeds")
 	planning.debug_set_values(1,999)
@@ -42,6 +43,7 @@ func _run() -> void:
 	check(not planning.cycle_singleplayer_speed() and planning.combat==frozen,"Terminal runs cannot change playback")
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
+	check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(),"A fresh run commits a fresh loadout")
 	check(planning.combat["speed_multiplier"]==1.0,"A fresh solo run always starts at normal speed")
 	planning.queue_free()
 	session.queue_free()

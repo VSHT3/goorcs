@@ -30,11 +30,14 @@ func _run() -> void:
 	var saved_bytes: String = FileAccess.get_file_as_string(save_path)
 	main = load("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(save_path)
+	main.combat_rules = CombatRules.new()
 	root.add_child(main)
 	await _settle()
 	main.play_button.pressed.emit()
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.selecting_loadout and not main.planning.active, "World navigation first enters explicit selection")
+	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "World fixture commits its owned tested towers")
 	await _settle()
 	screen = main.play_screen.planning_screen
 	world = screen.world
@@ -76,6 +79,8 @@ func _check_top_row_visibility(own_slot: int) -> void:
 		var board: PathBoard = world.boards[own_slot]
 		var header: Control = screen.get_node("HUD/Header")
 		for artwork: TowerReward in board.content_catalog.tower_rewards():
+			if artwork.icon_texture == null:
+				continue
 			var rect: Rect2 = board._sprite_rect(artwork.icon_texture, artwork.board_height, artwork.board_anchor,
 				board.cell_center(Vector2i(6, 0)) + Vector2(0, board._cell_size() * 0.28))
 			var bounds: Rect2 = board._texture_bounds[artwork.icon_texture]
@@ -343,6 +348,7 @@ func _check_leave_and_reopen() -> void:
 	main.play_button.pressed.emit()
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "Reopened world requires a fresh deck commitment")
 	await _settle()
 	world.set_process(false)
 	var own_center: Vector2 = world.boards[0].get_global_transform() * (world.boards[0].size * 0.5)

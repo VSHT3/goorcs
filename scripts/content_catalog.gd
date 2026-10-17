@@ -4,6 +4,8 @@ extends Resource
 
 @export var towers: Array[TowerDefinition] = []
 @export var enemies: Array[EnemyDefinition] = []
+# Empty preserves collection-only/custom catalogs with no guaranteed starter.
+@export var starter_tower_id: StringName = &""
 
 
 func tower_rewards() -> Array[TowerReward]:
@@ -25,10 +27,14 @@ func validation_errors() -> PackedStringArray:
 		if id == &"" or tower_ids.has(id):
 			errors.append("Tower catalog contains an empty or duplicate ID '%s'." % id)
 		tower_ids[id] = true
-		if tower.reward.title.is_empty() or tower.damage <= 0 or not is_finite(tower.range_cells) or tower.range_cells <= 0.0 or not is_finite(tower.interval) or tower.interval <= 0.0 or tower.cost <= 0 or tower.upgrade_base_cost <= 0 or tower.damage_upgrade_bonus <= 0 or not is_finite(tower.speed_upgrade_multiplier) or tower.speed_upgrade_multiplier <= 0.0 or tower.speed_upgrade_multiplier >= 1.0:
-			errors.append("Tower '%s' requires a title, positive stats/prices, and speed multiplier between zero and one." % id)
-		if tower.special_upgrade not in ["", "second_archer"] or (not tower.special_upgrade.is_empty() and (tower.special_upgrade_title.is_empty() or tower.special_upgrade_cost <= 0)) or not TowerDefinition.valid_evolutions(tower):
+		if tower.reward.title.is_empty() or tower.damage < 0 or (tower.behavior_kind in ["attack", "chain"] and tower.damage == 0) or not is_finite(tower.range_cells) or tower.range_cells <= 0.0 or not is_finite(tower.interval) or tower.interval <= 0.0 or tower.cost <= 0 or tower.upgrade_base_cost <= 0 or tower.damage_upgrade_bonus <= 0 or not is_finite(tower.speed_upgrade_multiplier) or tower.speed_upgrade_multiplier <= 0.0 or tower.speed_upgrade_multiplier >= 1.0:
+			errors.append("Tower '%s' requires a title, positive attack stats/prices, nonnegative passive damage, and speed multiplier between zero and one." % id)
+		if not TowerDefinition.valid_behavior(tower):
+			errors.append("Tower '%s' has invalid behavior or role-upgrade metadata." % id)
+		if not TowerDefinition.valid_special_upgrade(tower) or not TowerDefinition.valid_evolutions(tower):
 			errors.append("Tower '%s' has invalid special upgrade or evolution metadata." % id)
+		if not TowerDefinition.valid_roll_attributes(tower):
+			errors.append("Tower '%s' has invalid attribute compatibility or roll profile metadata." % id)
 		if not TowerDefinition.valid_advancements(tower):
 			errors.append("Tower '%s' has invalid advancement metadata." % id)
 		if tower.attack_sound not in [CombatSoundEvents.Cue.BOW, CombatSoundEvents.Cue.BALLISTA, CombatSoundEvents.Cue.RUNE]:
@@ -36,9 +42,13 @@ func validation_errors() -> PackedStringArray:
 		var art: TowerReward = tower.reward
 		if not is_finite(art.board_height) or art.board_height <= 0.0 or not art.board_anchor.is_finite() or not art.projectile_origin.is_finite() or not is_finite(art.projectile_length) or art.projectile_length <= 0.0 or not is_finite(art.projectile_width) or art.projectile_width <= 0.0 or not art.archer_pivot.is_finite() or not art.secondary_sprite_offset.is_finite():
 			errors.append("Tower '%s' has invalid presentation metadata." % id)
+		if not _valid_board_variants(tower):
+			errors.append("Tower '%s' has invalid branch presentation metadata." % id)
 		for offset: Vector2 in art.additional_archer_offsets:
 			if not offset.is_finite():
 				errors.append("Tower '%s' has invalid additional archer offsets." % id)
+	if starter_tower_id != &"" and not tower_ids.has(starter_tower_id):
+		errors.append("Starter tower '%s' must resolve to a registered tower." % starter_tower_id)
 	var enemy_ids: Dictionary[StringName, bool] = {}
 	for enemy: EnemyDefinition in enemies:
 		if enemy == null:
@@ -51,6 +61,9 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' has invalid combat, economy, or wave values." % enemy.id)
 		if enemy.send_first_wave < 1 or enemy.kill_bounty < -1 or not is_finite(enemy.group_interval) or enemy.group_interval <= 0.0:
 			errors.append("Enemy '%s' has invalid send, bounty, or group timing metadata." % enemy.id)
+		# Either zero permits authored enemies with no effective reroll payout.
+		if not is_finite(enemy.reroll_drop_chance) or enemy.reroll_drop_chance < 0.0 or enemy.reroll_drop_chance > 1.0 or enemy.reroll_drop_amount < 0:
+			errors.append("Enemy '%s' requires a finite reroll drop chance between zero and one and a nonnegative payout." % enemy.id)
 		var group_total: int = 0
 		for weight: int in enemy.group_weights:
 			if weight < 0:
@@ -84,3 +97,45 @@ func validation_errors() -> PackedStringArray:
 		if child == null or child.summon_interval > 0.0:
 			errors.append("Enemy '%s' requires a registered, non-summoning child." % enemy.id)
 	return errors
+
+
+static func _valid_board_variants(tower: TowerDefinition) -> bool:
+	var art: TowerReward = tower.reward
+	if art.board_variants.is_empty():
+		return true
+	var branches: Dictionary = {}
+	if not tower.special_upgrade.is_empty():
+		branches[tower.special_upgrade] = true
+	for branch: Variant in tower.advancements:
+		branches[branch] = true
+	for branch: Variant in tower.evolutions:
+		branches[branch] = true
+		var config: Variant = tower.evolutions[branch]
+		if not config is Dictionary:
+			continue
+		var followup: Variant = config.get("followup")
+		if followup is Dictionary and typeof(followup.get("id")) == TYPE_STRING:
+			branches[followup["id"]] = true
+		var followups: Variant = config.get("followups")
+		if followups is Dictionary:
+			for followup_id: Variant in followups:
+				branches[followup_id] = true
+	for branch: Variant in art.board_variants:
+		if typeof(branch) != TYPE_STRING or String(branch).is_empty() or not branches.has(branch) or not art.board_variants[branch] is Dictionary:
+			return false
+		var variant: Dictionary = art.board_variants[branch]
+		for field: Variant in variant:
+			if typeof(field) != TYPE_STRING or field not in ["texture", "board_height", "board_anchor"]:
+				return false
+		if not variant.get("texture") is Texture2D:
+			return false
+		var height: Variant = variant.get("board_height", art.board_height)
+		if typeof(height) not in [TYPE_FLOAT, TYPE_INT] or not is_finite(float(height)) or float(height) <= 0.0:
+			return false
+		var anchor: Variant = variant.get("board_anchor", art.board_anchor)
+		if not anchor is Vector2:
+			return false
+		var normalized_anchor: Vector2 = anchor
+		if not normalized_anchor.is_finite() or normalized_anchor.x < 0.0 or normalized_anchor.x > 1.0 or normalized_anchor.y < 0.0 or normalized_anchor.y > 1.0:
+			return false
+	return true
