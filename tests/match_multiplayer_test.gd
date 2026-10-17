@@ -247,7 +247,6 @@ func _peer_specials(code: String) -> void:
 			await _wait_combat(observer, {"coins": balances}, "Placement pays host-defined type price")
 			var before: Dictionary = _snapshot("host")["combat"]
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": upgrade})
-			await create_timer(0.1).timeout
 			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Premature special request cannot bypass the two-upgrade prerequisite over the network")
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "damage"})
 			balances[slot] -= int(stats["upgrade_base_cost"])
@@ -270,11 +269,9 @@ func _peer_specials(code: String) -> void:
 			elif type_id == "orc_ballista":
 				await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "bounce" if upgrade == "pierce" else "pierce"})
 				await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
-			await create_timer(0.1).timeout
 			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Cross-owner and repeat special requests cannot spend or mutate accepted state")
 			if type_id == "arrow_tower":
 				await _command(lane, {"action": "target_secondary", "slot": slot, "tower_id": id, "mode": MatchCombat.TargetMode.LAST})
-				await create_timer(0.1).timeout
 				tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
 				_check(tower["secondary_mode"] == MatchCombat.TargetMode.LAST and tower["mode"] == 0, "Independent Last second-archer targeting replicates without changing the primary policy")
 			x += 2
@@ -288,7 +285,6 @@ func _peer_specials(code: String) -> void:
 			await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": int(rune["id"]), "upgrade": upgrade})
 		var before_followup: Dictionary = _snapshot("host")["combat"]
 		await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": int(rune["id"]), "upgrade": "freeze_runes"})
-		await create_timer(0.1).timeout
 		if slot == 0:
 			rune = await _wait_tower(observer, slot, Vector2i(0, 3), 0)
 			_check(rune["freeze_upgraded"] and MatchCombat.tower_level(rune) == 5, "Freeze Runes follows Boulders and replicates level V using the host price")
@@ -299,18 +295,15 @@ func _peer_specials(code: String) -> void:
 	await _command("host", {"action": "step", "delta": 0.1})
 	await _command("host", {"action": "step", "delta": 0.9})
 	await _command("host", {"action": "step", "delta": 0.9})
-	await create_timer(0.15).timeout
 	var accepted: Dictionary = _snapshot("host")["combat"]
 	_check(_snapshot("guest")["combat"] == accepted, "Both real peers receive identical accepted evolution damage, enemy HP and attack events")
 	for slot: int in range(2):
 		_check(not accepted["enemies"][slot].is_empty() and int(accepted["enemies"][slot][0]["hp"]) < 100, "Rune branch damages enemies through the host simulation, slot=%d" % slot)
 	await _command("host", {"action": "step", "delta": 1.6})
-	await create_timer(0.15).timeout
 	accepted = _snapshot("host")["combat"]
 	_check(_snapshot("guest")["combat"] == accepted and accepted["enemies"][0][0]["slowed"] and not accepted["enemies"][1][0]["slowed"], "Real peers receive the host's damage-gated Freeze effect only from upgraded Boulders")
 	var before_debug: Dictionary = _snapshot("host").duplicate(true)
 	await _command("guest", {"action": "debug", "round": 31, "money": 999999, "shards": 999999})
-	await create_timer(0.1).timeout
 	for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
 		_check(_snapshot("host")[field] == before_debug[field] and _snapshot("guest")[field] == before_debug[field], "Guest debug API cannot mutate accepted match field: %s" % field)
 	var runtime: Dictionary = _debug_runtime()
@@ -318,7 +311,6 @@ func _peer_specials(code: String) -> void:
 	for shards: int in [-1, 1000000001]:
 		var rejected: Dictionary = await _command("host", {"action": "debug", "round": 31, "money": 5000, "shards": shards})
 		_check(not rejected["result"], "The real host rejects an out-of-bounds third argument")
-		await create_timer(0.1).timeout
 		for field: String in ["active", "locked", "flags", "boards", "routes", "combat"]:
 			_check(_snapshot("host")[field] == before_debug[field] and _snapshot("guest")[field] == before_debug[field], "Invalid Shards reject before growth or wave abandonment on both peers: %s" % field)
 		_check(_debug_runtime() == runtime, "Rejected real-peer Shard transactions consume no RNG or elapsed combat time")
