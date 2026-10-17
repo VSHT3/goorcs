@@ -45,7 +45,6 @@ focus_next = NodePath("../Sandbox")
 focus_previous = NodePath("../Quit")
 theme_type_variation = &"PrimaryButton"
 text = "Play"
-tooltip_text = "Singleplayer or private multiplayer (P)."
 script = ExtResource("2_button")
 
 [node name="Sandbox" type="Button" parent="Center/Panel"]
@@ -57,7 +56,6 @@ focus_neighbor_bottom = NodePath("../Orcieary")
 focus_next = NodePath("../Orcieary")
 focus_previous = NodePath("../Play")
 text = "Sandbox"
-tooltip_text = "Free building and enemy testing (S)."
 script = ExtResource("2_button")
 
 [node name="Orcieary" type="Button" parent="Center/Panel"]
@@ -69,7 +67,6 @@ focus_neighbor_bottom = NodePath("../Collection")
 focus_next = NodePath("../Collection")
 focus_previous = NodePath("../Sandbox")
 text = "Orcieary"
-tooltip_text = "Enemy field guide and lifetime records (B)."
 script = ExtResource("2_button")
 
 [node name="Collection" type="Button" parent="Center/Panel"]
@@ -81,7 +78,6 @@ focus_neighbor_bottom = NodePath("../Quit")
 focus_next = NodePath("../Quit")
 focus_previous = NodePath("../Orcieary")
 text = "Collection"
-tooltip_text = "Tower collection and chests (C)."
 script = ExtResource("2_button")
 
 [node name="Quit" type="Button" parent="Center/Panel"]

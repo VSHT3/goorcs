@@ -18,7 +18,7 @@ Towers and enemies are authored as Godot resources and registered in one explici
 
 Use the standard Godot edition and the [required engine release](docs/development.md#setup). Import `project.godot` into Godot and press **F5** to run the project.
 
-For command-line launch and verification, see the [development commands](docs/development.md#setup).
+For terminal launches, use `./tools/run.sh` to refresh imports and script classes before starting, including after pulling changes. See the [development commands](docs/development.md#setup) for engine selection and verification.
 
 The centered main-menu wordmark uses a green pixel-orc O with pointed ears, heavy brows, a broad jaw, and upward tusks. Its neutral face matches the letters' top and bottom edges, with pixel-snapped rows and matching pointer hit detection. On first load, the logo assembles in crisp pixel blocks, then the orc braces, squeezes its eyes shut, and opens its jaw for a short animated roar. The tusks descend with the jaw; the face recovers before the finishing light sweep. This is a silent animation, not a new sound effect. Buttons work throughout, and the entrance never replays on menu return; occasional blinking/tiny idle lift remain afterward. Hover/focus marks stay inside fixed button bounds.
 
@@ -27,6 +27,8 @@ Click the orc O to replay just his silent roar. Other letters do not trigger it;
 **Play** uses a centered menu with a primary Singleplayer action, paired Host/Join choices, and the same button styling/hover effects as the title screen. Connection forms, waiting rooms, real errors, and Cancel/Leave stay in the compact column rather than spanning the screen.
 
 Menus support mouse hover and visible keyboard focus; arrows/Tab navigate and Enter activates. Main-menu shortcuts are **P** Play, **S** Sandbox, **B** Orcieary, and **C** Collection. Escape returns or resumes the last activity; text fields/dialogs take priority. The gameplay pointer uses the steel variant from [Gauntlet Cursor by itsmars](https://opengameart.org/content/gauntlet-cursor), based on yd's CC0 artwork, at its original 32×32 size. Clickable UI retains the separate hand pointer; text/resize cursors remain native.
+
+Main-menu buttons retain their hover/focus highlights without descriptive hover popups.
 
 ## Test solo
 

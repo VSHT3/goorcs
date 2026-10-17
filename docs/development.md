@@ -11,9 +11,15 @@ No Node.js, .NET SDK, external packages, export templates, or MCP servers are re
 The commands below assume the Godot binary is available as `godot`; substitute its absolute path if necessary.
 
 ```sh
-godot --editor --path .  # Open the editor.
-godot --path .           # Run the actual game, using your normal saves.
+./tools/run.sh           # Refresh imports/classes, then run the actual game.
+godot --editor --path .  # Open the editor; F5 also runs after its import scan.
 ```
+
+Use `./tools/run.sh` for terminal launches after pulling friends' changes. It runs a headless editor import before starting the game, refreshing the ignored local `.godot` class registry and imported assets. `GODOT_BIN=/path/to/godot ./tools/run.sh` selects another executable; extra arguments are passed to the game. Run as your normal desktop user, not through `sudo`.
+
+Direct `godot --path .` does not perform the editor's project scan. A stale cache can therefore omit newly pulled `class_name` scripts, producing cascading “Could not find type” / “Could not resolve external class member” parse errors. If the main script cannot load, its menu button signals are never connected. Refresh with `godot --headless --editor --import --path .` before a direct launch, or open the editor and let its scan finish. Do not commit `.godot` or delete player saves to repair this.
+
+The stale-cache repair passed all **51/51** isolated headless/rendered checks with Mesa software rendering. A separate isolated Wayland main-scene smoke launched through `tools/run.sh`, clicked Play/Sandbox/Orcieary/Collection, returned with Escape, and exited through Quit. A rendered hover capture confirmed the main menu keeps its highlights without descriptive popups. This does not establish native NVIDIA driver behavior.
 
 ### Single-command verification
 
