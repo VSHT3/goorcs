@@ -49,18 +49,20 @@ func validation_errors() -> PackedStringArray:
 				errors.append("Tower '%s' has invalid additional archer offsets." % id)
 	if starter_tower_id != &"" and not tower_ids.has(starter_tower_id):
 		errors.append("Starter tower '%s' must resolve to a registered tower." % starter_tower_id)
-	var enemy_ids: Dictionary[StringName, bool] = {}
+	var enemy_ids: Dictionary[StringName, EnemyDefinition] = {}
 	for enemy: EnemyDefinition in enemies:
 		if enemy == null:
 			errors.append("Enemy catalog contains a missing definition.")
 			continue
 		if enemy.id == &"" or enemy_ids.has(enemy.id):
 			errors.append("Enemy catalog contains an empty or duplicate ID '%s'." % enemy.id)
-		enemy_ids[enemy.id] = true
+		enemy_ids[enemy.id] = enemy
 		if enemy.title.is_empty() or not is_finite(enemy.health_multiplier) or enemy.health_multiplier <= 0.0 or not is_finite(enemy.speed_multiplier) or enemy.speed_multiplier <= 0.0 or enemy.send_cost <= 0 or enemy.send_income < 0 or enemy.base_damage <= 0 or enemy.spawn_weight <= 0 or enemy.first_wave < 1 or enemy.max_per_wave < 0 or enemy.count_cap_growth < 0 or enemy.count_cap_growth_interval < 1 or not is_finite(enemy.max_weight_share) or enemy.max_weight_share < 0.0 or enemy.max_weight_share > 1.0:
 			errors.append("Enemy '%s' has invalid combat, economy, or wave values." % enemy.id)
 		if enemy.send_first_wave < 1 or enemy.kill_bounty < -1 or not is_finite(enemy.group_interval) or enemy.group_interval <= 0.0:
 			errors.append("Enemy '%s' has invalid send, bounty, or group timing metadata." % enemy.id)
+		if enemy.boss and (enemy.group_weights.size() != 1 or not is_finite(enemy.boss_spawn_chance) or enemy.boss_spawn_chance < 0.0 or not is_finite(enemy.boss_spawn_chance_growth) or enemy.boss_spawn_chance_growth < 0.0 or not is_finite(enemy.boss_spawn_chance_cap) or enemy.boss_spawn_chance_cap < enemy.boss_spawn_chance or enemy.boss_spawn_chance_cap > 1.0):
+			errors.append("Enemy '%s' requires a single-member boss and finite encounter odds between zero and one with nonnegative growth." % enemy.id)
 		# Either zero permits authored enemies with no effective reroll payout.
 		if not is_finite(enemy.reroll_drop_chance) or enemy.reroll_drop_chance < 0.0 or enemy.reroll_drop_chance > 1.0 or enemy.reroll_drop_amount < 0:
 			errors.append("Enemy '%s' requires a finite reroll drop chance between zero and one and a nonnegative payout." % enemy.id)
@@ -89,13 +91,17 @@ func validation_errors() -> PackedStringArray:
 	for enemy: EnemyDefinition in enemies:
 		if enemy == null or enemy.summon_interval <= 0.0:
 			continue
-		var child: EnemyDefinition = null
-		for candidate: EnemyDefinition in enemies:
-			if candidate != null and candidate.id == enemy.summon_type:
-				child = candidate
+		var visited: Dictionary[StringName, bool] = {}
+		var source: EnemyDefinition = enemy
+		while source.summon_interval > 0.0:
+			if visited.has(source.id):
+				errors.append("Enemy '%s' has a cyclic summon chain." % enemy.id)
 				break
-		if child == null or child.summon_interval > 0.0:
-			errors.append("Enemy '%s' requires a registered, non-summoning child." % enemy.id)
+			visited[source.id] = true
+			if not enemy_ids.has(source.summon_type):
+				errors.append("Enemy '%s' requires a registered summon child." % source.id)
+				break
+			source = enemy_ids[source.summon_type]
 	return errors
 
 

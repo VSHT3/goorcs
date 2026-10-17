@@ -62,6 +62,7 @@ func _check(condition: bool, description: String) -> void:
 func _catalog_rules() -> CombatRules:
 	var rules := CombatRules.new()
 	rules.roll_rules = null
+	rules.health_growth = 2
 	rules.catalog.towers = [
 		preload("res://resources/combat/towers/arrow_tower.tres").duplicate(true) as TowerDefinition,
 		preload("res://resources/combat/towers/orc_ballista.tres").duplicate(true) as TowerDefinition,

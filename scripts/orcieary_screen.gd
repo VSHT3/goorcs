@@ -224,7 +224,8 @@ func _select(index: int) -> void:
 		portrait.start_preview()
 	else:
 		portrait.stop_preview()
-	var preview: Dictionary = MatchCombat.enemy_preview(definition, rules, 1)
+	var preview_wave: int = definition.first_wave if definition.boss else 1
+	var preview: Dictionary = MatchCombat.enemy_preview(definition, rules, preview_wave)
 	_stat_values[&"health"].text = "%d HP" % int(preview["max_hp"])
 	_stat_values[&"speed"].text = "%.2f cells/s" % float(preview["speed"])
 	_stat_values[&"damage"].text = str(int(preview["base_damage"]))
@@ -233,6 +234,8 @@ func _select(index: int) -> void:
 	_stat_values[&"cost"].text = "%d %s" % [definition.send_cost, "Coin" if definition.send_cost == 1 else "Coins"] if definition.send_enabled else "—"
 	_stat_values[&"income"].text = "+%d / clear" % definition.send_income if definition.send_enabled else "—"
 	mechanics_label.text = _mechanics(definition)
+	if definition.boss:
+		mechanics_label.text = "Later waves %s%%–%s%% · Weight %d\n" % [String.num(definition.boss_spawn_chance * 100.0, 1), String.num(definition.boss_spawn_chance_cap * 100.0, 1), definition.spawn_weight] + mechanics_label.text
 	var immunities := PackedStringArray()
 	if definition.fire_immune:
 		immunities.append("Fire")
@@ -243,7 +246,7 @@ func _select(index: int) -> void:
 			mechanics_label.text += "\n"
 		mechanics_label.text += "Immune: " + " · ".join(immunities)
 	mechanics_label.visible = not mechanics_label.text.is_empty()
-	scaling_label.text = "Wave 1 · HP ×%s · Speed ×%s\nHP and speed grow with the delivery wave." % [String.num(definition.health_multiplier, 2), String.num(definition.speed_multiplier, 2)]
+	scaling_label.text = "Wave %d · HP ×%s · Speed ×%s" % [preview_wave, String.num(definition.health_multiplier, 2), String.num(definition.speed_multiplier, 2)]
 	_details_scroll.scroll_vertical = 0
 	_refresh_counts()
 
@@ -257,6 +260,8 @@ func _availability(definition: EnemyDefinition) -> String:
 		var source: String = "Summoned by " + ", ".join(sources) if not sources.is_empty() else "Summon only"
 		return source + "\nNo regular waves or paid sends."
 	var regular: String = "Regular waves %d+" % definition.first_wave if definition.regular_spawn_enabled else "No regular waves"
+	if definition.boss:
+		regular = "Boss round %d" % definition.first_wave
 	var sends: String = "Sends %d+" % definition.send_first_wave if definition.send_enabled else "No paid sends"
 	return regular + " · " + sends
 

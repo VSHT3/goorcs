@@ -1,0 +1,306 @@
+{
+  "authoring": "Original local integer pixel geometry; all poses redrawn from articulated joints. No model, external service, raster cutouts or sampled source pixels.",
+  "identity": "High-rank orc death sovereign: broad tusked face, swept bone-crowned executioner hood, angular iron-and-ivory shoulder blades, rib gorget, weighted dark tabards and grand horned skull reliquary staff.",
+  "generator": "tools/author_necorcmancer_mancer.py",
+  "generator_sha256": "7aa27ed1eb365f3318b0402f24d70acdf0544dc3ac05f90517782aea58de8bae",
+  "reproduce": "python3 tools/author_necorcmancer_mancer.py",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
+  "geometry_helpers_reused": [
+    "Pixels",
+    "segment",
+    "O",
+    "SK"
+  ],
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
+  "historical_reference": "assets/enemies/animations/necorcmancer_still.png",
+  "historical_reference_sha256": "667a6beb367cad12d9655c292848669208d29856243755f0c843939794658463",
+  "historical_reference_status": "Read only for comparison/provenance; no source pixels used in the new sprite",
+  "design_reference": "User-supplied Orcieary screenshot of the ordinary purple-robed NecOrcmancer; existing hooded orc/skull-staff identity retained, anatomy and equipment authored anew.",
+  "frame_size": [
+    128,
+    128
+  ],
+  "sheet_size": [
+    4608,
+    128
+  ],
+  "alpha": "binary 0/255; nearest-neighbour; no antialiasing, smoothing, dithering or raster-image rotation",
+  "lighting": "Upper-left broad material planes, dark outlines, muted ivory/iron and restrained cyan-green emissive clusters",
+  "camera": "Elevated three-quarter facing left, consistent with existing enemy roster",
+  "base_anchor_pixels": [
+    64,
+    112
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 1.05,
+  "sheet_sha256": "43625d94da247faddcbdf436c1d4f4881fedb6a5d214d322794a22130eae1562",
+  "sprite_frames_sha256": "acc57102d3c12fedad1033a3921fdca337adc88b98fef8c76dd6e7a3d2fc5c36",
+  "still": "assets/enemies/animations/necorcmancer_mancer_still.png",
+  "still_sha256": "2fc31db645f2879cde658809bbea5966d4844bd190eb8e72fe72c7fbaac51fd3",
+  "still_dimensions": [
+    128,
+    128
+  ],
+  "still_alpha_bounds": [
+    20,
+    8,
+    119,
+    112
+  ],
+  "death": {
+    "duration_seconds": 0.8,
+    "last_frame": "Settled armored corpse and fallen intact staff",
+    "articulation": "Recoil, bending knees, leftward torso/head impact and independently released toppling staff",
+    "blood_in_sprite": false
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 7,
+      "duration_seconds": 1.7142857142857142,
+      "frame_count": 12,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          20,
+          8,
+          119,
+          112
+        ],
+        [
+          20,
+          8,
+          119,
+          112
+        ],
+        [
+          20,
+          7,
+          119,
+          111
+        ],
+        [
+          19,
+          7,
+          119,
+          111
+        ],
+        [
+          19,
+          7,
+          119,
+          111
+        ],
+        [
+          18,
+          8,
+          119,
+          112
+        ],
+        [
+          18,
+          8,
+          119,
+          112
+        ],
+        [
+          18,
+          8,
+          119,
+          112
+        ],
+        [
+          18,
+          7,
+          119,
+          112
+        ],
+        [
+          19,
+          7,
+          119,
+          112
+        ],
+        [
+          20,
+          7,
+          119,
+          112
+        ],
+        [
+          20,
+          7,
+          119,
+          112
+        ]
+      ]
+    },
+    {
+      "name": "cast",
+      "fps": 10.434782608695652,
+      "duration_seconds": 1.15,
+      "frame_count": 12,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          19,
+          8,
+          119,
+          112
+        ],
+        [
+          19,
+          8,
+          119,
+          112
+        ],
+        [
+          20,
+          8,
+          119,
+          113
+        ],
+        [
+          21,
+          8,
+          119,
+          114
+        ],
+        [
+          20,
+          8,
+          119,
+          112
+        ],
+        [
+          18,
+          8,
+          119,
+          112
+        ],
+        [
+          16,
+          6,
+          119,
+          112
+        ],
+        [
+          15,
+          2,
+          119,
+          112
+        ],
+        [
+          15,
+          2,
+          119,
+          112
+        ],
+        [
+          17,
+          8,
+          119,
+          112
+        ],
+        [
+          19,
+          8,
+          119,
+          112
+        ],
+        [
+          19,
+          8,
+          119,
+          112
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "duration_seconds": 0.8,
+      "frame_count": 12,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          20,
+          8,
+          119,
+          112
+        ],
+        [
+          19,
+          8,
+          119,
+          112
+        ],
+        [
+          18,
+          9,
+          119,
+          114
+        ],
+        [
+          17,
+          11,
+          120,
+          116
+        ],
+        [
+          17,
+          14,
+          121,
+          118
+        ],
+        [
+          13,
+          19,
+          120,
+          120
+        ],
+        [
+          9,
+          24,
+          118,
+          120
+        ],
+        [
+          8,
+          29,
+          116,
+          121
+        ],
+        [
+          7,
+          33,
+          114,
+          120
+        ],
+        [
+          7,
+          36,
+          113,
+          119
+        ],
+        [
+          7,
+          36,
+          113,
+          119
+        ],
+        [
+          7,
+          36,
+          113,
+          119
+        ]
+      ]
+    }
+  ]
+}

@@ -147,6 +147,9 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"max_weight_share": definition.max_weight_share,
 			"send_first_wave": definition.send_first_wave,
 			"regular_spawn_enabled": definition.regular_spawn_enabled,
+			"boss": definition.boss, "boss_spawn_chance": definition.boss_spawn_chance,
+			"boss_spawn_chance_growth": definition.boss_spawn_chance_growth,
+			"boss_spawn_chance_cap": definition.boss_spawn_chance_cap,
 			"send_enabled": definition.send_enabled,
 			"group_weights": definition.group_weights.duplicate(),
 			"group_interval": definition.group_interval, "kill_bounty": definition.kill_bounty,
@@ -162,7 +165,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		}
 	var has_remainder_enemy: bool = false
 	for definition: EnemyDefinition in rules.catalog.enemies:
-		if definition.regular_spawn_enabled and definition.spawn_weight == 1 and definition.first_wave == 1 and definition.max_per_wave == 0 and definition.max_weight_share == 1.0:
+		if definition.regular_spawn_enabled and not definition.boss and definition.spawn_weight == 1 and definition.first_wave == 1 and definition.max_per_wave == 0 and definition.max_weight_share == 1.0:
 			has_remainder_enemy = true
 	if not has_remainder_enemy:
 		push_error("Combat regular waves require an always-unlocked weight-one enemy with unlimited count and full weight share")
@@ -1046,7 +1049,7 @@ func _income_aura_bonus(slot: int, tower: Dictionary) -> float:
 
 
 func _enemy_abilities(slot: int) -> void:
-	# Children cannot enter this iteration or recursively act.
+	# New children wait for a later pass; their own ability timers start at birth.
 	var count: int = enemies[slot].size()
 	for index: int in range(count):
 		var enemy: Dictionary = enemies[slot][index]
@@ -1198,6 +1201,18 @@ func _generate_wave_groups(wave_number: int) -> Array[Dictionary]:
 	var count_caps: Dictionary[String, int] = {}
 	for type_id: String in _enemy_types:
 		count_caps[type_id] = _enemy_count_cap(_enemy_types[type_id], wave_number)
+		var definition: Dictionary = _enemy_types[type_id]
+		var elapsed: int = wave_number - int(definition["first_wave"])
+		if not definition["boss"] or not definition["regular_spawn_enabled"] or elapsed < 0:
+			continue
+		var weight: int = definition["spawn_weight"]
+		if weight > remaining or weight > floori(float(budget) * float(definition["max_weight_share"])):
+			continue
+		var chance: float = minf(float(definition["boss_spawn_chance_cap"]), float(definition["boss_spawn_chance"]) + maxi(0, elapsed - 1) * float(definition["boss_spawn_chance_growth"]))
+		if elapsed == 0 or _wave_random.randf() < chance:
+			roster.append({"type_id": type_id, "count": 1})
+			counts[type_id] = 1
+			remaining -= weight
 	while remaining > 0:
 		eligible.clear()
 		for type_id: String in _enemy_types:
@@ -1206,7 +1221,7 @@ func _generate_wave_groups(wave_number: int) -> Array[Dictionary]:
 			var count: int = counts.get(type_id, 0)
 			var count_cap: int = count_caps[type_id]
 			var share_cap: int = floori(float(budget) * float(definition["max_weight_share"]))
-			if definition["regular_spawn_enabled"] and wave_number >= int(definition["first_wave"]) and weight <= remaining and (count_cap == 0 or count < count_cap) and (count + 1) * weight <= share_cap:
+			if definition["regular_spawn_enabled"] and not definition["boss"] and wave_number >= int(definition["first_wave"]) and weight <= remaining and (count_cap == 0 or count < count_cap) and (count + 1) * weight <= share_cap:
 				eligible.append(type_id)
 		# A validated weight-one remainder enemy guarantees exact fill.
 		if eligible.is_empty():

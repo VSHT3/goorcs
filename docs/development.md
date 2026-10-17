@@ -447,7 +447,7 @@ Verification passed deterministic FIFO cadence/idle restart/independent clocks, 
 
 ### Enemy roster
 
-The current seven-type roster, staged regular/send introductions, Orcling group odds/prices, Chief healing, NecOrcmancer rituals, SkeleOrc limits/bounties, animated presentation, and lifetime-save ownership are documented in [enemy roster and sandbox](enemy-roster.md). That document supersedes the earlier three-type/free-send roster.
+The current eight-type roster, staged regular/send introductions, round-40 NecOrcmancer Mancer boss, slower normal caster/HP progression, grouped Orclings, healing, nested NecOrcmancer/SkeleOrc rituals, animated presentation, and lifetime-save ownership are documented in [enemy roster and sandbox](enemy-roster.md). That document supersedes the earlier three-type/free-send roster.
 
 `CombatRules.catalog` owns registration. `MatchCombat` captures type definitions and authoritative animation/action clocks, builds one shared weighted group roster, and publishes detached instances, individual spawn times, send gates, and cumulative owned-side counters. Count/share limits apply to group events; flattened spawn totals count individuals. Future content uses the [content pipeline](content-pipeline.md), not an ID switch.
 
@@ -459,7 +459,7 @@ For round `n ≥ 1`, ordinary regular/send intervals multiply by `1 − min((n�
 
 #### Weighted regular waves
 
-Each event must fit remaining integer weight, introduction wave, count cap, and `floor(budget × max_weight_share)`. A finite cap grows from `max_per_wave` every `count_cap_growth_interval` waves after `first_wave`; zero cap remains unlimited. An always-unlocked, unlimited weight-one full-share regular enemy guarantees exact remainder fill. Orcling groups spend their weight once, not once per child. Summoned-only types never enter the regular draw. Wave completion waits for regular births, paid deliveries, living enemies, and summons.
+Boss encounters reserve their weight before ordinary selections. Each event still fits remaining integer weight, introduction wave, count cap, and `floor(budget × max_weight_share)`. A finite cap grows from `max_per_wave` every `count_cap_growth_interval` waves after `first_wave`; zero cap remains unlimited. An always-unlocked, unlimited, non-boss weight-one full-share regular enemy guarantees exact remainder fill. Orcling groups spend their weight once, not once per child. Summoned-only types never enter the regular draw. Wave completion waits for regular births, paid deliveries, living enemies, and every summon generation.
 
 #### Artwork provenance
 

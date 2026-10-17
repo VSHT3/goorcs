@@ -22,6 +22,11 @@ extends Resource
 @export var send_income: int = 2
 @export var send_first_wave: int = 1
 @export var regular_spawn_enabled: bool = true
+# Bosses reserve one encounter at debut, then roll once per eligible wave.
+@export var boss: bool = false
+@export_range(0.0, 1.0, 0.005) var boss_spawn_chance: float = 0.05
+@export_range(0.0, 1.0, 0.005) var boss_spawn_chance_growth: float = 0.005
+@export_range(0.0, 1.0, 0.005) var boss_spawn_chance_cap: float = 0.25
 @export var send_enabled: bool = true
 # Index zero is one member. A regular budget entry or purchase buys one group.
 @export var group_weights: PackedInt32Array = PackedInt32Array([1])

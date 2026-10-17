@@ -111,7 +111,7 @@ static func _admission_error(content: ContentCatalog, rules: CombatRules) -> Str
 	if rules.wave_weight <= 0 or rules.wave_weight_growth < 0 or not is_finite(rules.spawn_interval) or rules.spawn_interval < 0.0 or not rules.valid_speed_progression():
 		return "Combat wave and speed progression rules are invalid."
 	for enemy: EnemyDefinition in content.enemies:
-		if enemy.regular_spawn_enabled and enemy.spawn_weight == 1 and enemy.first_wave == 1 and enemy.max_per_wave == 0 and enemy.max_weight_share == 1.0:
+		if enemy.regular_spawn_enabled and not enemy.boss and enemy.spawn_weight == 1 and enemy.first_wave == 1 and enemy.max_per_wave == 0 and enemy.max_weight_share == 1.0:
 			return ""
 	return "Combat requires an always-available, unlimited weight-one remainder enemy."
 

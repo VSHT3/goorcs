@@ -17,7 +17,7 @@ extends Resource
 @export var roll_rules: TowerRollRules
 @export var starting_reroll_currency: int = 0
 @export var clear_reroll_currency: int = 3
-@export var health_growth: int = 2
+@export var health_growth: int = 1
 # Each milestone adds a fraction of original speed; spans grow 5, 10, 15... rounds.
 @export_range(0.0, 1.0, 0.01, "or_greater") var speed_growth_fraction: float = 0.1
 @export_range(1, 1000, 1, "or_greater") var speed_growth_rounds: int = 5
