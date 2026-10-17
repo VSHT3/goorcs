@@ -4,6 +4,8 @@ extends RefCounted
 
 signal changed
 
+enum TestKind { NONE, WAVE, SPAWN }
+
 var layout: PathLayout
 var combat: MatchCombat
 var rules: CombatRules
@@ -13,6 +15,9 @@ var speed: float = 1.0
 var active: bool = false
 var state: Dictionary = {}
 var _snapshot_elapsed: float = 0.0
+var _last_test_kind: TestKind = TestKind.NONE
+var _last_spawn_type: StringName = &""
+var _last_spawn_count: int = 0
 
 
 func configure(catalog: ContentCatalog, source_rules: CombatRules) -> void:
@@ -80,6 +85,7 @@ func start_wave() -> bool:
 		return false
 	var accepted: bool = combat.sandbox_start_wave(_routing(), round_number)
 	if accepted:
+		_last_test_kind = TestKind.WAVE
 		paused = false
 		_publish()
 	return accepted
@@ -91,14 +97,33 @@ func spawn(type_id: StringName, count: int) -> bool:
 	# Reject an unknown type before replacing any current simulation.
 	if not state.get("enemy_types", {}).has(String(type_id)):
 		return false
-	if combat.phase != MatchCombat.Phase.WAVE:
-		var roster: Array[String] = []
-		if not combat.sandbox_start(_routing(), round_number, roster):
-			return false
+	if combat.phase != MatchCombat.Phase.WAVE and not _start_empty_wave():
+		return false
 	var accepted: bool = combat.sandbox_spawn(0, type_id, count)
 	if accepted:
+		_last_test_kind = TestKind.SPAWN
+		_last_spawn_type = type_id
+		_last_spawn_count = count
 		_publish()
 	return accepted
+
+
+func can_restart() -> bool:
+	return _last_test_kind != TestKind.NONE and layout.is_ready()
+
+
+func restart() -> bool:
+	if not can_restart():
+		return false
+	if _last_test_kind == TestKind.WAVE:
+		return start_wave()
+	# The combat owner validates and abandons the old stream before the exact batch.
+	if not _start_empty_wave():
+		return false
+	if not spawn(_last_spawn_type, _last_spawn_count):
+		return false
+	set_paused(false)
+	return true
 
 
 func set_paused(value: bool) -> void:
@@ -176,6 +201,11 @@ func set_archer_targeting(tower_id: int, archer_index: int, mode: int) -> bool:
 func _new_layout(dimensions: Vector2i) -> PathLayout:
 	var row: int = floori(float(dimensions.y) * 0.5)
 	return PathLayout.new(dimensions, dimensions.x * dimensions.y - 2, Vector2i(0, row), Vector2i(dimensions.x - 1, row))
+
+
+func _start_empty_wave() -> bool:
+	var roster: Array[String] = []
+	return combat.sandbox_start(_routing(), round_number, roster)
 
 
 func _routing() -> Array[Dictionary]:

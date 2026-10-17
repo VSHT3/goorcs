@@ -26,6 +26,7 @@ var sound_player: GameSoundPlayer
 var _roll_details: Label
 var rarity_reroll: Button
 var attribute_reroll: Button
+var build_another_button: Button
 var _extra_upgrades: VBoxContainer
 var _extra_upgrade_buttons: Dictionary[String, Button] = {}
 var extra_targeting: Array[TargetingCycle] = []
@@ -165,6 +166,11 @@ func _build_tower_management() -> void:
 	var shell := VBoxContainer.new()
 	shell.add_theme_constant_override("separation", 8)
 	_management.add_child(shell)
+	build_another_button = Button.new()
+	build_another_button.text = "Build another [B]"
+	build_another_button.custom_minimum_size.y = 30
+	build_another_button.pressed.connect(_build_another)
+	shell.add_child(build_another_button)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	shell.add_child(scroll)
 	content.reparent(scroll, false)
@@ -207,6 +213,12 @@ func _build_tower_management() -> void:
 	_reroll_balance.tooltip_text = "Run-only rarity currency. Earned from round clears and enemy drops; spent on rarity rerolls."
 	_income.get_parent().add_child(_reroll_balance)
 	_income.get_parent().move_child(_reroll_balance, _income.get_index())
+	var heading := HBoxContainer.new()
+	shell.add_child(heading)
+	shell.move_child(heading, 0)
+	_tower_title.reparent(heading, false)
+	_tower_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	close_button.reparent(heading, false)
 
 
 func _reroll(kind: String) -> void:
@@ -345,6 +357,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	for popup: PopupMenu in world._hud_popups:
 		if popup.visible:
 			return
+	if not event is InputEventKey or not event.pressed or event.echo or event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
+		return
+	if event.keycode == KEY_B:
+		if _build_another():
+			get_viewport().set_input_as_handled()
+		return
 	var number: int = TowerShopButton.shortcut_number_from_event(event)
 	if number == 0:
 		return
@@ -427,6 +445,18 @@ func _buy_tower(cell: Vector2i, type_id: StringName, slot: int) -> void:
 		_placement_id = type_id
 	planning.build_tower(slot, cell, type_id, _default_targeting)
 	_refresh()
+
+
+func _build_another() -> bool:
+	var tower: Dictionary = _selected_tower()
+	if tower.is_empty() or planning == null or not planning.can_manage_towers(planning.local_slot()):
+		return false
+	var type_id := StringName(tower["type_id"])
+	var button: TowerShopButton = shop_buttons.get(type_id)
+	if button == null or not button.is_visible_in_tree() or button.disabled:
+		return false
+	_select_placement(type_id)
+	return true
 
 
 func _select_placement(type_id: StringName) -> void:
@@ -731,6 +761,8 @@ func _selected_tower() -> Dictionary:
 func _refresh_targeting() -> void:
 	var tower: Dictionary = _selected_tower()
 	_management.visible = not tower.is_empty()
+	var palette_button: TowerShopButton = shop_buttons.get(StringName(tower.get("type_id", "")))
+	build_another_button.disabled = tower.is_empty() or not planning.can_manage_towers(planning.local_slot()) or palette_button == null or not palette_button.is_visible_in_tree() or palette_button.disabled
 	if tower.is_empty():
 		targeting_button.mode = _default_targeting
 		return

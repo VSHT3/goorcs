@@ -5,6 +5,7 @@ signal back_requested
 
 const NUMBERS: Font = preload("res://assets/fonts/silkscreen/Silkscreen-Regular.ttf")
 const MATCH_THEME: Theme = preload("res://resources/ui/match_theme.tres")
+const SPEEDS: Array[float] = [1.0, 2.0, 4.0]
 
 
 class FreeShopButton extends TowerShopButton:
@@ -34,6 +35,9 @@ var fourth_targeting: TargetingCycle
 var advancement_buttons: Dictionary[String, Button] = {}
 var extra_targeting: Array[TargetingCycle] = []
 var play_button: Button
+var build_another_button: Button
+var restart_button: Button
+var speed_selector: OptionButton
 var wave_button: Button
 var spawn_button: Button
 var clear_button: Button
@@ -146,12 +150,13 @@ func _build_interface() -> void:
 	play_button = _button(summary, "Play", _toggle_play)
 	play_button.custom_minimum_size.x = 90
 	play_button.tooltip_text = "Space: pause/resume. Starts a weighted wave when stopped."
-	var speed := OptionButton.new()
-	for title: String in ["1×", "2×", "4×"]:
-		speed.add_item(title)
-	speed.item_selected.connect(func(index: int) -> void: controller.speed = [1.0, 2.0, 4.0][index])
-	summary.add_child(speed)
-	world._hud_popups.append(speed.get_popup())
+	restart_button = _button(summary, "Restart [R]", _restart)
+	speed_selector = OptionButton.new()
+	for title: String in ["1× [F]", "2× [F]", "4× [F]"]:
+		speed_selector.add_item(title)
+	speed_selector.item_selected.connect(_select_speed)
+	summary.add_child(speed_selector)
+	world._hud_popups.append(speed_selector.get_popup())
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	summary.add_child(spacer)
@@ -248,21 +253,25 @@ func _build_management() -> void:
 	panel_style.content_margin_top = 8
 	panel_style.content_margin_bottom = 8
 	_management.add_theme_stylebox_override("panel", panel_style)
-	var scroll := ScrollContainer.new()
-	scroll.follow_focus = true
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
-	_management.add_child(scroll)
-	var content := VBoxContainer.new()
-	content.custom_minimum_size.x = 0
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(content)
+	var shell := VBoxContainer.new()
+	_management.add_child(shell)
 	var heading := HBoxContainer.new()
-	content.add_child(heading)
+	shell.add_child(heading)
 	_tower_title = _label(heading, "Tower")
 	_tower_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_tower_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	CloseButtonStyle.apply(_button(heading, "X", cancel_interaction))
+	build_another_button = _button(shell, "Build another [B]", _build_another)
+	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shell.add_child(scroll)
+	var content := VBoxContainer.new()
+	content.custom_minimum_size.x = 0
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(content)
 	_tower_stats = _label(content, "", true)
 	_tower_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_roll_details = _label(content, "", true)
@@ -423,6 +432,16 @@ func _toggle_play() -> void:
 		_show_notice("Connect the portal, crystal, and all path tiles first.")
 
 
+func _restart() -> void:
+	if not controller.restart():
+		_show_notice("Start a weighted wave or Spawn batch, then connect the portal, crystal, and all path tiles before restarting.")
+
+
+func _select_speed(index: int) -> void:
+	controller.speed = SPEEDS[index]
+	_refresh()
+
+
 func _spawn() -> void:
 	count_input.apply()
 	if enemy_selector.selected >= 0 and not controller.spawn(StringName(enemy_selector.get_item_metadata(enemy_selector.selected)), int(count_input.value)):
@@ -442,6 +461,18 @@ func _back() -> void:
 func _edit(cell: Vector2i, place: bool) -> void:
 	if placement_id == &"":
 		controller.edit_path(cell, place)
+
+
+func _build_another() -> bool:
+	var tower: Dictionary = _find(controller.state["towers"][0], selected_tower_id)
+	if not _active or tower.is_empty():
+		return false
+	var type_id := StringName(tower["type_id"])
+	var button: TowerShopButton = shop_buttons.get(type_id)
+	if button == null or not button.is_visible_in_tree() or button.disabled:
+		return false
+	_select_placement(type_id)
+	return true
 
 
 func _select_placement(type_id: StringName) -> void:
@@ -531,6 +562,9 @@ func _refresh() -> void:
 	for type_id: StringName in shop_buttons:
 		shop_buttons[type_id].set_pressed_no_signal(type_id == placement_id)
 	play_button.text = "Pause" if running and not controller.paused else "Play"
+	restart_button.disabled = not _active or not controller.can_restart()
+	speed_selector.disabled = not _active
+	speed_selector.select(SPEEDS.find(controller.speed))
 	_status.text = "%s · Alive %d" % [("Paused" if controller.paused else "Running") if running else "Editing", state["enemies"][0].size()]
 	_status.tooltip_text = "%d path tiles · Unlimited tiles · %d × %d map" % [controller.layout.used_tiles(), controller.layout.dimensions.x, controller.layout.dimensions.y]
 	clear_button.disabled = running or controller.layout.used_tiles() == 0
@@ -552,6 +586,8 @@ func _find(items: Array, id: int) -> Dictionary:
 func _refresh_management(state: Dictionary) -> void:
 	var tower: Dictionary = _find(state["towers"][0], selected_tower_id)
 	_management.visible = not tower.is_empty()
+	var palette_button: TowerShopButton = shop_buttons.get(StringName(tower.get("type_id", "")))
+	build_another_button.disabled = not _active or tower.is_empty() or palette_button == null or not palette_button.is_visible_in_tree() or palette_button.disabled
 	if tower.is_empty():
 		selected_tower_id = -1
 		return
@@ -650,6 +686,8 @@ func _input(event: InputEvent) -> void:
 			focus.release_focus()
 			get_viewport().set_input_as_handled()
 		return
+	if get_viewport().gui_is_dragging():
+		return
 	if event.keycode == KEY_SPACE:
 		_toggle_play()
 		get_viewport().set_input_as_handled()
@@ -668,6 +706,21 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	for popup: PopupMenu in world._hud_popups:
 		if popup.visible:
 			return
+	if not event is InputEventKey or not event.pressed or event.echo or event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
+		return
+	if event.keycode == KEY_B:
+		if _build_another():
+			get_viewport().set_input_as_handled()
+		return
+	if event.keycode == KEY_R:
+		if not restart_button.disabled:
+			_restart()
+			get_viewport().set_input_as_handled()
+		return
+	if event.keycode == KEY_F:
+		_select_speed((speed_selector.selected + 1) % speed_selector.item_count)
+		get_viewport().set_input_as_handled()
+		return
 	var number: int = TowerShopButton.shortcut_number_from_event(event)
 	if number == 0:
 		return

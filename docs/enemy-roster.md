@@ -78,9 +78,10 @@ The boss entry shows actual round-40 debut stats, weight, later encounter odds, 
 **Sandbox** replaces Workshop; **S** opens it from the menu. It owns a separate model, path layout, camera, and paused menu-return state. All catalog towers and enemies are available without unlocking anything. Purchases/upgrades are genuinely free; lives cannot be lost. Sandbox does not edit collection saves or lifetime records.
 
 - Paint/erase paths with left/right drag while stopped; tiles have no spending budget.
-- Buy, inspect, target, upgrade, and sell the same real tower types/evolutions used in matches.
+- Buy, inspect, target, upgrade, and sell the same real tower types/evolutions used in matches. **Build another [B]** selects the inspected tower's base identity, not a copy of its upgrades or traits.
 - Choose a round and start its weighted wave, or choose any enemy and exact count, including SkeleOrcs.
-- Space starts or toggles pause; choose 1×/2×/4× playback. Stop/clear removes enemies and unlocks editing while retaining the build.
+- Space starts or toggles pause; choose 1×/2×/4× playback or cycle it with **F**. Stop/clear removes enemies and unlocks editing while retaining the build.
+- **Restart [R]** repeats the last accepted weighted wave or exact Spawn batch, clearing old enemies/queued spawns and running immediately. It keeps towers, upgrades, rolls, targeting, speed, current route, and selected round. Weighted retries roll a new regular roster; exact retries repeat only the last accepted type/count, not a history of mixed additions. Stop and round edits retain the recipe; a disconnected path prevents replay without discarding it. Fields, menus, confirmations, and active drags block keyboard shortcuts.
 - Set map width/height and confirm Resize to replace the map/build. Numeric fields accept values beyond their arrow range, subject to machine memory—not an infinite-performance promise.
 - Reset build requires confirmation and retains the path. Menu/Escape pauses and preserves the playground. WASD and cursor zoom reuse match camera controls; text entry, selectors, inspectors, and dialogs take input priority.
 
