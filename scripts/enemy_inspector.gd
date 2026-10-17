@@ -11,6 +11,10 @@ signal close_requested
 @onready var _description: Label = %Description
 
 
+func _ready() -> void:
+	CloseButtonStyle.apply(%CloseButton)
+
+
 func refresh(enemy: Dictionary, type_stats: Dictionary) -> void:
 	if enemy.is_empty():
 		hide()

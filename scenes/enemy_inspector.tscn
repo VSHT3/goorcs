@@ -76,13 +76,11 @@ autowrap_mode = 2
 
 [node name="CloseButton" type="Button" parent="Content/Header"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(28, 28)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
-size_flags_vertical = 0
+size_flags_vertical = 4
 mouse_filter = 0
-tooltip_text = "Close enemy inspection"
-text = "×"
-flat = true
+text = "X"
 
 [node name="HealthBar" type="ProgressBar" parent="Content"]
 unique_name_in_owner = true

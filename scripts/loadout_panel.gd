@@ -33,11 +33,21 @@ func _ready() -> void:
 	column.custom_minimum_size.x = 660
 	column.add_theme_constant_override("separation", 16)
 	center.add_child(column)
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 12)
+	column.add_child(header)
 	var title := Label.new()
 	title.text = "Choose your loadout"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 32)
-	column.add_child(title)
+	header.add_child(title)
+	leave_button = Button.new()
+	leave_button.name = "LeaveLoadout"
+	CloseButtonStyle.apply(leave_button)
+	MenuAudio.bind_action(leave_button)
+	leave_button.pressed.connect(_leave)
+	header.add_child(leave_button)
 	var hint := Label.new()
 	hint.text = "Equip one to four unlocked towers. Empty slots are fine.\nYour choices stay private until you build. Committing locks this run."
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -82,11 +92,6 @@ func _ready() -> void:
 	commit_button.theme_type_variation = &"PrimaryButton"
 	commit_button.pressed.connect(_commit)
 	column.add_child(commit_button)
-	leave_button = _button("LeaveLoadout")
-	leave_button.text = "Leave / Esc"
-	leave_button.theme_type_variation = &"QuietButton"
-	leave_button.pressed.connect(_leave)
-	column.add_child(leave_button)
 	planning.changed.connect(_refresh)
 	planning.feedback.connect(_show_notice)
 	_refresh()

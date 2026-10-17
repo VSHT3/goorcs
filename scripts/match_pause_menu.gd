@@ -26,6 +26,8 @@ var _settings_dirty: bool = false
 
 
 func _ready() -> void:
+	CloseButtonStyle.apply(_back_button)
+	MenuAudio.bind_action(_back_button)
 	resume_button.pressed.connect(resume_requested.emit)
 	settings_button.pressed.connect(_open_settings)
 	quit_button.pressed.connect(quit_requested.emit)
@@ -43,6 +45,7 @@ func open_menu(multiplayer: bool) -> void:
 	_save_error.hide()
 	_choices.show()
 	_settings_page.hide()
+	_back_button.hide()
 	_heading.text = "Match menu" if _online_match else "Paused"
 	_online_note.visible = _online_match
 	show()
@@ -92,6 +95,7 @@ func _open_settings() -> void:
 	_showing_settings = true
 	_choices.hide()
 	_settings_page.show()
+	_back_button.show()
 	_heading.text = "Settings"
 	music_slider.grab_focus()
 
@@ -100,6 +104,7 @@ func _return_to_choices() -> void:
 	_save_settings()
 	_showing_settings = false
 	_settings_page.hide()
+	_back_button.hide()
 	_choices.show()
 	_heading.text = "Match menu" if _online_match else "Paused"
 	settings_button.grab_focus()
@@ -148,7 +153,7 @@ func _keep_focus_inside(control: Control) -> void:
 	if not is_visible_in_tree() or control == null:
 		return
 	var page: Control = _settings_page if _showing_settings else _choices
-	if not page.is_ancestor_of(control):
+	if not page.is_ancestor_of(control) and not (_showing_settings and control == _back_button):
 		if _showing_settings:
 			music_slider.grab_focus()
 		else:

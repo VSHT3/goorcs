@@ -34,6 +34,7 @@ func _run() -> void:
 	await process_frame
 	var screen: CollectionScreen = main.collection_screen
 	_check(screen.visible and (main.sandbox_screen == null or not main.sandbox_screen.visible), "Collection navigation opens only the collection screen")
+	_check(root.get_visible_rect().encloses(screen.back_button.get_global_rect()), "The full catalog must not push collection navigation outside the visible window")
 	await _click(screen.open_button)
 	var granted: int = main.collection_store.unlocked_count()
 	_check(granted > initial_unlocked and granted <= catalog_size, "Opening actually grants previously locked collection types")

@@ -16,11 +16,12 @@ var _catalog_icons: Array[ChestReveal.RewardIcon] = []
 @onready var reset_button: Button = $Margin/Content/Header/Reset
 @onready var reset_confirmation: ConfirmationDialog = $ResetConfirmation
 @onready var _count: Label = $Margin/Content/Workspace/Archive/Count
-@onready var _catalog: VBoxContainer = $Margin/Content/Workspace/Archive/Catalog
+@onready var _catalog: VBoxContainer = $Margin/Content/Workspace/Archive/CatalogScroll/Catalog
 @onready var _status: RichTextLabel = $Margin/Content/Workspace/Archive/Status
 
 
 func _ready() -> void:
+	CloseButtonStyle.apply(back_button)
 	for button: Button in [open_button, skip_button, back_button, reset_button, reset_confirmation.get_ok_button(), reset_confirmation.get_cancel_button()]:
 		MenuAudio.bind_action(button)
 	open_button.pressed.connect(_open_chest)

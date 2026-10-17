@@ -40,6 +40,8 @@ var _loadout_was_selecting: bool = false
 
 
 func _ready() -> void:
+	CloseButtonStyle.apply(back_button)
+	MenuAudio.bind_action(back_button)
 	planning_screen = preload("res://scenes/planning_screen.tscn").instantiate()
 	planning_screen.planning = planning
 	planning_screen.hide()
@@ -228,7 +230,6 @@ func _refresh() -> void:
 		copy_button.text = "Copy code"
 	_error.text = session.error_message if session != null else "No session was supplied. Return to the menu and reopen Play."
 	_error.visible = not _error.text.is_empty()
-	back_button.text = "Leave / Esc" if active else "Back / Esc"
 	_players.text = ""
 	_players.hide()
 	_status.visible = session == null or session.state not in [MultiplayerSession.State.IDLE, MultiplayerSession.State.ERROR]
@@ -244,7 +245,6 @@ func _refresh() -> void:
 			_players.text = "Host · %d / 2 players" % session.player_count()
 		MultiplayerSession.State.CONNECTING:
 			_status.text = "Connecting to host…"
-			back_button.text = "Cancel / Esc"
 		MultiplayerSession.State.CONNECTED:
 			_status.text = "Connected"
 			_players.text = "%s · %d / 2 players" % ["Host" if session.is_host else "Guest", session.player_count()]

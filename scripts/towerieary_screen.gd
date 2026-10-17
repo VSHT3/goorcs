@@ -109,14 +109,7 @@ func _build_layout() -> void:
 	header.add_child(heading)
 	back_button = Button.new()
 	back_button.name = "Back"
-	back_button.text = "X"
-	back_button.custom_minimum_size = Vector2(40, 40)
-	back_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	for state: String in ["normal", "hover", "pressed", "disabled"]:
-		var close_style: StyleBox = get_theme_stylebox(state, "Button").duplicate()
-		close_style.set_content_margin_all(6)
-		back_button.add_theme_stylebox_override(state, close_style)
-	back_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	CloseButtonStyle.apply(back_button)
 	MenuAudio.bind_action(back_button)
 	back_button.pressed.connect(_request_back)
 	header.add_child(back_button)

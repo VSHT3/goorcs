@@ -42,6 +42,7 @@ func configure(content: ContentCatalog, combat_rules: CombatRules, statistics: E
 
 
 func _ready() -> void:
+	CloseButtonStyle.apply(back_button)
 	MenuAudio.bind_action(back_button)
 	back_button.pressed.connect(_request_back)
 	visibility_changed.connect(_visibility_changed)

@@ -28,9 +28,11 @@ The centered main-menu wordmark uses a green pixel-orc O with pointed ears, heav
 
 Click the orc O to replay his recorded roar and jaw animation. Every click restarts the current roar rather than stacking voices; clicking during the entrance switches directly to the requested roar. Other letters do not trigger it, and leaving the menu stops it.
 
-**Play** uses a centered menu with a primary Singleplayer action, paired Host/Join choices, and the same button styling/hover effects as the title screen. Connection forms, waiting rooms, real errors, and Cancel/Leave stay in the compact column rather than spanning the screen.
+**Play** uses a centered menu with a primary Singleplayer action, paired Host/Join choices, and the same button styling/hover effects as the title screen. Connection forms, waiting rooms, real errors, and the X close control stay in the compact column rather than spanning the screen.
 
 Menus support mouse hover and visible keyboard focus; arrows/Tab navigate and Enter activates. Main-menu shortcuts are **P** Play, **S** Sandbox, **B** Orcieary, **T** Towerieary, and **C** Collection. Escape returns or resumes the last activity; text fields/dialogs take priority. The gameplay pointer uses the steel variant from [Gauntlet Cursor by itsmars](https://opengameart.org/content/gauntlet-cursor), based on yd's CC0 artwork, at its original 32×32 size. Clickable UI retains the separate hand pointer; text/resize cursors remain native.
+
+Navigation and dismiss controls use the same compact **X** as Towerieary, including Collection, Orcieary, Sandbox, Play/loadouts, Settings, placement cancellation, and tower/enemy inspection. Escape keeps its existing priority and action; Settings X returns to the pause menu, while lobby X cancels/leaves normally. Collection's tower list scrolls without visible scrollbar chrome so all six entries remain reachable without pushing the header offscreen.
 
 Main-menu buttons retain their hover/focus highlights without descriptive hover popups.
 

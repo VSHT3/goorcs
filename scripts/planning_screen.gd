@@ -77,6 +77,8 @@ var _reroll_balance: Label
 
 
 func _ready() -> void:
+	CloseButtonStyle.apply(_cancel_placement)
+	CloseButtonStyle.apply(close_button)
 	sound_player = GameSoundPlayer.new()
 	sound_player.world = world
 	add_child(sound_player)

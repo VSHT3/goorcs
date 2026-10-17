@@ -314,9 +314,9 @@ text = "#"
 [node name="CancelPlacement" type="Button" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(116, 34)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
-text = "Cancel / Esc"
+text = "X"
 
 [node name="TowerManagement" type="PanelContainer" parent="HUD"]
 unique_name_in_owner = true
@@ -512,9 +512,9 @@ theme_override_font_sizes/font_size = 16
 
 [node name="CloseTower" type="Button" parent="HUD/TowerManagement/Content/Actions"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(72, 38)
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
-text = "Close"
+text = "X"
 
 [node name="EnemyInspector" parent="HUD" instance=ExtResource("4_inspector")]
 unique_name_in_owner = true

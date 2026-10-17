@@ -154,9 +154,9 @@ func _build_interface() -> void:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	summary.add_child(spacer)
-	menu_button = _button(summary, "Menu", _back)
+	menu_button = _button(summary, "X", _back)
+	CloseButtonStyle.apply(menu_button)
 	MenuAudio.bind_action(menu_button)
-	menu_button.tooltip_text = "Esc: cancel selection, then return to the menu. Your playground is preserved and paused."
 	var spawn_row := HBoxContainer.new()
 	header.add_child(spawn_row)
 	enemy_selector = OptionButton.new()
@@ -258,7 +258,7 @@ func _build_management() -> void:
 	_tower_title = _label(heading, "Tower")
 	_tower_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_tower_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_button(heading, "×", cancel_interaction)
+	CloseButtonStyle.apply(_button(heading, "X", cancel_interaction))
 	_tower_stats = _label(content, "", true)
 	_tower_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_roll_details = _label(content, "", true)
