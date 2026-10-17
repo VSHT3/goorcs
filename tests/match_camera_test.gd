@@ -71,6 +71,7 @@ func _run() -> void:
 	await _check_growth()
 	await _check_four_way_keys()
 	await _check_zoom()
+	await _check_home()
 	await _check_input_priority()
 	await _check_transformed_clicks()
 	await _check_lifecycle()
@@ -267,6 +268,35 @@ func _check_zoom() -> void:
 	_check(world.camera.position.is_equal_approx(revealed) and world.camera.zoom.is_equal_approx(revealed_zoom), "Ordinary snapshots do not repeat growth framing")
 
 
+func _check_home() -> void:
+	for slot: int in [1, 0]:
+		world.configure(Vector2i(16, 13), slot, -2)
+		world.set_process(false)
+		world.pan(100.0, Vector2.RIGHT if slot == 0 else Vector2.LEFT)
+		await _wheel(world.get_global_rect().get_center(), MOUSE_BUTTON_WHEEL_UP)
+		await _key(KEY_D, true)
+		world.zoom_at(1.5, world.get_global_rect().get_center())
+		await _key(KEY_HOME, true)
+		await _key(KEY_HOME, false)
+		var board: PathBoard = world.boards[slot]
+		var position: Vector2 = world.camera.position
+		var zoom: Vector2 = world.camera.zoom
+		_check(is_equal_approx(position.x, board.position.x + board.size.x * 0.5), "Home returns to the current player's board on either orientation")
+		for corner: Vector2i in [Vector2i.ZERO, Vector2i(15, 0), Vector2i(0, 12), Vector2i(15, 12)]:
+			var point: Vector2 = world.cell_screen_position(slot, corner)
+			_check(point.x >= MatchWorld.SIDE_MARGIN and point.x <= world.size.x - MatchWorld.SIDE_MARGIN and point.y >= MatchWorld.HUD_TOP and point.y <= world.size.y - MatchWorld.HUD_BOTTOM, "Home fits all corners of the current expanded board")
+		world._process(0.5)
+		_check(world.camera.position.is_equal_approx(position) and world.camera.zoom.is_equal_approx(zoom), "Home cancels held panning and pending zoom instead of drifting away afterward")
+		await _key(KEY_D, false)
+		world.pan(0.2, Vector2.RIGHT)
+		var blocked_position: Vector2 = world.camera.position
+		world.set_input_blocked(true)
+		await _key(KEY_HOME, true)
+		await _key(KEY_HOME, false)
+		_check(world.camera.position.is_equal_approx(blocked_position), "A modal-blocked world ignores Home")
+		world.set_input_blocked(false)
+
+
 func _check_input_priority() -> void:
 	var zoom: Vector2 = world.camera.zoom
 	await _wheel(header.get_global_rect().get_center(), MOUSE_BUTTON_WHEEL_UP)
@@ -283,6 +313,8 @@ func _check_input_priority() -> void:
 	await process_frame
 	var position: Vector2 = world.camera.position
 	await _wheel(world.get_global_rect().get_center(), MOUSE_BUTTON_WHEEL_UP)
+	await _key(KEY_HOME, true)
+	await _key(KEY_HOME, false)
 	await _key(KEY_W, true)
 	world._process(0.05)
 	_check(world.camera.zoom.is_equal_approx(zoom) and world.camera.position.is_equal_approx(position), "Open enemy popup blocks zoom and keyboard panning")
@@ -291,6 +323,8 @@ func _check_input_priority() -> void:
 	editor.show()
 	editor.grab_focus()
 	await _magnify(world.get_global_rect().get_center(), 1.2)
+	await _key(KEY_HOME, true)
+	await _key(KEY_HOME, false)
 	await _key(KEY_S, true)
 	world._process(0.05)
 	_check(world.camera.zoom.is_equal_approx(zoom) and world.camera.position.is_equal_approx(position), "Focused typing blocks magnify and physical WASD")

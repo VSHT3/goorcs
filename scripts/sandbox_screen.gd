@@ -188,7 +188,7 @@ func _build_interface() -> void:
 	var freedom := _label(tools, "Free builds · Invincible")
 	freedom.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	freedom.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	freedom.tooltip_text = "All content unlocked. No Coins are required. Leaks cannot cause defeat. No collection or lifetime statistics are saved. Paths may use every cell. WASD: pan · wheel/pinch: zoom."
+	freedom.tooltip_text = "All content unlocked. No Coins are required. Leaks cannot cause defeat. No collection or lifetime statistics are saved. Paths may use every cell. WASD: pan · wheel/pinch: zoom · Home: fit board."
 	var palette := HBoxContainer.new()
 	footer.add_child(palette)
 	for definition: TowerDefinition in catalog.towers:

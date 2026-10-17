@@ -165,6 +165,12 @@ func _handle_camera_input(event: InputEvent) -> void:
 		return
 	var key := event as InputEventKey
 	var code: Key = key.physical_keycode if key.physical_keycode != KEY_NONE else key.keycode
+	if code == KEY_HOME:
+		if key.pressed and not (key.echo or key.alt_pressed or key.ctrl_pressed or key.meta_pressed or _movement_blocked() or get_viewport().gui_is_dragging()):
+			_cancel_motion()
+			_frame_expanded_board()
+			get_viewport().set_input_as_handled()
+		return
 	if code != KEY_A and code != KEY_D and code != KEY_W and code != KEY_S:
 		return
 	if key.pressed and (key.echo or key.alt_pressed or key.ctrl_pressed or key.meta_pressed or _movement_blocked()):

@@ -1191,11 +1191,11 @@ func _refresh() -> void:
 		_counts[slot].visible = not finished and (in_wave or slot == own_slot)
 		if in_wave:
 			_counts[slot].text = "Alive %d" % all_enemies[slot].size()
-			_counts[slot].tooltip_text = "Regular enemies spawned: %d/%d.\nWASD: pan · Scroll / pinch: zoom." % [int(spawned[slot]), int(state.get("total", 0))]
+			_counts[slot].tooltip_text = "Regular enemies spawned: %d/%d.\nWASD: pan · Scroll / pinch: zoom · Home: fit your board." % [int(spawned[slot]), int(state.get("total", 0))]
 			_counts[slot].modulate = Color("b5e2b7")
 		else:
 			_counts[slot].text = "%d/%d tiles%s" % [layout.used_tiles(), layout.budget, " · Main" if bool(state.get("main_round", false)) else ""]
-			_counts[slot].tooltip_text = "%s\nPaths change only in setup and main rounds. WASD: pan · Scroll / pinch: zoom." % path_state
+			_counts[slot].tooltip_text = "%s\nPaths change only in setup and main rounds. WASD: pan · Scroll / pinch: zoom · Home: fit your board." % path_state
 			_counts[slot].modulate = Color("b5e2b7") if layout.is_ready() else Color("e0bc77")
 	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
 	ready_button.disabled = not finished and (not planning.active or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[own_slot] or not planning.layouts[own_slot].is_ready())
