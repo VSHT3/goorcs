@@ -101,12 +101,51 @@ func _run() -> void:
 	_solo_sends(planning)
 	_solo_typed_sends(planning)
 	_solo_specials(planning)
+	_solo_last_targeting(planning)
 	planning.queue_free()
 	session.queue_free()
 	await process_frame
 	if failures == 0:
 		print("PASS: offline mirrored commands, enemy sends/income/delivery, ownership, transactions, waves, results, and fresh restart")
 	quit(1 if failures > 0 else 0)
+
+
+func _solo_last_targeting(planning: MatchPlanning) -> void:
+	var rules := CombatRules.new()
+	rules.starting_coins = 10000
+	planning.combat_rules = rules
+	planning.start_singleplayer()
+	planning.build_tower(0, Vector2i(2, 3), &"arrow_tower", MatchCombat.TargetMode.LAST)
+	var id: int = planning.combat["towers"][0][0]["id"]
+	for slot: int in range(2):
+		_check(planning.combat["towers"][slot][0]["mode"] == MatchCombat.TargetMode.LAST, "Accepted Last build mirrors to each board's independent tower ID")
+	planning.set_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
+	planning.set_targeting(0, id, MatchCombat.TargetMode.LAST)
+	for upgrade: String in ["damage", "speed", "special"]:
+		planning.upgrade_tower(0, id, upgrade)
+	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.CLOSEST)
+	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.LAST)
+	for slot: int in range(2):
+		var tower: Dictionary = planning.combat["towers"][slot][0]
+		_check(tower["mode"] == MatchCombat.TargetMode.LAST and tower["secondary_mode"] == MatchCombat.TargetMode.LAST, "Primary and independent second-archer Last commands mirror through the same rules")
+	planning.upgrade_tower(0, id, "four_archers")
+	planning.set_targeting(0, id, MatchCombat.TargetMode.FURTHEST)
+	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
+	for archer_index: int in [2, 3]:
+		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.CLOSEST)
+		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.LAST)
+		for slot: int in range(2):
+			var tower: Dictionary = planning.combat["towers"][slot][0]
+			_check(tower["mode"] == MatchCombat.TargetMode.FURTHEST and tower["secondary_mode"] == MatchCombat.TargetMode.STRONGEST and tower["extra_archers"][archer_index - 2]["mode"] == MatchCombat.TargetMode.LAST, "Each extra Last archer mirrors without rewriting either earlier archer's accepted mode")
+	var frozen: Dictionary = planning.combat.duplicate(true)
+	var opponent_id: int = planning.combat["towers"][1][0]["id"]
+	planning.set_targeting(1, opponent_id, MatchCombat.TargetMode.LAST)
+	planning.set_secondary_targeting(1, opponent_id, MatchCombat.TargetMode.LAST)
+	for archer_index: int in [2, 3]:
+		planning.set_archer_targeting(1, opponent_id, archer_index, MatchCombat.TargetMode.CLOSEST)
+		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.LAST + 1)
+	_check(planning.combat == frozen, "Read-only solo opponent and invalid extra policies cannot mutate either mirrored tower")
+	planning.stop_singleplayer()
 
 
 func _solo_specials(planning: MatchPlanning) -> void:

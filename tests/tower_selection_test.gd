@@ -49,7 +49,7 @@ func _run() -> void:
 	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
 	var id: int = int(model.towers[0][0]["id"])
 	_check(screen.selected_tower_id == id and screen.get_node("%TowerManagement").visible, "Owned inspection opens management")
-	_check(screen.targeting_button.selected == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
+	_check(screen.targeting_button.mode == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
 	_check(screen.boards[0].selected_tower_id == id and screen.boards[1].selected_tower_id == -1, "Range selection stays local to owned board")
 	_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible and screen.damage_upgrade.visible and screen.speed_upgrade.visible, "Evolution choices are hidden until both stat upgrades")
 	var definition: Dictionary = main.planning.combat["tower_types"]["orc_ballista"]
@@ -381,19 +381,35 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 			_check(button.disabled, "Chosen and excluded paths cannot be bought again")
 		_check(screen.third_targeting.is_visible_in_tree() == (branch == "four_archers") and screen.fourth_targeting.is_visible_in_tree() == (branch == "four_archers"), "Only accepted Four Archers exposes selectors three and four")
 		if branch == "four_archers":
-			screen.targeting_button.item_selected.emit(1)
-			screen.secondary_targeting.item_selected.emit(2)
-			screen.third_targeting.item_selected.emit(2)
-			screen.fourth_targeting.item_selected.emit(1)
+			for direction: int in [1, -1]:
+				var expected_modes: Array = [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.FURTHEST] if direction == 1 else [MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.FURTHEST]
+				for expected: int in expected_modes:
+					await _press_cycle_button(screen.targeting_button.next_button if direction == 1 else screen.targeting_button.previous_button)
+					for slot: int in range(2):
+						_check(planning.combat["towers"][slot][0]["mode"] == expected and screen.targeting_button.mode == expected, "Native primary arrows wrap in display order through accepted mirrored policies")
+			await _press_cycle_button(screen.secondary_targeting.next_button)
+			await _press_cycle_button(screen.third_targeting.next_button)
+			await _press_cycle_button(screen.third_targeting.next_button)
+			await _press_cycle_button(screen.fourth_targeting.previous_button)
+			var selectors: Array[TargetingCycle] = [screen.targeting_button, screen.secondary_targeting, screen.third_targeting, screen.fourth_targeting]
+			var independent_modes: Array[int] = [MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST]
 			for slot: int in range(2):
 				var accepted: Dictionary = planning.combat["towers"][slot][0]
-				_check(accepted["mode"] == 1 and accepted["secondary_mode"] == 2 and accepted["extra_archers"][0]["mode"] == 2 and accepted["extra_archers"][1]["mode"] == 1, "All four actual selectors persist independent accepted modes through snapshots")
+				_check(accepted["mode"] == independent_modes[0] and accepted["secondary_mode"] == independent_modes[1] and accepted["extra_archers"][0]["mode"] == independent_modes[2] and accepted["extra_archers"][1]["mode"] == independent_modes[3], "All four native selectors persist independent accepted modes through mirrored snapshots")
+			for index: int in range(selectors.size()):
+				_check(selectors[index].mode == independent_modes[index], "Each archer displays its own accepted enum value rather than the display index")
+			# A stale enabled HUD must not display a request rejected by committed Ready.
 			planning._host_ready[0] = true
+			var rejected_mode: int = screen.third_targeting.mode
+			await _press_cycle_button(screen.third_targeting.next_button)
+			_check(screen.third_targeting.mode == rejected_mode and model.towers[0][0]["extra_archers"][0]["mode"] == rejected_mode, "An authoritative Ready rejection never optimistically advances the displayed policy")
 			planning._publish_snapshot()
 			frozen = planning.combat.duplicate(true)
-			screen.third_targeting.item_selected.emit(0)
-			planning.set_archer_targeting(0, id, 3, 0)
-			_check(planning.combat == frozen, "Ready also blocks extra targeting controls and direct gateway commands")
+			for selector: TargetingCycle in selectors:
+				_check(selector.disabled and selector.previous_button.disabled and selector.next_button.disabled, "Ready disables both native arrows for every archer")
+			await _press_cycle_button(screen.third_targeting.next_button)
+			planning.set_archer_targeting(0, id, 3, MatchCombat.TargetMode.LAST)
+			_check(planning.combat == frozen, "Ready blocks disabled native targeting arrows and direct gateway commands")
 			planning._host_ready[0] = false
 			planning._publish_snapshot()
 		for width: int in [1000, 1280]:
@@ -403,6 +419,10 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 			_check(surface.encloses(screen._management.get_global_rect()), "Arrow management remains inside the compact game surface")
 			for button: Button in screen.advancement_buttons.values():
 				_check(screen._management.get_global_rect().encloses(button.get_global_rect()), "Three wrapped choices stay inside the management panel")
+			for selector: TargetingCycle in [screen.targeting_button, screen.secondary_targeting, screen.third_targeting, screen.fourth_targeting]:
+				if selector.is_visible_in_tree():
+					for control: Control in [selector.previous_button, selector.mode_label, selector.next_button]:
+						_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "Labeled archer cycles stay inside the management panel at width %d" % width)
 		model.coins = [10000, 10000]
 		planning._publish_snapshot()
 		frozen = planning.combat.duplicate(true)
@@ -507,6 +527,30 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	_check(not screen.debug_button.visible and not screen.debug_popup.visible, "Finished matches do not expose a revival control")
 	planning.stop_singleplayer()
 	await create_timer(0.2).timeout
+
+
+func _press_cycle_button(button: Button) -> void:
+	if button.disabled:
+		var point: Vector2 = button.get_global_rect().get_center()
+		for pressed: bool in [true, false]:
+			var event := InputEventMouseButton.new()
+			event.position = point
+			event.global_position = point
+			event.button_index = MOUSE_BUTTON_LEFT
+			event.pressed = pressed
+			root.push_input(event, true)
+			await process_frame
+	else:
+		button.grab_focus()
+		_check(button.has_focus(), "Targeting arrows support native keyboard focus")
+		for pressed: bool in [true, false]:
+			var event := InputEventKey.new()
+			event.keycode = KEY_ENTER
+			event.physical_keycode = KEY_ENTER
+			event.pressed = pressed
+			root.push_input(event, true)
+			await process_frame
+	await process_frame
 
 
 func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:

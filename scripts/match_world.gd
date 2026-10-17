@@ -52,7 +52,7 @@ func _ready() -> void:
 	_world_viewport.world_2d = World2D.new()
 	_world_viewport.process_mode = Node.PROCESS_MODE_DISABLED
 	resized.connect(_fit_camera)
-	for path: String in ["%Targeting", "%SecondaryTargeting", "%EnemyType"]:
+	for path: String in ["%EnemyType"]:
 		var selector := get_parent().get_node_or_null(path) as OptionButton
 		if selector != null:
 			_hud_popups.append(selector.get_popup())

@@ -25,9 +25,9 @@ func _run() -> void:
 	await _build("host", 0, 1, 4, 0)
 	await _build("host", 0, -1, 2, 0)
 	await _build("host", 0, 1, 1, 0)
-	await _build("host", 0, 2, 1, 99)
+	await _build("host", 0, 2, 1, MatchCombat.TargetMode.LAST + 1)
 	await _build("host", 0, 2, 1, 0, "unknown_tower")
-	await _command("guest", {"action": "target", "slot": 0, "tower_id": tower_id, "mode": 2})
+	await _command("guest", {"action": "target", "slot": 0, "tower_id": tower_id, "mode": MatchCombat.TargetMode.LAST})
 	await _command("guest", {"action": "upgrade", "slot": 0, "tower_id": tower_id, "upgrade": "damage"})
 	await _command("guest", {"action": "sell", "slot": 0, "tower_id": tower_id})
 	await _command("host", {"action": "upgrade", "slot": 0, "tower_id": tower_id, "upgrade": "unknown"})
@@ -36,7 +36,7 @@ func _run() -> void:
 	await create_timer(0.15).timeout
 	_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Ownership, occupied/path/outside cells and invalid modes preserve authoritative towers")
 	_check(_snapshot("host")["boards"][0]["used"] == 12, "Path cannot overwrite a tower")
-	for mode: int in [1, 2, 0]:
+	for mode: int in [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.FURTHEST]:
 		await _command("host", {"action": "target", "slot": 0, "tower_id": tower_id, "mode": mode})
 		await _wait_tower("guest", 0, Vector2i(1, 1), mode)
 	await _both_ready()
@@ -86,8 +86,11 @@ func _run() -> void:
 		await _build("host", 0, cell.x, cell.y, 0, type_id)
 		var typed_host: Dictionary = await _wait_tower("guest", 0, cell, 0)
 		_check(typed_host.get("type_id") == type_id, "Guest sees the host's chosen tower identity")
-		await _build("guest", 1, cell.x, cell.y, 1, type_id)
-		var typed_guest: Dictionary = await _wait_tower("host", 1, cell, 1)
+		await _build("guest", 1, cell.x, cell.y, MatchCombat.TargetMode.LAST, type_id)
+		var typed_guest: Dictionary = await _wait_tower("host", 1, cell, MatchCombat.TargetMode.LAST)
+		for mode: int in [MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.CLOSEST]:
+			await _command("guest", {"action": "target", "slot": 1, "tower_id": int(typed_guest["id"]), "mode": mode})
+			await _wait_tower("host", 1, cell, mode)
 		_check(typed_guest.get("type_id") == type_id, "Host accepts the guest's chosen tower identity")
 	_check(_snapshot("host")["combat"]["tower_types"] == _snapshot("guest")["combat"]["tower_types"], "Both peers use detached host-owned per-type stats")
 	await _peer_economy()
@@ -270,10 +273,10 @@ func _peer_specials(code: String) -> void:
 			await create_timer(0.1).timeout
 			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Cross-owner and repeat special requests cannot spend or mutate accepted state")
 			if type_id == "arrow_tower":
-				await _command(lane, {"action": "target_secondary", "slot": slot, "tower_id": id, "mode": 2})
+				await _command(lane, {"action": "target_secondary", "slot": slot, "tower_id": id, "mode": MatchCombat.TargetMode.LAST})
 				await create_timer(0.1).timeout
 				tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
-				_check(tower["secondary_mode"] == 2 and tower["mode"] == 0, "Independent second-archer targeting replicates without changing the primary policy")
+				_check(tower["secondary_mode"] == MatchCombat.TargetMode.LAST and tower["mode"] == 0, "Independent Last second-archer targeting replicates without changing the primary policy")
 			x += 2
 	# Put each branch beside the spawn; other towers cannot reach these stationary enemies.
 	for slot: int in range(2):

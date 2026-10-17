@@ -4,11 +4,6 @@ extends Control
 signal leave_requested
 
 
-const TARGET_HELP: Array[String] = [
-	"Furthest along the route.",
-	"Nearest to this tower.",
-	"Highest current HP.",
-]
 const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III", "IV", "V"]
 
 var planning: MatchPlanning
@@ -55,15 +50,15 @@ var sound_player: GameSoundPlayer
 @onready var speed_upgrade: Button = %SpeedUpgrade
 @onready var special_upgrade: Button = %SpecialUpgrade
 @onready var alternate_upgrade: Button = %AlternateUpgrade
-@onready var secondary_targeting: OptionButton = %SecondaryTargeting
+@onready var secondary_targeting: TargetingCycle = %SecondaryTargeting
 @onready var _secondary_target_row: HBoxContainer = %SecondaryTargetRow
-@onready var third_targeting: OptionButton = %ThirdTargeting
-@onready var fourth_targeting: OptionButton = %FourthTargeting
-@onready var _extra_target_row: HBoxContainer = %ExtraTargetRow
+@onready var third_targeting: TargetingCycle = %ThirdTargeting
+@onready var fourth_targeting: TargetingCycle = %FourthTargeting
+@onready var _extra_target_row: VBoxContainer = %ExtraTargetRow
 @onready var _advancement_row: HBoxContainer = %AdvancementRow
 @onready var sell_button: Button = %SellTower
 @onready var close_button: Button = %CloseTower
-@onready var targeting_button: OptionButton = %Targeting
+@onready var targeting_button: TargetingCycle = %Targeting
 @onready var _tower_stats: Label = %TowerStats
 @onready var _status: Label = %Status
 @onready var _feedback: Label = %Feedback
@@ -86,12 +81,6 @@ func _ready() -> void:
 		boards[slot].command_mode = true
 		if planning != null:
 			boards[slot].content_catalog = planning.combat_rules.catalog
-	for selector: OptionButton in [targeting_button, secondary_targeting, third_targeting, fourth_targeting]:
-		selector.add_item("Furthest", 0)
-		selector.add_item("Closest", 1)
-		selector.add_item("Strongest", 2)
-		for index: int in range(TARGET_HELP.size()):
-			selector.set_item_tooltip(index, TARGET_HELP[index])
 	_create_palette()
 	_cancel_placement.pressed.connect(cancel_interaction)
 	close_button.pressed.connect(cancel_interaction)
@@ -101,12 +90,10 @@ func _ready() -> void:
 	special_upgrade.pressed.connect(_choice_upgrade_pressed.bind(false))
 	alternate_upgrade.pressed.connect(_choice_upgrade_pressed.bind(true))
 	sell_button.pressed.connect(_sell)
-	targeting_button.item_selected.connect(_target_selected)
-	secondary_targeting.item_selected.connect(_secondary_target_selected)
-	third_targeting.item_selected.connect(_extra_target_selected.bind(2))
-	fourth_targeting.item_selected.connect(_extra_target_selected.bind(3))
-	for selector: OptionButton in [third_targeting, fourth_targeting]:
-		world._hud_popups.append(selector.get_popup())
+	targeting_button.mode_requested.connect(_target_selected)
+	secondary_targeting.mode_requested.connect(_secondary_target_selected)
+	third_targeting.mode_requested.connect(_extra_target_selected.bind(2))
+	fourth_targeting.mode_requested.connect(_extra_target_selected.bind(3))
 	for command: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
 		var button: Button = _advancement_row.get_node(NodePath(command)) as Button
 		advancement_buttons[command] = button
@@ -162,8 +149,7 @@ func open_pause_menu() -> void:
 	debug_popup.hide()
 	cancel_interaction()
 	cancel_strokes()
-	for selector: OptionButton in [targeting_button, secondary_targeting, third_targeting, fourth_targeting, enemy_selector]:
-		selector.get_popup().hide()
+	enemy_selector.get_popup().hide()
 	world.set_input_blocked(true)
 	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
 	pause_menu.open_menu(not planning.singleplayer)
@@ -226,8 +212,7 @@ func _open_debug() -> void:
 		return
 	cancel_interaction()
 	cancel_strokes()
-	for selector: OptionButton in [targeting_button, secondary_targeting, third_targeting, fourth_targeting, enemy_selector]:
-		selector.get_popup().hide()
+	enemy_selector.get_popup().hide()
 	var state: Dictionary = planning.combat
 	debug_round.value = int(state.get("wave", 0)) + (1 if int(state.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.PLANNING else 0)
 	debug_money.value = _own_coins()
@@ -520,24 +505,24 @@ func _send_enemy() -> void:
 		planning.send_enemy(planning.local_slot(), _selected_enemy_type)
 
 
-func _target_selected(index: int) -> void:
+func _target_selected(mode: int) -> void:
 	var tower: Dictionary = _selected_tower()
 	if tower.is_empty():
-		_default_targeting = index
-	elif planning != null and planning.active:
-		planning.set_targeting(planning.local_slot(), selected_tower_id, index)
+		_default_targeting = mode
+	elif planning != null and planning.active and not targeting_button.disabled:
+		planning.set_targeting(planning.local_slot(), selected_tower_id, mode)
 	# A requested mode is not displayed as accepted until the host snapshot agrees.
 	_refresh_targeting()
 
 
-func _secondary_target_selected(index: int) -> void:
-	if planning != null and not secondary_targeting.disabled and not _selected_tower().is_empty():
-		planning.set_secondary_targeting(planning.local_slot(), selected_tower_id, index)
+func _secondary_target_selected(mode: int) -> void:
+	if planning != null and secondary_targeting.is_visible_in_tree() and not secondary_targeting.disabled and not _selected_tower().is_empty():
+		planning.set_secondary_targeting(planning.local_slot(), selected_tower_id, mode)
 	_refresh_targeting()
 
 
 func _extra_target_selected(mode: int, archer_index: int) -> void:
-	var selector: OptionButton = third_targeting if archer_index == 2 else fourth_targeting
+	var selector: TargetingCycle = third_targeting if archer_index == 2 else fourth_targeting
 	if planning != null and selector.is_visible_in_tree() and not selector.disabled and not _selected_tower().is_empty():
 		planning.set_archer_targeting(planning.local_slot(), selected_tower_id, archer_index, mode)
 	_refresh_targeting()
@@ -624,6 +609,7 @@ func _refresh_targeting() -> void:
 	var tower: Dictionary = _selected_tower()
 	_management.visible = not tower.is_empty()
 	if tower.is_empty():
+		targeting_button.mode = _default_targeting
 		return
 	var types: Dictionary = planning.combat.get("tower_types", {})
 	var stats: Dictionary = types.get(String(tower["type_id"]), {})
@@ -632,15 +618,14 @@ func _refresh_targeting() -> void:
 	var evolution: String = String(tower.get("evolution", ""))
 	var damage: int = int(tower.get("damage", stats.get("damage", 0)))
 	if evolution == "boulders":
-		_tower_stats.text = "Kills %d · %d DPS\nContinuous · Range %d" % [int(tower.get("kills", 0)), damage, int(stats.get("range", 0))]
+		_tower_stats.text = "Kills %d · %d DPS\nContinuous" % [int(tower.get("kills", 0)), damage]
 	elif evolution == "onyx_ring":
-		_tower_stats.text = "Kills %d · Damage %d\nEvery %.2fs · Range %d" % [int(tower.get("kills", 0)), damage, interval, int(stats.get("range", 0))]
+		_tower_stats.text = "Kills %d · Damage %d\nEvery %.2fs" % [int(tower.get("kills", 0)), damage, interval]
 	else:
-		_tower_stats.text = "Kills %d · Damage %d\n%.2f attacks/s · Range %d" % [
-			int(tower.get("kills", 0)), damage,
-			1.0 / interval, int(stats.get("range", 0)),
+		_tower_stats.text = "Kills %d · Damage %d\n%.2f attacks/s" % [
+			int(tower.get("kills", 0)), damage, 1.0 / interval,
 		]
-	targeting_button.select(int(tower["mode"]))
+	targeting_button.mode = int(tower["mode"])
 	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
 	_refresh_upgrade(damage_upgrade, tower, stats, "damage")
 	_refresh_upgrade(speed_upgrade, tower, stats, "speed")
@@ -674,7 +659,7 @@ func _refresh_targeting() -> void:
 	var second_archer: bool = bool(tower.get("special_upgraded", false)) and String(stats.get("special_upgrade", "")) == "second_archer"
 	_secondary_target_row.visible = second_archer
 	secondary_targeting.disabled = targeting_button.disabled or not second_archer
-	secondary_targeting.select(int(tower.get("secondary_mode", tower["mode"])))
+	secondary_targeting.mode = int(tower.get("secondary_mode", tower["mode"]))
 	var advancements: Dictionary = stats.get("advancements", {})
 	_advancement_row.visible = second_archer and not advancements.is_empty()
 	if _advancement_row.visible:
@@ -701,10 +686,10 @@ func _refresh_targeting() -> void:
 	var four_archers: bool = tower.get("advancement", "") == "four_archers" and extra_archers.size() == 2
 	_extra_target_row.visible = four_archers
 	for index: int in range(2):
-		var selector: OptionButton = third_targeting if index == 0 else fourth_targeting
+		var selector: TargetingCycle = third_targeting if index == 0 else fourth_targeting
 		selector.disabled = targeting_button.disabled or not four_archers
 		if four_archers:
-			selector.select(int(extra_archers[index]["mode"]))
+			selector.mode = int(extra_archers[index]["mode"])
 	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
 	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
 	sell_button.disabled = targeting_button.disabled
@@ -974,8 +959,7 @@ func open_results() -> void:
 	_close_pause_menu()
 	debug_popup.hide()
 	cancel_strokes()
-	for selector: OptionButton in [targeting_button,secondary_targeting,third_targeting,fourth_targeting,enemy_selector]:
-		selector.get_popup().hide()
+	enemy_selector.get_popup().hide()
 	selected_tower_id = -1
 	_placement_id = &""
 	_management.hide()

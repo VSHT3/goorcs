@@ -228,14 +228,13 @@ func _check_owned_drop() -> void:
 
 func _check_popup_and_text_focus() -> void:
 	var position: Vector2 = world.camera.position
-	for selector: OptionButton in [screen.targeting_button, screen.enemy_selector]:
-		selector.show_popup()
-		await process_frame
-		await _key(KEY_D, true)
-		world._process(0.1)
-		_check(world.camera.position.is_equal_approx(position), "An open gameplay selector blocks camera movement")
-		await _key(KEY_D, false)
-		selector.get_popup().hide()
+	screen.enemy_selector.show_popup()
+	await process_frame
+	await _key(KEY_D, true)
+	world._process(0.1)
+	_check(world.camera.position.is_equal_approx(position), "An open enemy selector blocks camera movement")
+	await _key(KEY_D, false)
+	screen.enemy_selector.get_popup().hide()
 	var editor := LineEdit.new()
 	screen.add_child(editor)
 	editor.grab_focus()

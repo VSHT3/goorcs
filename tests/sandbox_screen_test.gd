@@ -42,7 +42,7 @@ func _run() -> void:
 	_check(screen._notice.text.is_empty() and screen.world.get_global_rect() == initial_world_rect, "Rejection feedback expires without shifting the board")
 	for x: int in range(1, 13):
 		screen.controller.edit_path(Vector2i(x, 4), true)
-	var tower_id: StringName = screen.catalog.towers[0].reward.id
+	var tower_id: StringName = &"arrow_tower"
 	screen.shop_buttons[tower_id].pressed.emit()
 	screen._cell_clicked(Vector2i(3, 2), MOUSE_BUTTON_LEFT)
 	_check(screen.controller.combat.towers[0].size() == 1 and screen.selected_tower_id >= 0, "Free palette click places and inspects accepted tower")
@@ -51,8 +51,31 @@ func _run() -> void:
 	screen._upgrade_buttons["damage"].pressed.emit()
 	screen._upgrade_buttons["speed"].pressed.emit()
 	_check(screen.controller.combat.towers[0][0]["damage_upgraded"] and screen.controller.combat.towers[0][0]["speed_upgraded"], "Upgrade controls call real owner with no currency gate")
-	screen.targeting.item_selected.emit(MatchCombat.TargetMode.STRONGEST)
-	_check(screen.controller.combat.towers[0][0]["mode"] == MatchCombat.TargetMode.STRONGEST, "Management targeting changes accepted tower")
+	for direction: int in [1, -1]:
+		var expected_modes: Array = [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.FURTHEST] if direction == 1 else [MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.FURTHEST]
+		for expected: int in expected_modes:
+			await _press_cycle_button(screen.targeting.next_button if direction == 1 else screen.targeting.previous_button)
+			_check(screen.controller.state["towers"][0][0]["mode"] == expected and screen.targeting.mode == expected, "Sandbox native arrows wrap in both directions through accepted targeting policies")
+	screen._upgrade_buttons["special"].pressed.emit()
+	screen.advancement_buttons["four_archers"].pressed.emit()
+	_check(screen.controller.state["towers"][0][0]["advancement"] == "four_archers", "Sandbox exposes independent archer cycles after the real free advancement")
+	await _press_cycle_button(screen.secondary_targeting.next_button)
+	await _press_cycle_button(screen.third_targeting.next_button)
+	await _press_cycle_button(screen.third_targeting.next_button)
+	await _press_cycle_button(screen.fourth_targeting.previous_button)
+	var tower: Dictionary = screen.controller.state["towers"][0][0]
+	_check(tower["mode"] == MatchCombat.TargetMode.FURTHEST and tower["secondary_mode"] == MatchCombat.TargetMode.LAST and tower["extra_archers"][0]["mode"] == MatchCombat.TargetMode.CLOSEST and tower["extra_archers"][1]["mode"] == MatchCombat.TargetMode.STRONGEST, "All four sandbox archers retain distinct accepted targeting policies")
+	var selectors: Array[TargetingCycle] = [screen.targeting, screen.secondary_targeting, screen.third_targeting, screen.fourth_targeting]
+	var independent_modes: Array[int] = [MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST]
+	for index: int in range(selectors.size()):
+		_check(selectors[index].is_visible_in_tree() and selectors[index].mode == independent_modes[index], "Each sandbox archer displays its accepted enum value, not a dropdown index")
+	for width: int in [1000, 1280]:
+		root.size = Vector2i(width, 720)
+		root.content_scale_size = Vector2i(width, 720)
+		await _settle()
+		for selector: TargetingCycle in selectors:
+			for control: Control in [selector.previous_button, selector.mode_label, selector.next_button]:
+				_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "Four labeled sandbox cycles fit inside the compact management panel")
 	var header_rect: Rect2 = screen.play_button.get_global_rect()
 	screen.cancel_interaction()
 	_check(not screen._management.visible and screen.play_button.get_global_rect() == header_rect, "Inspector visibility never moves fixed HUD")
@@ -137,6 +160,19 @@ func _key(code: Key) -> InputEventKey:
 func _settle() -> void:
 	await process_frame
 	await process_frame
+
+
+func _press_cycle_button(button: Button) -> void:
+	button.grab_focus()
+	_check(button.has_focus(), "Sandbox targeting arrows support native keyboard focus")
+	for pressed: bool in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = KEY_ENTER
+		event.physical_keycode = KEY_ENTER
+		event.pressed = pressed
+		root.push_input(event, true)
+		await process_frame
+	await _settle()
 
 
 func _check(condition: bool, message: String) -> void:

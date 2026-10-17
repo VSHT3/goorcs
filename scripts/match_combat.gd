@@ -2,7 +2,7 @@ class_name MatchCombat
 extends RefCounted
 
 enum Phase { PLANNING, WAVE, FINISHED }
-enum TargetMode { FURTHEST, CLOSEST, STRONGEST }
+enum TargetMode { FURTHEST, CLOSEST, STRONGEST, LAST = 3 }
 
 const DEATH_EVENT_LIFETIME: float = 2.0
 
@@ -888,7 +888,7 @@ func _valid_slot(slot: int) -> bool:
 
 
 func _valid_mode(mode: int) -> bool:
-	return mode >= TargetMode.FURTHEST and mode <= TargetMode.STRONGEST
+	return mode >= TargetMode.FURTHEST and mode <= TargetMode.LAST
 
 
 func _move_enemies(slot: int, delta: float) -> void:
@@ -1391,13 +1391,14 @@ func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, e
 		var enemy: Dictionary = enemies[slot][index]
 		if int(enemy["hp"]) <= 0 or int(enemy["id"]) == excluded_id or int(enemy["id"]) == excluded_second or int(enemy["id"]) == excluded_third or not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), range_cells):
 			continue
-		var distance_squared: float = center.distance_squared_to(enemy["pos"])
 		var score: float
 		match int(tower["mode"]) if mode < 0 else mode:
 			TargetMode.CLOSEST:
-				score = -distance_squared
+				score = -center.distance_squared_to(enemy["pos"])
 			TargetMode.STRONGEST:
 				score = float(enemy["hp"])
+			TargetMode.LAST:
+				score = -float(enemy["progress"])
 			_:
 				score = enemy["progress"]
 		var id: int = enemy["id"]

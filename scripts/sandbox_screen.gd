@@ -27,10 +27,10 @@ var width_input: SpinBox
 var height_input: SpinBox
 var count_input: SpinBox
 var enemy_selector: OptionButton
-var targeting: OptionButton
-var secondary_targeting: OptionButton
-var third_targeting: OptionButton
-var fourth_targeting: OptionButton
+var targeting: TargetingCycle
+var secondary_targeting: TargetingCycle
+var third_targeting: TargetingCycle
+var fourth_targeting: TargetingCycle
 var advancement_buttons: Dictionary[String, Button] = {}
 var play_button: Button
 var wave_button: Button
@@ -222,8 +222,7 @@ func _build_interface() -> void:
 	_inspector.close_requested.connect(cancel_interaction)
 	resize_dialog = _confirmation("Resize map?", "This removes every path tile, tower, and enemy. The selected round is kept.", _confirm_resize)
 	reset_dialog = _confirmation("Reset build?", "This removes every tower and enemy. The map, path, and selected round are kept.", _confirm_reset)
-	for selector: OptionButton in [enemy_selector, targeting, secondary_targeting, third_targeting, fourth_targeting]:
-		world._hud_popups.append(selector.get_popup())
+	world._hud_popups.append(enemy_selector.get_popup())
 
 
 func _build_management() -> void:
@@ -274,14 +273,13 @@ func _build_management() -> void:
 	_button(content, "Sell tower", _sell)
 
 
-func _target_selector(parent: Node, archer_index: int) -> OptionButton:
-	var selector := OptionButton.new()
-	for title: String in ["Furthest", "Closest", "Strongest"]:
-		selector.add_item(title)
-	for index: int in range(MatchPlanningScreen.TARGET_HELP.size()):
-		selector.set_item_tooltip(index, MatchPlanningScreen.TARGET_HELP[index])
-	selector.tooltip_text = "Tower targeting" if archer_index == 0 else "Archer %d targeting" % (archer_index + 1)
-	selector.item_selected.connect(func(mode: int) -> void:
+func _target_selector(parent: Node, archer_index: int) -> TargetingCycle:
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	_label(row, "Archer %d" % (archer_index + 1))
+	var selector := TargetingCycle.new()
+	selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	selector.mode_requested.connect(func(mode: int) -> void:
 		if not selector.is_visible_in_tree() or selector.disabled:
 			return
 		if archer_index < 2:
@@ -289,7 +287,7 @@ func _target_selector(parent: Node, archer_index: int) -> OptionButton:
 		else:
 			controller.set_archer_targeting(selected_tower_id, archer_index, mode)
 	)
-	parent.add_child(selector)
+	row.add_child(selector)
 	return selector
 
 
@@ -529,22 +527,24 @@ func _refresh_management(state: Dictionary) -> void:
 	var stats: Dictionary = state["tower_types"][tower["type_id"]]
 	_tower_title.text = "%s · %s" % [stats["title"], MatchPlanningScreen.TOWER_LEVEL_NUMERALS[MatchCombat.tower_level(tower) - 1]]
 	if tower.get("evolution", "") == "boulders":
-		_tower_stats.text = "Kills %d · %d DPS\nContinuous · Range %d" % [int(tower["kills"]), int(tower["damage"]), int(stats["range"])]
+		_tower_stats.text = "Kills %d · %d DPS\nContinuous" % [int(tower["kills"]), int(tower["damage"])]
 	else:
-		_tower_stats.text = "Kills %d · Damage %d\nEvery %.2fs · Range %d" % [int(tower["kills"]), int(tower["damage"]), float(tower["interval"]), int(stats["range"])]
-	targeting.select(int(tower["mode"]))
-	secondary_targeting.visible = bool(tower["special_upgraded"]) and stats.get("special_upgrade", "") == "second_archer"
-	secondary_targeting.select(int(tower["secondary_mode"]))
+		_tower_stats.text = "Kills %d · Damage %d\nEvery %.2fs" % [int(tower["kills"]), int(tower["damage"]), float(tower["interval"])]
+	targeting.mode = int(tower["mode"])
+	targeting.disabled = not _active
+	secondary_targeting.get_parent_control().visible = bool(tower["special_upgraded"]) and stats.get("special_upgrade", "") == "second_archer"
+	secondary_targeting.disabled = not _active or not secondary_targeting.get_parent_control().visible
+	secondary_targeting.mode = int(tower["secondary_mode"])
 	var extra_archers: Array = tower.get("extra_archers", [])
 	var four_archers: bool = tower.get("advancement", "") == "four_archers" and extra_archers.size() == 2
 	for index: int in range(2):
-		var selector: OptionButton = third_targeting if index == 0 else fourth_targeting
-		selector.visible = four_archers
-		selector.disabled = not four_archers
+		var selector: TargetingCycle = third_targeting if index == 0 else fourth_targeting
+		selector.get_parent_control().visible = four_archers
+		selector.disabled = not _active or not four_archers
 		if four_archers:
-			selector.select(int(extra_archers[index]["mode"]))
+			selector.mode = int(extra_archers[index]["mode"])
 	var advancements: Dictionary = stats.get("advancements", {})
-	_advancement_row.visible = secondary_targeting.visible and not advancements.is_empty()
+	_advancement_row.visible = secondary_targeting.get_parent_control().visible and not advancements.is_empty()
 	for command: String in advancement_buttons:
 		var definition: Dictionary = advancements.get(command, {})
 		var chosen: String = String(tower.get("advancement", ""))

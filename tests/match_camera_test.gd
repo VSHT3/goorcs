@@ -35,9 +35,9 @@ func _run() -> void:
 	header.size = Vector2(1252, 66)
 	fixture.add_child(header)
 	selector = OptionButton.new()
-	selector.name = "Targeting"
-	selector.add_item("Furthest")
-	selector.add_item("Closest")
+	selector.name = "EnemyType"
+	selector.add_item("Orc")
+	selector.add_item("Runner")
 	header.add_child(selector)
 	# MatchWorld discovers real root popups in its normal scene. This isolated
 	# fixture supplies the same popup owner without inventing an input mock.
@@ -285,7 +285,7 @@ func _check_input_priority() -> void:
 	await _wheel(world.get_global_rect().get_center(), MOUSE_BUTTON_WHEEL_UP)
 	await _key(KEY_W, true)
 	world._process(0.05)
-	_check(world.camera.zoom.is_equal_approx(zoom) and world.camera.position.is_equal_approx(position), "Open targeting popup blocks zoom and keyboard panning")
+	_check(world.camera.zoom.is_equal_approx(zoom) and world.camera.position.is_equal_approx(position), "Open enemy popup blocks zoom and keyboard panning")
 	await _key(KEY_W, false)
 	selector.get_popup().hide()
 	editor.show()

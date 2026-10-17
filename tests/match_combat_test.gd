@@ -6,6 +6,7 @@ var failures: int = 0
 func _init() -> void:
 	_test_commands_and_snapshots()
 	_test_targeting_policies()
+	_test_last_captured_route_targeting()
 	_test_range_and_ties()
 	_test_routes_and_both_board_clear()
 	_test_kills_and_persistence()
@@ -131,7 +132,7 @@ func _test_commands_and_snapshots() -> void:
 	var combat := MatchCombat.new(_rules())
 	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.wave == 0 and combat.base_health == [10, 10], "New combat begins planning with two full bases")
 	_check(not combat.advance(1.0), "Planning has no autonomous simulation")
-	_check(not combat.build(-1, Vector2i.ZERO, &"arrow_tower", 0) and not combat.build(2, Vector2i.ZERO, &"arrow_tower", 0) and not combat.build(0, Vector2i.ZERO, &"arrow_tower", 3), "Invalid owner or targeting mode is rejected")
+	_check(not combat.build(-1, Vector2i.ZERO, &"arrow_tower", 0) and not combat.build(2, Vector2i.ZERO, &"arrow_tower", 0) and not combat.build(0, Vector2i.ZERO, &"arrow_tower", MatchCombat.TargetMode.LAST + 1), "Invalid owner or targeting mode is rejected")
 	var before_unknown: Dictionary = combat.snapshot()
 	_check(not combat.build(0, Vector2i(2, 1), &"unknown_tower", 0) and combat.snapshot() == before_unknown, "Unknown type is rejected without changing any authoritative state")
 	_check(combat.build(0, Vector2i(2, 1), &"arrow_tower", MatchCombat.TargetMode.FURTHEST), "Paid placement succeeds during planning")
@@ -139,7 +140,7 @@ func _test_commands_and_snapshots() -> void:
 	_check(combat.has_tower(0, Vector2i(2, 1)) and not combat.has_tower(1, Vector2i(2, 1)), "Tower cells belong to their own board")
 	_check(not combat.build(0, Vector2i(2, 1), &"arrow_tower", 0), "Duplicate cell placement is rejected")
 	var id: int = combat.towers[0][0]["id"]
-	_check(not combat.set_targeting(1, id, 1) and not combat.set_targeting(0, id, -1) and not combat.set_targeting(0, id, 0), "Wrong board, invalid mode, and no-op targeting leave towers untouched")
+	_check(not combat.set_targeting(1, id, MatchCombat.TargetMode.LAST) and not combat.set_targeting(0, id, -1) and not combat.set_targeting(0, id, MatchCombat.TargetMode.LAST + 1) and not combat.set_targeting(0, id, 0), "Wrong board, invalid mode, and no-op targeting leave towers untouched")
 	_check(combat.set_targeting(0, id, MatchCombat.TargetMode.CLOSEST), "Existing own tower changes targeting")
 	var invalid_routes: Array[Dictionary] = [_routing([]), _routing(_line(10))]
 	_check(not combat.start_wave(invalid_routes) and combat.wave == 0, "Missing route cannot start or increment a wave")
@@ -170,8 +171,8 @@ func _test_commands_and_snapshots() -> void:
 
 
 func _test_targeting_policies() -> void:
-	var expected: Array[Array] = [[4, 8, 8], [6, 8, 6], [6, 6, 8]]
-	for mode: int in range(3):
+	var expected: Array[Array] = [[4, 8, 8], [6, 8, 6], [6, 6, 8], [6, 8, 6]]
+	for mode: int in MatchCombat.TargetMode.values():
 		var combat := MatchCombat.new(_rules())
 		combat.build(0, Vector2i(0, 1), &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
 		combat.start_wave(_routes())
@@ -185,10 +186,46 @@ func _test_targeting_policies() -> void:
 		for enemy: Dictionary in combat.snapshot()["enemies"][0]:
 			health.append(enemy["hp"])
 		_check(health == expected[mode], "Policy %d produces its own observable damage distribution: %s" % [mode, health])
-		var target_index: int = [0, 2, 1][mode]
+		var target_index: int = [0, 2, 1, 2][mode]
 		_check(combat.towers[0][0]["target_id"] == combat.enemies[0][target_index]["id"] and combat.towers[0][0]["shot"] == 2, "Policy %d publishes matching native instant-hit visual event" % mode)
 		if mode == MatchCombat.TargetMode.STRONGEST:
 			_check(combat.towers[0][0]["target_id"] != first_id and combat.enemies[0][0]["max_hp"] == combat.enemies[0][1]["max_hp"], "Strongest compares current HP, not equal starting maximum HP")
+
+
+func _test_last_captured_route_targeting() -> void:
+	var rules := _rules()
+	rules.enemy_speed = 0.0
+	rules.wave_weight = 6
+	rules.spawn_interval = 0.0
+	rules.catalog.towers[0].range_cells = 3.0
+	var combat := MatchCombat.new(rules)
+	var graph: Dictionary = _branch_routing()
+	var routing: Array[Dictionary] = [graph, graph]
+	_check(combat.start_wave(routing), "Last fixture captures both shortest branches")
+	combat.advance(0.01)
+	var progress: Array[float] = [2.5, 3.0, 4.0, 1.5, 0.25, 1.0]
+	var health: Array[int] = [60, 40, 100, 0, 100, 100]
+	for index: int in range(progress.size()):
+		combat.enemies[0][index]["progress"] = progress[index]
+		combat.enemies[0][index]["hp"] = health[index]
+	combat._move_enemies(0, 0.0)
+	_check(combat.build(0, Vector2i(4, 2), &"arrow_tower", MatchCombat.TargetMode.LAST), "Build accepts Last as an authoritative primary policy")
+	var tower: Dictionary = combat.towers[0][0]
+	var last: Dictionary = combat.enemies[0][0]
+	var nearer: Dictionary = combat.enemies[0][1]
+	var furthest: Dictionary = combat.enemies[0][2]
+	var excluded: Dictionary = combat.enemies[0][5]
+	_check(last["route"] != nearer["route"] and Vector2(tower["cell"]).distance_squared_to(last["pos"]) > Vector2(tower["cell"]).distance_squared_to(nearer["pos"]) and last["hp"] > nearer["hp"], "Captured-branch Last candidate is farther from the tower and healthier than a later enemy")
+	_check(combat._target(0, tower, 3.0, -1, excluded["id"]) == 0 and combat._target(0, tower, 3.0, MatchCombat.TargetMode.LAST, -1, excluded["id"]) == 0 and combat._target(0, tower, 3.0, MatchCombat.TargetMode.LAST, -1, -1, excluded["id"]) == 0, "Last skips dead, out-of-range and each independently excluded earlier-progress candidate")
+	_check(combat._target(0, tower, 3.0, MatchCombat.TargetMode.FURTHEST, excluded["id"]) == 2 and combat._target(0, tower, 3.0, MatchCombat.TargetMode.CLOSEST, excluded["id"]) == 2 and combat._target(0, tower, 3.0, MatchCombat.TargetMode.STRONGEST, excluded["id"]) == 2, "Existing policies still compare greatest progress, tower distance and current HP")
+	excluded["hp"] = 0
+	combat._attack(0, 0.01)
+	_check(tower["target_id"] == last["id"] and tower["aim"] == last["pos"] and last["hp"] == 58 and nearer["hp"] == 40 and furthest["hp"] == 100, "Accepted Last shot damages only the smallest captured-route progress, not the closest or strongest enemy")
+	nearer["progress"] = last["progress"]
+	combat._move_enemies(0, 0.0)
+	combat.enemies[0].reverse()
+	var selected: int = combat._target(0, tower, 3.0)
+	_check(selected >= 0 and combat.enemies[0][selected]["id"] == last["id"], "Equal Last progress across distinct captured branches uses stable ID rather than position or array order")
 
 
 func _test_range_and_ties() -> void:
@@ -209,7 +246,7 @@ func _test_range_and_ties() -> void:
 	_check(combat._target(0, combat.towers[0][1], 3.0) == 0, "Fractional position inside the entrance tile remains on its diagonal boundary")
 	combat.enemies[0][0]["pos"] = Vector2(-0.51, 0.0)
 	_check(combat._target(0, combat.towers[0][1], 3.0) == -1, "Rounded enemy tile beyond a boundary is not in range")
-	for mode: int in range(3):
+	for mode: int in MatchCombat.TargetMode.values():
 		rules = _rules()
 		rules.enemy_speed = 0.0
 		rules.spawn_interval = 0.0
@@ -1072,8 +1109,8 @@ func _test_second_archer_targets_and_cadence() -> void:
 	_check(tower["shot"] == 1 and tower["secondary_shot"] == 0, "Buying a second archer does not grant a free immediate attack")
 	var primary_mode: int = tower["mode"]
 	var frozen: Dictionary = combat.snapshot()
-	_check(not combat.set_secondary_targeting(1, tower["id"], 2) and not combat.set_secondary_targeting(0, tower["id"], -1) and not combat.set_secondary_targeting(0, tower["id"], 3) and not combat.set_secondary_targeting(0, tower["id"], primary_mode) and combat.snapshot() == frozen, "Secondary policy validates owner, bounds and no-op atomically")
-	_check(combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.STRONGEST) and tower["mode"] == primary_mode, "Secondary policy changes without changing primary policy")
+	_check(not combat.set_secondary_targeting(1, tower["id"], MatchCombat.TargetMode.LAST) and not combat.set_secondary_targeting(0, tower["id"], -1) and not combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.LAST + 1) and not combat.set_secondary_targeting(0, tower["id"], primary_mode) and combat.snapshot() == frozen, "Secondary policy validates owner, bounds and no-op atomically")
+	_check(combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.LAST) and tower["mode"] == primary_mode, "Last secondary policy changes without changing primary policy")
 	combat.enemies[0][0]["progress"] = 2.0
 	combat.enemies[0][1]["progress"] = 1.0
 	combat.enemies[0][2]["progress"] = 0.0
@@ -1083,7 +1120,7 @@ func _test_second_archer_targets_and_cadence() -> void:
 	combat.advance(float(tower["cooldown"]) * 0.99)
 	_check(tower["shot"] == 1 and tower["secondary_shot"] == 0, "Neither archer attacks before the accelerated remaining reload")
 	combat.advance(float(tower["interval"]) * 0.02)
-	_check(tower["shot"] == 2 and tower["secondary_shot"] == 1 and combat.enemies[0][0]["hp"] == 77 and combat.enemies[0][1]["hp"] == 60 and combat.enemies[0][2]["hp"] == 87, "Independent furthest and strongest policies fire one full-damage arrow at distinct targets")
+	_check(tower["shot"] == 2 and tower["secondary_shot"] == 1 and combat.enemies[0][0]["hp"] == 77 and combat.enemies[0][1]["hp"] == 60 and combat.enemies[0][2]["hp"] == 87, "Independent furthest and last policies fire one full-damage arrow at distinct targets")
 	_check(tower["target_id"] == combat.enemies[0][0]["id"] and tower["secondary_target_id"] == combat.enemies[0][2]["id"] and tower["aim"] == Vector2(2, 0) and tower["secondary_aim"] == Vector2.ZERO, "Each arrow publishes its own accepted target and aim")
 	for volley: int in range(5):
 		var shots: int = tower["shot"]
@@ -1291,13 +1328,13 @@ func _test_ballista_pierce_deaths_and_policies() -> void:
 		combat._attack(0, 0.01)
 		_check(combat.enemies[0].size() == 1 and combat.enemies[0][0]["id"] == third["id"] and third["hp"] == 100 and tower["kills"] == 2 and tower["target_id"] == primary["id"], "Pierce captures both victims before primary death and removal in either array order, without hitting a third")
 		_check(combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]), "Both authoritative Pierce kills retain tower attribution and pay one bounty each")
-	for mode: int in [MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST]:
+	for mode: int in MatchCombat.TargetMode.values():
 		var combat := _ballista_field([Vector2(2, 1), Vector2(0, 3), Vector2(-2, 1)])
 		var tower: Dictionary = combat.towers[0][0]
 		combat.enemies[0][1]["hp"] = 200
 		combat.enemies[0][2]["pos"] = Vector2(-3, 1)
 		combat.set_targeting(0, tower["id"], mode)
-		var selected: int = 2 if mode == MatchCombat.TargetMode.FURTHEST else (0 if mode == MatchCombat.TargetMode.CLOSEST else 1)
+		var selected: int = [2, 0, 1, 0][mode]
 		var expected: Dictionary = combat.enemies[0][selected]
 		combat._attack(0, 0.01)
 		_check(tower["target_id"] == expected["id"] and tower["aim"] == expected["pos"] and tower["mode"] == mode, "Pierce ray obeys the existing primary targeting policy %s" % mode)

@@ -59,8 +59,12 @@ func _purchase() -> void:
 func _four_targets() -> void:
 	var model: MatchCombat = prepared("four_archers")
 	var tower: Dictionary = model.towers[0][0]
-	model.set_archer_targeting(0,tower["id"],2,MatchCombat.TargetMode.STRONGEST)
-	model.set_archer_targeting(0,tower["id"],3,MatchCombat.TargetMode.CLOSEST)
+	check(model.set_archer_targeting(0,tower["id"],2,MatchCombat.TargetMode.LAST),"Third archer accepts Last independently")
+	check(model.set_archer_targeting(0,tower["id"],2,MatchCombat.TargetMode.STRONGEST),"Third archer can leave Last without changing the other policies")
+	check(model.set_secondary_targeting(0,tower["id"],MatchCombat.TargetMode.CLOSEST),"Second archer accepts its independent closest policy")
+	check(model.set_archer_targeting(0,tower["id"],3,MatchCombat.TargetMode.LAST),"Fourth archer accepts Last independently")
+	var frozen: Dictionary = model.snapshot()
+	check(not model.set_archer_targeting(1,tower["id"],2,MatchCombat.TargetMode.LAST) and not model.set_archer_targeting(0,tower["id"],2,-1) and not model.set_archer_targeting(0,tower["id"],2,MatchCombat.TargetMode.LAST+1) and not model.set_archer_targeting(0,tower["id"],3,MatchCombat.TargetMode.LAST+1) and model.snapshot()==frozen,"Extra archer owner and policy bounds reject atomically")
 	for index: int in range(4):
 		var enemy: Dictionary = spawn(model,&"grunt",Vector2(index*0.2,4))
 		enemy["progress"] = float(index)
@@ -71,13 +75,14 @@ func _four_targets() -> void:
 	var unique: Dictionary = {}
 	for id: int in ids: unique[id]=true
 	check(unique.size()==4 and not unique.has(-1),"All four modes choose distinct living enemies")
+	check(ids==[model.enemies[0][3]["id"],model.enemies[0][0]["id"],model.enemies[0][2]["id"],model.enemies[0][1]["id"]],"Furthest, Closest, Strongest and Last each choose by their independent score after earlier archer exclusions")
 	for index: int in range(4): check(model.enemies[0][index]["hp"]==97+index*10,"Every selected enemy takes one upgraded physical hit")
 	model.enemies[0].resize(1)
 	tower["cooldown"] = 0.0
 	var hp: int = model.enemies[0][0]["hp"]
 	model._attack(0,0.01)
 	check(model.enemies[0][0]["hp"]==hp-12,"All four archers fire full-damage arrows at a sole eligible enemy")
-	check(tower["extra_archers"][0]["mode"]==MatchCombat.TargetMode.STRONGEST and tower["extra_archers"][1]["mode"]==MatchCombat.TargetMode.CLOSEST,"Extra independent targeting modes survive volley")
+	check(tower["mode"]==MatchCombat.TargetMode.FURTHEST and tower["secondary_mode"]==MatchCombat.TargetMode.CLOSEST and tower["extra_archers"][0]["mode"]==MatchCombat.TargetMode.STRONGEST and tower["extra_archers"][1]["mode"]==MatchCombat.TargetMode.LAST,"All four independent targeting modes survive a shared-target volley")
 	for count: int in [2,3]:
 		model=prepared("four_archers")
 		tower=model.towers[0][0]
