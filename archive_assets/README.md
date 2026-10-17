@@ -14,6 +14,7 @@
 | `towers/ballista/source/` | Original PixelLab ballista sprite | 1 |
 | `towers/ballista/manual-master/` | Manual starting pose, source layers, preview and rendered checks | 7 |
 | `towers/gold-mine/gamelab-20261017/` | Approved mine, raw/cutout sources, prior procedural PNG and generation provenance | 4 |
+| `towers/lightning/gamelab-20261017/` | Approved Lightning, raw/cutout sources, prior procedural PNG and provenance | 4 |
 | `world/idle/` | Approved portal/crystal idle sheets and animated previews | 5 |
 
 Numbers such as `0001` identify downloaded variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared chest pair has derivation links in `assets.json`; the endpoint and manual-ballista manifests record their own source links.
@@ -71,6 +72,12 @@ Graphical verification played the installed sheets automatically through every f
 [`towers/gold-mine/gamelab-20261017/gold_mine_candidate.png`](towers/gold-mine/gamelab-20261017/gold_mine_candidate.png) is the approved runtime Gold Mine, copied byte-for-byte into `assets/towers/gold_mine.png`. GameLab image job `c69e0860-2fc9-4468-b756-1c3f3cd7087e` generated it without reference images, using high quality, a requested 128×128 canvas and 48-color pixel-art processing, at a reported cost of two credits. `generation.json` retains the expanded prompt, settings, job IDs, source hashes, approval and processing. No animation was generated.
 
 The raw chroma image and provider cutout are preserved. The cleaned candidate thresholds cutout alpha at 128 into 0/255 without changing RGB, dimensions or palette; its opaque bounds are `(5, 11)–(125, 115)`. The previous 96×112 procedural mine is preserved as `previous-procedural.png`; the procedural tower tool no longer generates or overwrites Gold Mine. Provider licensing/privacy terms have not been independently verified.
+
+## Approved Lightning still
+
+[`towers/lightning/gamelab-20261017/lightning_candidate.png`](towers/lightning/gamelab-20261017/lightning_candidate.png) is the approved 128×128 GameLab source for base Lightning. Generation job `5abadff5-12ea-47c7-9bd5-798ba48ecec3` used no references, requested high quality and 48-color pixel-art processing, and reported two credits. The cleaned source contains 47 opaque colors and binary alpha; raw output, provider cutout, previous procedural PNG, and exact prompt/settings are preserved beside it.
+
+Runtime `assets/towers/lightning.png` reframes the approved pixels by `(-16, 11)` onto a 128×144 canvas. Every visible source pixel is preserved exactly; only transparent padding changes. This keeps the electric crown at the existing shared muzzle `(48, 19)`, leaving Longer Reach artwork and muzzle geometry unchanged. The base uses a new foot anchor and preserves its previous visible width; the unchanged evolution explicitly retains its old anchor. No animation is generated. Provider licensing/privacy terms have not been independently verified.
 
 ## Runtime separation
 

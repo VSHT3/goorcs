@@ -4,7 +4,7 @@
 Native 96x112 RGBA pixels; integer polygons/rectangles, hard alpha, no source
 images, sampling, antialiasing, models, or third-party artwork. Upper-left light,
 front-dominant elevated timber/stone forms. Run with Pillow to reproduce only
-these nine PNGs; approved Gold Mine and established tower PNGs are never written.
+these eight PNGs; approved Lightning, Gold Mine and established tower PNGs are never written.
 """
 from pathlib import Path
 
@@ -112,28 +112,21 @@ def coil(d, x, y, height):
     rect(d, (x, y - 13, x + 1, y - 9), "blue_light")
 
 
-def lightning(long_reach=False):
+def lightning_longer_reach():
     image, d = canvas()
     footing(d)
     block(d, 25, 63, 46, 24)
     rect(d, (34, 70, 56, 83), "iron_dark", "ink")
     poly(d, [(46, 71), (40, 78), (46, 78), (43, 82), (52, 75), (47, 75)], "blue_light", None)
     slab(d, 20, 59, 56, 7, 5)
-    if long_reach:
-        # Twin tall outriggers and a triangular terminal give a distinct silhouette.
-        coil(d, 30, 29, 28)
-        coil(d, 63, 29, 28)
-        timber(d, 44, 35, 5, 22)
-        poly(d, [(44, 26), (47, 14), (51, 26), (48, 35)], "blue", "iron_dark")
-        line(d, [(47, 17), (47, 29)], "blue_light")
-        line(d, [(30, 29), (46, 39), (63, 29)], "iron_dark", 3)
-        line(d, [(31, 28), (47, 37), (62, 28)], "iron_light")
-    else:
-        coil(d, 47, 32, 26)
-        timber(d, 24, 51, 5, 15)
-        timber(d, 64, 51, 5, 15)
-        line(d, [(29, 53), (36, 48)], "iron", 3)
-        line(d, [(58, 48), (65, 53)], "iron", 3)
+    # Twin tall outriggers and a triangular terminal give a distinct silhouette.
+    coil(d, 30, 29, 28)
+    coil(d, 63, 29, 28)
+    timber(d, 44, 35, 5, 22)
+    poly(d, [(44, 26), (47, 14), (51, 26), (48, 35)], "blue", "iron_dark")
+    line(d, [(47, 17), (47, 29)], "blue_light")
+    line(d, [(30, 29), (46, 39), (63, 29)], "iron_dark", 3)
+    line(d, [(31, 28), (47, 37), (62, 28)], "iron_light")
     return image
 
 
@@ -284,7 +277,7 @@ def tribute_office():
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     authored = {
-        "lightning": lightning(), "lightning_longer_reach": lightning(True),
+        "lightning_longer_reach": lightning_longer_reach(),
         "war_drums": war_drums(), "forge": forge(),
         "command_banner": command_banner(),
         "royal_mint": royal_mint(), "bounty_board": bounty_board(),
