@@ -109,6 +109,10 @@ An isolated **6.01-second actual-main-scene rendered walkthrough** passed on mac
 
 These checks do not approve all six roles' battlefield artwork, establish long-run performance, test Discord IPC with a configured application, or prove separate-network internet play.
 
+The round-100 path-drag regression is covered in `tower_selection_test.gd`: apply a debug jump, zoom the enlarged board, then hold left/right across multiple frames and verify every placed/deleted tile on both mirrored boards. `MatchWorld` retains the camera's stored zoom when interpolation settles, because a float64 target otherwise differs from its float32 vector value and keeps cancelling strokes after visible zoom motion ends. Focused tower-selection, camera, and debug suites passed. An isolated Wayland/Mesa rendered main-scene smoke exercised wheel zoom and both drag directions; accepted mirrored state and screenshots confirmed three placed tiles followed by zero. This does not establish native GPU performance or physical mouse feel.
+
+The subsequent isolated headless run passed **51/52 checks**, including the new stroke regression, camera, debug, native tower drag, and singleplayer suites. `match_multiplayer_test.gd` failed its guest tower-targeting assertion at `(2, 3)` and then accessed a missing dictionary `id`; this run is not claimed green. Logs: `.verify-logs/20261017T180159Z-headless-c2ff551c/`.
+
 
 ## Discord Rich Presence
 

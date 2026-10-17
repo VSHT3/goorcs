@@ -550,6 +550,7 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 		screen.debug_popup.hide()
 	root.size = original_size
 	await process_frame
+	await _check_debug_path_drag(screen)
 	screen.debug_button.pressed.emit()
 	screen.debug_round.get_line_edit().text = "31"
 	screen.debug_money.get_line_edit().text = "123456"
@@ -601,6 +602,45 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	_check(not screen.debug_button.visible and not screen.debug_popup.visible, "Finished matches do not expose a revival control")
 	planning.stop_singleplayer()
 	await create_timer(0.2).timeout
+
+
+func _check_debug_path_drag(screen: MatchPlanningScreen) -> void:
+	screen.debug_button.pressed.emit()
+	screen.debug_round.get_line_edit().text = "100"
+	screen.debug_apply.pressed.emit()
+	await create_timer(0.1).timeout
+	screen.world.zoom_at(1.12, screen.world.get_global_rect().get_center())
+	await create_timer(0.8).timeout
+	var cells: Array[Vector2i] = [Vector2i(5, 13), Vector2i(6, 13), Vector2i(7, 13)]
+	for button: MouseButton in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+		var start: Vector2 = screen.world.cell_screen_position(0, cells[0])
+		var press := InputEventMouseButton.new()
+		press.position = start
+		press.global_position = start
+		press.button_index = button
+		press.pressed = true
+		Input.parse_input_event(press)
+		root.push_input(press, true)
+		await process_frame
+		for cell: Vector2i in cells.slice(1):
+			var motion := InputEventMouseMotion.new()
+			motion.position = screen.world.cell_screen_position(0, cell)
+			motion.global_position = motion.position
+			motion.button_mask = MOUSE_BUTTON_MASK_LEFT if button == MOUSE_BUTTON_LEFT else MOUSE_BUTTON_MASK_RIGHT
+			Input.parse_input_event(motion)
+			root.push_input(motion, true)
+			await process_frame
+			await process_frame
+		var release := press.duplicate() as InputEventMouseButton
+		release.position = screen.world.cell_screen_position(0, cells[-1])
+		release.global_position = release.position
+		release.pressed = false
+		Input.parse_input_event(release)
+		root.push_input(release, true)
+		await process_frame
+		for slot: int in range(2):
+			for cell: Vector2i in cells:
+				_check(screen.planning.layouts[slot].has_path(cell) == (button == MOUSE_BUTTON_LEFT), "Round-100 path strokes place/delete every dragged cell on both mirrored boards")
 
 
 func _press_cycle_button(button: Button) -> void:
