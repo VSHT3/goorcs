@@ -201,6 +201,10 @@ func _update_zoom(delta: float) -> void:
 	var canvas_before: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * _zoom_anchor
 	_cancel_strokes()
 	camera.zoom = Vector2.ONE * next_zoom
+	if next_zoom == _target_zoom:
+		# Camera vectors store float32 components; retain the accepted value so
+		# a settled float64 target cannot keep cancelling path strokes forever.
+		_target_zoom = camera.zoom.x
 	camera.force_update_scroll()
 	var canvas_after: Vector2 = _world_viewport.get_canvas_transform().affine_inverse() * _zoom_anchor
 	camera.position += canvas_before - canvas_after

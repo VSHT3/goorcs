@@ -18,6 +18,8 @@ func configure(preview: Dictionary) -> void:
 	combat_towers = []
 	tower_types.clear()
 	_tower_art.clear()
+	_directional_framing.clear()
+	_directional_canvas_sizes.clear()
 	if preview.is_empty():
 		queue_redraw()
 		return
@@ -26,6 +28,7 @@ func configure(preview: Dictionary) -> void:
 	if reward == null:
 		return
 	_tower_art[String(tower["type_id"])] = reward
+	_cache_tower_art(reward)
 	tower_types[String(tower["type_id"])] = preview["stats"].duplicate(true)
 	combat_towers = [tower]
 	_fit_artwork(tower, reward)
@@ -44,6 +47,12 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 	var units: float = float(variant.get("board_height", reward.board_height)) / maxf(1.0, bounds.size.y)
 	var anchor: Vector2 = variant.get("board_anchor", reward.board_anchor)
 	_frame = Rect2((bounds.position - texture.get_size() * anchor) * units, bounds.size * units)
+	if not reward.directional_weapon_textures.is_empty():
+		var layers: Array[Texture2D] = [reward.board_texture]
+		layers.append_array(reward.directional_weapon_textures)
+		for layer: Texture2D in layers:
+			var layer_bounds: Rect2 = _texture_bounds[layer]
+			_frame = _frame.merge(Rect2((layer_bounds.position - texture.get_size() * anchor) * units, layer_bounds.size * units))
 	# Reserve the battlefield's orbit envelope, even as stones pass behind it.
 	_frame = _frame.merge(Rect2(-0.7, -0.85, 1.4, 0.65))
 	if reward.archer_head_texture != null:

@@ -57,6 +57,18 @@ func _run() -> void:
 			_check(bounds.has_area() and Rect2i(Vector2i.ONE, viewport.size - Vector2i(2, 2)).encloses(bounds), "Selected artwork and effects fit without clipping: %s/%s" % [record["id"], stage["id"]])
 			portrait._process(0.2)
 			_check(preview["tower"] == before, "Cosmetic portrait animation cannot mutate guide state")
+	var ballista: Dictionary = guide.preview(&"orc_ballista", "base")
+	var poses: Array[Image] = []
+	for index: int in range(8):
+		var aimed: Dictionary = ballista.duplicate(true)
+		aimed["tower"]["aim"] = Vector2(aimed["tower"]["cell"]) + Vector2.from_angle(-PI * 0.5 + float(index) * PI * 0.25)
+		portrait.configure(aimed)
+		var pose: Image = await _capture()
+		var bounds: Rect2i = pose.get_used_rect()
+		_check(Rect2i(Vector2i.ONE, viewport.size - Vector2i(2, 2)).encloses(bounds), "Every directional Ballista weapon fits the shared guide framing")
+		for previous: Image in poses:
+			_check(pose.get_data() != previous.get_data(), "Each accepted Ballista aim renders its own weapon pose in the guide")
+		poses.append(pose)
 	portrait.configure(guide.preview(&"rune_obelisk", "damage/speed/onyx_ring"))
 	var start: Image = await _capture()
 	portrait._process(0.4)

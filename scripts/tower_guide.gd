@@ -141,6 +141,8 @@ static func _copy_reward(source: TowerReward) -> TowerReward:
 	# Keep immutable artwork shared, but never share editable branch records.
 	reward.board_variants = source.board_variants.duplicate(true)
 	reward.additional_archer_offsets = source.additional_archer_offsets.duplicate()
+	reward.directional_weapon_textures = source.directional_weapon_textures.duplicate()
+	reward.directional_projectile_origins = source.directional_projectile_origins.duplicate()
 	return reward
 
 

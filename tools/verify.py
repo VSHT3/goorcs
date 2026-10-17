@@ -32,7 +32,11 @@ RENDERED_TESTS = {
 }
 # Exact diagnostic bodies and counts only; never exempt an entire negative suite.
 # A new negative test must add its deliberate push_error diagnostics here.
-EXPECTED_ERRORS = {}
+EXPECTED_ERRORS = {
+    "tests/discord_settings_test.gd": {
+        "ConfigFile parse error at user://discord_settings_test_invalid.cfg:0: Unexpected EOF while parsing simple tag.": 1,
+    },
+}
 ERROR_LINE = re.compile(r"^\s*(?:SCRIPT ERROR:|ERROR:|USER ERROR:|FATAL:|CRASH:)(.*)$")
 ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
@@ -77,10 +81,12 @@ def copy_project(destination, log_dir, marker):
     lines = config.read_text(encoding="utf-8").splitlines()
     output = []
     application = False
+    discord = False
     found = False
     for line in lines:
         if line.startswith("["):
             application = line == "[application]"
+            discord = line == "[discord]"
             if application:
                 found = True
                 output.extend([line, f'config/name="{marker}"', 'config/use_custom_user_dir=true',
@@ -89,6 +95,9 @@ def copy_project(destination, log_dir, marker):
                                f'config/custom_user_dir_name.macos="{marker}"'])
                 continue
         if application and re.match(r"config/(?:name|use_custom_user_dir|custom_user_dir_name)(?:\.[^=]+)?=", line):
+            continue
+        if discord and line.startswith("application_id="):
+            output.append("application_id=0")
             continue
         output.append(line)
     if not found:

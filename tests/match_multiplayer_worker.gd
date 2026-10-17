@@ -1,10 +1,36 @@
 extends "res://tests/match_planning_worker.gd"
 
+
+class CommandFence extends Node:
+	signal completed(sequence: int)
+
+	@rpc("any_peer", "call_remote", "reliable")
+	func request(sequence: int) -> void:
+		var sender: int = multiplayer.get_remote_sender_id()
+		if sender in multiplayer.get_peers():
+			acknowledge.rpc_id(sender, sequence)
+
+	@rpc("any_peer", "call_remote", "reliable")
+	func acknowledge(sequence: int) -> void:
+		if multiplayer.get_remote_sender_id() in multiplayer.get_peers():
+			completed.emit(sequence)
+
+
+var _command_fence: CommandFence
+var _pending_fence: int = 0
 var _manual_simulation: bool = false
 
 
 func _new_session() -> void:
 	super._new_session()
+	_command_fence = CommandFence.new()
+	_command_fence.name = "CommandFence"
+	_command_fence.completed.connect(func(sequence: int) -> void:
+		if sequence == _pending_fence:
+			_pending_fence = 0
+			_publish()
+	)
+	_main.add_child(_command_fence)
 	planning.changed.connect(func() -> void:
 		if _manual_simulation:
 			planning.set_physics_process(false)
@@ -109,9 +135,17 @@ func _execute_command(command: Dictionary) -> void:
 			planning._publish_snapshot()
 	else:
 		super._execute_command(command)
+	# Local dispatch only queues guest RPCs. The same reliable channel orders
+	# this fence after commands/snapshots and its reply after their remote effects.
+	if action in ["build", "target", "target_secondary", "upgrade", "sell", "send", "debug", "step", "edit", "clear", "ready"] and planning.active and _session.state == MultiplayerSession.State.CONNECTED:
+		_pending_fence = _command_id
+		var peer_id: int = planning._active_peer_id
+		_command_fence.request.rpc_id(peer_id, _pending_fence)
 
 
 func _publish() -> void:
+	if _pending_fence != 0:
+		return
 	super._publish()
 	if planning == null or planning._host_combat == null or _directory.is_empty() or _executing_command or _lane != "host":
 		return

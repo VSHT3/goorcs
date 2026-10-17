@@ -1,0 +1,112 @@
+{
+  "provider": "GameLab MCP",
+  "project_id": 32513,
+  "asset_id": 69683,
+  "job_id": "5abadff5-12ea-47c7-9bd5-798ba48ecec3",
+  "credits_debited": 2,
+  "references": [],
+  "requested_settings": {
+    "width": 128,
+    "height": 128,
+    "centered": true,
+    "isometric": false,
+    "three_quarter_top_down": true,
+    "two_d": true,
+    "subject_orientation_in_frame": "south",
+    "pixel_art": true,
+    "pixel_art_colors": 48,
+    "edge_cleanup": true,
+    "transparent_bg": true,
+    "quality": "high"
+  },
+  "provider_response": {
+    "job_id": "5abadff5-12ea-47c7-9bd5-798ba48ecec3",
+    "status": "completed",
+    "type": "image",
+    "prompt": "A single finished native 128 x 128 pixel-art LIGHTNING TOWER building for a medieval fantasy tower-defense game. A sturdy compact stone-and-timber electrical defense structure, not a modern machine or science-fiction turret. A tall central iron conductor with chunky warm copper coil windings rises from a squat pale gray masonry housing reinforced with dark oak and iron bands. A small blue-white energy core is recessed near the upper conductor; two short iron terminal prongs provide a distinctive readable crown. Restrained tiny cyan electric arcs ONLY between the terminal tips; the building silhouette must carry the design without effects. A broad front wall, a narrow visible RIGHT wall, and visible top surfaces establish a single elevated front-dominant oblique orthographic viewpoint. Front wall occupies about three quarters of apparent width, right wall about one quarter; front foundation edge nearly horizontal. Not equal-sided corner-on diamond isometric, not a flat frontal cutout. Tall but substantial and stable, one compact square-grid footprint. Foundation is integrated rough pale stone, not an oversized display platform. Hand-crafted classic fantasy strategy-game pixel art: deliberate chunky pixel clusters, dark desaturated charcoal-green contours, upper-left warm light, clear cool gray stone, warm timber and copper, muted iron, limited pale electric blue accents. Three or four readable value groups per material. Strong memorable silhouette, simple readable architecture, no fine noise or scattered highlights. The whole building must remain identifiable when reduced to approximately 56 pixels in width on dark muted green terrain. Native crisp single-pixel stepped edges, no smooth painting, gradients, antialiasing, glossy 3D materials or photorealism. No words, symbols resembling UI badges, lettering, numerals, characters, terrain tile, landscape or sprawling electric effects. Center the full isolated building with comfortable margins; keep all conductor tips, coils and footing inside the canvas. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south (down), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+    "error": null,
+    "created_at": "2026-10-17T18:50:52",
+    "updated_at": "2026-10-17T18:51:18",
+    "artifacts": [
+      {
+        "kind": "output",
+        "sequence": 0,
+        "filename": "image_000.png",
+        "content_type": "image/png"
+      }
+    ],
+    "transparent_bg_downloads": {
+      "chroma_key": {
+        "job_id": "5abadff5-12ea-47c7-9bd5-798ba48ecec3",
+        "sequence": 0,
+        "download_url": "/v1/jobs/5abadff5-12ea-47c7-9bd5-798ba48ecec3/artifacts/0"
+      },
+      "background_removed": {
+        "job_id": "bb90b2a8-2542-44b0-afe8-35f986d63b5d",
+        "status": "completed",
+        "sequence": 0,
+        "download_url": "/v1/jobs/bb90b2a8-2542-44b0-afe8-35f986d63b5d/artifacts/0",
+        "artifacts": [
+          {
+            "kind": "output",
+            "sequence": 0,
+            "filename": "image_000.png",
+            "content_type": "image/png"
+          }
+        ]
+      }
+    },
+    "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+  },
+  "artifacts": {
+    "raw": {
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "sha256": "bb42f2e0577ca77ede8ca73d0e8f87d1c1621f91c9774c049d8068ee66a99288"
+    },
+    "cutout": {
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        26,
+        2,
+        102,
+        126
+      ],
+      "sha256": "bec665d86a414ebd248645d368aa435899cd8ae894957b0088075adae7949dd7"
+    }
+  },
+  "candidate": {
+    "path": "lightning_candidate.png",
+    "sha256": "52964ba4ee047102b7c0a70f8b9faed62f9dac8420c0d1c8e7598a25d6d19f1c",
+    "bounds": [
+      27,
+      3,
+      101,
+      125
+    ],
+    "opaque_colors": 47
+  },
+  "processing": "Provider cutout alpha thresholded >=128 to255, otherwise0; RGB and canvas unchanged. Review uses nearest-neighbor scaling.",
+  "approval": "Creator approved the cleaned Lightning still, then explicitly requested installation on 2026-10-17. Installed without animation.",
+  "runtime_processing": {
+    "file": "assets/towers/lightning.png",
+    "canvas": [128, 144],
+    "translation": [-16, 11],
+    "opaque_bounds": [11, 14, 85, 136],
+    "anchor": [0.375, 0.94444444],
+    "board_height": 1.61169618,
+    "projectile_origin": [48, 19],
+    "invariant": "Every visible approved pixel preserved exactly; only transparent canvas/reframing changed. Shared muzzle coordinates and unchanged Longer Reach artwork/geometry retained."
+  }
+}

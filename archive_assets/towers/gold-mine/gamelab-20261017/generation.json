@@ -1,0 +1,147 @@
+{
+  "provider": "GameLab MCP",
+  "project_id": 32513,
+  "asset_id": 69682,
+  "job_id": "c69e0860-2fc9-4468-b756-1c3f3cd7087e",
+  "credits_debited": 2,
+  "references": [],
+  "requested_settings": {
+    "width": 128,
+    "height": 128,
+    "centered": true,
+    "isometric": false,
+    "three_quarter_top_down": true,
+    "two_d": true,
+    "subject_orientation_in_frame": "south",
+    "pixel_art": true,
+    "pixel_art_colors": 48,
+    "edge_cleanup": true,
+    "transparent_bg": true,
+    "quality": "high"
+  },
+  "provider_expanded_prompt": "One finished production-quality pixel-art GOLD MINE building sprite for a medieval fantasy tower-defense game, designed at native 128 x 128 pixels. Single compact freestanding structure, no characters. A squat irregular mound of cool gray rock encloses a deep dark mine entrance framed by chunky weathered oak posts and a heavy lintel, iron straps and a few large rivets. A short pair of mine rails disappears into the opening. A small wooden ore cart containing a few large readable golden nuggets sits beside the entrance, subordinate to the main silhouette. A restrained pickaxe attached to one post communicates mining. Broad stable rough-stone footing with a nearly horizontal front contact edge, not a decorative display plinth. CAMERA GEOMETRY IS CRITICAL: elevated front-dominant oblique orthographic view, looking down enough to see the rock top, lintel top and cart interior; the broad front occupies about three quarters of the apparent width and the visible RIGHT side about one quarter. All receding edges share the same shallow depth direction. Not a symmetric corner-on diamond-isometric view, not a flat front-elevation cutout, not a side-scrolling prop. Keep the structure upright. Art direction: lovingly hand-placed classic strategy-game pixel clusters, strong irregular silhouette, dark desaturated green-charcoal outlines, selective inner outlines, clear stone versus warm timber versus muted metal, upper-left warm light, restrained cool shadows, gold as a small warm focal accent. Chunky readable forms that survive reduction to roughly 56 pixels wide on a dark muted green battlefield. Consistent single-pixel raster, crisp deliberate stepped edges, three or four value groups per material; no smooth painting, fine speckled texture, glossy 3D rendering, gradients or antialiasing. Balanced compact architecture, no sprawling scenery, landscape, ground tile, grass patch, UI, lettering, numbers, floating coins or magical glow. Center the complete sprite with comfortable margins on all sides; do not crop the rock mound, cart, tools or footing. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south (down), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+  "last_status": {
+    "job_id": "c69e0860-2fc9-4468-b756-1c3f3cd7087e",
+    "status": "completed",
+    "type": "image",
+    "prompt": "One finished production-quality pixel-art GOLD MINE building sprite for a medieval fantasy tower-defense game, designed at native 128 x 128 pixels. Single compact freestanding structure, no characters. A squat irregular mound of cool gray rock encloses a deep dark mine entrance framed by chunky weathered oak posts and a heavy lintel, iron straps and a few large rivets. A short pair of mine rails disappears into the opening. A small wooden ore cart containing a few large readable golden nuggets sits beside the entrance, subordinate to the main silhouette. A restrained pickaxe attached to one post communicates mining. Broad stable rough-stone footing with a nearly horizontal front contact edge, not a decorative display plinth. CAMERA GEOMETRY IS CRITICAL: elevated front-dominant oblique orthographic view, looking down enough to see the rock top, lintel top and cart interior; the broad front occupies about three quarters of the apparent width and the visible RIGHT side about one quarter. All receding edges share the same shallow depth direction. Not a symmetric corner-on diamond-isometric view, not a flat front-elevation cutout, not a side-scrolling prop. Keep the structure upright. Art direction: lovingly hand-placed classic strategy-game pixel clusters, strong irregular silhouette, dark desaturated green-charcoal outlines, selective inner outlines, clear stone versus warm timber versus muted metal, upper-left warm light, restrained cool shadows, gold as a small warm focal accent. Chunky readable forms that survive reduction to roughly 56 pixels wide on a dark muted green battlefield. Consistent single-pixel raster, crisp deliberate stepped edges, three or four value groups per material; no smooth painting, fine speckled texture, glossy 3D rendering, gradients or antialiasing. Balanced compact architecture, no sprawling scenery, landscape, ground tile, grass patch, UI, lettering, numbers, floating coins or magical glow. Center the complete sprite with comfortable margins on all sides; do not crop the rock mound, cart, tools or footing. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south (down), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+    "error": null,
+    "created_at": "2026-10-17T18:39:15",
+    "updated_at": "2026-10-17T18:48:43",
+    "artifacts": [
+      {
+        "kind": "output",
+        "sequence": 0,
+        "filename": "image_000.png",
+        "content_type": "image/png"
+      }
+    ],
+    "transparent_bg_downloads": {
+      "chroma_key": {
+        "job_id": "c69e0860-2fc9-4468-b756-1c3f3cd7087e",
+        "sequence": 0,
+        "download_url": "/v1/jobs/c69e0860-2fc9-4468-b756-1c3f3cd7087e/artifacts/0"
+      },
+      "background_removed": {
+        "job_id": "c28f14f4-f284-426e-a2fd-82ab10f2077e",
+        "status": "completed",
+        "sequence": 0,
+        "download_url": "/v1/jobs/c28f14f4-f284-426e-a2fd-82ab10f2077e/artifacts/0",
+        "artifacts": [
+          {
+            "kind": "output",
+            "sequence": 0,
+            "filename": "image_000.png",
+            "content_type": "image/png"
+          }
+        ]
+      }
+    },
+    "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+  },
+  "approval": "Creator approved the cleaned still, then explicitly requested game import on 2026-10-17. Installed byte-identically as assets/towers/gold_mine.png. No animation generated.",
+  "artifacts": {
+    "raw": {
+      "file": "/home/vsht/Pictures/Gorcs-PixelArt/gamelab-gold-mine-trial-01/gold_mine_raw.png",
+      "size": [
+        128,
+        128
+      ],
+      "alpha_bounds": [
+        0,
+        0,
+        128,
+        128
+      ],
+      "alpha_values": [
+        255
+      ],
+      "opaque_rgb_colors": 49,
+      "sha256": "cf2cad877e9ed00de7ff0ad43b201612952b12fa6675a23f748d2da596d32053"
+    },
+    "cutout": {
+      "file": "/home/vsht/Pictures/Gorcs-PixelArt/gamelab-gold-mine-trial-01/gold_mine_cutout.png",
+      "size": [
+        128,
+        128
+      ],
+      "alpha_bounds": [
+        4,
+        7,
+        125,
+        116
+      ],
+      "alpha_values": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        13,
+        239,
+        241,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251,
+        252,
+        253,
+        254
+      ],
+      "opaque_rgb_colors": 48,
+      "sha256": "d7ac3d8222a1e6d6505b904ab0f36c04286cbd1c57da7c64858de05d1921975d"
+    },
+    "candidate": {
+      "file": "gold_mine_candidate.png",
+      "size": [
+        128,
+        128
+      ],
+      "alpha_bounds": [
+        5,
+        11,
+        125,
+        115
+      ],
+      "alpha_values": [
+        0,
+        255
+      ],
+      "opaque_rgb_colors": 48,
+      "sha256": "2766b28f778f4f64bf67eb9976db209ed8108e5b2316117af690ab4f763097fd"
+    }
+  },
+  "processing": "Preserved original downloads. Candidate alpha threshold: alpha >= 128 becomes 255, otherwise 0; RGB, dimensions and palette unchanged. Review uses nearest-neighbor scaling and equal opaque width, not a runtime capture."
+}

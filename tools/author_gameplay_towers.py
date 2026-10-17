@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Original gameplay tower artwork, hand-authored by Gorcs contributors (2026).
+"""Original procedural gameplay tower artwork, authored for Gorcs (2026).
 
 Native 96x112 RGBA pixels; integer polygons/rectangles, hard alpha, no source
 images, sampling, antialiasing, models, or third-party artwork. Upper-left light,
 front-dominant elevated timber/stone forms. Run with Pillow to reproduce only
-these ten new PNGs; established approved tower PNGs are never read or written.
+these eight PNGs; approved Lightning, Gold Mine and established tower PNGs are never written.
 """
 from pathlib import Path
 
@@ -112,28 +112,21 @@ def coil(d, x, y, height):
     rect(d, (x, y - 13, x + 1, y - 9), "blue_light")
 
 
-def lightning(long_reach=False):
+def lightning_longer_reach():
     image, d = canvas()
     footing(d)
     block(d, 25, 63, 46, 24)
     rect(d, (34, 70, 56, 83), "iron_dark", "ink")
     poly(d, [(46, 71), (40, 78), (46, 78), (43, 82), (52, 75), (47, 75)], "blue_light", None)
     slab(d, 20, 59, 56, 7, 5)
-    if long_reach:
-        # Twin tall outriggers and a triangular terminal give a distinct silhouette.
-        coil(d, 30, 29, 28)
-        coil(d, 63, 29, 28)
-        timber(d, 44, 35, 5, 22)
-        poly(d, [(44, 26), (47, 14), (51, 26), (48, 35)], "blue", "iron_dark")
-        line(d, [(47, 17), (47, 29)], "blue_light")
-        line(d, [(30, 29), (46, 39), (63, 29)], "iron_dark", 3)
-        line(d, [(31, 28), (47, 37), (62, 28)], "iron_light")
-    else:
-        coil(d, 47, 32, 26)
-        timber(d, 24, 51, 5, 15)
-        timber(d, 64, 51, 5, 15)
-        line(d, [(29, 53), (36, 48)], "iron", 3)
-        line(d, [(58, 48), (65, 53)], "iron", 3)
+    # Twin tall outriggers and a triangular terminal give a distinct silhouette.
+    coil(d, 30, 29, 28)
+    coil(d, 63, 29, 28)
+    timber(d, 44, 35, 5, 22)
+    poly(d, [(44, 26), (47, 14), (51, 26), (48, 35)], "blue", "iron_dark")
+    line(d, [(47, 17), (47, 29)], "blue_light")
+    line(d, [(30, 29), (46, 39), (63, 29)], "iron_dark", 3)
+    line(d, [(31, 28), (47, 37), (62, 28)], "iron_light")
     return image
 
 
@@ -200,34 +193,6 @@ def command_banner():
     for x in (30, 54):
         poly(d, [(x, 44), (x + 4, 49), (x + 8, 40), (x + 11, 45), (x + 6, 60), (x + 2, 55)], "gold", None)
         line(d, [(x + 1, 44), (x + 4, 50)], "gold_light")
-    return image
-
-
-def gold_mine():
-    image, d = canvas()
-    footing(d)
-    poly(d, [(15, 83), (18, 58), (27, 49), (35, 43), (55, 45), (70, 56), (77, 81)], "stone_dark")
-    poly(d, [(18, 62), (27, 50), (35, 46), (45, 48), (34, 58), (31, 73)], "stone_light")
-    poly(d, [(55, 47), (67, 56), (71, 74), (59, 68), (52, 55)], "stone")
-    poly(d, [(28, 83), (28, 63), (34, 56), (54, 56), (61, 63), (61, 84)], "ink")
-    timber(d, 26, 59, 7, 26)
-    timber(d, 56, 59, 7, 26)
-    timber(d, 24, 53, 41, 7)
-    line(d, [(34, 81), (40, 65)], "wood_dark", 2)
-    line(d, [(49, 81), (45, 65)], "wood_dark", 2)
-    line(d, [(36, 83), (51, 83)], "iron", 2)
-    line(d, [(33, 88), (55, 88)], "iron", 2)
-    line(d, [(35, 92), (57, 92)], "iron", 2)
-    poly(d, [(57, 78), (76, 78), (72, 90), (60, 90)], "wood", "iron_dark")
-    poly(d, [(57, 78), (62, 73), (74, 73), (76, 78)], "gold_dark")
-    coin(d, 61, 74)
-    coin(d, 68, 79)
-    rect(d, (61, 90, 64, 94), "ink")
-    rect(d, (71, 89, 74, 93), "ink")
-    # Pickaxe embedded in the left stone shoulder.
-    line(d, [(17, 76), (29, 61)], "wood_dark", 4)
-    line(d, [(17, 75), (29, 60)], "wood_top", 2)
-    poly(d, [(20, 57), (28, 55), (36, 61), (31, 60), (27, 58), (20, 60)], "iron_light")
     return image
 
 
@@ -312,9 +277,9 @@ def tribute_office():
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     authored = {
-        "lightning": lightning(), "lightning_longer_reach": lightning(True),
+        "lightning_longer_reach": lightning_longer_reach(),
         "war_drums": war_drums(), "forge": forge(),
-        "command_banner": command_banner(), "gold_mine": gold_mine(),
+        "command_banner": command_banner(),
         "royal_mint": royal_mint(), "bounty_board": bounty_board(),
         "greater_bounty": bounty_board(True), "tribute_office": tribute_office(),
     }

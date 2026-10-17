@@ -66,6 +66,68 @@ func _check_validation() -> void:
 	_check(second_rules.catalog.towers == registered, "Injected registration edits do not mutate another rules instance")
 
 
+func _check_directional_validation() -> void:
+	var catalog: ContentCatalog = _variant_catalog()
+	var art: TowerReward = catalog.towers[0].reward
+	var canvas: Texture2D = ImageTexture.create_from_image(Image.create(192, 192, false, Image.FORMAT_RGBA8))
+	var wrong_canvas: Texture2D = ImageTexture.create_from_image(Image.create(96, 192, false, Image.FORMAT_RGBA8))
+	art.icon_texture = canvas
+	art.board_texture = canvas
+	art.directional_weapon_textures.resize(8)
+	art.directional_weapon_textures.fill(canvas)
+	art.directional_projectile_origins.resize(8)
+	art.directional_projectile_origins.fill(Vector2(96, 77))
+	_check(catalog.validation_errors().is_empty(), "Eight aligned directional layers and finite bolt tips are admitted")
+	art.icon_texture = wrong_canvas
+	art.board_texture = wrong_canvas
+	art.directional_weapon_textures.fill(wrong_canvas)
+	art.directional_projectile_origins.fill(Vector2(48, 77))
+	_check(catalog.validation_errors().is_empty(), "Aligned directional canvases are not restricted to this Ballista's dimensions")
+	var empty_canvas: Texture2D = ImageTexture.new()
+	art.icon_texture = empty_canvas
+	art.board_texture = empty_canvas
+	art.directional_weapon_textures.fill(empty_canvas)
+	_check(not catalog.validation_errors().is_empty(), "Zero-sized directional canvases are rejected")
+	art.icon_texture = canvas
+	art.board_texture = canvas
+	art.directional_weapon_textures.fill(canvas)
+	art.directional_projectile_origins.fill(Vector2(96, 77))
+	art.directional_weapon_textures.resize(7)
+	_check(not catalog.validation_errors().is_empty(), "Partial directional texture arrays are rejected")
+	art.directional_weapon_textures.append(canvas)
+	art.directional_projectile_origins.resize(7)
+	_check(not catalog.validation_errors().is_empty(), "Partial directional origin arrays are rejected")
+	art.directional_projectile_origins.append(Vector2(96, 77))
+	art.directional_weapon_textures[3] = null
+	_check(not catalog.validation_errors().is_empty(), "Every directional pose requires a texture")
+	art.directional_weapon_textures[3] = wrong_canvas
+	_check(not catalog.validation_errors().is_empty(), "Directional weapon canvases must match the fixed icon canvas")
+	art.directional_weapon_textures[3] = canvas
+	art.board_texture = null
+	_check(not catalog.validation_errors().is_empty(), "Directional metadata requires a fixed base")
+	art.board_texture = wrong_canvas
+	_check(not catalog.validation_errors().is_empty(), "Fixed base and directional icon canvases must match")
+	art.board_texture = canvas
+	art.icon_texture = null
+	_check(not catalog.validation_errors().is_empty(), "Directional metadata requires its framing icon")
+	art.icon_texture = wrong_canvas
+	_check(not catalog.validation_errors().is_empty(), "Directional icon framing must match every base and weapon canvas")
+	art.icon_texture = canvas
+	for invalid: Vector2 in [Vector2(NAN, 1), Vector2(1, INF), Vector2(-1, 77), Vector2(96, -1), Vector2(192, 77), Vector2(96, 192)]:
+		art.directional_projectile_origins[5] = invalid
+		_check(not catalog.validation_errors().is_empty(), "Nonfinite or out-of-canvas directional tips are rejected: %s" % invalid)
+	art.directional_projectile_origins[5] = Vector2(96, 77)
+	art.directional_weapon_textures.clear()
+	_check(not catalog.validation_errors().is_empty(), "Origins without directional textures are rejected")
+	art.directional_weapon_textures.resize(8)
+	art.directional_weapon_textures.fill(canvas)
+	art.directional_projectile_origins.clear()
+	_check(not catalog.validation_errors().is_empty(), "Directional textures without origins are rejected")
+	art.directional_weapon_textures.clear()
+	art.board_texture = null
+	_check(catalog.validation_errors().is_empty(), "Empty directional arrays preserve legacy artwork without a board-only base")
+
+
 func _check_behavior_validation() -> void:
 	var catalog: ContentCatalog = _variant_catalog()
 	for tower: TowerDefinition in catalog.towers:
@@ -184,6 +246,7 @@ func _check_null_art_scene() -> void:
 
 func _run() -> void:
 	_check_validation()
+	_check_directional_validation()
 	_check_behavior_validation()
 	_check_variant_geometry_validation()
 	await _check_null_art_scene()

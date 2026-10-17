@@ -1,0 +1,556 @@
+{
+  "status": "Creator authorized trying this existing reconstructed-roof eight-direction assembly in-game after empty-base generation was blocked by insufficient credits. Provisional artwork, not a newly generated empty base. See game-trial.json in the parent directory for integration/verification.",
+  "canvas": [
+    192,
+    192
+  ],
+  "order": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+  ],
+  "swivel_pixels": [
+    96,
+    84
+  ],
+  "weapon_plane_pixels": [
+    96,
+    63
+  ],
+  "foot_pixels": [
+    96,
+    157
+  ],
+  "source_master": "../SE_approved_master.png",
+  "source_sha256": "73b7eed5e9c6f455e4769d4c5664005a5ffe6ecc242b5a556630f3a8ee7dbeb5",
+  "base": {
+    "file": "base.png",
+    "sha256": "b2f43996833fc7d9270655d133ef6c20ba68a0604ab7e1f528bcf3c4b9cb1660",
+    "repair": "Facade/foundation below native y54 retained; occluded roof reconstructed; shared fixed iron socket/post."
+  },
+  "pixel_policy": "Nearest-neighbor perspective normalization, binary alpha, nearest master-palette mapping without dithering; never rotate a finished PNG in its image plane.",
+  "additional_generation_credits": 0,
+  "views": {
+    "N": {
+      "source_file": "N_weapon.png",
+      "source_sha256": "64fc7dc6cb552a322c7a97952a862a1b8175f2bafac8e1651dc7e9a2b2ae7721",
+      "source_landmarks": {
+        "rear": [
+          64,
+          83
+        ],
+        "tip": [
+          64,
+          16
+        ],
+        "pivot": [
+          64,
+          58
+        ],
+        "scale": [
+          0.7878787878787878,
+          0.8208955223880597
+        ]
+      },
+      "support_cut": [
+        56,
+        86,
+        74,
+        105
+      ],
+      "detached_pixels_removed": 0,
+      "effective_scale": [
+        0.7890625,
+        0.8203125
+      ],
+      "translation": [
+        46,
+        15
+      ],
+      "landmarks": {
+        "rear": [
+          96.5,
+          83.086
+        ],
+        "tip": [
+          96.5,
+          28.125
+        ],
+        "pivot": [
+          96.5,
+          62.578
+        ]
+      },
+      "weapon_file": "weapon_N.png",
+      "frame_file": "ballista_N.png",
+      "weapon_bounds": [
+        57,
+        28,
+        135,
+        86
+      ],
+      "frame_bounds": [
+        57,
+        28,
+        135,
+        157
+      ],
+      "weapon_sha256": "9aba19796d8eb6acb477dc2223d77beb33ecad0287ade2e47cbe8b6c1eb141d0",
+      "frame_sha256": "a3357e3d234fb1a2c58e06d089a448ca9e6a7f84bc2808bd2dd1e50abf6a3305"
+    },
+    "NE": {
+      "source_file": "NE_weapon.png",
+      "source_sha256": "1d055f2740baea7a9bf278e26d0adb521f0d6abb3f4be407632cac985a8074c2",
+      "source_landmarks": {
+        "rear": [
+          29,
+          77
+        ],
+        "tip": [
+          103,
+          31
+        ],
+        "pivot": [
+          65,
+          56
+        ],
+        "scale": [
+          0.8243243243243243,
+          0.8260869565217391
+        ]
+      },
+      "support_cut": [
+        59,
+        70,
+        77,
+        87
+      ],
+      "detached_pixels_removed": 13,
+      "effective_scale": [
+        0.828125,
+        0.828125
+      ],
+      "translation": [
+        42,
+        17
+      ],
+      "landmarks": {
+        "rear": [
+          66.016,
+          80.766
+        ],
+        "tip": [
+          127.297,
+          42.672
+        ],
+        "pivot": [
+          95.828,
+          63.375
+        ]
+      },
+      "weapon_file": "weapon_NE.png",
+      "frame_file": "ballista_NE.png",
+      "weapon_bounds": [
+        64,
+        42,
+        131,
+        87
+      ],
+      "frame_bounds": [
+        58,
+        42,
+        134,
+        157
+      ],
+      "weapon_sha256": "5b2d8c6459c5a351ae7695d9405a6dd5dd45ab8467d2b6e4c622f2ea4fec1b16",
+      "frame_sha256": "fa514a72402e6bbffb76176fc6cb0713e30c6f65817f9dd25d179f000420b944"
+    },
+    "E": {
+      "source_file": "E_weapon.png",
+      "source_sha256": "0e78e89fdae8b6ef5bcc219012de4036194517641e926d2778be664f134dcd43",
+      "source_landmarks": {
+        "rear": [
+          16,
+          60
+        ],
+        "tip": [
+          116,
+          59
+        ],
+        "pivot": [
+          65,
+          59
+        ],
+        "scale": [
+          0.862670273047588,
+          0.6575342465753424
+        ]
+      },
+      "support_cut": null,
+      "detached_pixels_removed": 0,
+      "effective_scale": [
+        0.859375,
+        0.65625
+      ],
+      "translation": [
+        40,
+        24
+      ],
+      "landmarks": {
+        "rear": [
+          53.75,
+          63.375
+        ],
+        "tip": [
+          139.688,
+          62.719
+        ],
+        "pivot": [
+          95.859,
+          62.719
+        ]
+      },
+      "weapon_file": "weapon_E.png",
+      "frame_file": "ballista_E.png",
+      "weapon_bounds": [
+        54,
+        40,
+        141,
+        88
+      ],
+      "frame_bounds": [
+        54,
+        40,
+        141,
+        157
+      ],
+      "weapon_sha256": "61a0737e7d40cc903adc1d2c4c83e7533ba532bbaf018d766018f04e0087b031",
+      "frame_sha256": "a6c0d1ee7738c88a935680c5073183ea88fe79610cd9db2943187f4106e3a335"
+    },
+    "SE": {
+      "source_file": "SE_approved_master.png",
+      "source_sha256": "73b7eed5e9c6f455e4769d4c5664005a5ffe6ecc242b5a556630f3a8ee7dbeb5",
+      "source_landmarks": {
+        "rear": [
+          41,
+          7
+        ],
+        "tip": [
+          102,
+          45
+        ],
+        "pivot": [
+          64,
+          31
+        ],
+        "scale": [
+          1,
+          1
+        ]
+      },
+      "support_cut": null,
+      "detached_pixels_removed": 0,
+      "effective_scale": [
+        1.0,
+        1.0
+      ],
+      "translation": [
+        32,
+        32
+      ],
+      "landmarks": {
+        "rear": [
+          73.0,
+          39.0
+        ],
+        "tip": [
+          134.0,
+          77.0
+        ],
+        "pivot": [
+          96.0,
+          63.0
+        ]
+      },
+      "weapon_file": "weapon_SE.png",
+      "frame_file": "ballista_SE.png",
+      "weapon_bounds": [
+        57,
+        33,
+        135,
+        82
+      ],
+      "frame_bounds": [
+        57,
+        33,
+        135,
+        157
+      ],
+      "weapon_sha256": "113569ede19e2adfcc5a93f4eb22684bd2f8ccce34a57c2a2e889f497ca99fa3",
+      "frame_sha256": "24e485a9a7dcbcbaf1c8fa2947dfcf38a7c66f7cee561aa2b23e4d8c732bc142"
+    },
+    "S": {
+      "source_file": "S_weapon.png",
+      "source_sha256": "9357dbb6e4e29677e4efab7be007a95356895ad84f899f33cf7b2605c6b87e51",
+      "source_landmarks": {
+        "rear": [
+          66,
+          25
+        ],
+        "tip": [
+          66,
+          93
+        ],
+        "pivot": [
+          66,
+          62
+        ],
+        "scale": [
+          0.8297872340425532,
+          0.8088235294117647
+        ]
+      },
+      "support_cut": null,
+      "detached_pixels_removed": 0,
+      "effective_scale": [
+        0.828125,
+        0.8125
+      ],
+      "translation": [
+        41,
+        13
+      ],
+      "landmarks": {
+        "rear": [
+          95.656,
+          33.312
+        ],
+        "tip": [
+          95.656,
+          88.562
+        ],
+        "pivot": [
+          95.656,
+          63.375
+        ]
+      },
+      "weapon_file": "weapon_S.png",
+      "frame_file": "ballista_S.png",
+      "weapon_bounds": [
+        55,
+        31,
+        133,
+        92
+      ],
+      "frame_bounds": [
+        55,
+        31,
+        134,
+        157
+      ],
+      "weapon_sha256": "ddc5335adde45c5a0dc9b6e3156842e688b3df1d2ee2f3887611101c7b826e86",
+      "frame_sha256": "ac3b17164c9b71bc7542614e48aa0370e022e47544a9ef3c2a5ed8fa6f735f78"
+    },
+    "SW": {
+      "source_file": "SW_weapon.png",
+      "source_sha256": "7864e3c219a2072d8597d567da4e2e9548bba02a9bb366b1738544aeffd4a89f",
+      "source_landmarks": {
+        "rear": [
+          98,
+          33
+        ],
+        "tip": [
+          23,
+          75
+        ],
+        "pivot": [
+          62,
+          57
+        ],
+        "scale": [
+          0.8133333333333334,
+          0.9047619047619048
+        ]
+      },
+      "support_cut": [
+        55,
+        78,
+        73,
+        92
+      ],
+      "detached_pixels_removed": 0,
+      "effective_scale": [
+        0.8125,
+        0.90625
+      ],
+      "translation": [
+        46,
+        11
+      ],
+      "landmarks": {
+        "rear": [
+          125.625,
+          40.906
+        ],
+        "tip": [
+          64.688,
+          78.969
+        ],
+        "pivot": [
+          96.375,
+          62.656
+        ]
+      },
+      "weapon_file": "weapon_SW.png",
+      "frame_file": "ballista_SW.png",
+      "weapon_bounds": [
+        63,
+        37,
+        133,
+        86
+      ],
+      "frame_bounds": [
+        58,
+        37,
+        134,
+        157
+      ],
+      "weapon_sha256": "97e379b4ab206bf347dd438719bb891794d05b50d860b689214aad6a5500198a",
+      "frame_sha256": "9bceee4ff8a0d72a881bba6e6f0450b1e77bbb864c974208bf23ab6efd88f029"
+    },
+    "W": {
+      "source_file": "W_weapon.png",
+      "source_sha256": "c89c3aa6f3c400fdac72422adb507362c6783a04b0b8a9e87571ea16441cc7e2",
+      "source_landmarks": {
+        "rear": [
+          106,
+          59
+        ],
+        "tip": [
+          15,
+          53
+        ],
+        "pivot": [
+          59,
+          56
+        ],
+        "scale": [
+          0.9479893110413055,
+          0.7058823529411765
+        ]
+      },
+      "support_cut": null,
+      "detached_pixels_removed": 0,
+      "effective_scale": [
+        0.9453125,
+        0.703125
+      ],
+      "translation": [
+        40,
+        24
+      ],
+      "landmarks": {
+        "rear": [
+          140.203,
+          65.484
+        ],
+        "tip": [
+          54.18,
+          61.266
+        ],
+        "pivot": [
+          95.773,
+          63.375
+        ]
+      },
+      "weapon_file": "weapon_W.png",
+      "frame_file": "ballista_W.png",
+      "weapon_bounds": [
+        53,
+        41,
+        143,
+        89
+      ],
+      "frame_bounds": [
+        53,
+        41,
+        143,
+        157
+      ],
+      "weapon_sha256": "126174c3fd37f52332c1073ae9b7871eab88090548a550ed75d2e27edbe6a9e6",
+      "frame_sha256": "d4e7df2ad91f212043f068b3c72936f3ca03b2792b3bc94416bad931c5102818"
+    },
+    "NW": {
+      "source_file": "NW_weapon.png",
+      "source_sha256": "cba20ff24514b9d86a6af0a3107025f65778fa742af3082feb36ae44733f72e2",
+      "source_landmarks": {
+        "rear": [
+          105,
+          79
+        ],
+        "tip": [
+          26,
+          22
+        ],
+        "pivot": [
+          65,
+          52
+        ],
+        "scale": [
+          0.7721518987341772,
+          0.6666666666666666
+        ]
+      },
+      "support_cut": [
+        56,
+        75,
+        75,
+        94
+      ],
+      "detached_pixels_removed": 0,
+      "effective_scale": [
+        0.7734375,
+        0.6640625
+      ],
+      "translation": [
+        46,
+        28
+      ],
+      "landmarks": {
+        "rear": [
+          127.211,
+          80.461
+        ],
+        "tip": [
+          66.109,
+          42.609
+        ],
+        "pivot": [
+          96.273,
+          62.531
+        ]
+      },
+      "weapon_file": "weapon_NW.png",
+      "frame_file": "ballista_NW.png",
+      "weapon_bounds": [
+        65,
+        43,
+        131,
+        86
+      ],
+      "frame_bounds": [
+        58,
+        43,
+        134,
+        157
+      ],
+      "weapon_sha256": "1eea876e7120965f982b292d22742819cd321e2da7de7fa5eec68d7e4e249f3b",
+      "frame_sha256": "365c79b3a5ea2de5ecf9146b70c90072d2bdf9a9f454cbe9f0f6222b29b213ff"
+    }
+  }
+}

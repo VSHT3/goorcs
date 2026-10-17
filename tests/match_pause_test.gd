@@ -8,6 +8,10 @@ var audio_path: String
 var old_music: float
 var old_sound: float
 var save_path: String
+var discord: Node
+var discord_path: String
+var old_discord_enabled: bool
+var discord_save_path: String
 var collection_path: String
 
 
@@ -20,9 +24,18 @@ func _run() -> void:
 	audio_path = audio.save_path
 	old_music = audio.music_volume
 	old_sound = audio.sound_volume
-	save_path = OS.get_temp_dir().path_join("gorcs_pause_audio_%d.cfg" % OS.get_process_id())
-	collection_path = OS.get_temp_dir().path_join("gorcs_pause_collection_%d.json" % OS.get_process_id())
+	var old_viewport_size: Vector2i = root.size
+	var old_scale_size: Vector2i = root.content_scale_size
+	var fixture_id: String = "%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()]
+	save_path = OS.get_temp_dir().path_join("gorcs_pause_audio_%s.cfg" % fixture_id)
+	collection_path = OS.get_temp_dir().path_join("gorcs_pause_collection_%s.json" % fixture_id)
 	audio.save_path = save_path
+	discord = root.get_node("DiscordSettings")
+	discord_path = discord.save_path
+	old_discord_enabled = discord.enabled
+	discord_save_path = OS.get_temp_dir().path_join("gorcs_pause_discord_%s.cfg" % fixture_id)
+	discord.save_path = discord_save_path
+	discord.set_enabled(true)
 	main = load("res://scenes/main.tscn").instantiate()
 	main.collection_store = CollectionStore.new(collection_path)
 	main.combat_rules = CombatRules.new()
@@ -53,6 +66,9 @@ func _run() -> void:
 	_check(music.playing and not music.stream_paused, "Music remains audible while solo settings are open")
 	await _click(screen.pause_menu.settings_button.get_global_rect().get_center())
 	await _settings()
+	_check(not FileAccess.file_exists(discord_save_path), "Audio-only changes do not create Discord preferences")
+	await _discord_preferences()
+	_check(main.planning._host_combat.snapshot() == captured, "Discord keyboard and pointer input leave paused simulation unchanged")
 	await _key(KEY_ESCAPE)
 	_check(paused and screen.pause_menu.resume_button.is_visible_in_tree(), "Escape from Settings returns to pause choices")
 	await _key(KEY_ESCAPE)
@@ -70,19 +86,40 @@ func _run() -> void:
 		var viewport_rect := Rect2(Vector2.ZERO, Vector2(width, 720))
 		for slider: HSlider in [screen.pause_menu.music_slider, screen.pause_menu.sound_slider]:
 			_check(viewport_rect.encloses(slider.get_global_rect()), "Audio slider fits the viewport at width %d" % width)
+		_check(viewport_rect.encloses(screen.pause_menu.discord_presence_toggle.get_global_rect()), "Discord toggle fits the viewport at width %d" % width)
 		await _key(KEY_ESCAPE)
 		await _click(screen.pause_menu.resume_button.get_global_rect().get_center())
 		_check(not paused and main.planning.active, "Resume button unpauses without ending the run")
 	await _click(screen.menu_button.get_global_rect().get_center())
 	await _click(screen.pause_menu.settings_button.get_global_rect().get_center())
 	audio.save_path = save_path.path_join("unwritable.cfg")
+	discord.save_path = discord_save_path.path_join("unwritable.cfg")
 	screen.pause_menu.music_slider.grab_focus()
 	await _key(KEY_LEFT)
+	var selected_music: float = audio.music_volume
+	screen.pause_menu.discord_presence_toggle.grab_focus()
+	await _key(KEY_SPACE)
+	_check(not discord.enabled, "Disabling sharing applies before a failing save")
 	await _key(KEY_ESCAPE)
-	_check(paused and screen.pause_menu.get_node("%SaveError").visible, "Preference save failure is visible without trapping the Settings page")
+	_check(paused and screen.pause_menu.get_node("%SaveError").visible and not discord.enabled, "Preference save failure is visible without trapping Settings or re-enabling sharing")
+	audio.save_path = save_path
 	await _click(screen.pause_menu.resume_button.get_global_rect().get_center())
 	_check(not paused and main.planning.active, "A preference save failure cannot trap a paused match")
-	audio.save_path = save_path
+	var saved_audio := ConfigFile.new()
+	_check(saved_audio.load(save_path) == OK and is_equal_approx(float(saved_audio.get_value("audio", "music_volume", -1.0)), selected_music),
+		"A successful audio save is independent of a Discord save failure")
+	saved_audio.set_value("fixture", "preserve", true)
+	_check(saved_audio.save(save_path) == OK, "Audio independence fixture can be saved")
+	var audio_before_retry: PackedByteArray = FileAccess.get_file_as_bytes(save_path)
+	discord.save_path = discord_save_path
+	await _click(screen.menu_button.get_global_rect().get_center())
+	await _click(screen.pause_menu.settings_button.get_global_rect().get_center())
+	_check(not screen.pause_menu.discord_presence_toggle.button_pressed, "Reopening after a failed save retains disabled sharing")
+	await _key(KEY_ESCAPE)
+	_check(not screen.pause_menu.get_node("%SaveError").visible, "Retrying retained dirty preferences clears the save error")
+	_check(FileAccess.get_file_as_bytes(save_path) == audio_before_retry, "Retrying Discord does not rewrite already-saved audio")
+	_check_discord_restart(false)
+	await _click(screen.pause_menu.resume_button.get_global_rect().get_center())
 	await _click(screen.menu_button.get_global_rect().get_center())
 	await _click(screen.pause_menu.quit_button.get_global_rect().get_center())
 	_check(not paused and main.menu.visible and not main.planning.active, "Quit returns to title and releases pause")
@@ -97,15 +134,29 @@ func _run() -> void:
 	_check(not paused and not screen.pause_menu.visible, "External match teardown releases the solo pause")
 	main.queue_free()
 	await _settle()
+	var closing_menu: MatchPauseMenu = load("res://scenes/match_pause_menu.tscn").instantiate()
+	root.add_child(closing_menu)
+	closing_menu.open_menu(false)
+	await _click(closing_menu.settings_button.get_global_rect().get_center())
+	closing_menu.discord_presence_toggle.grab_focus()
+	await _key(KEY_SPACE)
+	var choice_on_close: bool = discord.enabled
+	closing_menu.queue_free()
+	await _settle()
+	_check_discord_restart(choice_on_close)
 	audio.save_path = audio_path
 	audio.set_music_volume(old_music)
 	audio.set_sound_volume(old_sound)
-	for path: String in [save_path, collection_path]:
+	discord.save_path = discord_path
+	discord.set_enabled(old_discord_enabled)
+	root.content_scale_size = old_scale_size
+	root.size = old_viewport_size
+	for path: String in [save_path, discord_save_path, collection_path]:
 		if FileAccess.file_exists(path):
 			DirAccess.remove_absolute(path)
 	await create_timer(0.1).timeout
 	if failures == 0:
-		print("PASS: live solo freeze/resume, modal input isolation, cog/keyboard navigation, audio mute/isolation/persistence, compact settings, quit and teardown")
+		print("PASS: live solo freeze/resume, modal input isolation, cog/keyboard navigation, audio and Discord preference isolation/persistence/failure recovery, compact settings, quit and teardown")
 	quit(1 if failures else 0)
 
 
@@ -142,6 +193,52 @@ func _settings() -> void:
 	reloaded.queue_free()
 	await _click(screen.pause_menu.settings_button.get_global_rect().get_center())
 
+
+
+func _discord_preferences() -> void:
+	var audio_fixture := ConfigFile.new()
+	_check(audio_fixture.load(save_path) == OK, "Saved audio is available before Discord changes")
+	audio_fixture.set_value("fixture", "preserve", true)
+	_check(audio_fixture.save(save_path) == OK, "Independent audio fixture can be saved")
+	var audio_before: PackedByteArray = FileAccess.get_file_as_bytes(save_path)
+	var toggle: CheckButton = screen.pause_menu.discord_presence_toggle
+	_check(toggle.button_pressed == discord.enabled, "Opening Settings reflects the current Discord preference")
+	screen.pause_menu.sound_slider.grab_focus()
+	await _key(KEY_TAB)
+	_check(toggle.has_focus(), "Tab moves from Sound to the Discord toggle")
+	await _key(KEY_TAB)
+	_check(screen.pause_menu.get_node("%Back").has_focus(), "Tab moves from Discord to Settings X")
+	await _key(KEY_TAB)
+	_check(screen.pause_menu.music_slider.has_focus(), "Settings focus wraps from X to Music")
+	toggle.grab_focus()
+	await _key(KEY_SPACE)
+	_check(paused and not discord.enabled and not toggle.button_pressed, "Space disables sharing immediately while paused")
+	await _key(KEY_ESCAPE)
+	_check_discord_restart(false)
+	_check(FileAccess.get_file_as_bytes(save_path) == audio_before, "Discord-only saves preserve the audio file")
+	await _click(screen.pause_menu.settings_button.get_global_rect().get_center())
+	_check(not toggle.button_pressed, "Reopening Settings reflects persisted disabled sharing")
+	toggle.grab_focus()
+	await _key(KEY_ENTER)
+	_check(paused and discord.enabled and toggle.button_pressed, "Enter re-enables sharing immediately while paused")
+	await _key(KEY_ESCAPE)
+	_check_discord_restart(true)
+	await _click(screen.pause_menu.settings_button.get_global_rect().get_center())
+	await _click(toggle.get_global_rect().get_center())
+	_check(not discord.enabled and not toggle.button_pressed, "Pointer activation disables sharing immediately")
+	await _click(toggle.get_global_rect().get_center())
+	_check(discord.enabled and toggle.button_pressed, "Pointer activation can re-enable sharing")
+	await _key(KEY_ESCAPE)
+	_check(FileAccess.get_file_as_bytes(save_path) == audio_before, "Repeated Discord saves do not rewrite audio")
+	await _click(screen.pause_menu.settings_button.get_global_rect().get_center())
+
+
+func _check_discord_restart(expected: bool) -> void:
+	var reloaded: Node = load("res://scripts/discord_settings.gd").new()
+	reloaded.save_path = discord_save_path
+	root.add_child(reloaded)
+	_check(reloaded.enabled == expected, "A recreated settings owner restores the selected Discord preference")
+	reloaded.queue_free()
 
 func _settle() -> void:
 	await process_frame

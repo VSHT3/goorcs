@@ -10,6 +10,7 @@ signal quit_requested
 @onready var quit_button: Button = %Quit
 @onready var music_slider: HSlider = %MusicSlider
 @onready var sound_slider: HSlider = %SoundSlider
+@onready var discord_presence_toggle: CheckButton = %DiscordPresence
 @onready var _back_button: Button = %Back
 @onready var _heading: Label = %Heading
 @onready var _online_note: Label = %OnlineNote
@@ -19,24 +20,28 @@ signal quit_requested
 @onready var _sound_value: Label = %SoundValue
 @onready var _save_error: Label = %SaveError
 @onready var _audio_settings: Node = get_node("/root/AudioSettings")
+@onready var _discord_settings: Node = get_node("/root/DiscordSettings")
 
 var _showing_settings: bool = false
 var _online_match: bool = false
-var _settings_dirty: bool = false
+var _audio_dirty: bool = false
+var _discord_dirty: bool = false
 
 
 func _ready() -> void:
 	CloseButtonStyle.apply(_back_button)
 	MenuAudio.bind_action(_back_button)
+	MenuAudio.bind_action(discord_presence_toggle)
 	resume_button.pressed.connect(resume_requested.emit)
 	settings_button.pressed.connect(_open_settings)
 	quit_button.pressed.connect(quit_requested.emit)
 	_back_button.pressed.connect(_return_to_choices)
 	music_slider.value_changed.connect(_set_music_volume)
 	sound_slider.value_changed.connect(_set_sound_volume)
+	discord_presence_toggle.toggled.connect(_set_discord_presence)
 	get_viewport().gui_focus_changed.connect(_keep_focus_inside)
 	_set_focus_cycle([resume_button, settings_button, quit_button])
-	_set_focus_cycle([music_slider, sound_slider, _back_button])
+	_set_focus_cycle([music_slider, sound_slider, discord_presence_toggle, _back_button])
 
 
 func open_menu(multiplayer: bool) -> void:
@@ -57,6 +62,10 @@ func close_menu() -> void:
 		return
 	_save_settings()
 	hide()
+
+
+func _exit_tree() -> void:
+	_save_settings()
 
 
 func handle_escape() -> void:
@@ -90,6 +99,7 @@ func _unhandled_input(_event: InputEvent) -> void:
 func _open_settings() -> void:
 	music_slider.set_value_no_signal(_audio_settings.music_volume * 100.0)
 	sound_slider.set_value_no_signal(_audio_settings.sound_volume * 100.0)
+	discord_presence_toggle.set_pressed_no_signal(_discord_settings.enabled)
 	_music_value.text = "%d%%" % roundi(music_slider.value)
 	_sound_value.text = "%d%%" % roundi(sound_slider.value)
 	_showing_settings = true
@@ -113,25 +123,39 @@ func _return_to_choices() -> void:
 func _set_music_volume(value: float) -> void:
 	_audio_settings.set_music_volume(value / 100.0)
 	_music_value.text = "%d%%" % roundi(value)
-	_settings_dirty = true
+	_audio_dirty = true
 
 
 func _set_sound_volume(value: float) -> void:
 	_audio_settings.set_sound_volume(value / 100.0)
 	_sound_value.text = "%d%%" % roundi(value)
-	_settings_dirty = true
+	_audio_dirty = true
+
+
+func _set_discord_presence(value: bool) -> void:
+	_discord_settings.set_enabled(value)
+	_discord_dirty = true
 
 
 func _save_settings() -> void:
-	if not _settings_dirty:
+	if not _audio_dirty and not _discord_dirty:
 		return
-	var result: Error = _audio_settings.save_settings()
+	var result: Error = OK
+	if _audio_dirty:
+		var audio_result: Error = _audio_settings.save_settings()
+		_audio_dirty = audio_result != OK
+		if audio_result != OK:
+			result = audio_result
+	if _discord_dirty:
+		var discord_result: Error = _discord_settings.save_settings()
+		_discord_dirty = discord_result != OK
+		if discord_result != OK:
+			result = discord_result
 	if result != OK:
-		_save_error.text = "Could not save audio settings: %s. Changes apply for this session." % error_string(result)
+		_save_error.text = "Could not save settings: %s. Changes apply for this session." % error_string(result)
 		_save_error.show()
 		return
 	_save_error.hide()
-	_settings_dirty = false
 
 
 

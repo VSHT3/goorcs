@@ -375,6 +375,9 @@ func _body_position(slot: int, id: int) -> Vector2:
 
 
 func _click_enemy(slot: int, id: int) -> void:
+	# UI refreshes re-enable cosmetic processing. Hold this fixture's displayed
+	# pose while preparing the synthetic body click.
+	_freeze()
 	var board: PathBoard = world.boards[slot]
 	var local: Vector2 = _body_position(slot, id)
 	var viewport_position: Vector2 = board.get_global_transform_with_canvas() * local
@@ -494,11 +497,12 @@ func _click_rendered_control(control: Control) -> void:
 
 
 func _click(point: Vector2) -> void:
+	# Dispatch one click in one input frame, so native focus/motion cannot
+	# replace the synthetic hover between its press and release.
 	var motion := InputEventMouseMotion.new()
 	motion.position = point
 	motion.global_position = point
 	root.push_input(motion, true)
-	await process_frame
 	for pressed: bool in [true, false]:
 		var event := InputEventMouseButton.new()
 		event.position = point
@@ -506,7 +510,7 @@ func _click(point: Vector2) -> void:
 		event.button_index = MOUSE_BUTTON_LEFT
 		event.pressed = pressed
 		root.push_input(event, true)
-		await process_frame
+	await process_frame
 
 
 func _key(code: Key) -> void:

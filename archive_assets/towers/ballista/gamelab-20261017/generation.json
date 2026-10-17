@@ -1,0 +1,871 @@
+{
+  "master_job": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+  "master_asset_id": 69685,
+  "requests": {
+    "N": {
+      "project_id": 32513,
+      "asset_id": 69685,
+      "asset_name": "Ballista weapon N \u2014 directional trial 01",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight UP on the image; bolt muzzle is above the swivel, rear stock below it. This is a rear view of the crossbow. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete north-aiming crossbow, not a grid or multiple views.",
+      "reference_artifacts": [
+        {
+          "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+          "sequence": 0
+        }
+      ],
+      "transparent_bg": true,
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "north",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "quality": "high"
+    },
+    "NE": {
+      "project_id": 32513,
+      "asset_id": 69685,
+      "asset_name": "Ballista weapon NE \u2014 directional trial 01",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point diagonally UP and RIGHT; bolt muzzle is upper-right of the swivel, rear stock lower-left. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete north-east-aiming crossbow, not a grid or multiple views.",
+      "reference_artifacts": [
+        {
+          "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+          "sequence": 0
+        }
+      ],
+      "transparent_bg": true,
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "north-east",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "quality": "high"
+    },
+    "E": {
+      "project_id": 32513,
+      "asset_id": 69685,
+      "asset_name": "Ballista weapon E \u2014 directional trial 01",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight RIGHT; bolt muzzle right of the swivel, rear stock left. Bow limbs spread up/down in the elevated projection. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete east-aiming crossbow, not a grid or multiple views.",
+      "reference_artifacts": [
+        {
+          "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+          "sequence": 0
+        }
+      ],
+      "transparent_bg": true,
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "east",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "quality": "high"
+    },
+    "S": {
+      "project_id": 32513,
+      "asset_id": 69685,
+      "asset_name": "Ballista weapon S \u2014 directional trial 01",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight DOWN; bolt muzzle below the swivel, rear stock above. This is the front view of the crossbow. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete south-aiming crossbow, not a grid or multiple views.",
+      "reference_artifacts": [
+        {
+          "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+          "sequence": 0
+        }
+      ],
+      "transparent_bg": true,
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "south",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "quality": "high"
+    },
+    "SW": {
+      "project_id": 32513,
+      "asset_id": 69685,
+      "asset_name": "Ballista weapon SW \u2014 directional trial 01",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point diagonally DOWN and LEFT; bolt muzzle lower-left of the swivel, rear stock upper-right. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete south-west-aiming crossbow, not a grid or multiple views.",
+      "reference_artifacts": [
+        {
+          "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+          "sequence": 0
+        }
+      ],
+      "transparent_bg": true,
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "south-west",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "quality": "high"
+    },
+    "W": {
+      "project_id": 32513,
+      "asset_id": 69685,
+      "asset_name": "Ballista weapon W \u2014 directional trial 01",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight LEFT; bolt muzzle left of the swivel, rear stock right. Bow limbs spread up/down in the elevated projection. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete west-aiming crossbow, not a grid or multiple views.",
+      "reference_artifacts": [
+        {
+          "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+          "sequence": 0
+        }
+      ],
+      "transparent_bg": true,
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "west",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "quality": "high"
+    },
+    "NW": {
+      "project_id": 32513,
+      "asset_id": 69685,
+      "asset_name": "Ballista weapon NW \u2014 directional trial 01",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point diagonally UP and LEFT; bolt muzzle upper-left of the swivel, rear stock lower-right. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete north-west-aiming crossbow, not a grid or multiple views.",
+      "reference_artifacts": [
+        {
+          "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+          "sequence": 0
+        }
+      ],
+      "transparent_bg": true,
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "north-west",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "quality": "high"
+    }
+  },
+  "submissions": {
+    "W": {
+      "job_id": "4b1939ab-a34e-48b1-b38e-3a1474cd917c",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32513,
+      "asset_id": 69685
+    },
+    "SW": {
+      "job_id": "e4df62c7-b4c6-4db5-af7d-22a8cb72420a",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32513,
+      "asset_id": 69685
+    },
+    "E": {
+      "job_id": "1dbdb496-cc99-4ae1-9e0e-d6554709f748",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32513,
+      "asset_id": 69685
+    },
+    "NW": {
+      "job_id": "a86b86df-97fa-4594-9de3-f9ece7a3e8e8",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32513,
+      "asset_id": 69685,
+      "invalid_params": [
+        {
+          "name": "subject_orientation_in_frame",
+          "reason": "must be a compass direction: east, north, north east, northwest, south, south east, south west, west"
+        }
+      ]
+    },
+    "NE": {
+      "job_id": "553cd2f9-49d2-4387-a63b-241b85b62fcb",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32513,
+      "asset_id": 69685
+    },
+    "S": {
+      "job_id": "b4e06aff-300a-4c86-896c-5425f8fa533d",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32513,
+      "asset_id": 69685
+    },
+    "N": {
+      "job_id": "7bdd02cb-3fd3-40ae-bb59-00b8acdbc099",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32513,
+      "asset_id": 69685
+    }
+  },
+  "completed_statuses": {
+    "N": {
+      "job_id": "7bdd02cb-3fd3-40ae-bb59-00b8acdbc099",
+      "status": "completed",
+      "type": "image",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight UP on the image; bolt muzzle is above the swivel, rear stock below it. This is a rear view of the crossbow. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete north-aiming crossbow, not a grid or multiple views. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: north (up), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-17T19:12:51",
+      "updated_at": "2026-10-17T19:13:26",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "7bdd02cb-3fd3-40ae-bb59-00b8acdbc099",
+          "sequence": 0,
+          "download_url": "/v1/jobs/7bdd02cb-3fd3-40ae-bb59-00b8acdbc099/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "bf6c4165-1ae1-4589-be18-706e0662de35",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/bf6c4165-1ae1-4589-be18-706e0662de35/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    },
+    "NE": {
+      "job_id": "553cd2f9-49d2-4387-a63b-241b85b62fcb",
+      "status": "completed",
+      "type": "image",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point diagonally UP and RIGHT; bolt muzzle is upper-right of the swivel, rear stock lower-left. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete north-east-aiming crossbow, not a grid or multiple views. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: north east (up-right), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-17T19:12:51",
+      "updated_at": "2026-10-17T19:13:39",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "553cd2f9-49d2-4387-a63b-241b85b62fcb",
+          "sequence": 0,
+          "download_url": "/v1/jobs/553cd2f9-49d2-4387-a63b-241b85b62fcb/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "6ab8e4a8-b504-4bca-963c-e68af6aa62d5",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/6ab8e4a8-b504-4bca-963c-e68af6aa62d5/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    },
+    "E": {
+      "job_id": "1dbdb496-cc99-4ae1-9e0e-d6554709f748",
+      "status": "completed",
+      "type": "image",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight RIGHT; bolt muzzle right of the swivel, rear stock left. Bow limbs spread up/down in the elevated projection. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete east-aiming crossbow, not a grid or multiple views. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: east (right), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-17T19:12:51",
+      "updated_at": "2026-10-17T19:13:23",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "1dbdb496-cc99-4ae1-9e0e-d6554709f748",
+          "sequence": 0,
+          "download_url": "/v1/jobs/1dbdb496-cc99-4ae1-9e0e-d6554709f748/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "d4c95250-467e-4f88-9383-6854073be461",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/d4c95250-467e-4f88-9383-6854073be461/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    },
+    "S": {
+      "job_id": "b4e06aff-300a-4c86-896c-5425f8fa533d",
+      "status": "completed",
+      "type": "image",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight DOWN; bolt muzzle below the swivel, rear stock above. This is the front view of the crossbow. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete south-aiming crossbow, not a grid or multiple views. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south (down), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-17T19:12:51",
+      "updated_at": "2026-10-17T19:13:36",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "b4e06aff-300a-4c86-896c-5425f8fa533d",
+          "sequence": 0,
+          "download_url": "/v1/jobs/b4e06aff-300a-4c86-896c-5425f8fa533d/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "09634ede-6676-42f9-93f5-481da1a63e2c",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/09634ede-6676-42f9-93f5-481da1a63e2c/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    },
+    "SW": {
+      "job_id": "e4df62c7-b4c6-4db5-af7d-22a8cb72420a",
+      "status": "completed",
+      "type": "image",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point diagonally DOWN and LEFT; bolt muzzle lower-left of the swivel, rear stock upper-right. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete south-west-aiming crossbow, not a grid or multiple views. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south west (down-left), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-17T19:12:51",
+      "updated_at": "2026-10-17T19:13:33",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "e4df62c7-b4c6-4db5-af7d-22a8cb72420a",
+          "sequence": 0,
+          "download_url": "/v1/jobs/e4df62c7-b4c6-4db5-af7d-22a8cb72420a/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "3a7515f7-fcae-43bf-81cc-622babaa70d4",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/3a7515f7-fcae-43bf-81cc-622babaa70d4/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    },
+    "W": {
+      "job_id": "4b1939ab-a34e-48b1-b38e-3a1474cd917c",
+      "status": "completed",
+      "type": "image",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point straight LEFT; bolt muzzle left of the swivel, rear stock right. Bow limbs spread up/down in the elevated projection. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete west-aiming crossbow, not a grid or multiple views. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: west (left), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-17T19:12:50",
+      "updated_at": "2026-10-17T19:13:20",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "4b1939ab-a34e-48b1-b38e-3a1474cd917c",
+          "sequence": 0,
+          "download_url": "/v1/jobs/4b1939ab-a34e-48b1-b38e-3a1474cd917c/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "2757bf0e-a72c-485a-b8d3-9a814015271c",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/2757bf0e-a72c-485a-b8d3-9a814015271c/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    },
+    "NW": {
+      "job_id": "a86b86df-97fa-4594-9de3-f9ece7a3e8e8",
+      "status": "completed",
+      "type": "image",
+      "prompt": "Use the supplied approved BALLISTA TOWER reference to draw exactly its CROSSBOW ASSEMBLY ONLY in a new direction. The reference weapon points south-east; now the steel-tipped bolt must point diagonally UP and LEFT; bolt muzzle upper-left of the swivel, rear stock lower-right. Rotate the same physical oak-and-steel weapon horizontally around its vertical swivel axis in the world, NOT by spinning or mirroring the finished image. Keep the camera fixed in the same elevated front-dominant orthographic view and keep the reference's upper-left light. This is a direction sheet component, not a redesigned weapon. Preserve the same warm oak stock, two thick curved bow limbs, iron straps, central stock track, winding winch, taut string joining both tips to its nock and one thick straight steel-tipped bolt aligned with the stock. Correct perspective foreshortening for this facing; bow limbs remain perpendicular to stock, all parts connected. Include the weapon's short central cylindrical iron swivel stem; its bottom contact should be near canvas pixel (64,80), centered horizontally, so it can be mounted on the EXISTING tower roof. Keep the entire weapon inside a 128x128 canvas with ample margins in all directions. Match the reference native pixel density and physical dimensions: full crossbow limb span roughly 70 pixels before foreshortening, full stock length roughly 65 pixels before foreshortening. The requested subject is ONLY the rotating weapon and short mounting stem: omit the masonry tower, roof, foundation, plinth, ground, supports beneath the swivel, scenery, text, arrows indicating direction, labels and UI. Classic strategy-game crisp pixel art, deliberate clusters, dark contours, warm oak and muted steel, limited 48-color palette, upper-left light; no smooth painting, gradients, antialiasing, diffuse speckled noise, magical effects or detached parts. One complete north-west-aiming crossbow, not a grid or multiple views. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-17T19:12:51",
+      "updated_at": "2026-10-17T19:13:29",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "a86b86df-97fa-4594-9de3-f9ece7a3e8e8",
+          "sequence": 0,
+          "download_url": "/v1/jobs/a86b86df-97fa-4594-9de3-f9ece7a3e8e8/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "28ae2770-91b8-4e23-8cad-eaaaad02ee6d",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/28ae2770-91b8-4e23-8cad-eaaaad02ee6d/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    }
+  },
+  "artifacts": {
+    "N": {
+      "raw": {
+        "file": "N_raw.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          0,
+          0,
+          128,
+          128
+        ],
+        "sha256": "9bd0d028dc93827e71829ad9cfefe26802696a6e7d83908d7c852b4c08b94571"
+      },
+      "cutout": {
+        "file": "N_cutout.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          12,
+          8,
+          116,
+          103
+        ],
+        "sha256": "a660a88f247067171328cfd46c5c4f0e8b37134b7e01af2c0a999d4b29afd0b4"
+      }
+    },
+    "W": {
+      "raw": {
+        "file": "W_raw.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          0,
+          0,
+          128,
+          128
+        ],
+        "sha256": "f5e1a40debad7f22bd0d3743357fc9a20ed4771c0e2fd5b04feb07307104e81a"
+      },
+      "cutout": {
+        "file": "W_cutout.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          14,
+          23,
+          110,
+          93
+        ],
+        "sha256": "1517d6e869b17946f01d3f0da40bbc6999815c7f7287ef9da732700a4add0842"
+      }
+    },
+    "E": {
+      "raw": {
+        "file": "E_raw.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          0,
+          0,
+          128,
+          128
+        ],
+        "sha256": "4427b355a8ab85f222d7680db2ee2aadc02e86553e4cf61527e34c76b84fad8a"
+      },
+      "cutout": {
+        "file": "E_cutout.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          14,
+          23,
+          118,
+          98
+        ],
+        "sha256": "3fd24788b71ecbd46d15af810de6d76a7f9351edac22ac2668e1a46b3bb03da5"
+      }
+    },
+    "NW": {
+      "raw": {
+        "file": "NW_raw.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          0,
+          0,
+          128,
+          128
+        ],
+        "sha256": "f9135eaee2dab59966f00378d4d75e2b76d186596979c3efbb1408365bd492fa"
+      },
+      "cutout": {
+        "file": "NW_cutout.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          23,
+          18,
+          117,
+          113
+        ],
+        "sha256": "4310e2034aa6c6e88a0c98054507fd119e91614d29bc8013f557aad054255847"
+      }
+    },
+    "SW": {
+      "raw": {
+        "file": "SW_raw.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          0,
+          0,
+          128,
+          128
+        ],
+        "sha256": "8f3c18377060d750f0cd0c816c7b7bdf8218d27f2275ca15161782a4bc493656"
+      },
+      "cutout": {
+        "file": "SW_cutout.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          20,
+          28,
+          108,
+          108
+        ],
+        "sha256": "84e04686f28adc014d29ed9659c2160e6209a2c2384229a51694170ffac0d047"
+      }
+    },
+    "S": {
+      "raw": {
+        "file": "S_raw.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          0,
+          0,
+          128,
+          128
+        ],
+        "sha256": "003a24863a53eb6f6afc155f370bece9bbfa3c1954ae03e043ff6e52cc7fdab9"
+      },
+      "cutout": {
+        "file": "S_cutout.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          15,
+          3,
+          125,
+          98
+        ],
+        "sha256": "db51d1123d224d9e07b702923a9b1a51743ee650e93da7c004731179a11ae8ea"
+      }
+    },
+    "NE": {
+      "raw": {
+        "file": "NE_raw.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          0,
+          0,
+          128,
+          128
+        ],
+        "sha256": "a72acdfb6ca030cb979fb02aa546ff7a9464f2f74d7f84ea6226e1f978c37efe"
+      },
+      "cutout": {
+        "file": "NE_cutout.png",
+        "size": [
+          128,
+          128
+        ],
+        "bounds": [
+          20,
+          18,
+          108,
+          94
+        ],
+        "sha256": "fe5a67ec0771e3af5826bb9c16aec487b016af6fae008b1922d019be76e904ed"
+      }
+    }
+  },
+  "cleaned_weapons": {
+    "N": {
+      "file": "N_weapon.png",
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        14,
+        15,
+        113,
+        102
+      ],
+      "opaque_colors": 48,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "64fc7dc6cb552a322c7a97952a862a1b8175f2bafac8e1651dc7e9a2b2ae7721",
+      "direction_review": "Bolt visually points in requested direction. Scale/swivel alignment not yet production-approved."
+    },
+    "NE": {
+      "file": "NE_weapon.png",
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        26,
+        30,
+        108,
+        84
+      ],
+      "opaque_colors": 48,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "1d055f2740baea7a9bf278e26d0adb521f0d6abb3f4be407632cac985a8074c2",
+      "direction_review": "Bolt visually points in requested direction. Scale/swivel alignment not yet production-approved."
+    },
+    "E": {
+      "file": "E_weapon.png",
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        16,
+        24,
+        117,
+        97
+      ],
+      "opaque_colors": 48,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "0e78e89fdae8b6ef5bcc219012de4036194517641e926d2778be664f134dcd43",
+      "direction_review": "Bolt visually points in requested direction. Scale/swivel alignment not yet production-approved."
+    },
+    "S": {
+      "file": "S_weapon.png",
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        17,
+        22,
+        111,
+        97
+      ],
+      "opaque_colors": 47,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "9357dbb6e4e29677e4efab7be007a95356895ad84f899f33cf7b2605c6b87e51",
+      "direction_review": "Bolt visually points in requested direction. Scale/swivel alignment not yet production-approved."
+    },
+    "SW": {
+      "file": "SW_weapon.png",
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        21,
+        29,
+        107,
+        90
+      ],
+      "opaque_colors": 47,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "7864e3c219a2072d8597d567da4e2e9548bba02a9bb366b1738544aeffd4a89f",
+      "direction_review": "Bolt visually points in requested direction. Scale/swivel alignment not yet production-approved."
+    },
+    "W": {
+      "file": "W_weapon.png",
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        14,
+        24,
+        109,
+        92
+      ],
+      "opaque_colors": 48,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "c89c3aa6f3c400fdac72422adb507362c6783a04b0b8a9e87571ea16441cc7e2",
+      "direction_review": "Bolt visually points in requested direction. Scale/swivel alignment not yet production-approved."
+    },
+    "NW": {
+      "file": "NW_weapon.png",
+      "size": [
+        128,
+        128
+      ],
+      "bounds": [
+        24,
+        21,
+        110,
+        92
+      ],
+      "opaque_colors": 48,
+      "alpha_values": [
+        0,
+        255
+      ],
+      "sha256": "cba20ff24514b9d86a6af0a3107025f65778fa742af3082feb36ae44733f72e2",
+      "direction_review": "Bolt visually points in requested direction. Scale/swivel alignment not yet production-approved."
+    }
+  },
+  "credits_debited": 14,
+  "processing": "Preserved raw and provider cutouts; cleaned exports threshold alpha >=128 to255, otherwise0. RGB/canvas unchanged. SE reference is the approved complete tower, not a generated eighth view. Review uses a source crop for SE, and nearest-neighbor scaled weapons for others.",
+  "review": "All requested bolt directions visually present. Different stem offsets, scale and detail require alignment/cleanup before assembly on one fixed base. No new masonry generated. No production-ready eight-frame set or runtime tracking is claimed.",
+  "approval": "Creator approved all seven directional designs on 2026-10-17 for scale/pivot cleanup and fixed-base assembly. Approval does not cover game import. No production alignment, animation or runtime tracking implemented."
+}

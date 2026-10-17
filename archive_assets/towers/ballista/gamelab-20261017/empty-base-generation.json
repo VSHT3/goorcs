@@ -1,0 +1,31 @@
+{
+  "request": {
+    "project_id": 32513,
+    "asset_id": 69685,
+    "asset_name": "Ballista \u2014 proper empty fixed stone base",
+    "prompt": "Use the supplied approved Ballista tower as the architectural and pixel-art reference. Draw ONLY its empty STONE TOWER BASE, with the crossbow and ALL weapon machinery completely removed. Retain the recognizable tall pale gray masonry tower, chunky corner buttresses, broad recessed front wall, narrow visible RIGHT wall, small dark arrow slit and compact stepped foundation. Keep the original fixed elevated front-dominant orthographic viewpoint: front wall about three quarters of apparent width, right wall about one quarter, nearly horizontal front foundation edge. The important new requirement is a structurally complete, fully drawn, EMPTY FLAT STONE ROOF where the weapon used to obscure the building: broad solid stone cap with a clear coherent top plane and believable slab joints, unobstructed across its entire center, ready for a rotating crossbow to be placed on it later. No battlements sticking up around the center, no central hole, no shaft, no iron mounting stem, no pedestal on the roof, no weapon fragments, no bowstring, no bolt, no statue or people. Reconstruct the previously hidden roof architecture properly rather than leaving a dark gap or repeating the weapon silhouette. Preserve the reference's upper-left lighting, cool pale stone, dark charcoal readable contours, deliberate crisp native pixel clusters and chunky material values; reduce tiny speckled texture rather than adding noise. Native 128x128 pixel-art sprite. Keep the structure roughly 78 pixels wide and 82 pixels tall, located in the LOWER part of the canvas, with roof center around (64,48) and foundation contact around (64,124), reserving empty space above it for the weapon. Center the tower horizontally. Keep the complete footing visible with a small margin, no clipped edges. One empty building, not multiple views or a sheet, no text, UI, ground tile or scenery. No smooth painting, gradients, antialiasing or glossy 3D rendering.",
+    "reference_artifacts": [
+      {
+        "job_id": "04a49b9f-9b6f-4038-9d2a-47266ec36e9d",
+        "sequence": 0
+      }
+    ],
+    "transparent_bg": true,
+    "width": 128,
+    "height": 128,
+    "centered": false,
+    "isometric": false,
+    "three_quarter_top_down": true,
+    "two_d": true,
+    "subject_orientation_in_frame": "south",
+    "pixel_art": true,
+    "pixel_art_colors": 48,
+    "edge_cleanup": true,
+    "quality": "high"
+  },
+  "result": "rejected",
+  "provider_error": "Error: Error calling tool 'image.generate': GameLabs API returned HTTP 402: Insufficient credits",
+  "job_id": null,
+  "status": "blocked: provider reports insufficient credits; no empty-base artifact returned",
+  "additional_generation_submitted": false
+}

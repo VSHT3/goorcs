@@ -58,35 +58,37 @@ Creator chose **Keep current sprites** for the initial presentation change. Exis
 
 Portable review artifacts: [shared-scene candidate comparison](docs/visual-reference/coherent-candidates.png) and [provenance](docs/visual-reference/coherent-candidates.provenance.json). These are unapproved static proposals, kept outside Godot imports; the updated original-asset lineup uses the corrected terrain palette.
 
-### 3. Structure perspective and ballista — starting image delivered; rotations creator-led
+Gold Mine and Lightning exceptions (2026-10-17): the creator approved and requested installation of both reference-free GameLab stills. Only their base sprites are replaced; originals and generation provenance are archived. Their visible widths remain approximately 0.98 cells, and existing evolution anchors/art remain unchanged. Lightning's runtime canvas is losslessly reframed to preserve its shared electric muzzle coordinates, with the approved taller silhouette retained. Isolated actual-main-scene Wayland/Mesa walkthroughs exercised pointer placement/inspection, both orientations at standard/compact widths, adjacent towers, top-row Lightning clearance, and accepted live chain fire. Rendered board/icon regressions passed. This is not roster-wide approval; War Drums remains procedural and Ballista's later trial is recorded below.
+
+### 3. Structure perspective and Ballista — provisional directional game trial
 
 The creator preferred the original heavy crossbow over a front-facing masonry base, but rejected that rough composite's quality. The later `swappy-20261014_223240.png` sketch supersedes the completely frontal box in `swappy-20261014_223203.png`: retain a broad front wall, show a narrower right wall, and reveal more roof. The earlier equal-sided corner-facing appearance in `swappy-20261014_215908.png` is not the target. These references are local Desktop screenshots; the geometry description here is the portable direction.
 
-**Current handoff (2026-10-15):** the creator selected the taller, manually drawn buttressed foundation, retained the original crossbow design, and requested additional weapon detail without enlargement. The deliverable is now **one good starting image**, not an assistant-produced rotation set; the creator will use PixelLab for rotations.
+**Current trial (2026-10-17):** the creator approved a new reference-free GameLab SE Ballista design, then all seven reference-guided weapon directions, and authorized trying the assembled set in-game. The shared 192×192 base/socket and weapon layers are installed; a complete SE still supplies collection/chest/shop/guide art. The requested separately generated empty base failed with insufficient provider credits, so this explicitly provisional trial retains the manually reconstructed roof rather than claiming a newly generated base.
 
-Use the transparent [128×128 starting image](archive_assets/towers/ballista/manual-master/ballista.png), with separate [fixed base](archive_assets/towers/ballista/manual-master/base.png) and [detailed crossbow](archive_assets/towers/ballista/manual-master/crossbow.png). Rotate the weapon layer rather than regenerating the masonry. The [enlarged preview](archive_assets/towers/ballista/manual-master/preview.png), native-pixel preparation script, provenance, and direct Godot board captures are in the [manual-master archive](archive_assets/README.md#manual-ballista-starting-image).
+Sources, previous runtime PNG, prompts/job IDs, reproducible alignment, shared palette, per-direction release tips and actual game captures are in the [GameLab Ballista archive](archive_assets/README.md#provisional-directional-ballista-game-trial). The fixed foundation remains approximately 1.10 cells wide with one foot anchor; camera clearance includes every pose. Gameplay footprints, target policy, stats, saved identity and authority are unchanged.
 
-The final image was rendered through the real `PathBoard` at 1280×720 and 1000×720, on both board orientations, beside original towers/enemies and adjacent copies. The approved base remains byte-identical; the crossbow retains its bounds, hard alpha, and native pixel scale. This is an artwork preview, **not a gameplay cutover or directional tracking implementation**.
+The [earlier manual starting image](archive_assets/towers/ballista/manual-master/ballista.png) and its separate base/crossbow remain historical alternatives, not the current runtime set. The older creator-led PixelLab rotation handoff has been superseded by the explicit GameLab generation/trial request.
 
 #### Artwork changes
 
 - [x] Refine one ballista starting pose around the approved taller buttressed base, preserving the recognizable heavy timber crossbow, pale stone, steel fittings, upper-left light, and dark contours. Add steel bindings, stock highlights, a windlass, and rivets without enlarging the weapon.
-- [ ] Produce **eight distinct crossbow poses: N, NE, E, SE, S, SW, W, NW**. The creator will handle these in PixelLab from the starting image; do not resume automated rotation generation unless requested.
-- [ ] Keep the **base identical in every pose**. Only the crossbow assembly turns around its vertical swivel: stock, bow limbs, string, and bolt move together. One shared base with eight weapon layers or full frames assembled from that same base are acceptable; independently changing masonry is not.
-- [ ] Align all poses to one swivel point, consistent scale, and canvas. Match physical weapon proportions and materials across views; ensure each bolt points in its named direction, strings meet the stock correctly, and nothing floats or detaches. Draw directional perspective rather than rotating the PNG in its image plane.
+- [x] Produce **eight distinct crossbow poses: N, NE, E, SE, S, SW, W, NW** from the approved GameLab master; all seven generated alternatives received creator design approval.
+- [x] Keep the **base identical in every pose**. Runtime renders one fixed base and one weapon layer; masonry and light direction never mirror or rotate.
+- [x] Align the approved views on a shared 192×192 canvas, swivel `(96, 84)` and foot `(96, 157)`, with nearest-neighbor perspective normalization, master-palette matching and detached support cleanup. No finished PNG is rotated in its image plane.
 - [ ] Apply the same accepted structure perspective to the other towers, crystal pedestal, and portal rim. Preserve crystal facets and portal-opening readability; do not change the square-grid map or gameplay camera to accommodate sprites.
-- [ ] Obtain approval for the finished actual-size set before importing replacements. Preserve original PNGs, generation provenance, and stable collection/save identities.
+- [ ] Final creator judgment of the provisional reconstructed roof and cross-view weapon proportions after playtesting; a separately generated empty base remains credit-blocked. Original images, exact processing and stable collection/save identities are already preserved.
 
 #### Game additions
 
-- [ ] Add ballista directional-art resources and board rendering using the accepted eight poses and shared base; retain a suitable still icon for collection/chest/UI surfaces.
-- [ ] Make the crossbow visually track the **host-selected enemy**, not a renderer-selected nearest enemy. `MatchCombat` already records `target_id` and `aim` when firing; follow the live target position between shots and handle absent/dead/out-of-range targets explicitly without changing targeting policy, damage, or authority.
-- [ ] Select the correct pose from the displayed direction to that target, including mirrored-board rendering. Keep the base, foot anchor, contact shadow, depth sorting, selection, and camera behavior stable while aiming.
-- [ ] Exercise all eight directions and target/idle transitions in the running game, on both board orientations and with separate host/client processes. Inspect adjacent towers, roof attachment, overlaps, and HUD clipping at 1280×720 and 1000×720; run the applicable development checks before marking this implemented.
+- [x] Add resource-driven directional weapon layers and bolt-tip origins over a fixed base; retain an SE still icon for collection/chest/UI surfaces.
+- [x] Track only the **host-selected enemy** through logical interpolation while it is alive and in range. Missing/dead/out-of-range targets retain host-captured aim; never-aimed towers rest SE. Release origins use the accepted shot aim, not later target movement or a client-local nearest enemy.
+- [x] Select all eight displayed directions on mirrored and normal boards while retaining stationary masonry, footing, depth, selection and all-pose camera headroom.
+- [x] Exercise all eight directions in separate authenticated rendered host/client main scenes at exact 1280×720 and 1000×720 viewports, including top-row/adjacent towers and accepted live bolts. Persistent peer regressions cover moving accepted targets, closer decoys, absent/dead/out-of-range fallback and immutable released projectiles; rendered board/icon and catalog checks cover geometry and validation.
 
-#### Experiment handoff
+#### Earlier experiments (archived)
 
-The earlier generation experiments stopped at the creator's request; **no replacement sprites were imported and no tracking behavior was implemented**. Those eight full-pose generations and isolated weapon candidates are not the current handoff and remain unapproved. The south full-pose generation was oversized; other observed issues included inconsistent bow/stock/string geometry, mount alignment gaps, and a detached west fragment. Use the manual starting image above instead of treating those draft assemblies as acceptance evidence.
+The earlier pre-GameLab experiments were stopped without importing their replacement sprites or implementing tracking. Those eight full-pose generations and isolated weapon candidates remain unapproved and are not the source of the installed GameLab trial. The south full-pose generation was oversized; other observed issues included inconsistent bow/stock/string geometry, mount gaps, and a detached west fragment.
 
 - Initial rough front-facing studies: `~/Pictures/Gorcs-PixelArt/ballista-facing-experiment/`.
 - Later generations, direction references, requests/history, and draft assemblies: `~/Pictures/Gorcs-PixelArt/ballista-eight-directions-v2/`.

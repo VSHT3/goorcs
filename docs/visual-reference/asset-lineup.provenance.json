@@ -325,6 +325,7 @@
     {
       "name": "Ballista",
       "source_path": "assets/towers/ballista_tower.png",
+      "archived_source_path": "archive_assets/towers/ballista/gamelab-20261017/previous-runtime.png",
       "source_sha256": "9ac5e953f4e02e4f18aa20064b392a09f6c5b6938b69248fd6720c68f79ae38a",
       "source_size": [
         96,
