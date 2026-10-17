@@ -85,6 +85,8 @@ const CYCLE_SECONDS: float = 6.8
 const INTRO_DURATION: float = 1.86
 const ROAR_START: float = 0.50
 const ROAR_DURATION: float = 0.96
+const MOUTH_OPEN_DELAY: float = 0.14
+const MOUTH_OPEN_START: float = ROAR_START + MOUTH_OPEN_DELAY
 const SUFFIX: Array[String] = ["R", "C", "S"]
 
 var _elapsed: float = 0.0
@@ -99,6 +101,7 @@ var _letter_advances: PackedFloat32Array = []
 var _face_pose: FacePose = FacePose.NEUTRAL
 var _face_offset := Vector2.ZERO
 var _roar_time: float = -1.0
+var _intro_roar_started: bool = false
 
 
 func _ready() -> void:
@@ -116,11 +119,16 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if not is_visible_in_tree():
+		return
 	if not _intro_finished:
 		_intro_time = minf(_intro_time + delta, INTRO_DURATION)
 		_entrance_material.set_shader_parameter("intro_time", _intro_time)
 		_entrance_material.set_shader_parameter("logo_center", size.x * 0.5)
 		_update_roar_pose(_intro_time - ROAR_START)
+		if not _intro_roar_started and _intro_time >= MOUTH_OPEN_START:
+			_intro_roar_started = true
+			_play_roar_if_mouth_open()
 		_intro_finished = _intro_time >= INTRO_DURATION
 		if _intro_finished:
 			material = null
@@ -132,8 +140,11 @@ func _process(delta: float) -> void:
 	var idle_offset: float = -1.0 if _elapsed >= IDLE_START and _elapsed < IDLE_END else 0.0
 	if _roar_time >= 0.0:
 		_idle_offset = idle_offset
+		var previous_roar_time: float = _roar_time
 		_roar_time = minf(_roar_time + delta, ROAR_DURATION)
 		_update_roar_pose(_roar_time)
+		if previous_roar_time < MOUTH_OPEN_DELAY and _roar_time >= MOUTH_OPEN_DELAY:
+			_play_roar_if_mouth_open()
 		if _roar_time >= ROAR_DURATION:
 			_roar_time = -1.0
 		queue_redraw()
@@ -144,12 +155,20 @@ func _process(delta: float) -> void:
 		queue_redraw()
 
 
+func _play_roar_if_mouth_open() -> void:
+	if _face_pose != FacePose.OPEN and _face_pose != FacePose.ROARING:
+		return
+	var audio: MenuAudio = MenuAudio.find_owner(self)
+	if audio != null:
+		audio.play_roar()
+
+
 func _update_roar_pose(time: float) -> void:
 	_eyes_closed = time >= 0.0 and time < ROAR_DURATION
 	_face_offset = Vector2.ZERO
 	if time < 0.0 or time >= 0.84:
 		_face_pose = FacePose.NEUTRAL
-	elif time < 0.14:
+	elif time < MOUTH_OPEN_DELAY:
 		_face_pose = FacePose.BRACED
 		_face_offset.y = 2.0
 	elif time < 0.26:
@@ -165,7 +184,15 @@ func _update_roar_pose(time: float) -> void:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		if _intro_finished and _roar_time < 0.0 and is_visible_in_tree():
+		if is_visible_in_tree():
+			# A click replaces any current entrance/roar instead of layering voices.
+			_intro_finished = true
+			_intro_time = INTRO_DURATION
+			material = null
+			_entrance_material = null
+			var audio: MenuAudio = MenuAudio.find_owner(self)
+			if audio != null:
+				audio.stop_roar()
 			_roar_time = 0.0
 			_update_roar_pose(_roar_time)
 			queue_redraw()
@@ -260,6 +287,9 @@ func _draw_face(origin: Vector2, shadow: bool) -> void:
 func _on_visibility_changed() -> void:
 	set_process(is_visible_in_tree())
 	if not is_visible_in_tree():
+		var audio: MenuAudio = MenuAudio.find_owner(self)
+		if audio != null:
+			audio.stop_roar()
 		# Leaving early completes the one-shot entrance; returning never replays it.
 		_intro_finished = true
 		_intro_time = INTRO_DURATION

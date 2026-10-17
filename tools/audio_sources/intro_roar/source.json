@@ -1,0 +1,46 @@
+{
+  "title": "80 CC0 creature SFX — roar_02.ogg",
+  "creator": "rubberduck",
+  "creator_url": "https://opengameart.org/users/rubberduck",
+  "source_page": "https://opengameart.org/content/80-cc0-creature-sfx",
+  "source_publication_date": "2018-07-01",
+  "retrieved_date": "2026-10-17",
+  "license": "CC0-1.0",
+  "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "license_evidence": "The creator's OpenGameArt submission lists License(s): CC0 and links to Creative Commons Zero 1.0.",
+  "recording_evidence": {
+    "speaker": "rubberduck (submission author)",
+    "comment_date": "2019-07-01 12:43",
+    "quote": "A little Fun-Fact: I don't even have a dog... I made most of these (including the dog sound) with my mouth... - I also used different filters to make them sound different...",
+    "scope": "Creator describes the pack as mouth-performed and filtered; the statement says most, not every individual file. Selected member is explicitly named roar_02.ogg in the creator's pack. No AI generation or procedural vocal synthesis is used in this project."
+  },
+  "archive": {
+    "url": "https://opengameart.org/sites/default/files/80-CC0-creature-SFX_0.zip",
+    "sha256": "5d4002eea42f278e76543bb36e8ddd2cb978588a13271984191d8228f5d26768",
+    "member": "roar_02.ogg"
+  },
+  "retained_original": {
+    "path": "tools/audio_sources/intro_roar/roar_02.ogg",
+    "sha256": "ceb532ee0fe775d6f86a821099b75f1790ab8022b963cb837c8c1fa4fffee5c2",
+    "bytes": 28522,
+    "format": "Ogg Vorbis, stereo, 48000 Hz, 0.902667 seconds"
+  },
+  "decoded_pcm": {
+    "path": "tools/audio_sources/intro_roar/roar_02_decoded.wav",
+    "sha256": "1dc1554a05e19abf7511b73733bbdbd2b443a4e499e8579ff8594b32f03bbdc7",
+    "frames": 43328,
+    "format": "WAV PCM16, mono, 48000 Hz",
+    "decoder": "ffmpeg n9.0.2; retained PCM is the canonical deterministic generator input, so regeneration needs no decoder dependency.",
+    "decode_command": "ffmpeg -nostdin -v error -i roar_02.ogg -map_metadata -1 -ac 1 -ar 48000 -c:a pcm_s16le -fflags +bitexact -flags:a +bitexact roar_02_decoded.wav"
+  },
+  "adaptation": {
+    "generator": "tools/author_sound_effects.py:recorded_roar",
+    "command": "python3 tools/author_sound_effects.py",
+    "source_trim_start_seconds": 0.07,
+    "duration_seconds": 0.78,
+    "processing": "Trim 0.070–0.850s; one-pole lowpass at 6000 Hz minus its 80 Hz lowpass; weighted DC removal; sin-squared entrance 1 ms and exit 15 ms; normalize peak to 0.32; PCM16 triangular dither with seed 918307. No pitch or time stretch, reverb, artificial vocal or layered noise.",
+    "credit": "Intro roar adapted from roar_02.ogg by rubberduck, 80 CC0 creature SFX (OpenGameArt), CC0 1.0. Menu clack is an original Gorcs mathematical sound design.",
+    "attribution_required": false,
+    "listening_review": "No human listening review claimed; timing and levels selected from source PCM envelope measurements."
+  }
+}

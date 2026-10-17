@@ -77,6 +77,7 @@ func _button(parent: Node, caption: String, action: Callable) -> Button:
 	button.text = caption
 	button.custom_minimum_size = Vector2(0,46)
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	MenuAudio.bind_action(button)
 	button.pressed.connect(action)
 	parent.add_child(button)
 	return button

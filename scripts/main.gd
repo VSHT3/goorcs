@@ -16,6 +16,7 @@ var session: MultiplayerSession
 var planning: MatchPlanning
 var play_screen: MultiplayerLobby
 var _last_activity: Control
+var _quitting: bool = false
 
 @onready var menu: Control = $Menu
 @onready var sandbox_button: Button = $Menu/Center/Panel/Sandbox
@@ -67,7 +68,7 @@ func _ready() -> void:
 	_show_menu()
 
 
-func _hide_activities() -> void:
+func _hide_activities(keep_menu: bool = false) -> void:
 	play_screen.prepare_to_leave()
 	play_screen.hide()
 	collection_screen.prepare_to_leave()
@@ -81,7 +82,8 @@ func _hide_activities() -> void:
 	if towerieary_screen != null:
 		towerieary_screen.prepare_to_leave()
 		towerieary_screen.hide()
-	menu.hide()
+	if not keep_menu:
+		menu.hide()
 
 
 func _open_sandbox() -> void:
@@ -138,7 +140,8 @@ func _open_play() -> void:
 
 
 func _show_menu() -> void:
-	_hide_activities()
+	# Startup must not briefly hide and cancel the wordmark's one-shot entrance.
+	_hide_activities(true)
 	menu.show()
 	if sandbox_screen != null and _last_activity == sandbox_screen:
 		sandbox_button.grab_focus()
@@ -168,8 +171,15 @@ func _sync_match_music() -> void:
 
 
 func _quit() -> void:
+	if _quitting:
+		return
+	_quitting = true
+	menu.hide()
 	_observe_enemy_totals()
 	session.leave()
+	# Let the final activation reach the output device before closing its driver.
+	var tail: float = MenuAudio.CLACK.get_length() + AudioServer.get_output_latency() + AudioServer.get_time_to_next_mix()
+	await get_tree().create_timer(tail, true, false, true).timeout
 	get_tree().quit()
 
 
@@ -188,9 +198,9 @@ func _input(event: InputEvent) -> void:
 				elif screen.pause_menu.visible:
 					screen.pause_menu.handle_escape()
 				elif not screen.cancel_interaction():
-					screen.open_pause_menu()
+					MenuAudio.activate(screen.menu_button)
 			else:
-				_show_menu()
+				MenuAudio.activate(play_screen.back_button)
 			get_viewport().set_input_as_handled()
 
 
@@ -203,32 +213,32 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if menu.visible:
 		match key.keycode:
 			KEY_P:
-				_open_play()
+				MenuAudio.activate(play_button)
 			KEY_S:
-				_open_sandbox()
+				MenuAudio.activate(sandbox_button)
 			KEY_B:
-				_open_orcieary()
+				MenuAudio.activate(orcieary_button)
 			KEY_T:
-				_open_towerieary()
+				MenuAudio.activate(towerieary_button)
 			KEY_C:
-				_open_collection()
+				MenuAudio.activate(collection_button)
 			KEY_ESCAPE:
 				if sandbox_screen != null and _last_activity == sandbox_screen:
-					_open_sandbox()
+					MenuAudio.activate(sandbox_button)
 				elif orcieary_screen != null and _last_activity == orcieary_screen:
-					_open_orcieary()
+					MenuAudio.activate(orcieary_button)
 				elif towerieary_screen != null and _last_activity == towerieary_screen:
-					_open_towerieary()
+					MenuAudio.activate(towerieary_button)
 				elif _last_activity == collection_screen:
-					_open_collection()
+					MenuAudio.activate(collection_button)
 				elif _last_activity == play_screen:
-					_open_play()
+					MenuAudio.activate(play_button)
 				else:
 					return
 			_:
 				return
 	elif key.keycode == KEY_ESCAPE and collection_screen.visible:
-		_show_menu()
+		MenuAudio.activate(collection_screen.back_button)
 	else:
 		return
 	get_viewport().set_input_as_handled()

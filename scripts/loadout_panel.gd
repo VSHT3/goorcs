@@ -56,6 +56,7 @@ func _ready() -> void:
 	for definition: TowerDefinition in planning.combat_rules.catalog.towers:
 		var reward: TowerReward = definition.reward
 		var button := _button(String(reward.id))
+		button.activation_sound_enabled = false
 		button.custom_minimum_size = Vector2(324, 64)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.toggle_mode = true
@@ -91,8 +92,8 @@ func _ready() -> void:
 	_refresh()
 
 
-func _button(control_name: String) -> Button:
-	var button: Button = preload("res://scripts/menu_button.gd").new()
+func _button(control_name: String) -> GameMenuButton:
+	var button: GameMenuButton = preload("res://scripts/menu_button.gd").new()
 	button.name = control_name
 	button.custom_minimum_size.y = 48
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

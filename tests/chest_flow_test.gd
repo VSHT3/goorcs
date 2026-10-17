@@ -86,6 +86,8 @@ func _run() -> void:
 	await _click(screen.skip_button)
 	main.queue_free()
 	await process_frame
+	# Menu clacks release their stopped playbacks on the native mix thread.
+	await create_timer(0.2).timeout
 	_remove_save()
 	if failures == 0:
 		print("PASS: chest grants save before reveal, repeat-click/skip/navigation cannot regrant, completion disables openings")

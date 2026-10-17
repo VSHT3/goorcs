@@ -21,6 +21,8 @@ var _catalog_icons: Array[ChestReveal.RewardIcon] = []
 
 
 func _ready() -> void:
+	for button: Button in [open_button, skip_button, back_button, reset_button, reset_confirmation.get_ok_button(), reset_confirmation.get_cancel_button()]:
+		MenuAudio.bind_action(button)
 	open_button.pressed.connect(_open_chest)
 	skip_button.pressed.connect(reveal.skip)
 	back_button.pressed.connect(_request_back)

@@ -1,14 +1,26 @@
+class_name GameMenuButton
 extends Button
 ## Inner pixel marks respond without moving the button or its label.
 
 const ACCENT: Color = Color(0.878, 0.737, 0.467, 1.0)
 const RESPONSE_SECONDS: float = 0.12
+@export var activation_sound_enabled: bool = true
 
 var _emphasis: float = 0.0:
 	set(value):
 		_emphasis = value
 		queue_redraw()
 var _response: Tween
+
+
+func _init() -> void:
+	# Connect before action callbacks can hide or remove this screen.
+	pressed.connect(_on_action_pressed)
+
+
+func _on_action_pressed() -> void:
+	if activation_sound_enabled:
+		MenuAudio.play_action_for(self)
 
 
 func _ready() -> void:

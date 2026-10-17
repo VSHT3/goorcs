@@ -112,6 +112,7 @@ func _ready() -> void:
 	enemy_selector.item_selected.connect(_enemy_type_selected)
 	speed_button.pressed.connect(_request_pacing.bind("speed"))
 	autoplay_button.pressed.connect(_request_pacing.bind("autoplay"))
+	MenuAudio.bind_action(menu_button)
 	menu_button.pressed.connect(open_pause_menu)
 	debug_button.pressed.connect(_open_debug)
 	debug_apply.pressed.connect(_apply_debug)
@@ -1160,9 +1161,9 @@ func _replay_results() -> void:
 
 func handle_results_escape() -> void:
 	if results_menu.visible:
-		_inspect_results()
+		MenuAudio.activate(results_menu.inspect_button)
 	else:
-		open_results()
+		MenuAudio.activate(menu_button)
 
 
 func _show_feedback(message: String) -> void:

@@ -130,11 +130,11 @@ func _start_singleplayer() -> void:
 
 
 func _submit_address(_text: String) -> void:
-	_create_host()
+	MenuAudio.activate(host_create_button)
 
 
 func _submit_code(_text: String) -> void:
-	_join_host()
+	MenuAudio.activate(join_connect_button)
 
 
 func _create_host() -> void:

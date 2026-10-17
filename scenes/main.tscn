@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="AudioStream" path="res://assets/audio/orcish_drone.mp3" id="4_music"]
 [ext_resource type="PackedScene" path="res://scenes/main_menu.tscn" id="5_menu"]
+[ext_resource type="Script" path="res://scripts/menu_audio.gd" id="6_audio"]
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -12,6 +13,10 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_main")
+
+[node name="MenuAudio" type="Node" parent="."]
+process_mode = 3
+script = ExtResource("6_audio")
 
 [node name="MatchMusic" type="AudioStreamPlayer" parent="."]
 process_mode = 3

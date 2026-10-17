@@ -155,6 +155,7 @@ func _build_interface() -> void:
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	summary.add_child(spacer)
 	menu_button = _button(summary, "Menu", _back)
+	MenuAudio.bind_action(menu_button)
 	menu_button.tooltip_text = "Esc: cancel selection, then return to the menu. Your playground is preserved and paused."
 	var spawn_row := HBoxContainer.new()
 	header.add_child(spawn_row)
@@ -629,5 +630,5 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_ESCAPE:
 		if not cancel_interaction():
-			_back()
+			MenuAudio.activate(menu_button)
 		get_viewport().set_input_as_handled()

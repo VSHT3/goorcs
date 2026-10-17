@@ -60,9 +60,9 @@ func handle_escape() -> void:
 	if not is_visible_in_tree():
 		return
 	if _showing_settings:
-		_return_to_choices()
+		MenuAudio.activate(_back_button)
 	else:
-		resume_requested.emit()
+		MenuAudio.activate(resume_button)
 
 
 func _input(event: InputEvent) -> void:

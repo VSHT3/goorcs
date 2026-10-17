@@ -42,6 +42,7 @@ func configure(content: ContentCatalog, combat_rules: CombatRules, statistics: E
 
 
 func _ready() -> void:
+	MenuAudio.bind_action(back_button)
 	back_button.pressed.connect(_request_back)
 	visibility_changed.connect(_visibility_changed)
 	portrait = EnemyPortrait.new()
@@ -86,9 +87,9 @@ func prepare_to_leave() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if is_visible_in_tree() and event.is_action_pressed("ui_cancel"):
+	if is_visible_in_tree() and event.is_action_pressed("ui_cancel") and not event.is_echo():
 		get_viewport().set_input_as_handled()
-		_request_back()
+		MenuAudio.activate(back_button)
 
 
 func _request_back() -> void:

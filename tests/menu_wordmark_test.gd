@@ -36,13 +36,12 @@ func _run() -> void:
 	var activations: Array[int] = [0]
 	button.pressed.connect(func() -> void: activations[0] += 1)
 
-	# Native clicks during assembly cannot restart or replace the one-shot entrance.
 	var face_point: Vector2 = title.position + title.get_parent().global_position + title._face_origin() + Vector2(34, 34)
-	await _click(face_point)
-	_check(title._roar_time < 0.0 and not title._intro_finished, "Startup ignores replay activation without skipping assembly")
 	title._process(0.80)
 	_check(title._eyes_closed and title._face_pose == WORDMARK_SCRIPT.FacePose.ROARING and title.material != null, "Startup retains its roar and entrance material")
-	title._process(2.0)
+	await _click(face_point)
+	_check(title._intro_finished and title.material == null and title._face_pose == WORDMARK_SCRIPT.FacePose.BRACED, "A native face click replaces the entrance with a fresh roar")
+	title._process(WORDMARK_SCRIPT.ROAR_DURATION + 0.01)
 	_check(title._intro_finished and title.material == null, "Startup finishes once and removes the logo shader")
 	var neutral: Image = await _capture()
 	var face_origin: Vector2 = title.global_position + title._face_origin()
@@ -73,8 +72,8 @@ func _run() -> void:
 	_check(neutral.get_region(suffix_area).get_data() == roaring.get_region(suffix_area).get_data(), "Roar does not move or redraw RCS differently")
 	_check(title.material == null and title.get_global_rect() == title_bounds and button.get_global_rect() == button_bounds, "Replay preserves completed shader state and title/button layout")
 	await _click(face_point)
-	_check(is_equal_approx(title._roar_time, 0.30), "Spam cannot restart a busy roar")
-	title._process(0.80)
+	_check(title._roar_time == 0.0 and title._face_pose == WORDMARK_SCRIPT.FacePose.BRACED, "Every native face click restarts even an active roar")
+	title._process(1.0)
 	_check(title._roar_time < 0.0 and title._face_pose == WORDMARK_SCRIPT.FacePose.NEUTRAL and not title._eyes_closed, "Roar settles back to its neutral open-eyed face")
 	await _click(face_point)
 	_check(title._roar_time == 0.0, "A settled roar can be activated again")
@@ -132,6 +131,7 @@ func _run() -> void:
 
 func _capture() -> Image:
 	await process_frame
+	RenderingServer.force_draw.call_deferred(false)
 	await RenderingServer.frame_post_draw
 	return viewport.get_texture().get_image()
 

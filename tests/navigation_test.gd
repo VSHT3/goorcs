@@ -1,8 +1,16 @@
 extends SceneTree
 
+class RecordingAudio extends MenuAudio:
+	var actions: int = 0
+
+	func play_action() -> void:
+		super.play_action()
+		actions += 1
+
 var failures: int = 0
 var main: Control
 var directory: String
+var menu_audio: RecordingAudio
 
 func _initialize() -> void:
 	_run.call_deferred()
@@ -20,13 +28,25 @@ func _run() -> void:
 	main.collection_store = CollectionStore.new(directory.path_join("collection.json"))
 	main.combat_rules = CombatRules.new()
 	main.statistics_store = EnemyStatisticsStore.new(directory.path_join("statistics.json"))
+	var original_audio: Node = main.get_node("MenuAudio")
+	main.remove_child(original_audio)
+	original_audio.free()
+	menu_audio = RecordingAudio.new()
+	menu_audio.name = "MenuAudio"
+	main.add_child(menu_audio)
+	main.move_child(menu_audio, 0)
 	root.add_child(main)
+	var title: Control = main.menu.get_node("Center/Panel/Title")
+	title.set_process(false)
+	_check(not title._intro_finished, "Initial menu setup does not hide and cancel the startup entrance")
 	await process_frame
 	await process_frame
 	_check(main.menu.visible and main.sandbox_screen == null and main.orcieary_screen == null and main.towerieary_screen == null, "Startup shows menu without constructing inactive playgrounds or guides")
 	await _check_menu_focus()
+	_check(menu_audio.actions == 0, "Native arrows, Tab and focus changes remain silent")
 	await _key(KEY_ENTER)
 	_check(main.play_screen.visible and not main.menu.visible, "Keyboard activation opens Play")
+	_check(menu_audio.actions == 1, "Native Enter emits one clack, not one per navigation callback")
 	await process_frame
 	await process_frame
 	await _click(main.play_screen.join_button.get_global_rect().get_center())
@@ -35,16 +55,20 @@ func _run() -> void:
 	main.play_screen.join_code_input.text = "invalid invite"
 	await _key(KEY_ENTER)
 	_check(main.session.state == MultiplayerSession.State.ERROR, "Invalid invite retains editable connection form")
+	_check(menu_audio.actions == 3, "Pointer Join and submitted Enter each emit exactly one action clack")
 	await _key(KEY_ESCAPE)
 	_check(main.menu.visible and main.session.state == MultiplayerSession.State.IDLE, "Escape leaves connection setup cleanly")
+	_check(menu_audio.actions == 4, "Lobby Escape shares the Back action without a duplicate cue")
 	await _key(KEY_S)
 	var sandbox: SandboxScreen = main.sandbox_screen
 	_check(sandbox.visible and not main.menu.visible, "Sandbox shortcut opens actual playground")
+	_check(menu_audio.actions == 5, "A main-menu letter shortcut emits exactly one clack")
 	await _motion(sandbox.cell_screen_position(Vector2i(1, 4)))
 	_check(sandbox.layout.used_tiles() == 0, "Idle sandbox hover cannot edit paths")
 	await _button(sandbox.cell_screen_position(Vector2i(1, 4)), true)
 	await _motion(sandbox.cell_screen_position(Vector2i(2, 4)))
 	_check(sandbox.layout.used_tiles() == 2, "Actual pointer drag edits sandbox")
+	_check(menu_audio.actions == 5, "Sandbox path editing does not become menu audio")
 	await _key(KEY_ESCAPE)
 	_check(main.menu.visible and not sandbox.visible, "Escape interrupts a path stroke and returns to menu")
 	await _button(Vector2(10, 10), false)
@@ -62,6 +86,7 @@ func _run() -> void:
 	_check(main.orcieary_screen.visible and not sandbox.visible, "Field guide shortcut opens Orcieary without exposing sandbox")
 	await _key(KEY_ESCAPE)
 	_check(main.menu.visible, "Orcieary Escape returns to menu")
+	_check(menu_audio.actions == 10, "Sandbox Back/Escape, menu resume and Orcieary entry/return each cue once")
 	await _check_towerieary(sandbox)
 	await _key(KEY_S)
 	_check(sandbox.layout.route == route and sandbox.layout.is_ready(), "Sandbox state survives visits to other menus")
@@ -82,7 +107,13 @@ func _check_match_music() -> void:
 	await _key(KEY_P)
 	await _click(main.play_screen.singleplayer_button.get_global_rect().get_center())
 	_check(main.planning.selecting_loadout and not main.planning.active and not music.playing, "Selection stays outside the active match soundtrack lifecycle")
-	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "Navigation fixture commits its owned starter")
+	var browsing_cues: int = menu_audio.actions
+	var loadout: LoadoutPanel = main.play_screen.loadout_panel
+	await _click(loadout.tower_buttons[&"arrow_tower"].get_global_rect().get_center())
+	_check(menu_audio.actions == browsing_cues, "Actual loadout tower-card activation remains silent")
+	_check(main.planning.select_loadout([&"arrow_tower"]), "Navigation fixture selects its owned starter")
+	await _click(loadout.commit_button.get_global_rect().get_center())
+	_check(main.planning.active and menu_audio.actions == browsing_cues + 1, "Native Commit starts the match with exactly one action clack")
 	await process_frame
 	_check(music.playing, "Match starts local soundtrack")
 	music.seek(5.0)
@@ -91,10 +122,13 @@ func _check_match_music() -> void:
 	main.planning.submit_ready(true)
 	await process_frame
 	_check(music.playing and music.get_playback_position() >= 4.0, "Snapshots and wave start do not restart music")
+	var pause_cues: int = menu_audio.actions
 	await _key(KEY_ESCAPE)
 	_check(main.play_screen.planning_screen.pause_menu.visible, "Escape opens active match menu")
+	_check(menu_audio.actions == pause_cues + 1, "Escape opening the match menu emits one clack")
 	await _click(main.play_screen.planning_screen.pause_menu.quit_button.get_global_rect().get_center())
 	_check(main.menu.visible and not music.playing and not main.planning.active, "Quit ends match and stops soundtrack")
+	_check(menu_audio.actions == pause_cues + 2, "Native match Quit emits one clack and survives menu navigation")
 	await _key(KEY_T)
 	_check(main.towerieary_screen.visible and not music.playing and not main.planning.active, "Guide after a match cannot resume gameplay or its soundtrack")
 	await _key(KEY_ESCAPE)
@@ -122,6 +156,10 @@ func _check_menu_focus() -> void:
 	for index: int in range(buttons.size() - 1, -1, -1):
 		await _key(KEY_TAB, true)
 		_check(root.gui_get_focus_owner() == buttons[index], "Shift-Tab reverses every menu link")
+	await _motion(main.sandbox_button.get_global_rect().get_center())
+	_check(root.gui_get_focus_owner() == main.sandbox_button, "Native hover transfers focus without activating an action")
+	await _motion(main.play_button.get_global_rect().get_center())
+	_check(root.gui_get_focus_owner() == main.play_button, "Hover restores the initial Play selection without an activation cue")
 
 func _check_towerieary(sandbox: SandboxScreen) -> void:
 	var sandbox_state: Dictionary = sandbox.controller.state.duplicate(true)
@@ -144,6 +182,7 @@ func _check_towerieary(sandbox: SandboxScreen) -> void:
 		return
 	_check(guide.tower_buttons.size() == main.combat_rules.catalog.towers.size(), "Towerieary includes the entire catalog, including unowned towers")
 	_check(guide.tower_buttons.size() > 1, "Guide exposes a selectable tower index")
+	var browsing_cues: int = menu_audio.actions
 	if guide.tower_buttons.size() > 1:
 		await _click(guide.tower_buttons.back().get_global_rect().get_center())
 	var selected_type: StringName = guide.selected_type_id
@@ -162,10 +201,12 @@ func _check_towerieary(sandbox: SandboxScreen) -> void:
 	await _key(KEY_DOWN)
 	var selected_stage: String = "damage/speed"
 	_check_towerieary_node(guide, selected_stage, "Native Down reaches the combined purchase state and actual preview")
+	_check(menu_audio.actions == browsing_cues, "Actual tower switching, upgrade previews, native graph clicks and arrow browsing stay silent")
 	await _key(KEY_ESCAPE)
 	_check(main.menu.visible and not guide.visible and root.gui_get_focus_owner() == main.towerieary_button, "Escape from the native graph directly returns to the focused Towerieary menu action")
 	await _key(KEY_ESCAPE)
 	_check(guide.visible and not main.menu.visible and main.towerieary_screen == guide, "Menu Escape resumes the existing guide instance")
+	_check(menu_audio.actions == browsing_cues + 2, "Guide Escape and menu resume each cue once")
 	_check(guide.selected_type_id == selected_type and guide.selected_stage_id == selected_stage, "Escape resume retains the selected tower and upgrade stage")
 	await _key(KEY_TAB)
 	_check_towerieary_node(guide, selected_stage, "Resumed index Tab reaches the actual remembered selected node")
@@ -179,8 +220,10 @@ func _check_towerieary(sandbox: SandboxScreen) -> void:
 	_check_towerieary_node(guide, selected_stage, "BackTab reverses X to the selected native node")
 	await _key(KEY_TAB, true)
 	_check(root.gui_get_focus_owner() == guide.tower_buttons[guide.selected_index], "Selected node BackTab returns to the current tower")
+	_check(menu_audio.actions == browsing_cues + 2, "Guide Tab/BackTab and focus restoration stay silent")
 	await _click(guide.back_button.get_global_rect().get_center())
 	_check(main.menu.visible and not guide.visible and root.gui_get_focus_owner() == main.towerieary_button, "Guide X returns to its corresponding focused menu action")
+	_check(menu_audio.actions == browsing_cues + 3, "The guide X is an action and emits one clack")
 	await _key(KEY_UP)
 	_check(root.gui_get_focus_owner() == main.orcieary_button, "Orcieary remains immediately above Towerieary")
 	await _key(KEY_DOWN)

@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Reproduce Gorcs' original short SFX using Python 3.10+ standard library only.
+"""Reproduce Gorcs' short SFX using Python 3.10+ standard library only.
 
 Run from any directory: python3 tools/author_sound_effects.py
-Writes only assets/audio/sfx/*.wav and its manifest.json. No recordings, external
-samples, network, runtime synthesis, dependencies, or changes to the music track.
-Recipes combine seeded noise, damped material modes, plucked strings, friction,
-and shaped air/body transients. The manifest records recipes and output hashes.
+Writes assets/audio/sfx/*.wav and its manifest.json, leaving identical WAVs alone.
+Original recipes combine seeded noise, damped modes, strings and transients.
+The intro roar instead edits a retained CC0 vocal recording: provenance, original
+compressed source and decoded PCM are in tools/audio_sources/intro_roar/.
+No network, runtime synthesis, dependencies, or changes to the music track.
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import io
 import math
 from pathlib import Path
 import random
@@ -22,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets/audio/sfx"
 RATE = 48000
 TAU = 2.0 * math.pi
+ROAR_SOURCE = ROOT / "tools/audio_sources/intro_roar"
 
 
 def lowpass(signal: list[float], cutoff: float) -> list[float]:
@@ -161,6 +164,7 @@ FAMILIES = {
     "purchase": (0.175, 0.21, 0.0, 1, "quiet coin edge/contact acknowledgment"),
     "upgrade": (0.325, 0.25, 0.0, 1, "rising three-part material resonance, affirmative not a fanfare"),
     "reject": (0.105, 0.20, 0.0, 1, "restrained low double latch click, no buzzer or alarm"),
+    "menu_click": (0.115, 0.16, 0.0, 1, "muted single woody clack with a short dull metal edge; no pitched reward or rejection"),
 }
 
 
@@ -247,23 +251,75 @@ def recipe(kind: str, variant: int, duration: float, seed: int) -> Sound:
         for at, gain in ((0.001, 0.38), (0.034, 0.22)):
             s.noise(at, 0.021, gain, 350, 2400, 0.004)
             s.modes(at, 0.060, gain * 0.65, (174, 361, 795), 0.009, 0.42, -0.10)
+    elif kind == "menu_click":
+        s.noise(0.001, 0.026, 0.48, 320, 3200, 0.005, 0.0015)
+        s.modes(0.002, 0.102, 0.36, (286, 557, 1043), 0.014, 0.46, -0.04)
+        s.modes(0.003, 0.045, 0.055, (1370, 2310, 3680), 0.005, 0.37)
+        s.noise(0.006, 0.065, 0.20, 140, 1350, 0.012, 0.002)
     else:
         raise ValueError(f"Unknown sound recipe: {kind}")
     return s
 
 
+def recorded_roar() -> tuple[bytes, dict]:
+    """Edit an actual recorded voice, never synthesize a vocal substitute."""
+    provenance = json.loads((ROAR_SOURCE / "source.json").read_text(encoding="utf-8"))
+    source = ROAR_SOURCE / "roar_02_decoded.wav"
+    if hashlib.sha256(source.read_bytes()).hexdigest() != provenance["decoded_pcm"]["sha256"]:
+        raise ValueError("Retained intro roar PCM does not match its source provenance")
+    with wave.open(str(source), "rb") as recording:
+        if (recording.getnchannels(), recording.getsampwidth(), recording.getframerate()) != (1, 2, RATE):
+            raise ValueError("Intro roar source must be mono PCM16 at 48 kHz")
+        recording.setpos(round(0.070 * RATE))
+        raw = recording.readframes(round(0.780 * RATE))
+    values = struct.unpack(f"<{len(raw) // 2}h", raw)
+    if len(values) != round(0.780 * RATE):
+        raise ValueError("Intro roar source is shorter than the recorded edit")
+    # Remove rumble, soften the recording's bright edge; preserve vocal timing/pitch.
+    signal = lowpass([value / 32768.0 for value in values], 6000.0)
+    rumble = lowpass(signal, 80.0)
+    sound = Sound(0.780, 918307)
+    sound.samples = [sample - low for sample, low in zip(signal, rumble)]
+    return sound.finish(0.32), provenance
+
+
+def write_wave(path: Path, pcm: bytes) -> None:
+    """Do not touch existing effects when their deterministic bytes are unchanged."""
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as output:
+        output.setnchannels(1)
+        output.setsampwidth(2)
+        output.setframerate(RATE)
+        output.writeframes(pcm)
+    data = buffer.getvalue()
+    if not path.exists() or path.read_bytes() != data:
+        path.write_bytes(data)
+
+
+def measurements(pcm: bytes) -> dict:
+    values = struct.unpack(f"<{len(pcm) // 2}h", pcm)
+    measured_peak = max(abs(value) for value in values) / 32768.0
+    rms = math.sqrt(sum(value * value for value in values) / len(values)) / 32768.0
+    return {
+        "duration_seconds": len(values) / RATE,
+        "measured_peak_dbfs": round(20.0 * math.log10(measured_peak), 3),
+        "measured_rms_dbfs": round(20.0 * math.log10(rms), 3),
+        "mean_pcm_lsb": round(sum(values) / len(values), 5),
+    }
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "format_version": 1,
+        "format_version": 2,
         "authoring": {
             "source": "tools/author_sound_effects.py",
             "command": "python3 tools/author_sound_effects.py",
-            "provenance": "Original mathematical sound designs authored for Gorcs; no sampled or copied audio.",
-            "inputs": "Seeded standard-library PRNG noise, filtered plucked strings, damped material modes, shaped air transients.",
+            "provenance": "Original mathematical designs except intro_roar.wav, an edit of rubberduck's CC0 recorded vocal; see third_party_sources.",
+            "inputs": "Seeded standard-library PRNG noise, filtered plucked strings, damped material modes, shaped air transients; retained decoded third-party PCM for intro_roar.wav only.",
             "external_dependencies": [],
             "runtime_synthesis": False,
-            "ownership": "Original project assets; no third-party audio license or attribution requirements.",
+            "ownership": "Original recipe assets have no third-party requirements. intro_roar.wav remains a third-party CC0 derivative, not an original project recording.",
             "reproducibility": "Fixed per-file seeds and recipes; PCM is deterministic on the same Python/libm platform. Cross-platform floating-point implementations may differ by a quantization step.",
         },
         "format": {"encoding": "PCM signed 16-bit little endian", "channels": 1, "sample_rate_hz": RATE},
@@ -279,34 +335,40 @@ def main() -> None:
         duration, peak, gain_db, variants, description = parameters
         for variant in range(1, variants + 1):
             seed = 720241 + family_index * 1009 + variant * 7919
-            name = f"{kind}_{variant:02d}.wav"
+            name = "menu_click.wav" if kind == "menu_click" else f"{kind}_{variant:02d}.wav"
             sound = recipe(kind, variant, duration, seed)
             pcm = sound.finish(peak)
             path = OUT / name
-            with wave.open(str(path), "wb") as output:
-                output.setnchannels(1)
-                output.setsampwidth(2)
-                output.setframerate(RATE)
-                output.writeframes(pcm)
-            values = struct.unpack(f"<{len(pcm) // 2}h", pcm)
-            measured_peak = max(abs(value) for value in values) / 32768.0
-            rms = math.sqrt(sum(value * value for value in values) / len(values)) / 32768.0
+            write_wave(path, pcm)
             manifest["files"].append({
                 "file": name,
                 "family": kind,
                 "variant": variant,
                 "seed": seed,
-                "duration_seconds": len(values) / RATE,
+                **measurements(pcm),
                 "authored_peak_linear": peak,
-                "measured_peak_dbfs": round(20.0 * math.log10(measured_peak), 3),
-                "measured_rms_dbfs": round(20.0 * math.log10(rms), 3),
-                "mean_pcm_lsb": round(sum(values) / len(values), 5),
                 "recommended_gain_db": gain_db,
                 "recipe": description,
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             })
+    pcm, provenance = recorded_roar()
+    path = OUT / "intro_roar.wav"
+    write_wave(path, pcm)
+    manifest["third_party_sources"] = {"intro_roar": provenance}
+    manifest["files"].append({
+        "file": "intro_roar.wav",
+        "family": "intro_roar",
+        "origin": "third_party_recording",
+        "source": "intro_roar",
+        "authored_peak_linear": 0.32,
+        **measurements(pcm),
+        "recommended_gain_db": 0.0,
+        "recipe": "Recorded CC0 roar_02; source trim 0.070–0.850s, mono 48 kHz PCM16; one-pole lowpass 6000 Hz minus 80 Hz lowpass, weighted DC removal, 1 ms sin² entrance/15 ms sin² exit, peak 0.32, triangular dither seed 918307. No pitch/time stretch or synthesized voice.",
+        "vocal_attack_seconds": 0.03,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    })
     (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-    print(f"Authored {len(manifest['files'])} original mono 48 kHz PCM16 SFX in {OUT.relative_to(ROOT)}")
+    print(f"Authored {len(manifest['files']) - 1} original SFX and 1 CC0 recorded vocal edit in {OUT.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
