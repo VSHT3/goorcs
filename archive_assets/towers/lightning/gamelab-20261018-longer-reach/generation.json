@@ -1,0 +1,69 @@
+{
+  "provider": "GameLabs MCP",
+  "job_id": "fb3ded39-fb01-48f4-8de8-45a095d3f719",
+  "project_id": 32579,
+  "asset_id": 69885,
+  "credits_debited": 2,
+  "references": [],
+  "target": "assets/towers/lightning_longer_reach.png",
+  "status_at_submission": "queued",
+  "settings": {
+    "width": 128,
+    "height": 128,
+    "centered": true,
+    "isometric": false,
+    "three_quarter_top_down": true,
+    "two_d": true,
+    "subject_orientation_in_frame": "south",
+    "pixel_art": true,
+    "pixel_art_colors": 48,
+    "edge_cleanup": true,
+    "transparent_bg": true,
+    "quality": "high"
+  },
+  "prompt": "Single finished 128 x 128 pixel-art upgraded LIGHTNING TOWER for a medieval fantasy tower defense game. A compact substantial pale gray masonry and dark oak building with iron corner braces and a stepped stone foundation. TWO tall parallel warm copper-wound conductor columns flank a central blue-white energy rod, short outward-reaching iron terminal arms at the crown, tiny restrained cyan arcs between their tips. Coherent grounded stone-and-timber fantasy architecture, not a sci-fi turret. Broad front wall and narrow visible right wall, visible top surfaces, elevated three-quarter orthographic front-right view, upper-left lighting. Crisp dark contours, deliberate sharp pixel clusters, restrained 48-color palette, readable at 80 pixels tall. Slightly broader and more powerful than a base single-coil conductor tower. One centered complete structure with clear margins, flat front foundation edge. No characters, scenery, ground tile, text, UI, oval shadow, bloom or blur.",
+  "status": "completed",
+  "cutout_job_id": "ec75d5f2-f3f5-4cd4-aeb8-b8d9a413bf79",
+  "raw_cutout_sha256": "642f261d416330899e544983b39e1da05bb9f5fb9fd3cc1977251cc403e536c1",
+  "cleaned_file": "lightning_longer_reach_clean.png",
+  "cleaning": "Alpha threshold >=128 becomes255, otherwise0; original RGB and 128x128 canvas retained.",
+  "cleaned_bounds": [
+    24,
+    3,
+    104,
+    125
+  ],
+  "approval": "Creator selected Approve and install in this session.",
+  "runtime_file": "assets/towers/lightning_longer_reach.png",
+  "runtime_canvas": [
+    128,
+    144
+  ],
+  "translation": [
+    -16,
+    11
+  ],
+  "runtime_bounds": [
+    8,
+    14,
+    88,
+    136
+  ],
+  "runtime_sha256": "85573e4e6481f1049b926eaedb4cabd2bb1a91b90e9ffc140084b5d34e542bff",
+  "board_height": 1.4945,
+  "board_anchor": [
+    0.375,
+    0.94444444
+  ],
+  "shared_muzzle": [
+    48,
+    19
+  ],
+  "provider_output_sha256": "4f61fdf9f7427ca1f846b660991b9e227bbc9cbb41cca13c6db6cdd7749b865e",
+  "verification": {
+    "main_scene_smoke": "Passed rendered X11/Mesa llvmpipe at 1000x720 and 1280x720; native pointer placement and upgrades; both orientations, top-row and adjacent towers, 0.98-cell width, crown muzzle, accepted live chain damage.",
+    "regressions": "12/12 standard rendered checks passed; separate headless Towerieary screen passed.",
+    "audio": "Dummy; not verified",
+    "native_gpu": "Not verified"
+  }
+}

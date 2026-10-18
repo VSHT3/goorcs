@@ -4,7 +4,7 @@
 Native 96x112 RGBA pixels; integer polygons/rectangles, hard alpha, no source
 images, sampling, antialiasing, models, or third-party artwork. Upper-left light,
 front-dominant elevated timber/stone forms. Run with Pillow to reproduce only
-these eight PNGs; approved Lightning, Gold Mine and established tower PNGs are never written.
+these seven PNGs; approved Lightning (including Longer Reach), Gold Mine and established tower PNGs are never written.
 """
 from pathlib import Path
 
@@ -97,37 +97,6 @@ def roof(d, x, y, w, fill="cloth"):
     for yy in (y - 9, y - 3):
         line(d, [(x + 5, yy), (x + w - 7, yy)], "cloth_dark" if fill == "cloth" else "wood_dark")
     line(d, [(x, y), (x + w - 7, y + 3)], "wood_dark", 3)
-
-
-def coil(d, x, y, height):
-    rect(d, (x - 4, y, x + 6, y + height), "iron_dark", "ink")
-    rect(d, (x - 2, y + 1, x, y + height - 1), "blue")
-    for yy in range(y + 6, y + height - 1, 6):
-        poly(d, [(x - 10, yy - 2), (x + 6, yy - 4), (x + 11, yy - 1), (x + 9, yy + 2), (x - 7, yy + 4), (x - 11, yy + 1)], "copper")
-        line(d, [(x - 9, yy - 1), (x + 6, yy - 3), (x + 9, yy - 1)], "copper_light")
-        line(d, [(x - 6, yy + 3), (x + 8, yy + 1)], "copper_dark")
-    poly(d, [(x - 10, y - 3), (x - 5, y - 7), (x + 7, y - 7), (x + 12, y - 3), (x + 8, y + 1), (x - 6, y + 1)], "iron")
-    line(d, [(x - 7, y - 4), (x - 3, y - 6), (x + 6, y - 6)], "iron_light", 2)
-    rect(d, (x - 1, y - 14, x + 2, y - 7), "blue_dark", "ink")
-    rect(d, (x, y - 13, x + 1, y - 9), "blue_light")
-
-
-def lightning_longer_reach():
-    image, d = canvas()
-    footing(d)
-    block(d, 25, 63, 46, 24)
-    rect(d, (34, 70, 56, 83), "iron_dark", "ink")
-    poly(d, [(46, 71), (40, 78), (46, 78), (43, 82), (52, 75), (47, 75)], "blue_light", None)
-    slab(d, 20, 59, 56, 7, 5)
-    # Twin tall outriggers and a triangular terminal give a distinct silhouette.
-    coil(d, 30, 29, 28)
-    coil(d, 63, 29, 28)
-    timber(d, 44, 35, 5, 22)
-    poly(d, [(44, 26), (47, 14), (51, 26), (48, 35)], "blue", "iron_dark")
-    line(d, [(47, 17), (47, 29)], "blue_light")
-    line(d, [(30, 29), (46, 39), (63, 29)], "iron_dark", 3)
-    line(d, [(31, 28), (47, 37), (62, 28)], "iron_light")
-    return image
 
 
 def drum(d, x, y, w, h):
@@ -277,7 +246,6 @@ def tribute_office():
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     authored = {
-        "lightning_longer_reach": lightning_longer_reach(),
         "war_drums": war_drums(), "forge": forge(),
         "command_banner": command_banner(),
         "royal_mint": royal_mint(), "bounty_board": bounty_board(),

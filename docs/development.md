@@ -652,6 +652,14 @@ Persistent peer coverage independently exercises actual host STRONGEST selection
 The final isolated `python3 tools/verify.py all` run passed **60/60 checks**, including clean import, actual save isolation, both startup modes, the expanded real-peer scenario, catalog/renderer regressions, and native input/inspection coverage. Logs are retained under ignored `.verify-logs/20261017T195643Z-all-8a05a457/`. Working-project editor imports were then refreshed without errors. The graphical walkthrough's throwaway project/scripts and fixture saves were removed; portable rendered evidence remains in the archive. These checks do not establish native GPU/performance or separate-network internet reachability.
 
 
+### Accepted Lightning Longer Reach sprite
+
+The creator-approved GameLab twin-copper-conductor still replaces `assets/towers/lightning_longer_reach.png`; the base collection icon is unchanged. [Archive provenance](../archive_assets/README.md#approved-longer-reach-evolution) records original output, alpha cleanup, lossless canvas translation, 0.98-cell width and the unchanged shared electric muzzle. The procedural authoring tool no longer overwrites this accepted art. No combat stats, upgrades, save identities or animation were changed.
+
+An isolated actual-main-scene X11 Compatibility/Mesa llvmpipe walkthrough passed in 8.78 seconds. Native pointer input placed Lightning and purchased damage, speed, special and Longer Reach; the guide and Sandbox were captured at exact 1000×720 and 1280×720 viewport sizes. Both board orientations, adjacent base/evolved towers, top-row clearance, accepted crown muzzle geometry and live chain damage were exercised. Captures were inspected; local proof remains under `.verify-logs/electro-longer-reach-20261018/`. Rendered portrait and board regressions plus the headless Towerieary screen regression passed. Software rendering and Dummy audio establish neither native GPU/performance nor sound quality; no networking logic changed.
+
+The final standard `python3 tools/verify.py rendered` run passed **12/12 checks**, including exact engine version, fresh import, save isolation, graphical startup and all eight rendered suites. Logs are retained under `.verify-logs/20261018T104115Z-rendered-e98d4186/`.
+
 ### Accepted Rune obelisk sprite
 
 `assets/towers/rune_obelisk.png` is the user-supplied 256×256 PixelLab file `pixellab-A-rune-obelisk--an-ancient-sto-1791966274141.png`, copied byte-for-byte from the original file, not from the pasted preview. Source and copy SHA-256 match: `c4c3a6b6a2caa470ecd81962c63289753bcdbdad40ced44ddb784a705ec177b8`.

@@ -16,5 +16,5 @@ board_anchor = Vector2(0.375, 0.94444444)
 mirror_board = true
 projectile_origin = Vector2(48, 19)
 board_variants = {
-"longer_reach": {"texture": ExtResource("3_reach"), "board_height": 1.1, "board_anchor": Vector2(0.5, 0.928571)}
+"longer_reach": {"texture": ExtResource("3_reach"), "board_height": 1.4945, "board_anchor": Vector2(0.375, 0.94444444)}
 }

@@ -16,6 +16,7 @@
 | `towers/ballista/gamelab-20261017/` | Approved source designs, provisional assembled trial, previous runtime art and actual game captures | 45 |
 | `towers/gold-mine/gamelab-20261017/` | Approved mine, raw/cutout sources, prior procedural PNG and generation provenance | 4 |
 | `towers/lightning/gamelab-20261017/` | Approved Lightning, raw/cutout sources, prior procedural PNG and provenance | 4 |
+| `towers/lightning/gamelab-20261018-longer-reach/` | Approved Longer Reach source/cutout, cleaned candidate, previous runtime art and provenance | 4 |
 | `world/idle/` | Approved portal/crystal idle sheets and animated previews | 5 |
 
 Numbers such as `0001` identify downloaded variants, not animation frames. Treasure and orc variants with the same number are not necessarily related. Only the prepared chest pair has derivation links in `assets.json`; the endpoint and manual-ballista manifests record their own source links.
@@ -88,7 +89,14 @@ The raw chroma image and provider cutout are preserved. The cleaned candidate th
 
 [`towers/lightning/gamelab-20261017/lightning_candidate.png`](towers/lightning/gamelab-20261017/lightning_candidate.png) is the approved 128×128 GameLab source for base Lightning. Generation job `5abadff5-12ea-47c7-9bd5-798ba48ecec3` used no references, requested high quality and 48-color pixel-art processing, and reported two credits. The cleaned source contains 47 opaque colors and binary alpha; raw output, provider cutout, previous procedural PNG, and exact prompt/settings are preserved beside it.
 
-Runtime `assets/towers/lightning.png` reframes the approved pixels by `(-16, 11)` onto a 128×144 canvas. Every visible source pixel is preserved exactly; only transparent padding changes. This keeps the electric crown at the existing shared muzzle `(48, 19)`, leaving Longer Reach artwork and muzzle geometry unchanged. The base uses a new foot anchor and preserves its previous visible width; the unchanged evolution explicitly retains its old anchor. No animation is generated. Provider licensing/privacy terms have not been independently verified.
+Runtime `assets/towers/lightning.png` reframes the approved pixels by `(-16, 11)` onto a 128×144 canvas. Every visible source pixel is preserved exactly; only transparent padding changes. This keeps the electric crown at the shared muzzle `(48, 19)`. The base uses its own foot anchor and preserves its previous visible width. No animation is generated. Provider licensing/privacy terms have not been independently verified.
+
+### Approved Longer Reach evolution
+
+[`towers/lightning/gamelab-20261018-longer-reach/`](towers/lightning/gamelab-20261018-longer-reach/) preserves the creator-approved twin-copper-conductor evolution, replacing the old procedural sprite. GameLab job `fb3ded39-fb01-48f4-8de8-45a095d3f719` generated a reference-free 128×128 still at high quality with 48-color pixel processing and reported two credits. `generation.json` retains the exact prompt/settings, job IDs, hashes, approval and runtime transform; source output, provider cutout, cleaned candidate and old runtime PNG are archived separately.
+
+Cleanup thresholds provider alpha at 128 into 0/255 without changing RGB. Runtime translates those pixels by `(-16, 11)` onto 128×144, preserving every opaque pixel and the shared crown muzzle `(48, 19)`. Opaque bounds are `(8, 14)–(88, 136)`; `board_height = 1.4945` and anchor `(0.375, 0.94444444)` keep the visible width at 0.98 cells and ground the foundation. Base/icon artwork and gameplay rules are unchanged. The procedural authoring tool no longer generates Lightning artwork.
+
 
 ## Runtime separation
 
