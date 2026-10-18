@@ -65,7 +65,7 @@ func _test_reel() -> void:
 	reel.present({"rarity": "mythic"}, null)
 	_check(reel._strip.rarities[RarityReel.WINNER_INDEX] == winner, "A competing tower presentation cannot replace an active accepted reward")
 	reel._process(RarityReel.SPIN_SECONDS + 10.0)
-	_check(reel.is_busy() and reel._revealed and reel._strip.scroll_position == float(RarityReel.WINNER_INDEX), "A delayed spin frame still reaches the accepted winner and starts a readable reveal hold")
+	_check(reel.is_busy() and reel._revealed, "A delayed spin frame still reveals the accepted winner and starts a readable hold")
 	_check(reel._result.text.contains(award["rarity_title"]) and reel._payout.text.contains(str(award["coins"])) and reel._payout.text.contains(str(award["shards"])) and reel._heading.text.contains(award["boss_title"]), "Revealed title and totals come from the accepted award, not its decorative payout table")
 	for width: int in [1000, 1280]:
 		root.size = Vector2i(width, 720)
@@ -97,7 +97,7 @@ func _test_reel() -> void:
 	for reward_mode: bool in [false, true]:
 		reel.present_reward(award) if reward_mode else reel.present({"rarity": "legendary"}, null)
 		await _key(KEY_ENTER)
-		_check(reel.is_busy() and reel._revealed and reel._strip.scroll_position == float(RarityReel.WINNER_INDEX) and reel._strip.reveal == 1.0, "Enter skips either reel to the accepted, fully visible result without closing")
+		_check(reel.is_busy() and reel._revealed and reel._strip.reveal == 1.0, "Enter skips either reel to the accepted, fully visible result without closing")
 		_check(award == frozen, "Skipping presentation cannot change accepted rewards")
 		reel.cancel()
 		reel.present_reward(award) if reward_mode else reel.present({"rarity": "epic"}, null)

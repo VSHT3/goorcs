@@ -382,7 +382,7 @@ func _skip_to_result() -> void:
 	queue_redraw()
 
 
-func _begin_reveal(immediate: bool = false) -> void:
+func _begin_reveal() -> void:
 	_revealed = true
 	# Start the readable hold at the actual reveal, even after a delayed frame.
 	_elapsed = SPIN_SECONDS
@@ -393,11 +393,9 @@ func _begin_reveal(immediate: bool = false) -> void:
 	_result.text = _winner_name
 	_payout.text = _winner_payout
 	_result.add_theme_color_override("font_color", _winner_color)
-	_strip.reveal = 1.0 if immediate else 0.0
+	_strip.reveal = 0.0
 	_strip.queue_redraw()
 	queue_redraw()
-
-
 
 
 func _input(event: InputEvent) -> void:
