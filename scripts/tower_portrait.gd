@@ -55,6 +55,7 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 			_frame = _frame.merge(Rect2((layer_bounds.position - texture.get_size() * anchor) * units, layer_bounds.size * units))
 	# Reserve the battlefield's orbit envelope, even as stones pass behind it.
 	_frame = _frame.merge(Rect2(-0.7, -0.85, 1.4, 0.65))
+	_reserve_effects(tower)
 	if reward.archer_head_texture != null:
 		var offsets: Array[Vector2] = [Vector2.ZERO]
 		var advancement: Dictionary = tower_types[String(tower["type_id"])].get("advancements", {}).get(tower.get("advancement", ""), {})
@@ -73,6 +74,21 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 		_frame = _frame.merge(variant["portrait_bounds"])
 	_frame = _frame.grow(0.08)
 	queue_redraw()
+
+
+# Branch effects that extend past the sprite: the outer orbit ring, the Onyx
+# rings and crown, S.U.M.G.G.M. orbs, and finale effects/sparks above the art.
+func _reserve_effects(tower: Dictionary) -> void:
+	var evolution: String = String(tower.get("evolution", ""))
+	if evolution in RUNE_ORBITERS and _orbit_count(tower) > INNER_ORBIT_LIMIT:
+		_frame = _frame.merge(Rect2(-1.0, -1.12, 2.0, 0.96))
+	if evolution == "onyx_ring":
+		_frame = _frame.merge(Rect2(-0.8, -1.35, 1.6, 1.4))
+	var art_top: float = _frame.position.y
+	if _has_finale(tower):
+		_frame = _frame.merge(Rect2(-0.5, art_top - 0.85, 1.0, 0.85))
+		if evolution == "bounce":
+			_frame = _frame.merge(Rect2(-1.16, -1.76, 2.32, 0.76))
 
 
 func _cell_size() -> float:
