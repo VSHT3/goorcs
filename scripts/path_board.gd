@@ -31,6 +31,8 @@ const BALLISTA_BOLT_LENGTH: float = 0.46
 const BALLISTA_BOLT_WIDTH: float = 0.045
 const MAGIC_COLOR := Color("b48cff")
 const MAGIC_CORE := Color("f1e6ff")
+# Curve side/strength per extra split bolt, relative to the original bolt.
+const SPLIT_FAN: Array[float] = [-1.0, 0.55, -0.55, 1.45]
 const PULSE_DURATION: float = 0.14
 const BOMB_IMPACT_DURATION: float = 0.28
 const THROW_FLIGHT_DURATION: float = 0.40
@@ -398,12 +400,18 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 	var evolution: String = tower.get("evolution", "")
 	var magic: bool = archer_index == 0 and not tower.get("magic_bounce", {}).is_empty()
 	var bounce_points: Array = []
+	var split_paths: Array = []
 	if bounce:
 		bounce_points = tower.get("bounce_points", []).duplicate()
 		if bounce_points.is_empty():
 			bounce_points = [tower.get("bounce_aim", tower.get("aim", Vector2(tower["cell"])))]
+		if magic:
+			split_paths = tower.get("split_paths", []).duplicate(true)
 	var bounce_leg: float = MAGIC_BOUNCE_DURATION if magic else SHOT_DURATION
-	var duration: float = (ONYX_PULSE_DURATION if evolution == "onyx_ring" else PULSE_DURATION) if area_attack else SHOT_DURATION + bounce_leg * bounce_points.size()
+	var longest: int = bounce_points.size()
+	for path: Array in split_paths:
+		longest = maxi(longest, path.size())
+	var duration: float = (ONYX_PULSE_DURATION if evolution == "onyx_ring" else PULSE_DURATION) if area_attack else SHOT_DURATION + bounce_leg * longest
 	if pierce:
 		# Longer-reach bolts keep the same speed for their extra flight.
 		var range_cells: float = maxf(1.0, float(tower.get("range", definition.get("range", 1.0))))
@@ -452,6 +460,7 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 		"bounce_active": bounce,
 		"bounce_aim": tower.get("bounce_aim", tower.get("aim", Vector2(tower["cell"]))),
 		"bounce_points": bounce_points,
+		"split_paths": split_paths,
 		"bounce_leg": bounce_leg,
 		"magic": magic,
 		"bolt_scale": float(tower.get("bolt_scale", 1.0)) if archer_index == 0 else 1.0,
@@ -1467,15 +1476,21 @@ func _projectile_position(trace: Dictionary) -> Vector2:
 	return _projectile_position_at(trace, float(trace["duration"]) - float(trace["life"]))
 
 
+# Path -1 is the original bolt; 0.. are the extra Double Magic/S.U.M.G.G.M. bolts.
+func _redirect_points(trace: Dictionary, split: int) -> Array:
+	if split >= 0:
+		return trace.get("split_paths", [])[split]
+	var points: Array = trace.get("bounce_points", [])
+	return points if not points.is_empty() else [trace["bounce_aim"]]
+
+
 func _bounce_point(point: Vector2) -> Vector2:
 	return _position_center(point) + Vector2(0, _cell_size() * 0.15)
 
 
 # The accepted redirect leg at this presentation time: its start, end and progress.
-func _bounce_leg(trace: Dictionary, elapsed: float) -> Dictionary:
-	var points: Array = trace.get("bounce_points", [])
-	if points.is_empty():
-		points = [trace["bounce_aim"]]
+func _bounce_leg(trace: Dictionary, elapsed: float, split: int = -1) -> Dictionary:
+	var points: Array = _redirect_points(trace, split)
 	var leg: float = float(trace.get("bounce_leg", SHOT_DURATION))
 	var index: int = clampi(floori((elapsed - SHOT_DURATION) / leg), 0, points.size() - 1)
 	var start: Vector2 = _projectile_destination(trace) if index == 0 else _bounce_point(points[index - 1])
@@ -1483,17 +1498,19 @@ func _bounce_leg(trace: Dictionary, elapsed: float) -> Dictionary:
 		"fraction": clampf((elapsed - SHOT_DURATION - index * leg) / leg, 0.0, 1.0)}
 
 
-func _projectile_position_at(trace: Dictionary, elapsed: float) -> Vector2:
+func _projectile_position_at(trace: Dictionary, elapsed: float, split: int = -1) -> Vector2:
 	var primary: Vector2 = _projectile_destination(trace)
 	if bool(trace["pierce_active"]):
 		return _projectile_origin(trace).lerp(primary, clampf(elapsed / float(trace["duration"]), 0.0, 1.0))
 	if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
-		var leg: Dictionary = _bounce_leg(trace, elapsed)
+		var leg: Dictionary = _bounce_leg(trace, elapsed, split)
 		var position: Vector2 = Vector2(leg["start"]).lerp(leg["end"], leg["fraction"])
 		if bool(trace.get("magic", false)):
 			# Homing arc: swing out sideways, then curve into the next victim.
+			# Split bolts fan out to alternating sides with varied swing so they visibly diverge.
 			var span: Vector2 = Vector2(leg["end"]) - Vector2(leg["start"])
-			var side := Vector2(-span.y, span.x).normalized() * (1.0 if int(leg["index"]) % 2 == 0 else -1.0)
+			var fan: float = 1.0 if split < 0 else SPLIT_FAN[split % SPLIT_FAN.size()]
+			var side := Vector2(-span.y, span.x).normalized() * (1.0 if int(leg["index"]) % 2 == 0 else -1.0) * fan
 			position += side * sin(float(leg["fraction"]) * PI) * minf(_cell_size() * 0.7, span.length() * 0.35)
 		return position
 	var fraction: float = clampf(elapsed / float(trace.get("flight_duration", SHOT_DURATION)), 0.0, 1.0)
@@ -1571,11 +1588,24 @@ func _draw_projectiles() -> void:
 # Biggest Wood. On its first leg it grows out of the muzzle instead of appearing
 # whole over the masonry. Magic bolts glow violet and leave a sparkling trail.
 func _draw_ballista_bolt(trace: Dictionary, elapsed: float) -> void:
+	var leg: float = float(trace.get("bounce_leg", SHOT_DURATION))
+	for split: int in range(-1, trace.get("split_paths", []).size()):
+		if split >= 0 and (_redirect_points(trace, split).is_empty() or elapsed < SHOT_DURATION):
+			continue
+		# A chain that already reached its last victim stops drawing its bolt.
+		if bool(trace["bounce_active"]) and elapsed > SHOT_DURATION + leg * _redirect_points(trace, split).size() + 0.000001:
+			continue
+		_draw_ballista_bolt_path(trace, elapsed, split)
+	if bool(trace.get("magic", false)):
+		_draw_magic_impacts(trace, elapsed, maxf(2.0, roundf(_cell_size() * BALLISTA_BOLT_WIDTH * float(trace.get("bolt_scale", 1.0)))))
+
+
+func _draw_ballista_bolt_path(trace: Dictionary, elapsed: float, split: int) -> void:
 	var cell_size: float = _cell_size()
 	var scale: float = float(trace.get("bolt_scale", 1.0))
 	var magic: bool = bool(trace.get("magic", false))
-	var tip: Vector2 = _projectile_position_at(trace, elapsed)
-	var direction: Vector2 = (tip - _projectile_position_at(trace, maxf(0.0, elapsed - 0.01))).normalized()
+	var tip: Vector2 = _projectile_position_at(trace, elapsed, split)
+	var direction: Vector2 = (tip - _projectile_position_at(trace, maxf(0.0, elapsed - 0.01), split)).normalized()
 	if direction == Vector2.ZERO:
 		direction = (_projectile_destination(trace) - _projectile_origin(trace)).normalized()
 	if direction == Vector2.ZERO:
@@ -1585,9 +1615,7 @@ func _draw_ballista_bolt(trace: Dictionary, elapsed: float) -> void:
 	var redirected: bool = bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION
 	if not redirected:
 		length = minf(length, _projectile_origin(trace).distance_to(tip))
-	_draw_bolt_trail(trace, elapsed, width, magic)
-	if magic:
-		_draw_magic_impacts(trace, elapsed, width)
+	_draw_bolt_trail(trace, elapsed, width, magic, split)
 	if length < 1.0:
 		return
 	var side := Vector2(-direction.y, direction.x)
@@ -1616,15 +1644,15 @@ func _draw_ballista_bolt(trace: Dictionary, elapsed: float) -> void:
 		draw_circle(tip, width * 1.0, Color(MAGIC_CORE, 0.85))
 
 
-func _draw_bolt_trail(trace: Dictionary, elapsed: float, width: float, magic: bool) -> void:
+func _draw_bolt_trail(trace: Dictionary, elapsed: float, width: float, magic: bool, split: int = -1) -> void:
 	var samples: int = 10 if magic else 3
 	var spacing: float = 0.014 if magic else 0.008
-	var previous: Vector2 = _projectile_position_at(trace, elapsed)
+	var previous: Vector2 = _projectile_position_at(trace, elapsed, split)
 	for index: int in range(1, samples + 1):
 		var time: float = elapsed - float(index) * spacing
 		if time < 0.0:
 			break
-		var point: Vector2 = _projectile_position_at(trace, time)
+		var point: Vector2 = _projectile_position_at(trace, time, split)
 		var fade: float = 1.0 - float(index) / float(samples + 1)
 		if magic:
 			draw_line(previous, point, Color(MAGIC_COLOR, 0.22 * fade), width * (1.5 + 3.5 * fade), true)
@@ -1640,10 +1668,17 @@ func _draw_bolt_trail(trace: Dictionary, elapsed: float, width: float, magic: bo
 
 
 func _draw_magic_impacts(trace: Dictionary, elapsed: float, width: float) -> void:
-	var points: Array = trace.get("bounce_points", [])
 	var leg: float = float(trace.get("bounce_leg", MAGIC_BOUNCE_DURATION))
+	var points: Array = trace.get("bounce_points", []).duplicate()
+	var indices: Array[int] = []
+	for index: int in range(points.size()):
+		indices.append(index)
+	for path: Array in trace.get("split_paths", []):
+		for index: int in range(path.size()):
+			points.append(path[index])
+			indices.append(index)
 	for index: int in range(-1, points.size()):
-		var hit_time: float = SHOT_DURATION + float(index + 1) * leg
+		var hit_time: float = SHOT_DURATION + float((indices[index] if index >= 0 else -1) + 1) * leg
 		var age: float = elapsed - hit_time
 		if age < 0.0 or age > 0.16:
 			continue

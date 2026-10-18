@@ -14,9 +14,10 @@ func _init() -> void:
 	_test_pierce_and_reach()
 	_test_magic_redirects()
 	_test_magic_loops_without_new_enemies()
+	_test_double_and_stronger_magic()
 	_test_roman_levels()
 	if failures == 0:
-		print("PASS: ordered Bigger/Biggest Wood and Magic Ballista chains, compounding stats, pierce/reach, decaying looping magic redirects, and Roman levels")
+		print("PASS: ordered Bigger/Biggest Wood and Magic/Double/Stronger Magic/S.U.M.G.G.M. chains, compounding stats, pierce/reach, decaying looping and split magic redirects, and Roman levels")
 	quit(1 if failures else 0)
 
 
@@ -102,6 +103,9 @@ func _test_validation() -> void:
 	_check(not TowerDefinition.valid_branch_upgrades("pierce", [{"id": "a", "title": "A", "cost": 1}, {"id": "a", "title": "B", "cost": 1}]), "Duplicate step IDs are rejected")
 	_check(not TowerDefinition.valid_branch_upgrades("pierce", [{"id": "a", "title": "A", "cost": 1, "explode": true}]), "Unknown step fields are rejected")
 	_check(not TowerDefinition.valid_branch_upgrades("pierce", []), "An empty chain is rejected")
+	_check(not TowerDefinition.valid_branch_upgrades("pierce", [{"id": "d", "title": "D", "cost": 1, "magic_split": 2}]), "Magic splits never belong to the Pierce branch")
+	_check(not TowerDefinition.valid_branch_upgrades("bounce", [{"id": "d", "title": "D", "cost": 1, "magic_split": 1}]), "A split must create at least two bolts")
+	_check(not TowerDefinition.valid_branch_upgrades("bounce", [{"id": "d", "title": "D", "cost": 1, "magic_split": TowerDefinition.MAX_MAGIC_SPLIT + 1}]), "Splits are bounded")
 
 
 func _test_purchase_order_and_stats() -> void:
@@ -203,3 +207,60 @@ func _test_roman_levels() -> void:
 	var tower: Dictionary = combat.towers[0][0]
 	var title: String = MatchPlanningScreen.tower_display_title(tower, combat._tower_types["orc_ballista"])
 	_check(title.ends_with("· " + MatchPlanningScreen.roman_numeral(MatchCombat.tower_level(tower))) and MatchCombat.tower_level(tower) > 5, "High tower levels keep Roman numerals: %s" % title)
+
+
+# Replays the model's sequential magic rolls: each bolt rolls until its first
+# failure, then the next bolt continues on the same stream.
+func _roll_chain(random: RandomNumberGenerator, chance: float, decay: float) -> int:
+	var extras: int = 0
+	while chance > 0.000000001 and random.randf() < chance:
+		chance -= decay
+		# Like the model, a success past the bounded cap is consumed, then stops.
+		if extras + 1 >= MatchCombat.MAX_BOUNCE_POINTS:
+			break
+		extras += 1
+	return extras
+
+
+func _test_double_and_stronger_magic() -> void:
+	var combat := _combat(["bounce"])
+	var tower: Dictionary = combat.towers[0][0]
+	_check(not combat.upgrade_tower(0, tower["id"], "double_magic"), "Double Magic requires Magic Ballista")
+	_check(combat.upgrade_tower(0, tower["id"], "magic_ballista") and not combat.upgrade_tower(0, tower["id"], "stronger_magic"), "Stronger Magic requires Double Magic")
+	_check(combat.upgrade_tower(0, tower["id"], "double_magic") and tower["magic_split"] == 2 and is_equal_approx(float(tower["magic_bounce"]["chance"]), 0.75), "Double Magic splits the bolt and keeps the original odds")
+	_check(not combat.upgrade_tower(0, tower["id"], "sumggm"), "S.U.M.G.G.M. requires Stronger Magic")
+	_check(combat.upgrade_tower(0, tower["id"], "stronger_magic") and is_equal_approx(float(tower["magic_bounce"]["chance"]), 0.8) and is_equal_approx(float(tower["magic_bounce"]["decay"]), 0.04), "Stronger Magic raises redirects to 80% and slows the decay to 4 points")
+	_check(tower["magic_split"] == 2 and combat._tower_damage_type(tower) == &"magic", "Stronger Magic keeps the split and magic damage")
+	_check(combat.upgrade_tower(0, tower["id"], "sumggm") and tower["magic_split"] == 5 and is_equal_approx(float(tower["magic_bounce"]["chance"]), 0.95) and is_equal_approx(float(tower["magic_bounce"]["decay"]), 0.03), "S.U.M.G.G.M. splits into five bolts with 95% / -3 odds")
+	_check(MatchPlanningScreen.tower_display_title(tower, combat._tower_types["orc_ballista"]).begins_with("S.U.M.G.G.M."), "The tower is titled S.U.M.G.G.M.")
+	var chains: Array = [
+		[["bounce", "magic_ballista", "double_magic"], 2, 0.75, 0.05],
+		[["bounce", "magic_ballista", "double_magic", "stronger_magic"], 2, 0.8, 0.04],
+		[["bounce", "magic_ballista", "double_magic", "stronger_magic", "sumggm"], 5, 0.95, 0.03],
+	]
+	for chain: Array in chains:
+		var bolts: int = chain[1]
+		var saw_divergence: bool = false
+		for seed_value: int in range(1, 9):
+			var typed: Array[String] = []
+			typed.assign(chain[0])
+			combat = _combat(typed, seed_value)
+			_place(combat, [2, 4, 6, 8, 10, 11, 12, 3, 5])
+			var replay := RandomNumberGenerator.new()
+			replay.seed = combat._magic_random.seed
+			tower = _fire(combat)
+			var paths: Array = [tower["bounce_points"]]
+			paths.append_array(tower["split_paths"])
+			_check(paths.size() == bolts, "%d bolts after the first hit, seed=%d" % [bolts, seed_value])
+			var firsts: Dictionary = {}
+			for path: Array in paths:
+				var extras: int = _roll_chain(replay, float(chain[2]), float(chain[3]))
+				_check(path.size() == 1 + extras, "Each bolt takes a guaranteed bounce then rolls its own %.0f%% / -%.0f odds, seed=%d" % [float(chain[2]) * 100.0, float(chain[3]) * 100.0, seed_value])
+				if not path.is_empty():
+					firsts[path[0]] = true
+			saw_divergence = saw_divergence or firsts.size() == bolts
+		_check(saw_divergence, "Split bolts seek different first victims while enough enemies exist (%d bolts)" % bolts)
+	combat = _combat(["bounce", "magic_ballista"])
+	_place(combat, [2, 4, 6])
+	tower = _fire(combat)
+	_check(tower["split_paths"].is_empty(), "Magic Ballista alone never splits")

@@ -19,6 +19,8 @@ attack_sound = 1
 ; values are provisional playtest balance. Multipliers compound with earlier
 ; steps; "pierce" adds straight-through hits; "bolt_scale" adds bolt size (and
 ; hit-lane width); "bolt_reach" adds cells a piercing bolt keeps flying past range.
+; "magic_bounce" sets redirect odds (a later step replaces earlier odds);
+; "magic_split" splits the bolt after its first hit into that many homing bolts.
 evolutions = {
 "pierce": {
 "title": "Pierce 2",
@@ -28,6 +30,6 @@ evolutions = {
 "bounce": {
 "title": "Bounce 1",
 "cost": 300,
-"upgrades": [{"id": "magic_ballista", "title": "Magic Ballista", "cost": 800, "damage_type": "magic", "magic_bounce": {"chance": 0.75, "decay": 0.05}}]
+"upgrades": [{"id": "magic_ballista", "title": "Magic Ballista", "cost": 800, "damage_type": "magic", "magic_bounce": {"chance": 0.75, "decay": 0.05}}, {"id": "double_magic", "title": "Double Magic", "cost": 1000, "magic_split": 2}, {"id": "stronger_magic", "title": "Stronger Magic", "cost": 1200, "magic_bounce": {"chance": 0.8, "decay": 0.04}}, {"id": "sumggm", "title": "S.U.M.G.G.M.", "cost": 5000, "magic_split": 5, "magic_bounce": {"chance": 0.95, "decay": 0.03}}]
 }
 }

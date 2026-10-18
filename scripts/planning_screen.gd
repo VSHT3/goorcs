@@ -1089,7 +1089,12 @@ static func branch_upgrade_description(step: Dictionary) -> String:
 	var parts := PackedStringArray()
 	if step.has("magic_bounce"):
 		var magic: Dictionary = step["magic_bounce"]
-		parts.append("Homing magic bolt. After its bounce it has a %.0f%% chance to bounce again to the nearest enemy, %.0f%% less likely each further bounce. With no new enemy left it loops back to earlier victims. Bounces deal 50%% damage." % [float(magic.get("chance", 0.0)) * 100.0, float(magic.get("decay", 0.0)) * 100.0])
+		if step.has("damage_type"):
+			parts.append("Homing magic bolt. After its bounce it has a %.0f%% chance to bounce again to the nearest enemy, %.0f%% less likely each further bounce. With no new enemy left it loops back to earlier victims. Bounces deal 50%% damage." % [float(magic.get("chance", 0.0)) * 100.0, float(magic.get("decay", 0.0)) * 100.0])
+		else:
+			parts.append("Stronger redirects: %.0f%% chance to bounce again, only %.0f%% less likely each further bounce." % [float(magic.get("chance", 0.0)) * 100.0, float(magic.get("decay", 0.0)) * 100.0])
+	if int(step.get("magic_split", 1)) > 1:
+		parts.append("After its first hit the bolt splits into %d homing bolts that seek different enemies and bounce independently." % int(step["magic_split"]))
 	if step.has("damage_type"):
 		parts.append("Deals %s damage." % String(step["damage_type"]).to_upper())
 	if step.has("damage_multiplier"):

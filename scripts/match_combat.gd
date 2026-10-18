@@ -269,8 +269,8 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"firing": false, "continuous_fire_time": 0.0, "refuel_remaining": 0.0, "refuel_duration": 0.0,
 		"bounce_active": false, "bounce_aim": Vector2(cell),
 		"pierce_active": false, "pierce_aim": Vector2(cell),
-		"bounce_points": [] as Array[Vector2], "branch_upgrades": [] as Array[String],
-		"branch_pierce": 0, "bolt_scale": 1.0, "bolt_reach": 0.0, "magic_bounce": {},
+		"bounce_points": [] as Array[Vector2], "split_paths": [] as Array[Array], "branch_upgrades": [] as Array[String],
+		"branch_pierce": 0, "bolt_scale": 1.0, "bolt_reach": 0.0, "magic_bounce": {}, "magic_split": 1,
 		"damage": definition["damage"], "interval": definition["interval"],
 		"range": definition["range"], "base_damage": definition["damage"], "base_interval": definition["interval"],
 		"behavior_kind": definition["behavior_kind"], "behavior_config": definition["behavior_config"].duplicate(true),
@@ -380,6 +380,7 @@ func _refresh_board(slot: int) -> void:
 		var bolt_scale: float = 1.0
 		var bolt_reach: float = 0.0
 		var magic_bounce: Dictionary = {}
+		var magic_split: int = 1
 		for step: Dictionary in branch.get("upgrades", []):
 			if not tower.get("branch_upgrades", []).has(step["id"]):
 				continue
@@ -388,7 +389,9 @@ func _refresh_board(slot: int) -> void:
 			bolt_reach += float(step.get("bolt_reach", 0.0))
 			if step.has("magic_bounce"):
 				magic_bounce = step["magic_bounce"].duplicate()
+			magic_split = maxi(magic_split, int(step.get("magic_split", 1)))
 		tower["branch_pierce"] = branch_pierce
+		tower["magic_split"] = magic_split
 		tower["bolt_scale"] = bolt_scale
 		tower["bolt_reach"] = bolt_reach
 		tower["magic_bounce"] = magic_bounce
@@ -663,6 +666,7 @@ func grow_for_main_round() -> void:
 			tower["secondary_aim"] += Vector2.DOWN
 			tower["chain_points"].clear()
 			tower["bounce_points"].clear()
+			tower["split_paths"].clear()
 			for archer: Dictionary in tower["extra_archers"]:
 				archer["aim"] += Vector2.DOWN
 			tower["bounce_aim"] += Vector2.DOWN
@@ -775,6 +779,7 @@ func debug_set_round(round_number: int) -> bool:
 			tower["bounce_aim"] = Vector2(tower["cell"])
 			tower["bounce_active"] = false
 			tower["bounce_points"].clear()
+			tower["split_paths"].clear()
 			tower["pierce_aim"] = Vector2(tower["cell"])
 			tower["pierce_active"] = false
 	for slot: int in range(2):
@@ -2017,6 +2022,7 @@ func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_in
 	var magic: Dictionary = tower.get("magic_bounce", {})
 	var points: Array = tower["bounce_points"]
 	points.clear()
+	tower["split_paths"].clear()
 	if pierce == 0 and bounces == 0:
 		_hit(slot, tower, primary_index)
 		return
@@ -2061,25 +2067,55 @@ func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_in
 			current_id = int(enemies[slot][selected]["id"])
 			hit_ids[current_id] = true
 			_hit(slot, tower, selected)
+	# Double Magic / S.U.M.G.G.M.: after the first hit the bolt splits; each bolt
+	# redirects on its own hit record and chance rolls, preferring a first victim
+	# no earlier split bolt took.
+	var taken: Dictionary = {}
+	var first_id: int = _redirect(slot, tower, position, current_id, hit_ids.duplicate(), bounces, magic, points, time, taken, true)
+	if first_id >= 0:
+		taken[first_id] = true
+	if not magic.is_empty():
+		for split: int in range(int(tower.get("magic_split", 1)) - 1):
+			var path: Array[Vector2] = []
+			first_id = _redirect(slot, tower, position, current_id, hit_ids.duplicate(), bounces, magic, path, time, taken, false)
+			if first_id >= 0:
+				taken[first_id] = true
+			tower["split_paths"].append(path)
+
+
+# Guaranteed redirects first, then Magic's decaying chance. With no unhit enemy
+# left a magic bolt loops back to earlier victims, never onto its current one.
+# Returns the first redirected victim's ID, or -1.
+func _redirect(slot: int, tower: Dictionary, position: Vector2, current_id: int, hit_ids: Dictionary, bounces: int, magic: Dictionary, points: Array, time: float, avoid: Dictionary, primary: bool) -> int:
 	var chance: float = float(magic.get("chance", 0.0))
+	var first_id: int = -1
 	var jump: int = 0
 	while jump < bounces or (not magic.is_empty() and chance > 0.000000001 and _magic_random.randf() < chance):
 		if jump >= bounces:
 			chance -= float(magic.get("decay", 0.0))
 		jump += 1
-		var selected: int = _nearest_unhit(slot, position, hit_ids, INF, time)
+		var selected: int = -1
+		if jump == 1 and not avoid.is_empty():
+			var excluded: Dictionary = hit_ids.duplicate()
+			excluded.merge(avoid)
+			selected = _nearest_unhit(slot, position, excluded, INF, time)
+		if selected < 0:
+			selected = _nearest_unhit(slot, position, hit_ids, INF, time)
 		if selected < 0 and not magic.is_empty():
-			# Every living enemy was already struck: loop back, never onto itself.
 			selected = _nearest_unhit(slot, position, {current_id: true}, INF, time)
 		if selected < 0 or jump > MAX_BOUNCE_POINTS:
 			break
 		position = enemies[slot][selected]["pos"] if time < 0.0 else _position(enemies[slot][selected]["route"], _historical_progress(enemies[slot][selected], time))
 		current_id = int(enemies[slot][selected]["id"])
 		hit_ids[current_id] = true
+		if first_id < 0:
+			first_id = current_id
 		tower["bounce_active"] = true
-		tower["bounce_aim"] = position
+		if primary:
+			tower["bounce_aim"] = position
 		points.append(position)
 		_hit(slot, tower, selected, ceili(float(tower["damage"]) * TowerDefinition.BOUNCE_DAMAGE_MULTIPLIER))
+	return first_id
 
 
 func _attack_chain(slot: int, tower: Dictionary, primary_index: int) -> void:

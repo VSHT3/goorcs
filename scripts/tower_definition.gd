@@ -6,6 +6,8 @@ const BOUNCE_DAMAGE_MULTIPLIER: float = 0.5
 const FREEZE_HP_SCALE: float = 100.0
 const FREEZE_SPEED_MULTIPLIER: float = 0.8
 const FREEZE_DURATION: float = 2.0
+# Most homing bolts one Magic Ballista shot may split into.
+const MAX_MAGIC_SPLIT: int = 5
 
 @export var reward: TowerReward
 @export var damage: int = 2
@@ -159,7 +161,7 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
 			return false
 		for field: Variant in config:
-			if field not in ["id", "title", "cost", "damage_multiplier", "pierce", "attack_rate_multiplier", "bolt_scale", "bolt_reach", "damage_type", "magic_bounce"]:
+			if field not in ["id", "title", "cost", "damage_multiplier", "pierce", "attack_rate_multiplier", "bolt_scale", "bolt_reach", "damage_type", "magic_bounce", "magic_split"]:
 				return false
 		for field: String in ["damage_multiplier", "attack_rate_multiplier"]:
 			if config.has(field) and not _positive_number(config[field]):
@@ -170,6 +172,8 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		if config.has("pierce") and (not config["pierce"] is int or int(config["pierce"]) < 0):
 			return false
 		if config.has("damage_type") and String(config["damage_type"]) not in ["physical", "magic"]:
+			return false
+		if config.has("magic_split") and (branch != "bounce" or not config["magic_split"] is int or int(config["magic_split"]) < 2 or int(config["magic_split"]) > MAX_MAGIC_SPLIT):
 			return false
 		if config.has("magic_bounce"):
 			var magic: Variant = config["magic_bounce"]
