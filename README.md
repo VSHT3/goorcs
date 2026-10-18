@@ -124,6 +124,7 @@ Menu action activation uses a short, muted wood/metal clack; hovering, moving ke
 - Resize the map through width/height controls with confirmation. Menu/Escape pauses and preserves the current build, map, and camera; leaving never changes progression.
 - **Orcieary** orders enemies by earliest encounter/send availability and lists their descriptions, portraits, stats, mechanics, and lifetime records. Click a portrait—or focus it and press Enter/Space—to play its action once. Sandbox actions are excluded from records.
 - **Towerieary** includes all six tower identities, every upgrade/branch, role-specific stats, and purchase/total costs. Connected full-size artwork nodes scroll without scrollbar chrome; clicking or arrow-key navigation reveals each selected tier. Nodes and the detail portrait share the battlefield renderer, including all archer weapons/crew, the second storey, evolutions, and Rune orbits. X/Escape closes the guide; reopening restores each tower's selection. Previews use isolated accepted state and never purchase upgrades, unlock towers, or modify a match.
+- Towerieary spells out **S.U.M.G.G.M. — Super Ultimate Mega Giga Giga Magic** and its five-way homing-bolt split after the first hit. Each bolt starts with a **95% extra-bounce chance**, decreasing by **3 percentage points** after each successful extra bounce. Magic branch descriptions read their bolt counts and odds from the accepted preview.
 - Full controls, balance rules, save behavior, and verification: [enemy roster and sandbox](docs/enemy-roster.md).
 
 ## Documentation
