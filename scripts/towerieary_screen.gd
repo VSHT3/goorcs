@@ -347,6 +347,12 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 	if evolution == "pierce":
 		return "Projectiles pass straight through an enemy and can hit a second aligned target."
 	if evolution == "bounce":
+		var magic: Dictionary = tower.get("magic_bounce", {})
+		if not magic.is_empty():
+			var bolts: int = int(tower.get("magic_split", 1))
+			var prefix: String = "S.U.M.G.G.M. — Super Ultimate Mega Giga Giga Magic.\n" if tower.get("branch_upgrades", []).has("sumggm") else ""
+			var split: String = "After the first hit, splits into %d homing bolts." % bolts if bolts > 1 else "After the first hit, the bolt redirects between enemies."
+			return prefix + split + " Each bolt starts with a %s%% extra-bounce chance, decreasing by %s percentage points after each successful extra bounce." % [_number(float(magic["chance"]) * 100.0), _number(float(magic["decay"]) * 100.0)]
 		return "Projectiles redirect to another nearby enemy after the first hit."
 	return String(record["description"])
 
