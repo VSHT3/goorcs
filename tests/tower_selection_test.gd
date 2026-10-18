@@ -131,7 +131,8 @@ func _run() -> void:
 	_check(model.upgrade_tower(0, id, "pierce"), "Exact configured price buys Pierce")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
-	_check(screen._special_upgrade_command != "pierce" and screen._alternate_upgrade_command != "pierce" and not screen.alternate_upgrade.visible and screen.special_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased evolution disappears while its excluded sibling remains unavailable")
+	_check(screen._special_upgrade_command == "bounce" and screen.special_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased evolution disappears while its excluded sibling remains unavailable")
+	_check(screen._alternate_upgrade_command == "bigger_wood_1" and screen.alternate_upgrade.disabled, "Only the branch's next upgrade is offered, and it follows affordability")
 	screen.close_button.pressed.emit()
 	_check(screen.selected_tower_id == -1 and model.towers[0].size() == 1, "Close clears selection without selling")
 	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
@@ -252,13 +253,18 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 		_check(screen._tower_stats.text == stats_before, "Ballista evolutions preserve ordinary attack-stat presentation")
 		model.coins = [2000, 2000]
 		planning._publish_snapshot()
-		_check(screen.special_upgrade.disabled and not screen.alternate_upgrade.is_visible_in_tree(), "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
+		var first_step: String = String(choices[evolution]["upgrades"][0]["id"])
+		var sibling: String = "bounce" if evolution == "pierce" else "pierce"
+		_check(screen._special_upgrade_command == sibling and screen.special_upgrade.disabled, "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
+		_check(screen._alternate_upgrade_command == first_step and not screen.alternate_upgrade.disabled, "The funded branch offers exactly its next upgrade")
 		frozen = planning.combat.duplicate(true)
-		chosen.pressed.emit()
-		other.pressed.emit()
-		for command: String in ["pierce", "bounce", "special", "boulders", "onyx_ring", "freeze_runes"]:
+		screen.special_upgrade.pressed.emit()
+		for command: String in ["pierce", "bounce", "special", "boulders", "onyx_ring", "freeze_runes", "bigger_wood_2", "magic_ballista" if evolution == "pierce" else "bigger_wood_1"]:
 			planning.upgrade_tower(0, id, command)
-		_check(planning.combat == frozen and screen.selected_tower_id == id and screen.boards[0].selected_tower_id == id, "Purchased Ballista preserves the selected tower and rejects repeated purchases, the other branch, and unrelated commands even with funds")
+		_check(planning.combat == frozen and screen.selected_tower_id == id and screen.boards[0].selected_tower_id == id, "Purchased Ballista preserves the selected tower and rejects repeated purchases, the other branch, out-of-order steps, and unrelated commands even with funds")
+		screen.alternate_upgrade.pressed.emit()
+		for slot: int in range(2):
+			_check(model.towers[slot][0]["branch_upgrades"] == [first_step] and MatchCombat.tower_level(model.towers[slot][0]) == 5, "The next-step button buys exactly that branch upgrade on both solo boards")
 		planning.stop_singleplayer()
 		await create_timer(0.2).timeout
 
