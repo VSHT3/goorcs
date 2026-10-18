@@ -11,6 +11,43 @@ This is a **static composition study, not an implemented game screenshot**. Appr
 
 The portable reference is copied unchanged from `~/Pictures/Gorcs-PixelArt/board-readability-pass/board-target.png`. The original study directory also retains its detail image and `provenance.json`. Reference artwork is excluded from Godot imports and is not a runtime asset.
 
+## Requested HUD, controls, and tower inspection pass
+
+Requested on 2026-10-18 from gameplay screenshots, including the later continuous-tracking and blue-health revisions. Implemented and exercised in the actual game at 1000×720 / 1280×720; the final isolated full verification passed **64/64 checks**. See [verification details](docs/development.md#hud-tower-accounting-and-continuous-tracking).
+
+### HUD and camera
+
+- [x] Remove visible tower-palette keybind labels such as `[1]` and `[2]`; retain the working shortcuts without explanatory keybind prose.
+- [x] Remove currently-alive enemy counters from the HUD.
+- [x] Remove the mirrored/opponent HP counter from the HUD.
+- [x] Move Shards next to Coins and restyle both currencies as a cohesive compact display with recognizable icons.
+- [x] Move the debug-menu icon immediately left of the Settings icon.
+- [x] Add middle-mouse-button drag camera panning.
+- [x] Replace the player's plain HP text with a styled health bar and a numerical HP value beside it.
+- [x] Set default starting base HP to **100**.
+- [x] Replace the rejected heart/gold housing with a clean blue crystal-health gauge: continuous cyan-blue fill, minimal navy track, and pale adjacent HP; no quarter segments or health-dependent color swaps.
+- [x] Make Ballista acquire and continuously track accepted targets before firing and while reloading, including reacquisition when its previous target dies or leaves range; preserve captured released bolts.
+
+### Tower inspection, statistics, and selling
+
+- [x] Remove the **Build another** button from tower inspection.
+- [x] Hide already-purchased upgrade buttons rather than leaving disabled **Owned** buttons visible; preserve available upgrades and evolution choices.
+- [x] Track and display cumulative kills per placed tower.
+- [x] Track and display cumulative damage dealt per placed tower.
+- [x] Track and display Coins generated per placed economy tower, including Mine/Mint production and Bounty Board/related branch bonus income.
+- [x] Track and display indirect damage contributed by Bounty Board damage amplification, separate from direct damage dealt.
+- [x] Make **Backspace** sell the selected owned tower through the existing validated sale action, respecting management locks and text-field/modal input priority.
+- [x] Play a cash sound on a successful tower sale, respecting Sound volume/mute; rejected sales must not play the success sound.
+
+### Buff labels and rarity presentation
+
+- [x] Rename **SUPPORT:** to **BUFF:** in tower inspection.
+- [x] Include rarity in the tower name, for example **Broken A.O.M.**, rather than showing rarity as a separate heading.
+- [x] Give every rarity's text its own distinct color.
+- [x] Consider a restrained rarity-text animation: retained static colors to avoid idle visual noise.
+
+Implementation must retain host-authoritative health, sales, damage, rewards, and tower statistics; inspection displays accepted state rather than estimating outcomes locally.
+
 ## Recommended viewing angle
 
 **Validate an elevated, front-dominant oblique view for structures:** a broad front face, a narrower visible right side, and enough roof to convey depth. This is the creator's latest working preference from the 2026-10-14 sprite discussion; replacement artwork is not yet approved.
@@ -59,6 +96,8 @@ Creator chose **Keep current sprites** for the initial presentation change. Exis
 Portable review artifacts: [shared-scene candidate comparison](docs/visual-reference/coherent-candidates.png) and [provenance](docs/visual-reference/coherent-candidates.provenance.json). These are unapproved static proposals, kept outside Godot imports; the updated original-asset lineup uses the corrected terrain palette.
 
 Gold Mine and Lightning exceptions (2026-10-17): the creator approved and requested installation of both reference-free GameLab stills. Only their base sprites are replaced; originals and generation provenance are archived. Their visible widths remain approximately 0.98 cells, and existing evolution anchors/art remain unchanged. Lightning's runtime canvas is losslessly reframed to preserve its shared electric muzzle coordinates, with the approved taller silhouette retained. Isolated actual-main-scene Wayland/Mesa walkthroughs exercised pointer placement/inspection, both orientations at standard/compact widths, adjacent towers, top-row Lightning clearance, and accepted live chain fire. Rendered board/icon regressions passed. This is not roster-wide approval; War Drums remains procedural and Ballista's later trial is recorded below.
+
+Longer Reach exception (2026-10-18): the creator approved and requested installation of the new GameLab twin-conductor Lightning evolution. Its 128×144 runtime canvas preserves the shared crown muzzle and 0.98-cell visible width; the previous procedural sprite and generation provenance are archived. An isolated actual-main-scene X11/Mesa walkthrough exercised native pointer placement/upgrades, guide and battlefield captures at 1000×720/1280×720, both orientations, top-row/adjacent placements and accepted live chain damage. Rendered portrait/board and Towerieary screen regressions passed. This is still-art integration, not generated animation or native-GPU/performance proof.
 
 ### 3. Structure perspective and Ballista — provisional directional game trial
 

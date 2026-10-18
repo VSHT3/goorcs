@@ -104,7 +104,7 @@ func _sandbox_build_another(sandbox: SandboxScreen) -> void:
 	await _key(KEY_B)
 	_check(sandbox.placement_id == &"", "B without an inspected tower has no side effects")
 	await _click(sandbox.cell_screen_position(Vector2i(4, 2)))
-	for code: Key in [KEY_B, KEY_F, KEY_R]:
+	for code: Key in [KEY_B, KEY_F, KEY_R, KEY_BACKSPACE]:
 		for variant: String in ["echo", "ctrl", "alt", "meta"]:
 			await _guarded_key(code, variant)
 	_check(sandbox.selected_tower_id == source_id and sandbox.controller.state == before and sandbox.controller.speed == 1.0, "Repeated and modified B/F/R never trigger Sandbox actions")
@@ -114,6 +114,7 @@ func _sandbox_build_another(sandbox: SandboxScreen) -> void:
 	await _key(KEY_B)
 	await _key(KEY_F)
 	await _key(KEY_R)
+	await _key(KEY_BACKSPACE)
 	_check(sandbox.selected_tower_id == source_id and sandbox.placement_id == &"" and sandbox.controller.speed == 1.0 and sandbox.controller.state == before, "Typing B/F/R does not trigger Sandbox actions")
 	field.text = "14"
 	field.release_focus()
@@ -122,11 +123,12 @@ func _sandbox_build_another(sandbox: SandboxScreen) -> void:
 	await _key(KEY_B)
 	await _key(KEY_F)
 	await _key(KEY_R)
+	await _key(KEY_BACKSPACE)
 	_check(sandbox.selected_tower_id == source_id and sandbox.controller.speed == 1.0 and sandbox.controller.state == before, "A confirmation modal blocks B/F/R")
 	sandbox.reset_dialog.hide()
 	await _settle()
-	await _click(sandbox.build_another_button.get_global_rect().get_center())
-	_check(sandbox.placement_id == &"arrow_tower" and sandbox.controller.state == before, "Inspector button selects ordinary free placement without mutation")
+	await _key(KEY_B)
+	_check(sandbox.placement_id == &"arrow_tower" and sandbox.controller.state == before, "B still selects ordinary free placement after modal dismissal")
 	sandbox.controller.combat._roll_random.seed = 81
 	random_state = sandbox.controller.combat._roll_random.state
 	await _click(sandbox.cell_screen_position(Vector2i(6, 2)))
@@ -137,13 +139,24 @@ func _sandbox_build_another(sandbox: SandboxScreen) -> void:
 	palette_button.hide()
 	sandbox._refresh()
 	await _key(KEY_B)
-	_check(sandbox.build_another_button.disabled and sandbox.placement_id == &"", "A hidden palette identity blocks Build another")
+	_check(sandbox.placement_id == &"" and sandbox.controller.state["towers"][0].size() == before["towers"][0].size() + 1, "A hidden palette identity blocks B without placing another tower")
 	palette_button.show()
 	palette_button.disabled = true
 	sandbox._refresh()
 	await _key(KEY_B)
-	_check(sandbox.build_another_button.disabled and sandbox.placement_id == &"", "A disabled palette identity blocks Build another")
+	_check(sandbox.placement_id == &"", "A disabled palette identity blocks B")
 	palette_button.disabled = false
+	var sold_id: int = sandbox.selected_tower_id
+	var popup: PopupMenu = sandbox.enemy_selector.get_popup()
+	popup.popup()
+	await _settle()
+	before = sandbox.controller.state.duplicate(true)
+	await _key(KEY_BACKSPACE)
+	_check(sandbox.controller.state == before, "An open Sandbox selector blocks Backspace selling")
+	popup.hide()
+	await _settle()
+	await _key(KEY_BACKSPACE)
+	_check(sandbox._find(sandbox.controller.state["towers"][0], sold_id).is_empty() and sandbox.selected_tower_id == -1 and sandbox.board.selected_tower_id == -1 and not sandbox._management.visible, "Backspace sells the selected free tower and clears inspection and board selection")
 	sandbox.cancel_interaction()
 
 
@@ -212,7 +225,7 @@ func _solo_build_another(screen: MatchPlanningScreen) -> void:
 	var source_id: int = screen.selected_tower_id
 	var before: Dictionary = main.planning.combat.duplicate(true)
 	await _key(KEY_B)
-	_check(screen.build_another_button.disabled and screen._placement_type() == &"" and main.planning.combat == before, "Insufficient funds disable B without changing inspection or balances")
+	_check(screen._placement_type() == &"" and main.planning.combat == before, "Insufficient funds disable B without changing inspection or balances")
 	main.planning.debug_set_values(1, 1000, 8)
 	main.planning.upgrade_tower(0, source_id, "damage")
 	_check(main.planning.reroll_tower(0, source_id, "attributes"), "Paid source tower has rerolled traits")
@@ -222,9 +235,25 @@ func _solo_build_another(screen: MatchPlanningScreen) -> void:
 	_check(screen._placement_type() == &"arrow_tower" and main.planning.combat == before and main.planning._host_combat._roll_random.state == random_state, "Paid B selects accepted identity without spending or rerolling either mirror")
 	await _key(KEY_ESCAPE)
 	await _click(screen.world.cell_screen_position(0, Vector2i(4, 2)))
+	var typing := LineEdit.new()
+	screen.add_child(typing)
+	typing.text = "123"
+	typing.grab_focus()
+	await _key(KEY_BACKSPACE)
+	_check(main.planning.combat == before and screen.selected_tower_id == source_id, "Backspace editing a focused text field cannot sell the inspected tower")
+	typing.release_focus()
+	typing.queue_free()
+	var popup: PopupMenu = screen.enemy_selector.get_popup()
+	popup.popup()
+	await _settle()
+	await _key(KEY_BACKSPACE)
+	_check(main.planning.combat == before and screen.selected_tower_id == source_id, "An open match selector blocks Backspace selling")
+	popup.hide()
+	await _settle()
 	screen.open_pause_menu()
 	await _settle()
 	await _key(KEY_B)
+	await _key(KEY_BACKSPACE)
 	_check(screen._placement_type() == &"" and main.planning.combat == before, "Pause blocks B without changing the accepted paid state")
 	screen._resume_match()
 	await _settle()
@@ -234,13 +263,13 @@ func _solo_build_another(screen: MatchPlanningScreen) -> void:
 	main.planning._publish_snapshot()
 	before = main.planning.combat.duplicate(true)
 	await _key(KEY_B)
-	screen.build_another_button.pressed.emit()
-	_check(screen.build_another_button.disabled and screen._placement_type() == &"" and main.planning.combat == before, "Committed Ready blocks both B and the button callback")
+	await _key(KEY_BACKSPACE)
+	_check(screen._placement_type() == &"" and main.planning.combat == before and screen.selected_tower_id == source_id, "Committed Ready blocks B and Backspace without changing selection or accepted state")
 	main.planning._host_ready[0] = false
 	main.planning._publish_snapshot()
 	await _settle()
-	await _click(screen.build_another_button.get_global_rect().get_center())
-	_check(screen._placement_type() == &"arrow_tower", "Clearing the Ready lock restores native Build another placement")
+	await _key(KEY_B)
+	_check(screen._placement_type() == &"arrow_tower", "Clearing the Ready lock restores B placement")
 	var coins: int = main.planning.combat["coins"][0]
 	var cost: int = main.planning.combat["tower_types"]["arrow_tower"]["cost"]
 	var count: int = main.planning.combat["towers"][0].size()
@@ -256,18 +285,24 @@ func _solo_build_another(screen: MatchPlanningScreen) -> void:
 	for command: String in ["speed", "special", "four_archers", "eight_archers"]:
 		main.planning.upgrade_tower(0, source_id, command)
 	await _settle()
-	_check(screen._selected_tower().get("advancement", "") == "eight_archers", "Long inspector fixture reaches Eight Archers")
+	_check(screen._selected_tower().get("advancement", "") == "eight_archers", "Inspected source reaches Eight Archers")
 	var scroll := screen._management.find_child("InspectionScroll", true, false) as ScrollContainer
-	var title_rect: Rect2 = screen._tower_title.get_global_rect()
-	var close_rect: Rect2 = screen.close_button.get_global_rect()
-	var build_rect: Rect2 = screen.build_another_button.get_global_rect()
-	_check(scroll.get_v_scroll_bar().max_value > scroll.get_v_scroll_bar().page, "Eight independent weapons require real inspector scrolling")
-	scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
-	await _settle()
-	_check(screen._tower_title.get_global_rect() == title_rect and screen.close_button.get_global_rect() == close_rect and screen.build_another_button.get_global_rect() == build_rect, "Tower identity, close and Build another stay pinned while long stats scroll")
+	if scroll.get_v_scroll_bar().max_value > scroll.get_v_scroll_bar().page:
+		var title_rect: Rect2 = screen._tower_title.get_global_rect()
+		var close_rect: Rect2 = screen.close_button.get_global_rect()
+		scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
+		await _settle()
+		_check(screen._tower_title.get_global_rect() == title_rect and screen.close_button.get_global_rect() == close_rect, "Tower identity and close stay pinned while overflowing stats scroll")
 	before = main.planning.combat.duplicate(true)
 	await _click(screen.close_button.get_global_rect().get_center())
-	_check(not screen._management.visible and main.planning.combat == before, "Pinned X dismisses a scrolled inspector without changing gameplay")
+	_check(not screen._management.visible and main.planning.combat == before, "X dismisses the inspector without changing gameplay")
+	await _click(screen.world.cell_screen_position(0, Vector2i(4, 2)))
+	var refund: int = int(screen._selected_tower()["sell_value"])
+	var coins_before: int = int(main.planning.combat["coins"][0])
+	var tower_count: int = main.planning.combat["towers"][0].size()
+	await _key(KEY_BACKSPACE)
+	_check(main.planning.combat["towers"][0].size() == tower_count - 1 and main.planning.combat["towers"][1].size() == tower_count - 1 and main.planning.combat["coins"][0] == coins_before + refund, "Native Backspace submits one ordinary validated mirrored sale with the accepted refund")
+	_check(screen.selected_tower_id == -1 and screen.boards[0].selected_tower_id == -1 and not screen._management.visible, "Accepted Backspace sale clears inspector and board selection")
 
 
 func _finish() -> void:

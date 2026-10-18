@@ -158,7 +158,7 @@ func _test_strategy_growth_and_reset() -> void:
 	planning.upgrade_tower(0, tower_id, "damage")
 	planning.upgrade_tower(0, tower_id, "speed")
 	planning.upgrade_tower(0, tower_id, "special")
-	planning.set_secondary_targeting(0, tower_id, MatchCombat.TargetMode.STRONGEST)
+	planning.set_targeting(0, tower_id, MatchCombat.TargetMode.STRONGEST)
 	var original_towers: Array = planning.combat["towers"].duplicate(true)
 	var original_route: Array[Vector2i] = planning.layouts[0].route.duplicate()
 	for upcoming: int in range(1, 31):
@@ -175,6 +175,7 @@ func _test_strategy_growth_and_reset() -> void:
 			var expected_tower: Dictionary = original_towers[slot][0].duplicate(true)
 			expected_tower["cell"] += Vector2i(0, expansions)
 			expected_tower["aim"] += Vector2(0, expansions)
+			expected_tower["tracking_aim"] += Vector2(0, expansions)
 			expected_tower["secondary_aim"] += Vector2(0, expansions)
 			expected_tower["bounce_aim"] += Vector2(0, expansions)
 			expected_tower["pierce_aim"] += Vector2(0, expansions)

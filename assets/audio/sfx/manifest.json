@@ -583,6 +583,20 @@
       "sha256": "4cc8885ef7f1d33823cb2d97d087e552e2a9b35124684dc12b79e3e2d96fed02"
     },
     {
+      "file": "sale_01.wav",
+      "family": "sale",
+      "variant": 1,
+      "seed": 741277,
+      "duration_seconds": 0.31,
+      "measured_peak_dbfs": -12.766,
+      "measured_rms_dbfs": -29.797,
+      "mean_pcm_lsb": -0.00101,
+      "authored_peak_linear": 0.23,
+      "recommended_gain_db": 0.0,
+      "recipe": "three bright falling coin contacts into a muted cash drawer",
+      "sha256": "a7409ec0cf036375ca3d608f306768bbae6696a262164a8cb139601a73a7d7a7"
+    },
+    {
       "file": "intro_roar.wav",
       "family": "intro_roar",
       "origin": "third_party_recording",

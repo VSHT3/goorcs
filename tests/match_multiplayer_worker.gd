@@ -140,7 +140,7 @@ func _execute_command(command: Dictionary) -> void:
 		super._execute_command(command)
 	# Publish the observing peer's captured state before acknowledging this fence;
 	# transport ordering alone does not order that process's next disk write.
-	if action in ["build", "target", "target_secondary", "upgrade", "sell", "send", "debug", "step", "edit", "clear", "ready"] and planning.active and _session.state == MultiplayerSession.State.CONNECTED:
+	if action in ["build", "target", "upgrade", "sell", "send", "debug", "step", "edit", "clear", "ready"] and planning.active and _session.state == MultiplayerSession.State.CONNECTED:
 		_pending_fence = _command_id
 		var peer_id: int = planning._active_peer_id
 		_command_fence.request.rpc_id(peer_id, _pending_fence)

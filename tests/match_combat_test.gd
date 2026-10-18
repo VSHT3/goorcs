@@ -32,6 +32,7 @@ func _init() -> void:
 	_test_second_archer_targets_and_cadence()
 	_test_ballista_bounce()
 	_test_ballista_configuration()
+	_test_ballista_continuous_tracking()
 	_test_ballista_pierce_geometry()
 	_test_ballista_pierce_deaths_and_policies()
 	_test_ballista_pierce_snapshot_lifecycle()
@@ -509,6 +510,7 @@ func _test_area_kills_and_bounties() -> void:
 	combat._attack(0, 0.01)
 	_check(combat.enemies[0].size() == 1 and combat.enemies[0][0]["pos"] == Vector2(1.51, 0.0), "One area attack hits every enemy on the tile/eight neighbors, never the outer rounded tile")
 	_check(combat.towers[0][0]["kills"] == 2 and combat.towers[0][1]["kills"] == 0 and combat.coins == [116, 200], "Overlapping area towers attribute each kill and bounty exactly once to the killing tower/board")
+	_check(combat.towers[0][0]["damage_dealt"] == 4 and combat.towers[0][1]["damage_dealt"] == 0, "Overlapping pulses account only for actual HP removed by the first attacker")
 	_check(combat.towers[0][0]["shot"] == 1 and combat.towers[0][0]["target_id"] == first_id, "Area attacks publish one cosmetic event, not a separate shot for each victim")
 	var before: Array[int] = combat.coins.duplicate()
 	combat._attack(0, 0.1)
@@ -1061,7 +1063,7 @@ func _test_special_transactions() -> void:
 			var type_stats: Dictionary = combat.snapshot()["tower_types"][String(ids[index])]
 			var price: int = type_stats["special_upgrade_cost"] if upgrade == "special" else type_stats["evolutions"][upgrade]["cost"]
 			var frozen: Dictionary = combat.snapshot()
-			_check(tower["evolution"] == "" and not combat.upgrade_tower(0, id, upgrade) and not combat.set_secondary_targeting(0, id, 2) and combat.snapshot() == frozen, "Special/evolution and secondary policy are locked at level I for %s" % ids[index])
+			_check(tower["evolution"] == "" and not combat.upgrade_tower(0, id, upgrade) and combat.snapshot() == frozen, "Special/evolution is locked at level I for %s" % ids[index])
 			combat.upgrade_tower(0, id, first)
 			frozen = combat.snapshot()
 			_check(not combat.upgrade_tower(0, id, upgrade) and combat.snapshot() == frozen, "One prerequisite never unlocks a final upgrade for either stat order")
@@ -1092,8 +1094,6 @@ func _test_special_transactions() -> void:
 			combat.coins[0] = 10000
 			frozen = combat.snapshot()
 			_check(not combat.upgrade_tower(0, id, upgrade) and not combat.upgrade_tower(0, id, "damage") and not combat.upgrade_tower(0, id, "speed") and not combat.upgrade_tower(0, id, "boulders") and not combat.upgrade_tower(0, id, "onyx_ring") and not combat.upgrade_tower(0, id, "pierce") and not combat.upgrade_tower(0, id, "bounce") and combat.snapshot() == frozen, "Final choice excludes both branches and all repeat purchases even when funded")
-			if ids[index] != &"arrow_tower":
-				_check(not combat.set_secondary_targeting(0, id, 2) and combat.snapshot() == frozen, "Non-archer upgrades cannot acquire a secondary targeting policy")
 			var refund: int = tower["sell_value"]
 			_check(combat.sell_tower(0, id) and combat.coins[0] == 10000 + refund, "Sale includes sixty percent of all four paid levels")
 			frozen = combat.snapshot()
@@ -1101,7 +1101,7 @@ func _test_special_transactions() -> void:
 		var terminal := _prepared_special(_special_rules(ids[index]), ids[index])
 		terminal.phase = MatchCombat.Phase.FINISHED
 		var frozen_terminal: Dictionary = terminal.snapshot()
-		_check(not terminal.upgrade_tower(0, terminal.towers[0][0]["id"], upgrade) and not terminal.set_secondary_targeting(0, terminal.towers[0][0]["id"], 2) and terminal.snapshot() == frozen_terminal, "Terminal final-upgrade and secondary commands preserve the frozen outcome")
+		_check(not terminal.upgrade_tower(0, terminal.towers[0][0]["id"], upgrade) and not terminal.set_targeting(0, terminal.towers[0][0]["id"], 2) and terminal.snapshot() == frozen_terminal, "Terminal upgrade and targeting commands preserve the frozen outcome")
 	var ordinary := _prepared_special(_rules(), &"arrow_tower")
 	var no_special: Dictionary = ordinary.snapshot()
 	_check(not ordinary.upgrade_tower(0, ordinary.towers[0][0]["id"], "special") and ordinary.snapshot() == no_special, "Custom tower without a special cannot buy a no-effect level")
@@ -1110,17 +1110,15 @@ func _test_special_transactions() -> void:
 func _test_second_archer_targets_and_cadence() -> void:
 	var combat := _prepared_special(_special_rules(&"arrow_tower"), &"arrow_tower")
 	var tower: Dictionary = combat.towers[0][0]
-	_check(tower["secondary_mode"] == tower["mode"], "Secondary policy starts as the build-time primary policy")
 	combat.start_wave(_routes(100, 100))
 	combat.advance(0.01)
 	var old_interval: float = tower["interval"]
 	var old_reload: float = tower["cooldown"]
 	_check(combat.upgrade_tower(0, tower["id"], "special") and is_equal_approx(tower["interval"], old_interval / 1.1) and is_equal_approx(tower["cooldown"], old_reload / 1.1), "Second archer raises attacks per second by ten percent and rescales the live reload proportionally")
 	_check(tower["shot"] == 1 and tower["secondary_shot"] == 0, "Buying a second archer does not grant a free immediate attack")
-	var primary_mode: int = tower["mode"]
 	var frozen: Dictionary = combat.snapshot()
-	_check(not combat.set_secondary_targeting(1, tower["id"], MatchCombat.TargetMode.LAST) and not combat.set_secondary_targeting(0, tower["id"], -1) and not combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.LAST + 1) and not combat.set_secondary_targeting(0, tower["id"], primary_mode) and combat.snapshot() == frozen, "Secondary policy validates owner, bounds and no-op atomically")
-	_check(combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.LAST) and tower["mode"] == primary_mode, "Last secondary policy changes without changing primary policy")
+	_check(not combat.set_targeting(1, tower["id"], MatchCombat.TargetMode.LAST) and not combat.set_targeting(-1, tower["id"], MatchCombat.TargetMode.LAST) and not combat.set_targeting(2, tower["id"], MatchCombat.TargetMode.LAST) and not combat.set_targeting(0, tower["id"] + 100, MatchCombat.TargetMode.LAST) and not combat.set_targeting(0, tower["id"], -1) and not combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.LAST + 1) and not combat.set_targeting(0, tower["id"], tower["mode"]) and combat.snapshot() == frozen, "Shared targeting validates owner, slot, tower, bounds and no-op atomically")
+	_check(combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.LAST) and tower["cooldown"] == frozen["towers"][0][0]["cooldown"] and tower["shot"] == 1 and tower["secondary_shot"] == 0, "Changing the shared policy preserves the pending reload and accepted shots")
 	combat.enemies[0][0]["progress"] = 2.0
 	combat.enemies[0][1]["progress"] = 1.0
 	combat.enemies[0][2]["progress"] = 0.0
@@ -1130,21 +1128,21 @@ func _test_second_archer_targets_and_cadence() -> void:
 	combat.advance(float(tower["cooldown"]) * 0.99)
 	_check(tower["shot"] == 1 and tower["secondary_shot"] == 0, "Neither archer attacks before the accelerated remaining reload")
 	combat.advance(float(tower["interval"]) * 0.02)
-	_check(tower["shot"] == 2 and tower["secondary_shot"] == 1 and combat.enemies[0][0]["hp"] == 77 and combat.enemies[0][1]["hp"] == 60 and combat.enemies[0][2]["hp"] == 87, "Independent furthest and last policies fire one full-damage arrow at distinct targets")
-	_check(tower["target_id"] == combat.enemies[0][0]["id"] and tower["secondary_target_id"] == combat.enemies[0][2]["id"] and tower["aim"] == Vector2(2, 0) and tower["secondary_aim"] == Vector2.ZERO, "Each arrow publishes its own accepted target and aim")
+	_check(tower["shot"] == 2 and tower["secondary_shot"] == 1 and combat.enemies[0][0]["hp"] == 80 and combat.enemies[0][1]["hp"] == 57 and combat.enemies[0][2]["hp"] == 87, "Both archers use Last to hit the two least-progressed distinct targets")
+	_check(tower["target_id"] == combat.enemies[0][2]["id"] and tower["secondary_target_id"] == combat.enemies[0][1]["id"] and tower["aim"] == Vector2.ZERO and tower["secondary_aim"] == Vector2(1, 0), "Each arrow publishes its own accepted target and aim under the shared policy")
 	for volley: int in range(5):
 		var shots: int = tower["shot"]
 		combat.advance(float(tower["interval"]) * 0.99)
 		_check(tower["shot"] == shots, "True special cadence does not fire before its interval")
 		combat.advance(float(tower["interval"]) * 0.011)
 		_check(tower["shot"] == shots + 1, "True special cadence fires at the interval divided by 1.1")
-	# Both policies prefer the same enemy; exclusion still guarantees a second victim.
+	# One shared policy still excludes the primary victim while another is available.
 	combat = _prepared_special(_special_rules(&"arrow_tower", 100, 2), &"arrow_tower")
 	tower = combat.towers[0][0]
 	combat.upgrade_tower(0, tower["id"], "special")
 	combat.start_wave(_routes())
 	combat.advance(0.01)
-	_check(combat.enemies[0][0]["hp"] == 97 and combat.enemies[0][1]["hp"] == 97 and tower["target_id"] != tower["secondary_target_id"], "Identical policies cannot double-hit the primary target")
+	_check(combat.enemies[0][0]["hp"] == 97 and combat.enemies[0][1]["hp"] == 97 and tower["target_id"] != tower["secondary_target_id"], "Shared targeting chooses distinct enemies before allowing a fallback")
 	combat = _prepared_special(_special_rules(&"arrow_tower", 3, 2), &"arrow_tower")
 	tower = combat.towers[0][0]
 	combat.upgrade_tower(0, tower["id"], "special")
@@ -1169,9 +1167,7 @@ func _test_second_archer_targets_and_cadence() -> void:
 	combat.upgrade_tower(0, tower["id"], "special")
 	combat.start_wave(_routes(100, 100))
 	combat.advance(0.01)
-	combat.set_secondary_targeting(0, tower["id"], MatchCombat.TargetMode.CLOSEST)
 	combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.STRONGEST)
-	_check(tower["secondary_mode"] == MatchCombat.TargetMode.CLOSEST, "Changing the primary policy leaves the secondary policy independent")
 	combat.enemies[0][0]["progress"] = 3.0
 	combat.enemies[0][0]["hp"] = 100
 	combat.enemies[0][1]["progress"] = 0.0
@@ -1179,13 +1175,73 @@ func _test_second_archer_targets_and_cadence() -> void:
 	combat.enemies[0][2]["progress"] = 4.0
 	combat.enemies[0][2]["hp"] = 1000
 	combat.advance(float(tower["interval"]))
-	_check(combat.enemies[0][0]["hp"] == 97 and combat.enemies[0][1]["hp"] == 87 and combat.enemies[0][2]["hp"] == 1000, "Independent strongest primary and closest secondary both respect the original tower range")
+	_check(combat.enemies[0][0]["hp"] == 97 and combat.enemies[0][1]["hp"] == 87 and combat.enemies[0][2]["hp"] == 1000, "Shared Strongest targeting chooses both eligible enemies and respects the original tower range")
 	var secondary_shots: int = tower["secondary_shot"]
 	combat.enemies[0][0]["progress"] = 0.0
 	combat.enemies[0][1]["progress"] = 5.0
 	combat.enemies[0][2]["progress"] = 6.0
 	combat.advance(float(tower["interval"]))
 	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 87 and combat.enemies[0][2]["hp"] == 1000 and tower["secondary_shot"] == secondary_shots + 1 and tower["secondary_target_id"] == tower["target_id"], "With only one in-range enemy both archers share it and ignore out-of-range alternatives")
+
+
+func _test_ballista_continuous_tracking() -> void:
+	var combat := MatchCombat.new(_special_rules(&"orc_ballista", 100, 3))
+	combat.build(0, Vector2i(0, 1), &"orc_ballista", MatchCombat.TargetMode.FURTHEST)
+	var tower: Dictionary = combat.towers[0][0]
+	_check(combat.snapshot()["tower_types"]["orc_ballista"]["directional_weapon"]
+		and tower["tracking_target_id"] == -1 and tower["tracking_aim"] == Vector2(0, 1),
+		"Directional capability starts without an invented target or accepted aim")
+	combat.start_wave(_routes(100, 100))
+	tower["cooldown"] = 100.0
+	combat.advance(0.01)
+	var first: Dictionary = combat.enemies[0][0]
+	var second: Dictionary = combat.enemies[0][1]
+	var third: Dictionary = combat.enemies[0][2]
+	_check(tower["tracking_target_id"] == first["id"] and tower["shot"] == 0
+		and tower["target_id"] == -1 and tower["aim"] == Vector2(0, 1),
+		"A long-cooldown Ballista accepts a live target before its first shot without fabricating a shot event")
+	for enemy: Dictionary in combat.enemies[0]:
+		enemy["progress"] = 7.0
+	combat.advance(0.01)
+	var last_aim: Vector2 = tower["tracking_aim"]
+	_check(tower["tracking_target_id"] == -1 and last_aim == Vector2.ZERO,
+		"No in-range enemy clears the live target while retaining the last tracking aim")
+	first["progress"] = 2.0
+	second["progress"] = 1.0
+	second["hp"] = 200
+	combat.advance(0.01)
+	_check(tower["tracking_target_id"] == first["id"] and tower["tracking_aim"] == Vector2(2, 0)
+		and tower["shot"] == 0, "Reloading Ballista acquires the host-policy target as it enters range")
+	var cooldown: float = tower["cooldown"]
+	combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.STRONGEST)
+	_check(tower["tracking_target_id"] == second["id"] and tower["tracking_aim"] == Vector2(1, 0)
+		and tower["cooldown"] == cooldown, "Changing policy immediately republishes live tracking without advancing the reload")
+	combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.FURTHEST)
+	first["progress"] = 7.0
+	combat.advance(0.01)
+	_check(tower["tracking_target_id"] == second["id"] and tower["shot"] == 0,
+		"An out-of-range victim is replaced by another valid host-selected target during reload")
+	third["progress"] = 3.0
+	combat._hit(0, tower, combat._enemy_index(0, second["id"]), int(second["hp"]))
+	combat.advance(0.01)
+	_check(tower["tracking_target_id"] == third["id"] and tower["shot"] == 0,
+		"A killed victim is replaced by the remaining in-range enemy before any shot is due")
+	tower["cooldown"] = 0.0
+	combat.advance(0.01)
+	var released: Dictionary = tower.duplicate(true)
+	var accepted: Dictionary = combat.snapshot()
+	third["progress"] = 1.0
+	combat.advance(0.01)
+	_check(tower["tracking_aim"] == Vector2(1, 0) and tower["aim"] == released["aim"]
+		and tower["target_id"] == released["target_id"] and tower["shot"] == released["shot"]
+		and tower["damage_dealt"] == released["damage_dealt"] and tower["kills"] == released["kills"],
+		"Live tracking changes independently of released aim, cadence, damage and kill accounting")
+	_check(accepted["towers"][0][0]["tracking_aim"] == Vector2(3, 0)
+		and accepted["towers"][0][0]["tracking_target_id"] == third["id"],
+		"Accepted tracking snapshots are detached from subsequent host tracking movement")
+	combat.debug_set_round(2)
+	_check(tower["tracking_target_id"] == -1 and tower["tracking_aim"] == Vector2(0, 1),
+		"An explicit round reset clears tracking alongside shot events")
 
 
 func _test_ballista_bounce() -> void:
@@ -1202,6 +1258,7 @@ func _test_ballista_bounce() -> void:
 	combat.enemies[0][3]["progress"] = 10.0
 	combat.advance(float(tower["interval"]))
 	_check(combat.enemies[0][0]["hp"] == 82 and combat.enemies[0][1]["hp"] == 95 and combat.enemies[0][2]["hp"] == 100 and combat.enemies[0][3]["hp"] == 100, "Bounce hits only the nearest other enemy beyond tower range, once, for rounded-up half damage")
+	_check(tower["damage_dealt"] == 23, "Primary and redirected bolt damage both accumulate once across volleys")
 	_check(tower["bounce_active"] and tower["aim"] == Vector2(4, 0) and tower["bounce_aim"] == Vector2(5, 0), "Primary event captures sequential primary-hit and bounce endpoints")
 	# Equal distances use stable IDs even after array reordering and primary removal.
 	combat = _prepared_special(_special_rules(&"orc_ballista", 100, 3), &"orc_ballista")
@@ -1329,8 +1386,8 @@ func _test_ballista_pierce_deaths_and_policies() -> void:
 		var primary: Dictionary = combat.enemies[0][0]
 		var second: Dictionary = combat.enemies[0][1]
 		var third: Dictionary = combat.enemies[0][2]
-		primary["hp"] = 9
-		second["hp"] = 9
+		primary["hp"] = 3
+		second["hp"] = 4
 		combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.CLOSEST)
 		if reverse_order:
 			combat.enemies[0].reverse()
@@ -1338,6 +1395,7 @@ func _test_ballista_pierce_deaths_and_policies() -> void:
 		combat._attack(0, 0.01)
 		_check(combat.enemies[0].size() == 1 and combat.enemies[0][0]["id"] == third["id"] and third["hp"] == 100 and tower["kills"] == 2 and tower["target_id"] == primary["id"], "Pierce captures both victims before primary death and removal in either array order, without hitting a third")
 		_check(combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]), "Both authoritative Pierce kills retain tower attribution and pay one bounty each")
+		_check(tower["damage_dealt"] == 7, "Lethal piercing victims contribute only their seven remaining HP, never two full overkills")
 	for mode: int in MatchCombat.TargetMode.values():
 		var combat := _ballista_field([Vector2(2, 1), Vector2(0, 3), Vector2(-2, 1)])
 		var tower: Dictionary = combat.towers[0][0]
@@ -1685,21 +1743,22 @@ func _test_special_snapshot_and_growth() -> void:
 	combat.advance(0.01)
 	var copy: Dictionary = combat.snapshot()
 	copy["towers"][0][0]["special_upgraded"] = false
-	copy["towers"][0][0]["secondary_mode"] = 2
+	copy["towers"][0][0]["mode"] = 2
 	copy["towers"][0][0]["secondary_shot"] = 999
 	copy["towers"][0][0]["secondary_aim"] = Vector2(99, 99)
 	copy["towers"][0][0]["bounce_active"] = true
 	copy["enemies"][0][0]["speed"] = 999.0
 	copy["tower_types"]["arrow_tower"]["special_upgrade_cost"] = 1
-	_check(tower["special_upgraded"] and tower["secondary_mode"] == 0 and tower["secondary_shot"] == 1 and tower["secondary_aim"] == Vector2.ZERO and not tower["bounce_active"] and combat.enemies[0][0]["speed"] == 0.0 and combat.snapshot()["tower_types"]["arrow_tower"]["special_upgrade_cost"] == 200, "Special metadata, attack events, policy and enemy speed are detached snapshot values")
+	_check(tower["special_upgraded"] and tower["mode"] == 0 and tower["secondary_shot"] == 1 and tower["secondary_aim"] == Vector2.ZERO and not tower["bounce_active"] and combat.enemies[0][0]["speed"] == 0.0 and combat.snapshot()["tower_types"]["arrow_tower"]["special_upgrade_cost"] == 200, "Special metadata, attack events, shared policy and enemy speed are detached snapshot values")
 	combat.phase = MatchCombat.Phase.PLANNING
 	var old_aim: Vector2 = tower["aim"]
+	var old_tracking: Vector2 = tower["tracking_aim"]
 	var old_secondary: Vector2 = tower["secondary_aim"]
 	var old_bounce: Vector2 = tower["bounce_aim"]
 	var primary_shots: int = tower["shot"]
 	var secondary_shots: int = tower["secondary_shot"]
 	combat.grow_for_main_round()
-	_check(tower["cell"] == Vector2i(0, 2) and tower["aim"] == old_aim + Vector2.DOWN and tower["secondary_aim"] == old_secondary + Vector2.DOWN and tower["bounce_aim"] == old_bounce + Vector2.DOWN and tower["shot"] == primary_shots and tower["secondary_shot"] == secondary_shots, "Board growth shifts every cosmetic endpoint exactly once without inventing a shot")
+	_check(tower["cell"] == Vector2i(0, 2) and tower["aim"] == old_aim + Vector2.DOWN and tower["tracking_aim"] == old_tracking + Vector2.DOWN and tower["secondary_aim"] == old_secondary + Vector2.DOWN and tower["bounce_aim"] == old_bounce + Vector2.DOWN and tower["shot"] == primary_shots and tower["secondary_shot"] == secondary_shots, "Board growth shifts every cosmetic endpoint exactly once without inventing a shot")
 
 
 func _test_freeze_transactions() -> void:

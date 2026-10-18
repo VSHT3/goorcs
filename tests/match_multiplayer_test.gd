@@ -271,9 +271,10 @@ func _peer_specials(code: String) -> void:
 				await _command(lane, {"action": "upgrade", "slot": slot, "tower_id": id, "upgrade": "special"})
 			_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Cross-owner and repeat special requests cannot spend or mutate accepted state")
 			if type_id == "arrow_tower":
-				await _command(lane, {"action": "target_secondary", "slot": slot, "tower_id": id, "mode": MatchCombat.TargetMode.LAST})
-				tower = await _wait_tower(observer, slot, Vector2i(x, 3), 0)
-				_check(tower["secondary_mode"] == MatchCombat.TargetMode.LAST and tower["mode"] == 0, "Independent Last second-archer targeting replicates without changing the primary policy")
+				await _command(lane, {"action": "target", "slot": slot, "tower_id": id, "mode": MatchCombat.TargetMode.LAST})
+				tower = await _wait_tower(observer, slot, Vector2i(x, 3), MatchCombat.TargetMode.LAST)
+				_check(tower["mode"] == MatchCombat.TargetMode.LAST, "Both real senders update the one shared policy after Second Archer and publish it before command acknowledgement")
+				_check(_snapshot("host")["combat"] == _snapshot("guest")["combat"], "Shared-policy command fences publish both accepted snapshots")
 			x += 2
 	# Put each branch beside the spawn; other towers cannot reach these stationary enemies.
 	for slot: int in range(2):

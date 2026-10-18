@@ -728,6 +728,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		tower["special_upgraded"] = true
 		tower["evolution"] = "bounce"
 		tower["aim"] = Vector2(3, 1)
+		tower["tracking_aim"] = tower["aim"]
 		board.combat_towers = [tower]
 		baseline = await _board_image(board, viewport)
 		tower = tower.duplicate(true)
@@ -759,6 +760,7 @@ func _check_special_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		var captured_position: Vector2 = board._projectile_position(board._shot_traces[0])
 		var later: Dictionary = tower.duplicate(true)
 		later["aim"] = Vector2(4, 4)
+		later["tracking_aim"] = later["aim"]
 		later["bounce_aim"] = Vector2(4, 0)
 		later["bounce_active"] = false
 		board.combat_towers = [later]
@@ -1215,6 +1217,7 @@ func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		tower["special_upgraded"] = true
 		tower["evolution"] = "pierce"
 		tower["aim"] = Vector2(1, 3)
+		tower["tracking_aim"] = tower["aim"]
 		board.combat_towers = [tower]
 		var baseline: Image = await _board_image(board, viewport)
 		tower = tower.duplicate(true)
@@ -1263,6 +1266,7 @@ func _check_pierce_attacks(board: PathBoard, viewport: SubViewport) -> void:
 		var captured_position: Vector2 = board._projectile_position(trace)
 		var later: Dictionary = tower.duplicate(true)
 		later["aim"] = Vector2(0, 0)
+		later["tracking_aim"] = later["aim"]
 		later["pierce_aim"] = Vector2(0, 0)
 		later["pierce_active"] = false
 		later["target_id"] = -1
@@ -1325,6 +1329,7 @@ func _check_directional_weapons(board: PathBoard, viewport: SubViewport) -> void
 		var first_lower: PackedByteArray
 		for index: int in range(8):
 			tower["aim"] = Vector2(tower["cell"]) + directions[index]
+			tower["tracking_aim"] = tower["aim"]
 			board.combat_towers = [tower]
 			var expected: int = posmod(8 - index, 8) if mirrored else index
 			_check(board._directional_weapon_index(tower) == expected,
@@ -1352,7 +1357,9 @@ func _check_directional_weapons(board: PathBoard, viewport: SubViewport) -> void
 					"Half-sector boundaries select adjacent cardinal/diagonal poses without mirror bias")
 		var accepted_aim := Vector2(0, 3)
 		tower["aim"] = accepted_aim
-		tower["target_id"] = 802
+		tower["tracking_aim"] = Vector2(4, 3)
+		tower["tracking_target_id"] = 802
+		tower["target_id"] = 899
 		var route: Array = [Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0), Vector2i(4, 1), Vector2i(4, 2), Vector2i(4, 3)]
 		var target: Dictionary = _enemy(802, 0.0, Vector2(2, 0), route)
 		var decoy: Dictionary = _enemy(803, 0.0, Vector2(3, 3), [])
@@ -1391,9 +1398,10 @@ func _check_directional_weapons(board: PathBoard, viewport: SubViewport) -> void
 				invalid_target["pos"] = Vector2(20, 3)
 			board.combat_enemies = [decoy] if state == "missing" else [decoy, invalid_target]
 			board.set_process(false)
-			_check(board._directional_weapon_index(tower) == accepted_index,
-				"A %s accepted target holds the last host aim instead of selecting a decoy" % state)
-		tower["aim"] = Vector2(2, 0)
+			_check(board._directional_weapon_index(tower) == (6 if mirrored else 2),
+				"A %s accepted target holds the last host tracking aim, not the stale released shot or a decoy" % state)
+		tower["tracking_target_id"] = -1
+		tower["tracking_aim"] = Vector2(2, 0)
 		board.combat_towers = [tower]
 		_check(board._projectile_origin(trace).is_equal_approx(released_tip)
 			and board._directional_weapon_index(tower) == 0,
@@ -1792,6 +1800,7 @@ func _pixels_changed_near(before: Image, after: Image, position: Vector2) -> boo
 func _tower(id: int, cell: Vector2i, type_id: String) -> Dictionary:
 	return {"id": id, "cell": cell, "type_id": type_id, "evolution": "", "freeze_upgraded": false,
 		"shot": 0, "aim": Vector2(cell), "pierce_active": false, "pierce_aim": Vector2(cell),
+		"tracking_target_id": -1, "tracking_aim": Vector2(cell),
 		"bounce_active": false, "bounce_aim": Vector2(cell)}
 
 

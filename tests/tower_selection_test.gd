@@ -76,16 +76,50 @@ func _run() -> void:
 	_check(screen.selected_tower_id == id and screen.get_node("%TowerManagement").visible, "Owned inspection opens management")
 	_check(screen.targeting_button.mode == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
 	_check(screen.boards[0].selected_tower_id == id and screen.boards[1].selected_tower_id == -1, "Range selection stays local to owned board")
+	main.planning.combat["rules"]["base_health"] = 140
+	main.planning.combat["health"] = [63, 17]
+	main.planning.changed.emit()
+	_check(screen._health_bar.max_value == 140 and screen._health_bar.value == 63, "Own health bar consumes accepted health and admitted maximum rather than local defaults or opponent health")
+	for accepted_health: int in [140, 90, 35, 7, 0, 140]:
+		main.planning.combat["health"] = [accepted_health, 140 - accepted_health]
+		main.planning.changed.emit()
+		_check(screen._health_bar.max_value == 140 and screen._health_bar.value == accepted_health, "Full, damaged, critical, depleted and restored health follow the accepted own-slot value")
+		_check(is_equal_approx(screen._health_bar.get_as_ratio(), float(accepted_health) / 140.0), "Health fill ratio uses the accepted maximum throughout damage and restoration")
+	main.planning.combat["rules"]["base_health"] = 80
+	main.planning.combat["health"] = [20, 79]
+	main.planning.changed.emit()
+	_check(screen._health_bar.max_value == 80 and screen._health_bar.value == 20 and is_equal_approx(screen._health_bar.get_as_ratio(), 0.25), "A changed accepted maximum immediately remaps the own health ratio without using opponent health")
+	main.planning.combat["rules"]["base_health"] = 0
+	main.planning.combat["health"] = [0, 79]
+	main.planning.changed.emit()
+	_check(screen._health_bar.value == 0 and screen._health_bar.get_as_ratio() == 0.0, "A zero accepted maximum renders an empty finite health display")
+	main.planning.combat["rules"]["base_health"] = 140
+	main.planning.combat["health"] = [63, 17]
+	var accepted_health_state: Dictionary = main.planning.combat.duplicate(true)
+	main.planning.changed.emit()
+	screen._refresh()
+	_check(main.planning.combat == accepted_health_state and screen._health_bar.max_value == 140 and screen._health_bar.value == 63, "Repeated health refresh neither mutates accepted health nor retains a previous maximum")
+	var rarity_colors: Array[Color] = []
+	for rarity: String in TowerRollRules.RARITIES:
+		var color: Color = MatchPlanningScreen.tower_rarity_color({"rarity": rarity})
+		_check(not rarity_colors.has(color), "Every accepted rarity has a distinct static title color")
+		rarity_colors.append(color)
 	_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible and screen.damage_upgrade.visible and screen.speed_upgrade.visible, "Evolution choices are hidden until both stat upgrades")
 	var definition: Dictionary = main.planning.combat["tower_types"]["orc_ballista"]
 	_check(model.upgrade_tower(0, id, "damage"), "First real stat upgrade succeeds")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
-	_check(not screen.special_upgrade.visible and screen.speed_upgrade.visible, "Special stays hidden until both stat upgrades are purchased")
+	_check(not screen.special_upgrade.visible and not screen.damage_upgrade.visible and screen.speed_upgrade.visible and not screen.speed_upgrade.disabled, "Purchasing one stat hides only that upgrade and preserves its unpurchased sibling")
 	_check(model.upgrade_tower(0, id, "speed"), "Second real stat upgrade succeeds")
 	model.towers[0][0]["kills"] = 7
+	model.towers[0][0]["damage_dealt"] = 12345
+	model.towers[0][0]["coins_generated"] = 456
+	model.towers[0][0]["indirect_damage"] = 789
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
+	var accepted_counters: Dictionary = model.snapshot()
+	screen._refresh()
+	_check(model.snapshot() == accepted_counters, "Repeated inspection refresh cannot reset kills or other lifetime statistics")
 	_check(screen.damage_upgrade.disabled and screen.speed_upgrade.disabled, "Purchased upgrades cannot be bought twice in management")
 	_check(screen.special_upgrade.visible and screen.alternate_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible and not screen.special_upgrade.disabled and not screen.alternate_upgrade.disabled, "Both purchased Ballista stats expose two affordable evolution choices")
 	var pierce_price: int = int(definition["evolutions"]["pierce"]["cost"])
@@ -97,7 +131,7 @@ func _run() -> void:
 	_check(model.upgrade_tower(0, id, "pierce"), "Exact configured price buys Pierce")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
-	_check(screen.special_upgrade.visible and screen.alternate_upgrade.visible and screen.special_upgrade.disabled and screen.alternate_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased Ballista evolution keeps both exclusive choices visible and disabled")
+	_check(screen._special_upgrade_command != "pierce" and screen._alternate_upgrade_command != "pierce" and not screen.alternate_upgrade.visible and screen.special_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased evolution disappears while its excluded sibling remains unavailable")
 	screen.close_button.pressed.emit()
 	_check(screen.selected_tower_id == -1 and model.towers[0].size() == 1, "Close clears selection without selling")
 	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
@@ -214,11 +248,11 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 			var evolved: Dictionary = model.towers[slot][0]
 			_check(evolved.get("evolution", "") == evolution and evolved["special_upgraded"] and MatchCombat.tower_level(evolved) == 4 and model.coins[slot] == 0, "Each native Ballista button buys its own branch with exact funds on both solo boards")
 			_check(evolved["damage"] == damage_before and is_equal_approx(float(evolved["interval"]), interval_before), "Ballista branches preserve current upgraded attack stats")
-		_check(chosen.visible and other.visible and chosen.disabled and other.disabled, "Purchased and excluded Ballista branches remain visible and unavailable")
+		_check(screen._special_upgrade_command != evolution and screen._alternate_upgrade_command != evolution, "Purchased Ballista branch is absent from remaining controls")
 		_check(screen._tower_stats.text == stats_before, "Ballista evolutions preserve ordinary attack-stat presentation")
 		model.coins = [2000, 2000]
 		planning._publish_snapshot()
-		_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
+		_check(screen.special_upgrade.disabled and not screen.alternate_upgrade.is_visible_in_tree(), "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
 		frozen = planning.combat.duplicate(true)
 		chosen.pressed.emit()
 		other.pressed.emit()
@@ -298,7 +332,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		if evolution == "boulders":
 			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes", "Purchased Boulders replaces branch purchases with its reachable follow-up")
 		else:
-			_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Purchased Onyx leaves both exclusive branch purchases visibly unavailable")
+			_check(screen._special_upgrade_command != evolution and screen._alternate_upgrade_command != evolution and not chosen.is_visible_in_tree() and screen.special_upgrade.disabled, "Purchased Onyx is hidden and the excluded branch cannot be bought")
 		frozen = planning.combat.duplicate(true)
 		chosen.pressed.emit()
 		other.pressed.emit()
@@ -311,7 +345,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		if evolution == "boulders":
 			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes" and not screen.special_upgrade.disabled, "Funded Boulders exposes only its legitimate follow-up, not a repeat or branch switch")
 		else:
-			_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Funded Onyx exposes no enabled repeat or alternate branch purchase")
+			_check(not chosen.is_visible_in_tree() and screen.special_upgrade.disabled, "Funded Onyx exposes no enabled repeat or alternate branch purchase")
 			chosen.pressed.emit()
 			other.pressed.emit()
 		for command: String in ["boulders", "onyx_ring", "special"]:
@@ -345,11 +379,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			screen.special_upgrade.pressed.emit()
 			for slot: int in range(2):
 				_check(model.towers[slot][0].get("freeze_upgraded", false) and MatchCombat.tower_level(model.towers[slot][0]) == 5 and model.coins[slot] == 0, "Follow-up button dispatches its real command and reaches level V on both solo boards")
-			_check(screen.special_upgrade.disabled and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up stays visible without changing continuous damage stats or reviving Onyx")
-			_check(screen._tower_title.text.ends_with(MatchPlanningScreen.TOWER_LEVEL_NUMERALS[4]), "Management displays the accepted fifth tower level")
-			await process_frame
-			var row: Control = screen.special_upgrade.get_parent()
-			_check(is_equal_approx(screen.special_upgrade.size.x, row.size.x), "Boulders follow-up uses the entire existing upgrade row")
+			_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up disappears without changing continuous damage stats or reviving Onyx")
 			frozen = planning.combat.duplicate(true)
 			screen.special_upgrade.pressed.emit()
 			planning.upgrade_tower(0, id, "freeze_runes")
@@ -384,24 +414,25 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 		var tower: Dictionary = model.towers[0][0]
 		var id: int = int(tower["id"])
 		screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+		await _check_upgrade_order(screen, 2)
 		var frozen: Dictionary = planning.combat.duplicate(true)
 		for button: Button in screen.advancement_buttons.values():
 			button.pressed.emit()
 		planning.upgrade_tower(0, id, branch)
-		planning.set_archer_targeting(0, id, 2, 1)
-		_check(planning.combat == frozen, "Hidden Arrow advancement and extra-target controls cannot bypass prerequisites")
+		_check(planning.combat == frozen, "Hidden Arrow advancement controls cannot bypass prerequisites")
 		screen.damage_upgrade.pressed.emit()
 		screen.speed_upgrade.pressed.emit()
-		_check(not screen._advancement_row.visible and screen.special_upgrade.visible, "Both stats expose Second Archer, not level-V choices")
+		_check(not screen.advancement_buttons["four_archers"].visible and screen.special_upgrade.visible, "Both stats expose Second Archer, not level-V choices")
 		frozen = planning.combat.duplicate(true)
 		planning.upgrade_tower(0, id, branch)
 		_check(planning.combat == frozen, "Level-V purchase requires the accepted fourth level")
 		screen.special_upgrade.pressed.emit()
-		_check(screen._advancement_row.visible and not screen.special_upgrade.visible and MatchCombat.tower_level(tower) == 4, "Second Archer replaces its action with three advancement choices")
+		_check(screen.advancement_buttons["four_archers"].visible and not screen.special_upgrade.visible and MatchCombat.tower_level(tower) == 4, "Second Archer replaces its action with three advancement choices")
+		await _check_shared_archer_targeting(planning, screen, 2)
+		await _check_upgrade_order(screen, 3)
 		var choices: Dictionary = planning.combat["tower_types"]["arrow_tower"]["advancements"]
 		var price: int = int(choices[branch]["cost"])
 		var chosen: Button = screen.advancement_buttons[branch]
-		_check(chosen.text.contains(str(price)), "Arrow button shows the accepted host resource price")
 		model.coins = [price - 1, price - 1]
 		planning._publish_snapshot()
 		_check(chosen.disabled, "Arrow path affordability uses the accepted exact price")
@@ -420,54 +451,25 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 		planning._publish_snapshot()
 		chosen.pressed.emit()
 		_check(tower["advancement"] == branch and MatchCombat.tower_level(tower) == 5 and model.coins == [0, 0], "Native advancement control buys its exclusive fifth level through mirrored owner commands")
-		for command: String in screen.advancement_buttons:
-			var button: Button = screen.advancement_buttons[command]
-			_check(button.disabled, "Chosen and excluded paths cannot be bought again")
-		_check(screen.third_targeting.is_visible_in_tree() == (branch == "four_archers") and screen.fourth_targeting.is_visible_in_tree() == (branch == "four_archers"), "Only accepted Four Archers exposes selectors three and four")
-		if branch == "four_archers":
-			for direction: int in [1, -1]:
-				var expected_modes: Array = [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.FURTHEST] if direction == 1 else [MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.FURTHEST]
-				for expected: int in expected_modes:
-					await _press_cycle_button(screen.targeting_button.next_button if direction == 1 else screen.targeting_button.previous_button)
-					for slot: int in range(2):
-						_check(planning.combat["towers"][slot][0]["mode"] == expected and screen.targeting_button.mode == expected, "Native primary arrows wrap in display order through accepted mirrored policies")
-			await _press_cycle_button(screen.secondary_targeting.next_button)
-			await _press_cycle_button(screen.third_targeting.next_button)
-			await _press_cycle_button(screen.third_targeting.next_button)
-			await _press_cycle_button(screen.fourth_targeting.previous_button)
-			var selectors: Array[TargetingCycle] = [screen.targeting_button, screen.secondary_targeting, screen.third_targeting, screen.fourth_targeting]
-			var independent_modes: Array[int] = [MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST]
-			for slot: int in range(2):
-				var accepted: Dictionary = planning.combat["towers"][slot][0]
-				_check(accepted["mode"] == independent_modes[0] and accepted["secondary_mode"] == independent_modes[1] and accepted["extra_archers"][0]["mode"] == independent_modes[2] and accepted["extra_archers"][1]["mode"] == independent_modes[3], "All four native selectors persist independent accepted modes through mirrored snapshots")
-			for index: int in range(selectors.size()):
-				_check(selectors[index].mode == independent_modes[index], "Each archer displays its own accepted enum value rather than the display index")
-			# A stale enabled HUD must not display a request rejected by committed Ready.
-			planning._host_ready[0] = true
-			var rejected_mode: int = screen.third_targeting.mode
-			await _press_cycle_button(screen.third_targeting.next_button)
-			_check(screen.third_targeting.mode == rejected_mode and model.towers[0][0]["extra_archers"][0]["mode"] == rejected_mode, "An authoritative Ready rejection never optimistically advances the displayed policy")
-			planning._publish_snapshot()
-			frozen = planning.combat.duplicate(true)
-			for selector: TargetingCycle in selectors:
-				_check(selector.disabled and selector.previous_button.disabled and selector.next_button.disabled, "Ready disables both native arrows for every archer")
-			await _press_cycle_button(screen.third_targeting.next_button)
-			planning.set_archer_targeting(0, id, 3, MatchCombat.TargetMode.LAST)
-			_check(planning.combat == frozen, "Ready blocks disabled native targeting arrows and direct gateway commands")
-			planning._host_ready[0] = false
-			planning._publish_snapshot()
-		for width: int in [1000, 1280]:
-			root.size = Vector2i(width, 720)
-			await process_frame
-			var surface := Rect2(screen.global_position, screen.size)
-			_check(surface.encloses(screen._management.get_global_rect()), "Arrow management remains inside the compact game surface")
-			for button: Button in screen.advancement_buttons.values():
-				if button.is_visible_in_tree():
-					_check(screen._management.get_global_rect().encloses(button.get_global_rect()), "Eligible wrapped choices stay inside the management panel")
-			for selector: TargetingCycle in [screen.targeting_button, screen.secondary_targeting, screen.third_targeting, screen.fourth_targeting]:
-				if selector.is_visible_in_tree():
-					for control: Control in [selector.previous_button, selector.mode_label, selector.next_button]:
-						_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "Labeled archer cycles stay inside the management panel at width %d" % width)
+		for command: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
+			_check(not screen.advancement_buttons[command].is_visible_in_tree(), "Purchased and excluded branch choices leave no stale actions")
+		await _check_shared_archer_targeting(planning, screen, 4 if branch == "four_archers" else 2)
+		await _check_upgrade_order(screen)
+		await _check_targeting_input_guards(planning, screen)
+		# A stale enabled HUD must not display a request rejected by committed Ready.
+		planning._host_ready[0] = true
+		var rejected_mode: int = screen.targeting_button.mode
+		await _press_cycle_button(screen.targeting_button.next_button)
+		_check(screen.targeting_button.mode == rejected_mode and model.towers[0][0]["mode"] == rejected_mode, "An authoritative Ready rejection never optimistically advances the common policy")
+		planning._publish_snapshot()
+		frozen = planning.combat.duplicate(true)
+		_check(screen.targeting_button.disabled and screen.targeting_button.previous_button.disabled and screen.targeting_button.next_button.disabled, "Ready disables both native targeting arrows")
+		await _press_cycle_button(screen.targeting_button.next_button)
+		planning.set_targeting(0, id, MatchCombat.TargetMode.LAST)
+		_check(planning.combat == frozen, "Ready blocks disabled native targeting arrows and direct gateway commands")
+		planning._host_ready[0] = false
+		planning._publish_snapshot()
+		await _check_upgrade_order(screen)
 		var followups: Array = {
 			"four_archers": ["eight_archers", "arrow_minigun"],
 			"fire_arrows": ["molotov", "quick_pitch", "flamethrower"],
@@ -479,29 +481,117 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 			planning._publish_snapshot()
 			var next_button: Button = screen.advancement_buttons[command]
 			_check(next_button.is_visible_in_tree() and not next_button.disabled, "Immediate prerequisite exposes the next native branch purchase")
+			await _check_upgrade_order(screen)
 			await _press_cycle_button(next_button)
 			_check(tower["advancement"] == command and model.coins == [0, 0], "Each deeper native upgrade charges the exact authored price on both mirrored boards")
 			_check(tower["advancement_path"].back() == command, "Each accepted native branch purchase appends its history")
-			if command == "eight_archers":
-				for index: int in range(2, screen.extra_targeting.size()):
-					var selector: TargetingCycle = screen.extra_targeting[index]
-					_check(selector.is_visible_in_tree(), "Eight Archers exposes all independent native stream selectors")
-					await _press_cycle_button(selector.next_button)
-					for slot: int in range(2):
-						_check(planning.combat["towers"][slot][0]["extra_archers"][index]["mode"] == selector.mode, "Streams five through eight dispatch accepted mirrored target policies")
-		_check(not screen.secondary_targeting.is_visible_in_tree() and not screen._extra_target_row.is_visible_in_tree(), "Single-weapon terminal tiers hide obsolete secondary targeting controls")
+			var count: int = 8 if command == "eight_archers" else (2 if command in ["molotov", "quick_pitch", "bigger_bombs", "anti_orc_grenades"] else 1)
+			await _check_shared_archer_targeting(planning, screen, count)
+			await _check_upgrade_order(screen)
 		model.coins = [10000, 10000]
 		planning._publish_snapshot()
 		frozen = planning.combat.duplicate(true)
 		for command: String in screen.advancement_buttons:
 			screen.advancement_buttons[command].pressed.emit()
 			planning.upgrade_tower(0, id, command)
-		planning.set_archer_targeting(0, id, 4, 1)
 		planning.upgrade_tower(1, id, branch)
-		_check(planning.combat == frozen, "Repeat, switch, foreign-owner and invalid archer-index commands are atomic rejections")
+		_check(planning.combat == frozen, "Repeat, switch and foreign-owner branch commands are atomic rejections")
 		planning.stop_singleplayer()
 		await create_timer(0.2).timeout
 	root.size = original_size
+
+func _check_shared_archer_targeting(planning: MatchPlanning, screen: MatchPlanningScreen, count: int) -> void:
+	var selectors: int = 0
+	for control: Node in screen._management.find_children("*", "HBoxContainer", true, false):
+		if control is TargetingCycle and control.is_visible_in_tree():
+			selectors += 1
+	_check(selectors == 1, "Every accepted archer tier exposes one common targeting cycle")
+	for direction: int in [1, -1]:
+		var expected_modes: Array = [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.FURTHEST] if direction == 1 else [MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.FURTHEST]
+		for expected: int in expected_modes:
+			await _press_cycle_button(screen.targeting_button.next_button if direction == 1 else screen.targeting_button.previous_button)
+			for slot: int in range(2):
+				var accepted: Dictionary = planning.combat["towers"][slot][0]
+				var stats: Dictionary = planning.combat["tower_types"][accepted["type_id"]]
+				_check(accepted["mode"] == expected and screen.targeting_button.mode == expected, "Native arrows cycle the accepted common tower policy on both mirrored boards")
+				_check(MatchPlanningScreen.independent_weapon_count(accepted, stats) == count and accepted["extra_archers"].size() == maxi(0, count - 2), "Common policy changes preserve every accepted visual firing stream")
+
+
+func _check_targeting_input_guards(planning: MatchPlanning, screen: MatchPlanningScreen) -> void:
+	var cell: Vector2i = planning.combat["towers"][0][0]["cell"]
+	var frozen: Dictionary = planning.combat.duplicate(true)
+	screen.debug_button.pressed.emit()
+	await process_frame
+	screen.debug_money.get_line_edit().grab_focus()
+	for pressed: bool in [true, false]:
+		var key := InputEventKey.new()
+		key.keycode = KEY_RIGHT
+		key.pressed = pressed
+		root.push_input(key, true)
+		await process_frame
+	_check(planning.combat == frozen, "Typing navigation in a debug field never changes the common targeting policy")
+	screen.debug_popup.hide()
+	screen._cell_clicked(cell, MOUSE_BUTTON_LEFT, 0)
+	await process_frame
+	var point: Vector2 = screen.targeting_button.next_button.get_global_rect().get_center()
+	screen.open_pause_menu()
+	await process_frame
+	for pressed: bool in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.position = point
+		click.global_position = point
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = pressed
+		root.push_input(click, true)
+		await process_frame
+	_check(planning.combat == frozen, "The pause modal blocks native targeting input behind it")
+	screen._resume_match()
+	screen._cell_clicked(cell, MOUSE_BUTTON_LEFT, 0)
+	await process_frame
+
+
+func _check_upgrade_order(screen: MatchPlanningScreen, expected_choices: int = -1) -> void:
+	var original_size: Vector2i = root.size
+	var scroll: ScrollContainer = screen._management.find_child("InspectionScroll", true, false) as ScrollContainer
+	for width: int in [1000, 1280]:
+		root.size = Vector2i(width, 720)
+		await process_frame
+		await process_frame
+		var buttons: Array = [screen.damage_upgrade, screen.speed_upgrade, screen.special_upgrade, screen.alternate_upgrade]
+		buttons.append_array(screen._extra_upgrade_buttons.values())
+		buttons.append_array(screen.advancement_buttons.values())
+		var visible_buttons: Array[Button] = []
+		for button: Button in buttons:
+			if button.is_visible_in_tree():
+				visible_buttons.append(button)
+		if expected_choices >= 0:
+			_check(visible_buttons.size() == expected_choices, "The accepted tier exposes all %d purchase choices together" % expected_choices)
+		if not visible_buttons.is_empty():
+			scroll.ensure_control_visible(visible_buttons[0])
+			await process_frame
+			await process_frame
+			visible_buttons.sort_custom(func(left: Button, right: Button) -> bool: return left.get_global_rect().position.x < right.get_global_rect().position.x)
+			var first_rect: Rect2 = visible_buttons[0].get_global_rect()
+			var previous_end: float = first_rect.position.x
+			for button: Button in visible_buttons:
+				var button_rect: Rect2 = button.get_global_rect()
+				_check(scroll.get_global_rect().encloses(button_rect), "All purchase choices, including locked actions, fit simultaneously inside the inspector at width %d" % width)
+				_check(is_equal_approx(button_rect.position.y, first_rect.position.y) and is_equal_approx(button_rect.size.y, first_rect.size.y), "Every visible purchase shares one horizontal row and consistent height at width %d" % width)
+				_check(button_rect.position.x >= previous_end, "Side-by-side purchase choices never overlap at width %d" % width)
+				_check(button_rect.end.y <= screen.sell_button.get_global_rect().position.y, "The single purchase row consistently precedes Sell at width %d" % width)
+				previous_end = button_rect.end.x
+		scroll.ensure_control_visible(screen.sell_button)
+		await process_frame
+		await process_frame
+		_check(screen._management.get_global_rect().encloses(screen.sell_button.get_global_rect()), "Sell remains the reachable final action at width %d" % width)
+		scroll.ensure_control_visible(screen.targeting_button)
+		await process_frame
+		await process_frame
+		for control: Control in [screen.targeting_button.previous_button, screen.targeting_button.mode_label, screen.targeting_button.next_button]:
+			_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "The common targeting cycle fits the scrolled inspector at width %d" % width)
+	root.size = original_size
+	await process_frame
+
 
 
 func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
@@ -667,6 +757,14 @@ func _check_debug_path_drag(screen: MatchPlanningScreen) -> void:
 
 
 func _press_cycle_button(button: Button) -> void:
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer:
+			ancestor.ensure_control_visible(button)
+			await process_frame
+			await process_frame
+			break
+		ancestor = ancestor.get_parent()
 	if button.disabled:
 		var point: Vector2 = button.get_global_rect().get_center()
 		for pressed: bool in [true, false]:
@@ -692,6 +790,8 @@ func _press_cycle_button(button: Button) -> void:
 
 func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:
 	var rules: CombatRules = main.combat_rules.duplicate() as CombatRules
+	# Keep the bounded terminal-visibility scenario independent of starting-health balance.
+	rules.base_health = 10
 	rules.catalog = rules.catalog.duplicate(true) as ContentCatalog
 	for enemy: EnemyDefinition in rules.catalog.enemies:
 		enemy.send_first_wave = 1

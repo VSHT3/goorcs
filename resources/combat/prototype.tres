@@ -9,7 +9,7 @@ roll_rules = ExtResource("2_rolls")
 ; Provisional run-only grants; independent from Coins and collection progress.
 starting_reroll_currency = 8
 clear_reroll_currency = 3
-base_health = 10
+base_health = 100
 enemy_health = 8
 enemy_speed = 2.0
 wave_weight = 6

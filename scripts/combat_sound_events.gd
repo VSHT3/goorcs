@@ -2,7 +2,7 @@ class_name CombatSoundEvents
 extends RefCounted
 ## Host-owned cosmetic facts. Dropping/coalescing cues never changes combat.
 
-enum Cue { BOW, BALLISTA, RUNE, EXPLOSION, HIT, DEATH, BONES, PORTAL, CRYSTAL, PURCHASE, UPGRADE, SEND, REJECT, TROLL_STOMP, CLUB_IMPACT, CANNON, TOWER_STUN, MACHINE_GEAR, MACHINE_JUMP, MACHINE_DOOR }
+enum Cue { BOW, BALLISTA, RUNE, EXPLOSION, HIT, DEATH, BONES, PORTAL, CRYSTAL, PURCHASE, UPGRADE, SEND, REJECT, TROLL_STOMP, CLUB_IMPACT, CANNON, TOWER_STUN, MACHINE_GEAR, MACHINE_JUMP, MACHINE_DOOR, SALE }
 
 const CAPACITY: int = 128
 const LIFETIME: float = 1.2
@@ -17,7 +17,7 @@ var _last_times: PackedFloat64Array = []
 
 
 static func is_ui_cue(cue: int) -> bool:
-	return cue in [Cue.PURCHASE, Cue.UPGRADE, Cue.SEND, Cue.REJECT]
+	return cue in [Cue.PURCHASE, Cue.UPGRADE, Cue.SEND, Cue.REJECT, Cue.SALE]
 
 
 func _init() -> void:

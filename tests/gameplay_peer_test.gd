@@ -251,6 +251,7 @@ func _chain_scenario(code: String) -> void:
 	var state: Dictionary = await _agree("Nearest unhit chain damage reaches the real client")
 	var chain: Dictionary = _tower(state, 0, Vector2i(0, 3))
 	_check(chain["chain_points"].size() == 3, "One accepted chain has exactly its configured three distinct hits")
+	_check(chain["damage_dealt"] == 30 and chain["indirect_damage"] == 0 and chain["coins_generated"] == 0, "Three accepted chain contacts replicate exactly 30 lifetime damage, with no invented support or income")
 	for index: int in range(4):
 		_check(state["enemies"][0][index]["hp"] == (90 if index < 3 else 100), "Nearest eligible jumps deal full damage once each and leave the isolated fourth enemy untouched")
 	_check(chain["chain_points"][0] != chain["chain_points"][1] and chain["chain_points"][1] != chain["chain_points"][2] and chain["chain_points"][0] != chain["chain_points"][2], "Accepted chain points never revisit an individual target")
@@ -264,6 +265,7 @@ func _chain_scenario(code: String) -> void:
 	state = await _agree("Permanent chain evolution remains inside the selected identity")
 	chain = _tower(state, 0, Vector2i(0, 3))
 	_check(chain["type_id"] == "lightning" and chain["evolution"] == "longer_reach" and chain["range"] == 5.0 and chain["behavior_config"]["jump_distance"] == 3.5 and chain["behavior_config"]["successive_hit_bonus"] == 0.25, "Longer Reach captures range/jump changes without discarding purchased escalation or requiring another deck slot")
+	_check(chain["damage_dealt"] == 75, "Lifetime damage survives both purchased escalation and permanent evolution on the actual client")
 	_assert_private_decks(["lightning"], ["arrow_tower", "lightning"], [["lightning"], []])
 
 
@@ -308,6 +310,7 @@ func _production_scenario(code: String) -> void:
 	await _command("host", {"action": "step", "delta": 0.01})
 	state = await _agree("Host Mint cadence and amount replicate")
 	_check(state["coins"][0] == initial["coins"][0] + 5 and state["coins"][1] == initial["coins"][1], "Upgraded Mint pays ceil(3 * 1.45) to its owner without interest or opponent income")
+	_check(_tower(state, 0, Vector2i(1, 0))["coins_generated"] == 5 and _tower(state, 0, Vector2i(0, 0))["coins_generated"] == 0, "Only the producing Mint receives accepted periodic Coin credit")
 	await _command("guest", {"action": "step", "delta": 100.0})
 	await _stable("Client cannot produce extra periodic Coins or random drops", state)
 	await _place("host", 0, Vector2i(0, 3), "arrow_tower")
@@ -320,6 +323,8 @@ func _production_scenario(code: String) -> void:
 	_check(state["coins"][0] == before_kills["coins"][0] + 66 and state["coins"][1] == before_kills["coins"][1] + 35, "Exact clear rewards compose host 7+11 kill bounties, 11 clear Coins, 15 Mine and 22 Mint; guest gets 7+11+15+2 send income")
 	_check(_matches(state, {"reroll_currency": [10, 5]}), "Per-type drops belong to the killer: host gets regular 2 + sent Runner 5 + clear 3, guest gets regular 2 + clear 3")
 	_check(_matches(state["enemy_totals"][0]["kills"], {"grunt": 1, "runner": 1}) and _matches(state["enemy_totals"][1]["kills"], {"grunt": 1}), "Sent enemies die on the receiving board rather than paying their sender's defenses")
+	_check(_tower(state, 0, Vector2i(0, 0))["coins_generated"] == 15 and _tower(state, 0, Vector2i(1, 0))["coins_generated"] == 27, "Distinct Mine and Mint lifetime totals replicate periodic plus clear production, excluding normal rewards")
+	_check(_tower(state, 0, Vector2i(0, 3))["damage_dealt"] == 200 and _tower(state, 0, Vector2i(0, 3))["coins_generated"] == 0, "Real peer overkill counts only the two enemies' removed HP, not baseline bounty Coins")
 
 
 func _bounty_scenario(code: String) -> void:
@@ -374,6 +379,7 @@ func _bounty_scenario(code: String) -> void:
 	for enemy: Dictionary in state["enemies"][0]:
 		if enemy["id"] == caster_id:
 			_check(enemy["hp"] == 188 and enemy["bounty_tower_id"] == boards[2], "Remaining Board reclaims the caster and its 20% mark turns a 10-damage attack into 12")
+	_check(_tower(state, 0, Vector2i(0, 2))["damage_dealt"] == 10 and _tower(state, 0, Vector2i(2, 3))["indirect_damage"] == 2, "Host partitions accepted amplified HP between killer and exclusive Board in both processes")
 	await _upgrade("host", 0, int(killer["id"]), ["damage"])
 	await _place("guest", 1, Vector2i(0, 3), "arrow_tower")
 	var guest_killer: Dictionary = _tower(await _agree("Both killing towers are paid and accepted"), 1, Vector2i(0, 3))
@@ -389,6 +395,8 @@ func _bounty_scenario(code: String) -> void:
 	_check(state["coins"][0] == before_kills["coins"][0] + 57 and state["coins"][1] == before_kills["coins"][1] + 20, "One final ceil yields grunt 21 + caster 25 + zero-bounty summon 0 + clear 11; duplicate auras never double the killer-location bonus and Bounty branches produce no Mine income")
 	_check(_matches(state, {"reroll_currency": [16, 5]}), "Killer owns grunt 2 + sent caster 4 + summoned SkeleOrc 7 + clear 3; zero normal bounty does not remove summon drop eligibility")
 	_check(_matches(state["enemy_totals"][0]["kills"], {"grunt": 1, "necorcmancer": 1, "skeleorc": 1}), "All exact rewards are backed by accepted per-type real attack kills")
+	_check(_tower(state, 0, Vector2i(1, 3))["coins_generated"] == 11 and _tower(state, 0, Vector2i(2, 3))["coins_generated"] == 8 and _tower(state, 0, Vector2i(0, 3))["coins_generated"] == 9 and _tower(state, 0, Vector2i(1, 2))["coins_generated"] == 0, "Exact marked and aura bonus Coin ownership replicates without duplicate aura or zero-bounty income")
+	_check(_tower(state, 0, Vector2i(0, 2))["damage_dealt"] == 338 and _tower(state, 0, Vector2i(2, 3))["indirect_damage"] == 2, "Later overkills preserve exactly 340 removed HP without attributing nonexistent amplified damage")
 	_assert_private_decks(["arrow_tower", "gold_mine"], ["arrow_tower", "gold_mine", "lightning"], [["gold_mine", "gold_mine", "gold_mine", "gold_mine", "arrow_tower"], ["arrow_tower"]])
 
 
@@ -412,13 +420,27 @@ func _directional_ballista_scenario(code: String) -> void:
 	var idle: Dictionary = await _ballista_views()
 	for lane: String in ["host", "guest"]:
 		for view: Dictionary in idle[lane]:
-			_check(_matches(view, {"poses": [3, 3, 3]}) and view["released_pose"] == 3 and view["trace_count"] == 0, "%s has no renderer-selected target before the first host shot; both orientations default to SE" % lane)
+			var direction: int = 2 if view["mirrored"] else 6
+			_check(_matches(view, {"poses": [direction, direction, direction]}) and view["released_pose"] == 3
+				and view["tracking_target_id"] >= 0 and view["target_id"] == -1 and view["trace_count"] == 0,
+				"%s consumes the host-selected live target before any shot; release state remains un-aimed SE" % lane)
+	await _command("host", {"action": "ballista_reload", "seconds": 20.0})
+	await _command("host", {"action": "step", "delta": 0.1})
+	var loading: Dictionary = await _agree("A long initial reload publishes host-owned live tracking without a shot")
+	var loading_tower: Dictionary = _tower(loading, 0, Vector2i(4, 3))
+	_check(loading_tower["shot"] == 0 and loading_tower["target_id"] == -1
+		and loading_tower["tracking_target_id"] == loading["enemies"][0][0]["id"]
+		and float(loading_tower["cooldown"]) > 19.0,
+		"Real peers accept a continuous target while no first shot is due")
+	await _command("host", {"action": "ballista_reload", "seconds": 0.0})
 	await _command("host", {"action": "step", "delta": 0.001})
 	var accepted: Dictionary = await _agree("Actual host-selected Ballista shot and victim replicate before presentation")
 	var tower: Dictionary = _tower(accepted, 0, Vector2i(4, 3))
 	var target: Dictionary = accepted["enemies"][0][0]
 	var decoy: Dictionary = accepted["enemies"][0][1]
-	_check(int(tower["shot"]) == 1 and tower["target_id"] == target["id"] and target["hp"] == 290 and decoy["hp"] == 100, "Actual STRONGEST policy shoots the farther living target, not the nearer decoy")
+	_check(int(tower["shot"]) == 1 and tower["target_id"] == target["id"]
+		and tower["tracking_target_id"] == target["id"] and target["hp"] == 290 and decoy["hp"] == 100,
+		"Actual STRONGEST policy tracks and shoots the farther living target, not the nearer decoy")
 	var released: Dictionary = await _ballista_views()
 	for lane: String in ["host", "guest"]:
 		for view: Dictionary in released[lane]:
@@ -441,14 +463,39 @@ func _directional_ballista_scenario(code: String) -> void:
 			_check(_matches(view, {"poses": expected}) and view["released_pose"] == shot_view["released_pose"], "%s follows only the accepted victim's interpolated logical position across W/S/E, with mirrored E/S/W" % lane)
 			_check(view["trace_count"] == 1 and view["trace_origin"] == shot_view["trace_origin"] and view["trace_aim"] == shot_view["trace_aim"], "%s rotating weapon cannot move the already released bolt origin or destination" % lane)
 			_check(view["live_muzzle"] != view["trace_origin"] and float(view["released_origin_error"]) < 0.00001, "%s live directional muzzle changes while the captured origin remains the accepted release-pose bolt tip" % lane)
+	await _command("host", {"action": "ballista_targeting", "mode": MatchCombat.TargetMode.CLOSEST})
+	var changed: Dictionary = await _agree("A targeting-mode command immediately republishes the host's new live target")
+	var changed_tower: Dictionary = _tower(changed, 0, Vector2i(4, 3))
+	_check(changed_tower["tracking_target_id"] == decoy["id"] and changed_tower["shot"] == 1
+		and changed_tower["target_id"] == target["id"] and changed_tower["aim"] == tower["aim"],
+		"Mode changes select a new tracking victim during reload without rewriting the released shot")
+	await _command("host", {"action": "ballista_targeting", "mode": MatchCombat.TargetMode.STRONGEST})
+	await _agree("Restoring Strongest reacquires the original living victim during the same reload")
 	for state: String in ["out_of_range", "dead", "absent"]:
 		await _command("host", {"action": "ballista_target_state", "state": state})
-		await _agree("Host's %s accepted-target fixture reaches the real client" % state)
+		var reacquired: Dictionary = await _agree("Host's %s victim replacement reaches the real client" % state)
+		var reacquired_tower: Dictionary = _tower(reacquired, 0, Vector2i(4, 3))
+		_check(reacquired_tower["tracking_target_id"] == decoy["id"] and reacquired_tower["target_id"] == target["id"]
+			and reacquired_tower["shot"] == 1, "The host reacquires a valid replacement for a %s victim while reloading" % state)
 		var fallback: Dictionary = await _ballista_views()
 		for lane: String in ["host", "guest"]:
 			for index: int in range(fallback[lane].size()):
 				var view: Dictionary = fallback[lane][index]
 				var shot_view: Dictionary = released[lane][index]
-				var direction: int = 2 if view["mirrored"] else 6
-				_check(_matches(view, {"poses": [direction, direction, direction]}) and view["target_id"] == tower["target_id"] and view["shot"] == 1, "%s %s accepted victim falls back to the host-captured aim, never to the living closer decoy" % [lane, state])
+				_check(_matches(view, {"poses": [4, 4, 4]}) and view["tracking_target_id"] == decoy["id"]
+					and view["target_id"] == tower["target_id"] and view["shot"] == 1,
+					"%s renders the host-selected southward replacement after the previous victim becomes %s" % [lane, state])
 				_check(view["trace_count"] == 1 and view["trace_origin"] == shot_view["trace_origin"] and view["trace_aim"] == shot_view["trace_aim"], "%s %s victim cannot rewrite the released projectile" % [lane, state])
+	await _command("host", {"action": "ballista_target_state", "state": "none"})
+	var empty: Dictionary = await _agree("No valid live target is accepted by both real peers")
+	_check(_tower(empty, 0, Vector2i(4, 3))["tracking_target_id"] == -1,
+		"The host clears live tracking when no valid enemy remains")
+	var held: Dictionary = await _ballista_views()
+	for lane: String in ["host", "guest"]:
+		for index: int in range(held[lane].size()):
+			var view: Dictionary = held[lane][index]
+			var shot_view: Dictionary = released[lane][index]
+			_check(_matches(view, {"poses": [4, 4, 4]}) and view["tracking_target_id"] == -1
+				and view["shot"] == 1 and view["trace_origin"] == shot_view["trace_origin"]
+				and view["trace_aim"] == shot_view["trace_aim"],
+				"%s holds its last accepted tracking aim, not the old westward shot, when no victim remains" % lane)

@@ -2,18 +2,19 @@ extends SceneTree
 var failures: int = 0
 func _init() -> void:
 	_purchase()
-	_four_targets()
+	_shared_targets()
 	_fire()
 	_bombs()
 	_immunity()
 	_progression()
 	_throwers()
 	_eight_and_minigun()
+	_upgrade_targeting()
 	_flamethrower()
 	_validation()
 	_modified_streams()
 	_flame_motion_and_kills()
-	if failures == 0: print("PASS: captured archer progression, atomic purchases, independent streams, thrown splash, fire immunity, continuous fuel/refuel and frame-step invariance")
+	if failures == 0: print("PASS: captured archer progression, atomic purchases, shared targeting with distinct streams, thrown splash, fire immunity, continuous fuel/refuel and frame-step invariance")
 	quit(1 if failures else 0)
 func check(value: bool, message: String) -> void:
 	if not value:
@@ -86,43 +87,77 @@ func _purchase() -> void:
 		frozen = model.snapshot()
 		for other: String in ["four_archers","fire_arrows","bomb_arrows"]: check(not model.upgrade_tower(0,tower["id"],other) and model.snapshot()==frozen,"Purchased branch forbids repeats and switching")
 		check(tower["sell_value"]==floori(float(tower["invested"])*0.6),"Refund includes actual paid advancement investment")
-func _four_targets() -> void:
-	var model: MatchCombat = prepared("four_archers")
-	var tower: Dictionary = model.towers[0][0]
-	check(model.set_archer_targeting(0,tower["id"],2,MatchCombat.TargetMode.LAST),"Third archer accepts Last independently")
-	check(model.set_archer_targeting(0,tower["id"],2,MatchCombat.TargetMode.STRONGEST),"Third archer can leave Last without changing the other policies")
-	check(model.set_secondary_targeting(0,tower["id"],MatchCombat.TargetMode.CLOSEST),"Second archer accepts its independent closest policy")
-	check(model.set_archer_targeting(0,tower["id"],3,MatchCombat.TargetMode.LAST),"Fourth archer accepts Last independently")
-	var frozen: Dictionary = model.snapshot()
-	check(not model.set_archer_targeting(1,tower["id"],2,MatchCombat.TargetMode.LAST) and not model.set_archer_targeting(0,tower["id"],2,-1) and not model.set_archer_targeting(0,tower["id"],2,MatchCombat.TargetMode.LAST+1) and not model.set_archer_targeting(0,tower["id"],3,MatchCombat.TargetMode.LAST+1) and model.snapshot()==frozen,"Extra archer owner and policy bounds reject atomically")
-	for index: int in range(4):
-		var enemy: Dictionary = spawn(model,&"grunt",Vector2(index*0.2,4))
-		enemy["progress"] = float(index)
-		enemy["hp"] = 100+index*10
-	tower["cooldown"] = 0.0
-	model._attack(0,0.01)
-	var ids: Array = [tower["target_id"],tower["secondary_target_id"],tower["extra_archers"][0]["target_id"],tower["extra_archers"][1]["target_id"]]
-	var unique: Dictionary = {}
-	for id: int in ids: unique[id]=true
-	check(unique.size()==4 and not unique.has(-1),"All four modes choose distinct living enemies")
-	check(ids==[model.enemies[0][3]["id"],model.enemies[0][0]["id"],model.enemies[0][2]["id"],model.enemies[0][1]["id"]],"Furthest, Closest, Strongest and Last each choose by their independent score after earlier archer exclusions")
-	for index: int in range(4): check(model.enemies[0][index]["hp"]==97+index*10,"Every selected enemy takes one upgraded physical hit")
-	model.enemies[0].resize(1)
-	tower["cooldown"] = 0.0
-	var hp: int = model.enemies[0][0]["hp"]
-	model._attack(0,0.01)
-	check(model.enemies[0][0]["hp"]==hp-12,"All four archers fire full-damage arrows at a sole eligible enemy")
-	check(tower["mode"]==MatchCombat.TargetMode.FURTHEST and tower["secondary_mode"]==MatchCombat.TargetMode.CLOSEST and tower["extra_archers"][0]["mode"]==MatchCombat.TargetMode.STRONGEST and tower["extra_archers"][1]["mode"]==MatchCombat.TargetMode.LAST,"All four independent targeting modes survive a shared-target volley")
-	for count: int in [2,3]:
-		model=prepared("four_archers")
-		tower=model.towers[0][0]
-		for index: int in range(count): spawn(model,&"grunt",Vector2(index*0.2,4))
-		model._attack(0,0.01)
-		var total_hp: int=0
-		var victims: Dictionary={}
-		for enemy: Dictionary in model.enemies[0]: total_hp+=int(enemy["hp"])
-		for target: int in [tower["target_id"],tower["secondary_target_id"],tower["extra_archers"][0]["target_id"],tower["extra_archers"][1]["target_id"]]: victims[target]=true
-		check(total_hp==count*100-12 and victims.size()==count and not victims.has(-1),"Two/three-enemy volleys cover distinct enemies first, then reuse targets without idle archers")
+func _stream_targets(tower: Dictionary) -> Array[int]:
+	var ids: Array[int] = [tower["target_id"], tower["secondary_target_id"]]
+	for archer: Dictionary in tower["extra_archers"]:
+		ids.append(archer["target_id"])
+	return ids
+
+func _shared_targets() -> void:
+	var progress: Array[int] = [2,5,1,4,0,3,8,7,9,6]
+	var ordering: Dictionary = {
+		2: [[1,3], [0,1], [1,0], [2,0]],
+		4: [[1,3,5,0], [0,1,2,3], [3,2,1,0], [4,2,0,5]],
+		8: [[8,6,7,9,1,3,5,0], [0,1,2,3,4,5,6,7], [7,6,5,4,3,2,1,0], [4,2,0,5,3,1,9,7]],
+	}
+	for shooters: int in [2,4,8]:
+		var branch: String = "" if shooters == 2 else ("four_archers" if shooters == 4 else "eight_archers")
+		var model: MatchCombat = prepared(branch)
+		var tower: Dictionary = model.towers[0][0]
+		var enemy_ids: Array[int] = []
+		for index: int in range(shooters+2):
+			var enemy: Dictionary = spawn(model,&"grunt",Vector2(index*0.1,4))
+			enemy["progress"] = float(progress[index])
+			enemy_ids.append(enemy["id"])
+		var volley: int = 0
+		for mode: int in [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST]:
+			for index: int in range(model.enemies[0].size()):
+				model.enemies[0][index]["hp"] = 1000+((index+2)%(shooters+2))*10
+			var frozen: Dictionary = model.snapshot()
+			check(not model.set_targeting(1,tower["id"],mode) and not model.set_targeting(0,tower["id"],-1) and not model.set_targeting(0,tower["id"],MatchCombat.TargetMode.LAST+1) and model.snapshot()==frozen,"Shared policy rejects wrong-owner and invalid modes atomically at every archer count")
+			check(model.set_targeting(0,tower["id"],mode),"One accepted policy change controls the next live volley")
+			frozen = model.snapshot()
+			check(not model.set_targeting(0,tower["id"],mode) and model.snapshot()==frozen,"Repeated shared policy is an atomic no-op")
+			var expected: Array[int] = []
+			for index: int in ordering[shooters][mode]:
+				expected.append(enemy_ids[index])
+			var before_damage: int = tower["damage_dealt"]
+			tower["cooldown"] = 0.0
+			model._attack(0,0.01)
+			volley += 1
+			check(_stream_targets(tower)==expected,"%d archers use mode %d in score order after excluding all earlier targets" % [shooters,mode])
+			check(tower["aim"]==model.enemies[0][ordering[shooters][mode][0]]["pos"] and tower["secondary_aim"]==model.enemies[0][ordering[shooters][mode][1]]["pos"],"First and second streams retain their own accepted aim")
+			check(tower["shot"]==volley and tower["secondary_shot"]==volley and tower["damage_dealt"]==before_damage+3*shooters,"Policy changes retain every stream's shot history and full-damage accounting")
+			for index: int in range(tower["extra_archers"].size()):
+				var archer: Dictionary = tower["extra_archers"][index]
+				check(archer["shot"]==volley and archer["aim"]==model.enemies[0][ordering[shooters][mode][index+2]]["pos"],"Every extra stream retains its independently captured shot and aim")
+			for index: int in range(model.enemies[0].size()):
+				var expected_hp: int = 1000+((index+2)%(shooters+2))*10-(3 if expected.has(enemy_ids[index]) else 0)
+				check(model.enemies[0][index]["hp"]==expected_hp,"Distinct selection damages each chosen enemy once without touching unselected enemies")
+		for count: int in [1,2,3,7]:
+			if count>=shooters:
+				continue
+			model = prepared(branch)
+			tower = model.towers[0][0]
+			model.set_targeting(0,tower["id"],MatchCombat.TargetMode.STRONGEST)
+			enemy_ids.clear()
+			var total_hp: int = 0
+			for index: int in range(count):
+				var enemy: Dictionary = spawn(model,&"grunt",Vector2(index*0.1,4))
+				enemy["hp"] = 100+index*10
+				total_hp += int(enemy["hp"])
+				enemy_ids.append(enemy["id"])
+			model._attack(0,0.01)
+			var expected: Array[int] = []
+			for index: int in range(shooters):
+				expected.append(enemy_ids[maxi(0,count-1-index)] if index<count else enemy_ids[count-1])
+			var remaining_hp: int = 0
+			for enemy: Dictionary in model.enemies[0]:
+				remaining_hp += int(enemy["hp"])
+			check(_stream_targets(tower)==expected and remaining_hp==total_hp-3*shooters,"Too-few-enemy volleys exhaust distinct Strongest targets before sharing the best fallback")
+			check(tower["shot"]==1 and tower["secondary_shot"]==1 and tower["damage_dealt"]==3*shooters,"Fallback never idles a real archer or changes full-damage accounting")
+			for archer: Dictionary in tower["extra_archers"]:
+				check(archer["shot"]==1,"Every extra archer releases its accepted fallback shot")
 func _fire() -> void:
 	var model: MatchCombat = prepared("fire_arrows")
 	var tower: Dictionary = model.towers[0][0]
@@ -130,6 +165,7 @@ func _fire() -> void:
 	tower["cooldown"] = 0.0
 	model._attack(0,0.01)
 	check(enemy["hp"]==94 and enemy["burning"],"Both physical arrows hit while ignition grants no instant burn tick")
+	check(tower["damage_dealt"] == 6, "Both accepted projectile hits contribute actual HP once")
 	tower["cooldown"] = 100.0
 	model.advance(0.25)
 	check(enemy["hp"]==93,"Burn integrates exactly four damage per simulation second")
@@ -142,6 +178,7 @@ func _fire() -> void:
 	var before: int = model.coins[0]
 	model.advance(0.25)
 	check(model.enemies[0].is_empty() and tower["kills"]==1 and model.coins[0]==before+3 and not model.snapshot()["deaths"][0].is_empty(),"Burn kill after source sale retains attribution, bounty and confirmed corpse once")
+	check(tower["damage_dealt"] == 9, "Burn continues lifetime accounting after source sale and clips its lethal hit to one remaining HP")
 func _bombs() -> void:
 	var model: MatchCombat = prepared("bomb_arrows")
 	var tower: Dictionary = model.towers[0][0]
@@ -150,6 +187,7 @@ func _bombs() -> void:
 	var outside: Dictionary = spawn(model,&"grunt",Vector2(0.7,4.7))
 	model._attack_arrow(0,tower,primary["id"],primary["pos"],model.snapshot()["tower_types"]["arrow_tower"]["advancements"]["bomb_arrows"])
 	check(primary["hp"]==95 and near["hp"]==98 and outside["hp"]==100,"Bomb primary gets ceil1.5 damage, other true-radius victims ceilhalf, square-corner victim escapes")
+	check(tower["damage_dealt"] == 7, "Primary and true-radius splash contribute exactly their distinct removed HP")
 func _immunity() -> void:
 	var model: MatchCombat = prepared("fire_arrows")
 	var tower: Dictionary = model.towers[0][0]
@@ -211,7 +249,6 @@ func _throwers() -> void:
 		victim["hp"]=10000
 		model._attack(0,0.01)
 		check(tower["shot"]==1 and tower["secondary_shot"]==0 and tower["secondary_target_id"]==-1 and tower["extra_archers"].is_empty(),"Rocket branches have one real operator, never a phantom second projectile")
-		check(not model.set_secondary_targeting(0,tower["id"],1),"Single operators reject unavailable targeting streams")
 
 func _eight_and_minigun() -> void:
 	var model: MatchCombat=prepared("eight_archers")
@@ -219,7 +256,7 @@ func _eight_and_minigun() -> void:
 	for index: int in range(8):
 		var enemy: Dictionary=spawn(model,&"grunt",Vector2(index*0.1,4))
 		enemy["progress"]=index*0.1
-	for index: int in range(2,8): check(model.set_archer_targeting(0,tower["id"],index,MatchCombat.TargetMode.LAST),"Every available upper/lower archer accepts independent targeting")
+	check(model.set_targeting(0,tower["id"],MatchCombat.TargetMode.LAST),"Eight archers accept one shared Last policy")
 	model._attack(0,0.01)
 	var ids: Dictionary={tower["target_id"]:true,tower["secondary_target_id"]:true}
 	for archer: Dictionary in tower["extra_archers"]: ids[archer["target_id"]]=true
@@ -245,6 +282,46 @@ func _eight_and_minigun() -> void:
 		if reference<0: reference=tower["shot"]
 		check(tower["shot"]==reference,"Single-stream throughput is independent of physics/playback step")
 
+func _upgrade_targeting() -> void:
+	for branch: String in ["arrow_minigun","flamethrower","aom_speed_2"]:
+		var fixture_rules: CombatRules = rules()
+		fixture_rules.sandbox_mode = true
+		var model := MatchCombat.new(fixture_rules)
+		model.build(0,Vector2i(0,3),&"arrow_tower",MatchCombat.TargetMode.FURTHEST)
+		var tower: Dictionary = model.towers[0][0]
+		check(model.set_targeting(0,tower["id"],MatchCombat.TargetMode.STRONGEST),"Shared Strongest policy can be chosen before adding or replacing archers")
+		var path: Array[String] = []
+		var cursor: String = branch
+		var configs: Dictionary = model.snapshot()["tower_types"]["arrow_tower"]["advancements"]
+		while not cursor.is_empty():
+			path.push_front(cursor)
+			cursor = String(configs[cursor].get("requires",""))
+		for command: String in ["damage","speed","special"]+path:
+			check(model.upgrade_tower(0,tower["id"],command) and tower["mode"]==MatchCombat.TargetMode.STRONGEST,"Every stat, archer and branch upgrade retains the chosen tower policy")
+		var roster: Array[String] = []
+		model.sandbox_start(routes(),1,roster)
+		var enemy_ids: Array[int] = []
+		for index: int in range(4):
+			var enemy: Dictionary = spawn(model,&"grunt",Vector2(index*0.2,4))
+			enemy["progress"] = index*0.2
+			enemy_ids.append(enemy["id"])
+		var expected: Dictionary = {
+			MatchCombat.TargetMode.FURTHEST: 3,
+			MatchCombat.TargetMode.CLOSEST: 0,
+			MatchCombat.TargetMode.STRONGEST: 2,
+			MatchCombat.TargetMode.LAST: 0,
+		}
+		for mode: int in [MatchCombat.TargetMode.STRONGEST,MatchCombat.TargetMode.LAST,MatchCombat.TargetMode.FURTHEST,MatchCombat.TargetMode.CLOSEST]:
+			if mode!=tower["mode"]:
+				check(model.set_targeting(0,tower["id"],mode),"The same targeting action controls evolved single operators during combat")
+			for index: int in range(4):
+				model.enemies[0][index]["hp"] = [1000,1100,1500,1200][index]
+			var previous_shots: int = tower["shot"]
+			tower["cooldown"] = 0.0
+			model.advance(0.01)
+			check(tower["target_id"]==enemy_ids[expected[mode]] and tower["aim"]==model.enemies[0][expected[mode]]["pos"],"Minigun, Flame and Rocket use the accepted shared mode and captured aim")
+			check(tower["firing"] if branch=="flamethrower" else tower["shot"]>previous_shots,"Chosen single-operator targets produce real firing rather than only policy metadata")
+
 func flame_fixture() -> MatchCombat:
 	var model: MatchCombat=prepared("flamethrower")
 	var enemy: Dictionary=spawn(model,&"grunt",Vector2(0,4))
@@ -261,6 +338,7 @@ func _flamethrower() -> void:
 		check(is_equal_approx(tower["continuous_fire_time"],1.0) and tower["firing"] and is_zero_approx(tower["refuel_remaining"]) and tower["shot"]==0 and tower["secondary_shot"]==0,"Sixty firing seconds, six locked refuel seconds, then one firing second produce no discrete arrows")
 		if reference<0: reference=hp
 		check(hp==reference,"Continuous fractional fire plus sustained burn is frame-step independent through refuel")
+		check(tower["damage_dealt"] == 100000 - hp, "Flame plus burn count every removed HP once through refuel at each simulation cadence")
 	var model: MatchCombat=flame_fixture()
 	var tower: Dictionary=model.towers[0][0]
 	model.advance(59.5)
@@ -295,6 +373,21 @@ func _flamethrower() -> void:
 	model.advance(60.0)
 	for tick: int in range(122): model.advance(0.05)
 	check(tower["refuel_remaining"]==0.0 and tower["firing"],"Fractional clock steps retire the refuel flag completely so the resumed flame can render")
+	for step: float in [0.01, 2.0]:
+		model = flame_fixture()
+		tower = model.towers[0][0]
+		enemy = model.enemies[0][0]
+		check(model.build(0, Vector2i(1, 3), &"gold_mine", 0), "Marked flame fixture places its real Board")
+		var board: Dictionary = model.towers[0][1]
+		for command: String in ["damage", "speed", "bounty_board"]:
+			check(model.upgrade_tower(0, board["id"], command), "Marked flame fixture accepts its Board prerequisite")
+		model._update_bounties(0)
+		for tick: int in range(roundi(2.0 / step)):
+			model.advance(step)
+		var config: Dictionary = model.snapshot()["tower_types"]["arrow_tower"]["advancements"]["flamethrower"]
+		var bonus: float = enemy["bounty_damage_bonus"]
+		var extra: int = floori(2.0 * float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * bonus + 0.000000001) + floori(2.0 * float(config["burn_dps"]) * float(tower["damage_multiplier"]) * bonus + 0.000000001)
+		check(board["indirect_damage"] == extra and tower["damage_dealt"] + extra == 100000 - int(enemy["hp"]), "Marked flame and burn accumulate separate fractional bonus streams without duplicate attribution at %.2fs cadence" % step)
 
 func _validation() -> void:
 	var definition: TowerDefinition=(load("res://resources/combat/towers/arrow_tower.tres") as TowerDefinition).duplicate(true) as TowerDefinition
@@ -370,3 +463,4 @@ func _flame_motion_and_kills() -> void:
 		for enemy: Dictionary in model.enemies[0]: total+=int(enemy["hp"])
 		if remaining<0: remaining=total
 		check(total==remaining and tower["kills"]>=2,"Lethal continuous fractions retarget inside coarse ticks without wasting damage or inventing arrows")
+		check(tower["damage_dealt"] == 400 - total, "Lethal flame retargeting accounts exactly for living and killed enemies without overkill")

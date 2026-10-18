@@ -308,16 +308,6 @@ func set_targeting(slot: int, tower_id: int, mode: int) -> void:
 	_request_tower_command("target", slot, Vector2i.ZERO, tower_id, mode, "")
 
 
-func set_secondary_targeting(slot: int, tower_id: int, mode: int) -> void:
-	_request_tower_command("target_secondary", slot, Vector2i.ZERO, tower_id, mode, "")
-
-
-func set_archer_targeting(slot: int, tower_id: int, archer_index: int, mode: int) -> void:
-	if archer_index < 2 or archer_index > 7:
-		return
-	_request_tower_command("target_archer_%d" % (archer_index + 1), slot, Vector2i.ZERO, tower_id, mode, "")
-
-
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> void:
 	_request_tower_command("upgrade", slot, Vector2i.ZERO, tower_id, -1, upgrade)
 
@@ -502,11 +492,6 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 			accepted = _host_combat.reroll_tower_mirrored(slot, tower_id, argument) if mirrored else _host_combat.reroll_tower(slot, tower_id, argument)
 		"target":
 			accepted = _host_combat.set_targeting(slot, tower_id, mode)
-		"target_secondary":
-			accepted = _host_combat.set_secondary_targeting(slot, tower_id, mode)
-		"target_archer_3", "target_archer_4", "target_archer_5", "target_archer_6", "target_archer_7", "target_archer_8":
-			var archer_index: int = command.trim_prefix("target_archer_").to_int() - 1
-			accepted = _host_combat.set_archer_targeting(slot, tower_id, archer_index, mode)
 		"upgrade":
 			accepted = _host_combat.upgrade_tower_mirrored(slot, tower_id, argument) if mirrored else _host_combat.upgrade_tower(slot, tower_id, argument)
 		"sell":

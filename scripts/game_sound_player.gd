@@ -27,10 +27,11 @@ const STREAMS: Array = [
 	[preload("res://assets/audio/sfx/machine_gear_01.wav"), preload("res://assets/audio/sfx/machine_gear_02.wav")],
 	[preload("res://assets/audio/sfx/machine_jump_01.wav"), preload("res://assets/audio/sfx/machine_jump_02.wav")],
 	[preload("res://assets/audio/sfx/machine_door_01.wav"), preload("res://assets/audio/sfx/machine_door_02.wav")],
+	[preload("res://assets/audio/sfx/sale_01.wav")],
 ]
-const GAINS_DB: Array[float] = [-7.0, -5.0, -8.0, -7.0, -11.0, -9.0, -9.0, -8.0, -4.0, -3.0, -3.0, -8.0, -4.0, -4.0, -4.0, -4.0, -7.0, -7.0, -5.0, -6.0]
-const GAPS_MSEC: Array[int] = [75, 100, 150, 140, 110, 170, 170, 220, 180, 65, 100, 160, 180, 260, 180, 200, 160, 300, 250, 220]
-const PRIORITY: Array[int] = [30, 35, 40, 60, 10, 45, 45, 25, 100, 100, 100, 100, 100, 65, 75, 80, 75, 50, 70, 60]
+const GAINS_DB: Array[float] = [-7.0, -5.0, -8.0, -7.0, -11.0, -9.0, -9.0, -8.0, -4.0, -3.0, -3.0, -8.0, -4.0, -4.0, -4.0, -4.0, -7.0, -7.0, -5.0, -6.0, -3.0]
+const GAPS_MSEC: Array[int] = [75, 100, 150, 140, 110, 170, 170, 220, 180, 65, 100, 160, 180, 260, 180, 200, 160, 300, 250, 220, 65]
+const PRIORITY: Array[int] = [30, 35, 40, 60, 10, 45, 45, 25, 100, 100, 100, 100, 100, 65, 75, 80, 75, 50, 70, 60, 100]
 
 var world: MatchWorld
 var _world_players: Array[AudioStreamPlayer2D] = []
@@ -117,7 +118,7 @@ func observe(state: Dictionary, own_slot: int, active: bool, combat_paused: bool
 			_candidates[cue] = {"id": id, "gain": gain, "point": point}
 	_last_id = maxi(_last_id, latest)
 	# Prioritize urgent feedback before disposable contacts; no audio backlog.
-	for cue: int in [Cues.CRYSTAL, Cues.PURCHASE, Cues.UPGRADE, Cues.SEND, Cues.CANNON, Cues.CLUB_IMPACT, Cues.TOWER_STUN, Cues.MACHINE_JUMP, Cues.TROLL_STOMP, Cues.MACHINE_DOOR, Cues.MACHINE_GEAR, Cues.EXPLOSION, Cues.DEATH, Cues.BONES, Cues.RUNE, Cues.BALLISTA, Cues.BOW, Cues.PORTAL, Cues.HIT]:
+	for cue: int in [Cues.CRYSTAL, Cues.SALE, Cues.PURCHASE, Cues.UPGRADE, Cues.SEND, Cues.CANNON, Cues.CLUB_IMPACT, Cues.TOWER_STUN, Cues.MACHINE_JUMP, Cues.TROLL_STOMP, Cues.MACHINE_DOOR, Cues.MACHINE_GEAR, Cues.EXPLOSION, Cues.DEATH, Cues.BONES, Cues.RUNE, Cues.BALLISTA, Cues.BOW, Cues.PORTAL, Cues.HIT]:
 		var candidate: Dictionary = _candidates[cue]
 		if candidate.is_empty():
 			continue

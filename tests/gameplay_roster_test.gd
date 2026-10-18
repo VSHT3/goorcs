@@ -14,6 +14,8 @@ func _init() -> void:
 	_bounty()
 	_bounty_fractional_damage()
 	_bounty_fractional_transitions()
+	_lifetime_accounting()
+	_fractional_credit_sources()
 	_drops_and_summons()
 	_ballista_roll_stacking()
 	_effective_original_attacks()
@@ -340,9 +342,11 @@ func _production() -> void:
 	open_wave(model)
 	model.advance(12.4)
 	check(model.coins[0] == before + 10 and is_equal_approx(mine["production_elapsed"], 2.4), "Mint pays every elapsed simulation interval even on coarse deltas")
+	check(mine["coins_generated"] == 10, "Mint lifetime production excludes starting Coins, investments and ordinary wave rewards")
 	model.debug_set_round(7)
 	before = model.coins[0]
 	check(mine["production_elapsed"] == 0.0 and not model.advance(100.0) and model.coins[0] == before, "Debug abandonment clears partial Mint clock and grants no rewards")
+	check(mine["coins_generated"] == 10, "Abandoning a wave preserves production already earned")
 	var clear_rules := fixture()
 	clear_rules.enemy_speed = 20.0
 	model = MatchCombat.new(clear_rules)
@@ -353,6 +357,7 @@ func _production() -> void:
 	open_wave(model)
 	model.advance(1000.0)
 	check(model.phase == MatchCombat.Phase.PLANNING and model.coins[0] == before + 11 + 22 and model.coins[1] == clear_rules.starting_coins + 11 and model.reroll_currency[0] == currency + 5, "Both-board clear pays one normal reward, mine income and run currency without idle coarse-tick Mint payouts")
+	check(mine["coins_generated"] == 22, "Clear production credits its actual Mine without the ordinary wave reward")
 	before = model.coins[0]
 	check(not model.advance(1000.0) and model.coins[0] == before, "Finished clear cannot pay twice")
 	clear_rules.base_health = 1
@@ -390,6 +395,7 @@ func _bounty() -> void:
 	var hp: int = first["hp"]
 	model._hit(0, attack, model._enemy_index(0, first["id"]), 5)
 	check(first["hp"] == hp - 6, "Marked enemy takes authored increased damage")
+	check(attack["damage_dealt"] == 5 and board["indirect_damage"] == 1, "Actual removed HP is partitioned between physical source and exclusive vulnerability source")
 	upgrade(model, board, ["income_aura"])
 	check(first["bounty_tower_id"] == -1 and board["bounty_target_id"] == -1 and board["behavior_kind"] == "income_aura", "Income-aura branch immediately clears its previous active mark")
 	upgrade(model, second, ["stronger_mark"])
@@ -401,6 +407,8 @@ func _bounty() -> void:
 	model._hit(0, attack, model._enemy_index(0, tied["id"]), 1000)
 	# Upgraded mark: 1.0*1.45; upgraded aura: .35*1.45. One final ceil.
 	check(model.coins[0] == before + 21 and second["bounty_target_id"] == -1, "One normal bounty plus upgraded mark plus strongest aura pays exact Coins once, never duplicate aura stacking")
+	check(second["coins_generated"] == 11 and board["coins_generated"] == 3 and aura2["coins_generated"] == 0 and attack["coins_generated"] == 0, "Combined rounding credits mark first then oldest strongest aura, never normal killer bounty or duplicate aura")
+	check(second["indirect_damage"] == 0 and attack["damage_dealt"] == 105, "A fully overkilling baseline leaves no fictitious vulnerability contribution")
 	before = model.coins[0]
 	model._hit(0, attack, model._enemy_index(0, first["id"]), 1000)
 	check(model.coins[0] == before + 11, "Aura eligibility uses killing tower position even when enemy is far outside aura")
@@ -481,6 +489,8 @@ func _bounty_fractional_damage() -> void:
 			var hp: int = enemy["hp"]
 			_advance_exposure(model, 1.0, step)
 			check(enemy["hp"] == hp - 7, "Marked %s at %.2fs cadence integrates seven HP, without per-tick ceil or repeated modifiers" % [label, step])
+			var board: Dictionary = setup["board"]
+			check(board["indirect_damage"] == (3 if burn else 1) and source["damage_dealt"] == (16 if burn else 6), "Fractional %s bonus credit accumulates at %.2fs cadence without counting it twice" % [label, step])
 			if burn:
 				check(enemy["burning"] and is_equal_approx(enemy["burn_remaining"], 2.0), "Marked burn retains authored expiry and status")
 				check(model.sell_tower(0, source["id"]), "Burn source can be sold during marked exposure")
@@ -492,6 +502,7 @@ func _bounty_fractional_damage() -> void:
 			# Seven normal Coins plus a 50% mark scaled by both income upgrades:
 			# ceil(7 * (1 + 0.5 * (1 + 0.25 + 0.2))) = 13.
 			check(model.enemies[0].is_empty() and source["kills"] == 1 and model.coins[0] == coins_before + 13 and model.snapshot()["deaths"][0].size() == 1, "Marked %s retains source attribution, actual-HP kill capping, one bounty and one corpse%s" % [label, " after source sale" if burn else ""])
+			check(source["damage_dealt"] + board["indirect_damage"] == (20 if burn else 8) and board["coins_generated"] == 6 and source["coins_generated"] == 0, "Lethal fractional damage counts only actual HP and credits bonus Coins to the live Board")
 
 func _bounty_fractional_transitions() -> void:
 	for burn: bool in [false, true]:
@@ -517,6 +528,50 @@ func _bounty_fractional_transitions() -> void:
 			check(enemy["hp"] == hp - 1, "Lost mark does not boost new %s exposure (1.95 total)" % label)
 			_advance_exposure(model, 0.01, step)
 			check(enemy["hp"] == hp - 2, "Lost mark preserves already-earned %s fractional credit (2.01 total)" % label)
+
+func _lifetime_accounting() -> void:
+	var rules := fixture()
+	rules.catalog.towers = [tower_definition(rules, &"arrow_tower")]
+	rules.roll_rules = rolls({"damage": Vector2(0.25, 0.25)})
+	var model := MatchCombat.new(rules)
+	check(model.build_mirrored(0, Vector2i(0, 1), &"arrow_tower", 0), "Mirrored placement creates independent lifetime counters")
+	open_wave(model)
+	for slot: int in range(2):
+		model._hit(slot, model.towers[slot][0], 0, 1000)
+		check(model.towers[slot][0]["damage_dealt"] == 100 and model.towers[slot][0]["kills"] == 1 and model.towers[slot][0]["coins_generated"] == 0, "Overkill credits actual removed HP and excludes ordinary kill Coins on each mirror")
+	var id: int = model.towers[0][0]["id"]
+	check(model.upgrade_tower_mirrored(0, id, "damage") and model.upgrade_tower_mirrored(0, id, "speed") and model.upgrade_tower_mirrored(0, id, "special"), "Mirrored progression preserves both accepted builds")
+	check(model.reroll_tower_mirrored(0, id, "attributes") and model.reroll_tower_mirrored(0, id, "rarity"), "Both accepted reroll kinds retain lifetime accounting")
+	check(model.upgrade_tower_mirrored(0, id, "fire_arrows"), "Evolution retains the established mirrored lifetime counters")
+	model.debug_set_round(2)
+	open_wave(model)
+	for slot: int in range(2):
+		model._hit(slot, model.towers[slot][0], 0, 1000)
+		var tower: Dictionary = model.towers[slot][0]
+		check(tower["damage_dealt"] == 200 and tower["kills"] == 2 and tower["indirect_damage"] == 0, "Lifetime counters survive wave abandonment, upgrades, rerolls and a new wave on both mirrors")
+	var snapshot: Dictionary = model.snapshot()
+	snapshot["towers"][0][0]["damage_dealt"] = 9999
+	check(model.towers[0][0]["damage_dealt"] == 200, "Client snapshot counter edits cannot change authoritative lifetime accounting")
+
+func _fractional_credit_sources() -> void:
+	for burn: bool in [false, true]:
+		for step: float in [0.01, 1.0]:
+			var setup: Dictionary = _bounty_exposure_fixture(burn, true)
+			var model: MatchCombat = setup["model"]
+			var source: Dictionary = setup["source"]
+			var board: Dictionary = setup["board"]
+			var enemy: Dictionary = setup["enemy"]
+			var initial: int = board["indirect_damage"]
+			var hp: int = enemy["hp"]
+			var direct: int = source["damage_dealt"]
+			_advance_exposure(model, 0.75, step)
+			check(board["indirect_damage"] == initial, "Sub-HP vulnerability credit never rounds up per tick")
+			upgrade(model, board, ["stronger_mark"])
+			_advance_exposure(model, 0.1, step)
+			check(board["indirect_damage"] == initial + 1 and source["damage_dealt"] - direct == hp - int(enemy["hp"]) - 1, "Strength changes preserve original fractional bonus credit and partition every removed HP")
+			check(model.sell_tower(0, board["id"]), "Fractional accounting fixture removes its actual mark source")
+			_advance_exposure(model, 0.2, step)
+			check(board["indirect_damage"] == initial + 1 and source["damage_dealt"] - direct == hp - int(enemy["hp"]) - 1, "Removed marks cannot attribute later unmarked exposure or duplicate a prior whole bonus HP")
 
 func _drops_and_summons() -> void:
 	var rules := fixture()

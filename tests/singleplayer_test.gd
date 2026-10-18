@@ -31,6 +31,7 @@ func _run() -> void:
 	planning.session = session
 	# Isolate mirrored lifecycle from the shipped randomized horde composition.
 	var rules: CombatRules = _classic_rules()
+	rules.base_health = 10
 	var grunt: EnemyDefinition = preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
 	grunt.send_first_wave = 1
 	rules.catalog.enemies = [grunt]
@@ -125,65 +126,88 @@ func _run() -> void:
 
 
 func _solo_last_targeting(planning: MatchPlanning) -> void:
-	var rules: CombatRules = _classic_rules()
-	rules.starting_coins = 10000
-	planning.combat_rules = rules
-	planning.start_singleplayer()
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Targeting fixture commits its tested identities")
-	planning.build_tower(0, Vector2i(2, 3), &"arrow_tower", MatchCombat.TargetMode.LAST)
-	var id: int = planning.combat["towers"][0][0]["id"]
-	for slot: int in range(2):
-		_check(planning.combat["towers"][slot][0]["mode"] == MatchCombat.TargetMode.LAST, "Accepted Last build mirrors to each board's independent tower ID")
-	planning.set_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
-	planning.set_targeting(0, id, MatchCombat.TargetMode.LAST)
-	for upgrade: String in ["damage", "speed", "special"]:
-		planning.upgrade_tower(0, id, upgrade)
-	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.CLOSEST)
-	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.LAST)
-	for slot: int in range(2):
-		var tower: Dictionary = planning.combat["towers"][slot][0]
-		_check(tower["mode"] == MatchCombat.TargetMode.LAST and tower["secondary_mode"] == MatchCombat.TargetMode.LAST, "Primary and independent second-archer Last commands mirror through the same rules")
-	planning.upgrade_tower(0, id, "four_archers")
-	planning.set_targeting(0, id, MatchCombat.TargetMode.FURTHEST)
-	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
-	for archer_index: int in [2, 3]:
-		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.CLOSEST)
-		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.LAST)
+	for count: int in [2, 4, 8, 1]:
+		var rules: CombatRules = _classic_rules()
+		rules.starting_coins = 10000
+		rules.enemy_health = 400
+		rules.health_growth = 0
+		rules.enemy_speed = 1.0
+		rules.speed_growth_fraction = 0.0
+		rules.wave_weight = 3
+		rules.spawn_interval = 0.02
+		rules.spawn_jitter_ratio = 0.0
+		var grunt := preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
+		rules.catalog.enemies = [grunt]
+		rules.catalog.towers[0].range_cells = 20.0
+		# The owner's public snapshot publishes every 0.1 seconds. Keep even
+		# the paid minigun interval longer than that first observation window.
+		rules.catalog.towers[0].interval = 10.0
+		planning.combat_rules = rules
+		planning.start_singleplayer()
+		_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Shared-targeting fixture commits its tested identities")
+		planning.build_tower(0, Vector2i(2, 3), &"arrow_tower", MatchCombat.TargetMode.LAST)
+		var id: int = planning.combat["towers"][0][0]["id"]
+		var opponent_id: int = planning.combat["towers"][1][0]["id"]
+		_check(id != opponent_id, "Accepted Last build mirrors by cell to independent tower IDs")
+		var upgrades: Array[String] = ["damage", "speed", "special"]
+		if count in [4, 8, 1]:
+			upgrades.append("four_archers")
+		if count in [8, 1]:
+			upgrades.append("eight_archers")
+		if count == 1:
+			upgrades.append("arrow_minigun")
+		var prices: Dictionary = {"damage": 30, "speed": 45, "special": 200, "four_archers": 650, "eight_archers": 800, "arrow_minigun": 1600}
+		for upgrade: String in upgrades:
+			var before: Array = planning.combat["coins"].duplicate()
+			planning.upgrade_tower(0, id, upgrade)
+			for slot: int in range(2):
+				var tower: Dictionary = planning.combat["towers"][slot][0]
+				_check(planning.combat["coins"][slot] == before[slot] - prices[upgrade] and tower["mode"] == MatchCombat.TargetMode.LAST, "Each mirrored paid upgrade preserves the one accepted policy and charges its real price: %s" % upgrade)
+		planning.set_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
+		for slot: int in range(2):
+			_check(planning.combat["towers"][slot][0]["mode"] == MatchCombat.TargetMode.STRONGEST, "The real validated targeting command updates both evolved towers")
+		planning.set_targeting(0, id, MatchCombat.TargetMode.LAST)
+		var frozen: Dictionary = planning.combat.duplicate(true)
+		planning.set_targeting(1, opponent_id, MatchCombat.TargetMode.CLOSEST)
+		planning.set_targeting(0, opponent_id, MatchCombat.TargetMode.CLOSEST)
+		for mode: int in [-1, MatchCombat.TargetMode.LAST + 1]:
+			planning.set_targeting(0, id, mode)
+		planning.upgrade_tower(0, id, upgrades.back())
+		_check(planning.combat == frozen, "Shared targeting grants no opponent authority; invalid modes and repeat paid upgrades reject atomically")
+		for x: int in range(1, 13):
+			planning.request_edit(0, Vector2i(x, 4), true)
+		planning.submit_ready(true)
+		_check(planning.locked and planning.combat["phase"] == MatchCombat.Phase.WAVE and planning.combat["wave_roster"] == ["grunt", "grunt", "grunt"], "Shared-targeting fixture admits exactly three real grunts on both legal routes")
+		planning._physics_process(0.1)
 		for slot: int in range(2):
 			var tower: Dictionary = planning.combat["towers"][slot][0]
-			_check(tower["mode"] == MatchCombat.TargetMode.FURTHEST and tower["secondary_mode"] == MatchCombat.TargetMode.STRONGEST and tower["extra_archers"][archer_index - 2]["mode"] == MatchCombat.TargetMode.LAST, "Each extra Last archer mirrors without rewriting either earlier archer's accepted mode")
-	var frozen: Dictionary = planning.combat.duplicate(true)
-	var opponent_id: int = planning.combat["towers"][1][0]["id"]
-	planning.set_targeting(1, opponent_id, MatchCombat.TargetMode.LAST)
-	planning.set_secondary_targeting(1, opponent_id, MatchCombat.TargetMode.LAST)
-	for archer_index: int in [2, 3]:
-		planning.set_archer_targeting(1, opponent_id, archer_index, MatchCombat.TargetMode.CLOSEST)
-		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.LAST + 1)
-	_check(planning.combat == frozen, "Read-only solo opponent and invalid extra policies cannot mutate either mirrored tower")
-	var before_eight: Array = planning.combat["coins"].duplicate()
-	planning.upgrade_tower(0, id, "eight_archers")
-	for slot: int in range(2):
-		var eight: Dictionary = planning.combat["towers"][slot][0]
-		_check(eight["advancement"] == "eight_archers" and eight["extra_archers"].size() == 6 and planning.combat["coins"][slot] == before_eight[slot] - 800, "Eight-archer purchase adds six extra streams and charges both mirrored balances atomically")
-	for archer_index: int in range(4, 8):
-		planning.set_archer_targeting(0, id, archer_index, MatchCombat.TargetMode.STRONGEST)
-		for slot: int in range(2):
-			_check(planning.combat["towers"][slot][0]["extra_archers"][archer_index - 2]["mode"] == MatchCombat.TargetMode.STRONGEST, "Second-floor targeting commands reach the host owner and mirror independently")
-	frozen = planning.combat.duplicate(true)
-	planning.set_archer_targeting(1, opponent_id, 7, MatchCombat.TargetMode.CLOSEST)
-	planning.set_archer_targeting(0, id, 8, MatchCombat.TargetMode.CLOSEST)
-	_check(planning.combat == frozen, "Eighth-archer support grants neither opponent authority nor a ninth stream")
-	var before_minigun: Array = planning.combat["coins"].duplicate()
-	planning.upgrade_tower(0, id, "arrow_minigun")
-	for slot: int in range(2):
-		var minigun: Dictionary = planning.combat["towers"][slot][0]
-		_check(minigun["advancement"] == "arrow_minigun" and minigun["extra_archers"].is_empty() and planning.combat["coins"][slot] == before_minigun[slot] - 1600, "Minigun conversion retires individual extra streams and charges the accepted price on both boards")
-	frozen = planning.combat.duplicate(true)
-	planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.LAST)
-	planning.set_archer_targeting(0, id, 7, MatchCombat.TargetMode.CLOSEST)
-	planning.upgrade_tower(0, id, "eight_archers")
-	_check(planning.combat == frozen, "Merged weapon cannot retain hidden archer commands or repurchase its prior tier")
-	planning.stop_singleplayer()
+			var ranked: Array = planning.combat["enemies"][slot].duplicate()
+			ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+				if float(a["progress"]) == float(b["progress"]): return int(a["id"]) < int(b["id"])
+				return float(a["progress"]) < float(b["progress"])
+			)
+			_check(ranked.size() == 3 and float(ranked[0]["progress"]) < float(ranked[1]["progress"]) and float(ranked[1]["progress"]) < float(ranked[2]["progress"]), "Mirrored volleys have three surviving, differently progressed real enemies")
+			var streams: Array = [{"shot": tower["shot"], "aim": tower["aim"], "target_id": tower["target_id"]}]
+			if count > 1:
+				streams.append({"shot": tower["secondary_shot"], "aim": tower["secondary_aim"], "target_id": tower["secondary_target_id"]})
+			else:
+				_check(tower["secondary_shot"] == 0 and tower["secondary_target_id"] == -1, "Minigun retires the second independent firing stream")
+			streams.append_array(tower["extra_archers"])
+			_check(tower["mode"] == MatchCombat.TargetMode.LAST and streams.size() == count, "All 2/4/8 archers and the merged minigun retain one tower policy")
+			var expected_hits: Dictionary = {}
+			for index: int in range(streams.size()):
+				# The rotary gun releases at tick start, before later births;
+				# ordinary archer volleys select all streams at tick end.
+				var expected: Dictionary = ranked.back() if count == 1 else (ranked[index] if index < ranked.size() else ranked[0])
+				var expected_aim: Vector2 = Vector2(0, 4) if count == 1 else expected["pos"]
+				var stream: Dictionary = streams[index]
+				_check(stream["shot"] == 1 and stream["target_id"] == expected["id"] and stream["aim"] == expected_aim, "Each mirrored %d-stream volley captures its host-timed Last shot/aim/ID, distinct-first before shared fallback" % count)
+				expected_hits[expected["id"]] = int(expected_hits.get(expected["id"], 0)) + 1
+			for enemy: Dictionary in ranked:
+				var hits: int = int(expected_hits.get(enemy["id"], 0))
+				_check(enemy["max_hp"] == 400 and enemy["hp"] == 400 - hits * int(tower["damage"]), "Mirrored real attacks apply exactly the shared-policy ranked volley damage, including repeated fallback hits")
+			_check(tower["damage_dealt"] == count * int(tower["damage"]) and tower["kills"] == 0, "Each mirrored paid tier deals its real volley damage without clearing the fixture")
+		planning.stop_singleplayer()
 
 
 func _solo_specials(planning: MatchPlanning) -> void:
@@ -241,10 +265,10 @@ func _solo_specials(planning: MatchPlanning) -> void:
 			planning.upgrade_tower(0, id, "freeze_runes")
 			_check(planning.combat == before, "Onyx cannot buy the Boulders follow-up")
 		if type_id == &"arrow_tower":
-			planning.set_secondary_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
+			planning.set_targeting(0, id, MatchCombat.TargetMode.STRONGEST)
 			for slot: int in range(2):
 				var tower: Dictionary = planning.combat["towers"][slot].back()
-				_check(tower["secondary_mode"] == MatchCombat.TargetMode.STRONGEST and tower["mode"] == MatchCombat.TargetMode.FURTHEST, "Second-archer policy mirrors independently of primary policy")
+				_check(tower["mode"] == MatchCombat.TargetMode.STRONGEST, "Second Archer shares its tower's one mirrored accepted policy")
 		x += 2
 	planning.stop_singleplayer()
 
