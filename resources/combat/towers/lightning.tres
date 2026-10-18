@@ -8,6 +8,7 @@ script = ExtResource("1_definition")
 reward = ExtResource("2_reward")
 ; Provisional playtest balance, not creator-approved final stats or identity.
 damage = 3
+damage_type = &"lightning"
 range_cells = 3.0
 interval = 1.1
 cost = 100

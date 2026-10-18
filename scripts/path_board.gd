@@ -43,6 +43,12 @@ static var _rune_stone_shape := PackedVector2Array([
 	Vector2(-0.85, -0.45), Vector2(-0.25, -0.95), Vector2(0.60, -0.75),
 	Vector2(1.0, 0.15), Vector2(0.35, 0.85), Vector2(-0.65, 0.70),
 ])
+static var _stun_star_shape := PackedVector2Array([
+	Vector2(0.0, -1.0), Vector2(0.253, -0.348), Vector2(0.951, -0.309),
+	Vector2(0.409, 0.133), Vector2(0.588, 0.809), Vector2(0.0, 0.43),
+	Vector2(-0.588, 0.809), Vector2(-0.409, 0.133), Vector2(-0.951, -0.309),
+	Vector2(-0.253, -0.348), Vector2(0.0, -1.0),
+])
 
 var layout: PathLayout
 var command_mode: bool = false
@@ -56,6 +62,7 @@ var combat_towers: Array = []:
 	set(value):
 		combat_towers = value
 		_capture_shots()
+		_capture_stuns()
 		_rebuild_draw_order()
 		_sync_combat_animation()
 		queue_redraw()
@@ -64,6 +71,7 @@ var combat_enemies: Array = []:
 	set(value):
 		combat_enemies = value
 		_blend_enemies()
+		_capture_boss_actions()
 		_rebuild_draw_order()
 		_sync_combat_animation()
 		queue_redraw()
@@ -127,6 +135,12 @@ var _flame_elapsed: float = 0.0
 var _boulder_phase: float = 0.0
 var _enemy_progress: Dictionary[int, Vector2] = {}
 var _enemies_by_id: Dictionary[int, Dictionary] = {}
+var _enemy_lifts: Dictionary[int, Vector2] = {}
+var _enemy_position_from: Dictionary[int, Vector2] = {}
+var _enemy_position_to: Dictionary[int, Vector2] = {}
+var _boss_seen_enemy: Dictionary[int, Vector2i] = {}
+var _boss_seen_stuns: Dictionary[int, int] = {}
+var _boss_effects: Array[Dictionary] = []
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 var _bounty_health: Dictionary[int, float] = {}
 var _bounty_hit_life: Dictionary[int, float] = {}
@@ -205,7 +219,7 @@ func _advance_endpoints() -> void:
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty()))
 
 
 func _process(delta: float) -> void:
@@ -221,7 +235,7 @@ func _process(delta: float) -> void:
 		var interval: float = maxf(0.14, float(pose["interval"]))
 		pose["age"] = minf(float(pose["age"]) + visual_delta, interval)
 		_has_archer_motion = _has_archer_motion or float(pose["age"]) < interval
-	_enemy_blend_elapsed = minf(_enemy_blend_elapsed + delta, ENEMY_BLEND_DURATION)
+	_enemy_blend_elapsed = minf(_enemy_blend_elapsed + (0.0 if _corpse_paused else delta), ENEMY_BLEND_DURATION)
 	for id: int in _bounty_hit_life.keys():
 		var life: float = _bounty_hit_life[id] - visual_delta
 		if life <= 0.0:
@@ -232,6 +246,10 @@ func _process(delta: float) -> void:
 		_shot_traces[index]["life"] -= visual_delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
 			_shot_traces.remove_at(index)
+	for index: int in range(_boss_effects.size() - 1, -1, -1):
+		_boss_effects[index]["age"] += visual_delta
+		if float(_boss_effects[index]["age"]) >= float(_boss_effects[index]["duration"]):
+			_boss_effects.remove_at(index)
 	var expired: bool = false
 	if not _corpse_paused:
 		for index: int in range(_corpse_traces.size() - 1, -1, -1):
@@ -250,6 +268,12 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 	if match_id != _death_match_id or generation != _death_generation:
 		_corpse_traces.clear()
 		_last_death_id = 0
+		_boss_effects.clear()
+		_boss_seen_enemy.clear()
+		_boss_seen_stuns.clear()
+		_enemy_lifts.clear()
+		_enemy_position_from.clear()
+		_enemy_position_to.clear()
 		_death_match_id = match_id
 		_death_generation = generation
 	_corpse_speed = maxf(0.0, speed)
@@ -430,10 +454,22 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 func _blend_enemies() -> void:
 	var next_progress: Dictionary[int, Vector2] = {}
 	var next_health: Dictionary[int, float] = {}
+	var next_lifts: Dictionary[int, Vector2] = {}
+	var next_position_from: Dictionary[int, Vector2] = {}
+	var next_position_to: Dictionary[int, Vector2] = {}
 	_enemies_by_id.clear()
 	for enemy: Dictionary in combat_enemies:
 		var id: int = int(enemy["id"])
 		_enemies_by_id[id] = enemy
+		var lift: float = EnemyVisuals.jump_lift(enemy)
+		var old_lift: Vector2 = _enemy_lifts.get(id, Vector2(lift, lift))
+		next_lifts[id] = Vector2(lerpf(old_lift.x, old_lift.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), lift)
+		if bool(enemy.get("direct_movement", false)):
+			var target_position: Vector2 = enemy["pos"]
+			var prior_target: Vector2 = _enemy_position_to.get(id, target_position)
+			var prior_from: Vector2 = _enemy_position_from.get(id, prior_target)
+			next_position_from[id] = prior_from.lerp(prior_target, _enemy_blend_elapsed / ENEMY_BLEND_DURATION)
+			next_position_to[id] = target_position
 		var hp: float = float(enemy["hp"])
 		if int(enemy.get("bounty_tower_id", -1)) >= 0 and float(enemy.get("bounty_damage_bonus", 0.0)) > 0.0 and hp < _bounty_health.get(id, hp):
 			_bounty_hit_life[id] = 0.18
@@ -443,11 +479,18 @@ func _blend_enemies() -> void:
 		var displayed: float = lerpf(previous.x, previous.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION)
 		next_progress[id] = Vector2(displayed, target)
 	_enemy_progress = next_progress
+	_enemy_lifts = next_lifts
+	_enemy_position_from = next_position_from
+	_enemy_position_to = next_position_to
 	_bounty_health = next_health
 	_enemy_blend_elapsed = 0.0
 
 
 func _enemy_position(enemy: Dictionary) -> Vector2:
+	if bool(enemy.get("direct_movement", false)):
+		var id: int = int(enemy["id"])
+		var target: Vector2 = _enemy_position_to.get(id, enemy["pos"])
+		return _enemy_position_from.get(id, target).lerp(target, _enemy_blend_elapsed / ENEMY_BLEND_DURATION)
 	var route: Array = enemy["route"]
 	if route.is_empty():
 		return enemy["pos"]
@@ -457,6 +500,8 @@ func _enemy_position(enemy: Dictionary) -> Vector2:
 
 
 func _enemy_visual_position(enemy: Dictionary) -> Vector2:
+	if bool(enemy.get("direct_movement", false)):
+		return _enemy_position(enemy)
 	var route: Array = enemy["route"]
 	if route.size() < 2:
 		return _enemy_position(enemy)
@@ -501,11 +546,11 @@ func _enemy_faces_left(route: Array, progress: float) -> bool:
 	# Keep upright sprites facing the last horizontal leg through vertical turns.
 	var index: int = mini(floori(progress), route.size() - 2)
 	for segment: int in range(index, -1, -1):
-		var direction: Vector2i = route[segment + 1] - route[segment]
+		var direction: Vector2 = Vector2(route[segment + 1]) - Vector2(route[segment])
 		if direction.x != 0:
 			return (direction.x < 0) != mirror_horizontal
 	for segment: int in range(index + 1, route.size() - 1):
-		var direction: Vector2i = route[segment + 1] - route[segment]
+		var direction: Vector2 = Vector2(route[segment + 1]) - Vector2(route[segment])
 		if direction.x != 0:
 			return (direction.x < 0) != mirror_horizontal
 	return mirror_horizontal
@@ -715,9 +760,11 @@ func _draw() -> void:
 	_update_ground()
 	_draw_ranges()
 	_draw_hover()
+	_draw_boss_telegraphs()
 	_draw_attacks()
 	_draw_combat()
 	_draw_projectiles()
+	_draw_boss_effects()
 
 
 func _update_ground() -> void:
@@ -979,6 +1026,8 @@ func visual_headroom() -> float:
 		var bounds: Rect2 = EnemyVisuals.union_bounds(artwork)
 		var top: float = rect.position.y + bounds.position.y * rect.size.y / texture.get_height()
 		headroom = maxf(headroom, -top + maxf(3.0, _cell_size() * 0.055) + 3.0)
+		if artwork.jump_duration > 0.0:
+			headroom = maxf(headroom, -top + _cell_size() * 0.85 + 10.0)
 	return ceilf(headroom + 6.0)
 
 
@@ -1071,6 +1120,7 @@ func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
 	var orbiting: bool = tower.get("evolution", "") in ["boulders", "onyx_ring"]
 	if orbiting:
 		_draw_boulders(tower, foot, false)
+	_draw_stun_stars(tower, foot, false)
 	if artwork != null and artwork.icon_texture != null:
 		var variant: Dictionary = _tower_variant(tower, artwork)
 		var texture: Texture2D = variant.get("texture", artwork.board_texture if artwork.board_texture != null else artwork.icon_texture)
@@ -1097,6 +1147,7 @@ func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
 			_draw_archer(tower, artwork, 0)
 	if orbiting:
 		_draw_boulders(tower, foot, true)
+	_draw_stun_stars(tower, foot, true)
 
 
 func _draw_support_context(tower: Dictionary, foot: Vector2) -> void:
@@ -1187,7 +1238,8 @@ func _draw_death_blood(trace: Dictionary, foot: Vector2) -> void:
 func _draw_enemy_death(item: Dictionary) -> void:
 	var trace: Dictionary = item["data"]
 	var artwork: EnemyDefinition = _enemy_art[trace["type_id"]]
-	var frame: Texture2D = EnemyVisuals.frame_texture(artwork, &"death", float(trace["age"]))
+	var animation: StringName = EnemyVisuals.damage_animation(artwork, &"death", float(trace.get("hp", 1.0)), float(trace.get("max_hp", 1.0)))
+	var frame: Texture2D = EnemyVisuals.frame_texture(artwork, animation, float(trace["age"]))
 	if frame == null:
 		return
 	var flip: bool = (bool(trace["faces_left"]) != mirror_horizontal) != artwork.source_faces_left
@@ -1202,9 +1254,9 @@ func _draw_enemy(item: Dictionary) -> void:
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
 	var flip: bool = _enemy_faces_left(enemy["route"], item["progress"]) != artwork.source_faces_left
 	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
-	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, item["foot"], flip)
+	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, item["foot"]), flip)
 	var animation: StringName = StringName(enemy.get("animation", "walk"))
-	if animation == &"heal" or animation == &"cast":
+	if animation == &"heal" or (animation == &"cast" and not artwork.direct_movement):
 		EnemyVisuals.draw_action_effect(self, item["foot"], _cell_size() * 0.38, animation, float(enemy.get("animation_elapsed", 0.0)))
 	if flip:
 		rect.size.x = -rect.size.x
@@ -1226,7 +1278,7 @@ func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> 
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
 	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
 	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
-	return EnemyVisuals.visible_rect(artwork, frame, _cell_size() * artwork.board_height, foot, flip)
+	return EnemyVisuals.visible_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, foot), flip)
 
 
 func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, position: Vector2) -> bool:
@@ -1235,7 +1287,7 @@ func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, po
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
 	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
 	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
-	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, foot, flip)
+	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, foot), flip)
 	var uv: Vector2 = (position - rect.position) / rect.size
 	if flip:
 		uv.x = 1.0 - uv.x
@@ -1260,8 +1312,9 @@ func _draw_enemy_health(item: Dictionary) -> void:
 	if float(enemy["hp"]) >= float(enemy["max_hp"]):
 		return
 	var bounds: Rect2 = _enemy_sprite_bounds(enemy, item["foot"], item["progress"])
-	var bar_size := Vector2(clampf(bounds.size.x * 0.85, _cell_size() * 0.22, _cell_size() * 0.38),
-		maxf(2.0, _cell_size() * 0.04))
+	var boss: bool = _enemy_art[enemy["type_id"]].boss
+	var bar_size := Vector2(clampf(bounds.size.x * 0.85, _cell_size() * (0.55 if boss else 0.22), _cell_size() * (0.95 if boss else 0.38)),
+		maxf(2.0, _cell_size() * (0.055 if boss else 0.04)))
 	var bar_position := Vector2(item["foot"].x - bar_size.x * 0.5, bounds.position.y - bar_size.y - 3.0)
 	draw_rect(Rect2(bar_position, bar_size), Color("172120"))
 	var fraction: float = clampf(float(enemy["hp"]) / maxf(1.0, float(enemy["max_hp"])), 0.0, 1.0)
@@ -1275,7 +1328,7 @@ func _draw_attacks() -> void:
 		var definition: Dictionary = tower_types.get(tower["type_id"], {})
 		if _archer_advancement(tower, definition).get("weapon", "arrow") != "flamethrower":
 			continue
-		if not bool(tower.get("firing", false)) or float(tower.get("refuel_remaining", 0.0)) > 0.0:
+		if not bool(tower.get("firing", false)) or float(tower.get("refuel_remaining", 0.0)) > 0.0 or float(tower.get("stunned_remaining", 0.0)) > 0.0:
 			continue
 		var geometry: Dictionary = _archer_geometry(tower, 0, 1.0)
 		var end: Vector2 = _position_center(tower.get("aim", Vector2(tower["cell"]))) + Vector2(0, cell_size * 0.15)
@@ -1618,3 +1671,154 @@ func _draw_bomb_impact(position: Vector2, splash_radius: float, phase: float) ->
 		var angle: float = float(index) * TAU / 5.0
 		var spark: Vector2 = position + Vector2(cos(angle), sin(angle)) * radius * phase * 0.55
 		draw_rect(Rect2(spark.floor(), Vector2.ONE * pixel * 2.0), Color(1.0, 0.62, 0.24, fade))
+
+
+func _enemy_render_foot(enemy: Dictionary, ground_foot: Vector2) -> Vector2:
+	var lift: float = EnemyVisuals.jump_lift(enemy)
+	var blend: Vector2 = _enemy_lifts.get(int(enemy["id"]), Vector2(lift, lift))
+	return ground_foot - Vector2(0.0, lerpf(blend.x, blend.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION) * _cell_size())
+
+
+func _capture_boss_actions() -> void:
+	var active: Dictionary[int, bool] = {}
+	for enemy: Dictionary in combat_enemies:
+		var id: int = int(enemy["id"])
+		active[id] = true
+		var count := Vector2i(int(enemy.get("tower_attack_count", 0)), int(enemy.get("stomp_count", 0)))
+		var previous: Vector2i = _boss_seen_enemy.get(id, Vector2i(0, count.y))
+		var definition: EnemyDefinition = _enemy_art.get(enemy["type_id"])
+		if definition == null:
+			continue
+		if count.x > previous.x and definition.tower_attack_kind == &"cannon" and float(enemy.get("tower_attack_remaining", 0.0)) > 0.0:
+			var duration: float = maxf(0.001, definition.tower_attack_cast_duration)
+			_boss_effects.append({"kind": "cannon", "from": enemy["pos"], "to": enemy.get("tower_attack_aim", enemy["pos"]), "age": maxf(0.0, duration - float(enemy["tower_attack_remaining"])), "duration": duration})
+		if count.y > previous.y:
+			_boss_effects.append({"kind": "stomp", "pos": enemy["pos"], "radius": definition.stomp_radius, "age": 0.0, "duration": 0.55})
+		_boss_seen_enemy[id] = count
+	for id: int in _boss_seen_enemy.keys():
+		if not active.has(id):
+			_boss_seen_enemy.erase(id)
+	_limit_boss_effects()
+
+
+func _capture_stuns() -> void:
+	var active: Dictionary[int, bool] = {}
+	for tower: Dictionary in combat_towers:
+		var id: int = int(tower["id"])
+		active[id] = true
+		var count: int = int(tower.get("stun_count", 0))
+		if count > int(_boss_seen_stuns.get(id, count)):
+			_boss_effects.append({"kind": "stun", "pos": Vector2(tower["cell"]), "source": tower.get("stun_source", ""), "age": 0.0, "duration": 0.48})
+		_boss_seen_stuns[id] = count
+	for id: int in _boss_seen_stuns.keys():
+		if not active.has(id):
+			_boss_seen_stuns.erase(id)
+	_limit_boss_effects()
+
+
+func _limit_boss_effects() -> void:
+	while _boss_effects.size() > MAX_SHOT_TRACES:
+		_boss_effects.pop_front()
+
+
+func _draw_boss_telegraphs() -> void:
+	var cell_size: float = _cell_size()
+	for enemy: Dictionary in combat_enemies:
+		var locomotion: String = enemy.get("locomotion", "path")
+		if locomotion in ["jump_charge", "jump"] and enemy.has("jump_to"):
+			var landing: Vector2 = _position_center(enemy["jump_to"])
+			var rect := Rect2(landing - Vector2.ONE * cell_size * 0.38, Vector2.ONE * cell_size * 0.76)
+			draw_rect(rect, Color(0.90, 0.66, 0.27, 0.12))
+			draw_rect(rect, Color(0.95, 0.73, 0.33, 0.85), false, 2.0)
+			var foot: Vector2 = _position_center(_enemy_position(enemy))
+			if locomotion == "jump_charge":
+				var phase: float = 0.5 + sin(float(enemy.get("animation_elapsed", 0.0)) * 12.0) * 0.5
+				draw_line(foot, landing, Color(0.93, 0.70, 0.31, 0.25 + phase * 0.35), 2.0)
+				draw_set_transform(foot, 0.0, Vector2(1.0, 0.35))
+				draw_arc(Vector2.ZERO, cell_size * (0.48 + phase * 0.12), 0.0, TAU, 24, Color(0.95, 0.73, 0.33, 0.80), 2.0, false)
+				draw_set_transform(Vector2.ZERO)
+		if float(enemy.get("tower_attack_remaining", 0.0)) > 0.0:
+			var target: Vector2 = _position_center(enemy.get("tower_attack_aim", enemy["pos"]))
+			draw_set_transform(target, 0.0, Vector2(1.0, 0.4))
+			draw_arc(Vector2.ZERO, cell_size * 0.33, 0.0, TAU, 24, Color(0.94, 0.45, 0.27, 0.9), 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+
+
+func _draw_boss_effects() -> void:
+	var cell_size: float = _cell_size()
+	var pixel: float = maxf(1.0, floorf(cell_size * 0.025))
+	for effect: Dictionary in _boss_effects:
+		var phase: float = clampf(float(effect["age"]) / float(effect["duration"]), 0.0, 1.0)
+		if effect["kind"] == "cannon":
+			# This trajectory only exists after an accepted host attack/aim.
+			# Its arrival coincides with the accepted windup boundary; impacts
+			# are separate stun-count facts, not a local gameplay prediction.
+			var flight: float = minf(0.36, float(effect["duration"]))
+			var travel: float = (float(effect["age"]) - float(effect["duration"]) + flight) / flight
+			if travel < 0.0:
+				continue
+			var start: Vector2 = _position_center(effect["from"]) + Vector2(0.0, -cell_size * 0.46)
+			var end: Vector2 = _position_center(effect["to"]) + Vector2(0.0, -cell_size * 0.50)
+			var point: Vector2 = start.lerp(end, travel) - Vector2(0.0, sin(travel * PI) * cell_size * 0.35)
+			var tail: Vector2 = point + (start - end).normalized() * pixel * 7.0
+			draw_line(tail.floor(), point.floor(), Color("c28a4e"), pixel * 3.0)
+			draw_rect(Rect2(point.floor() - Vector2.ONE * pixel * 3.0, Vector2.ONE * pixel * 6.0), Color("24292c"))
+			draw_rect(Rect2(point.floor() - Vector2.ONE * pixel * 2.0, Vector2.ONE * pixel * 2.0), Color("93938a"))
+		elif effect["kind"] == "stomp":
+			var foot: Vector2 = _position_center(effect["pos"]) + Vector2(0.0, cell_size * 0.28)
+			var radius: float = maxf(0.3, float(effect["radius"])) * cell_size
+			draw_set_transform(foot, 0.0, Vector2(1.0, 0.42))
+			draw_arc(Vector2.ZERO, radius * (0.2 + phase * 0.8), 0.0, TAU, 32, Color(0.76, 0.64, 0.44, 1.0 - phase), pixel * 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+			for index: int in range(7):
+				var angle: float = float(index) * TAU / 7.0
+				var dust: Vector2 = foot + Vector2(cos(angle), sin(angle) * 0.42) * radius * phase
+				draw_rect(Rect2(dust.floor(), Vector2(pixel * 3.0, pixel * 2.0)), Color(0.65, 0.57, 0.40, 1.0 - phase))
+		elif effect["kind"] == "stun":
+			var point: Vector2 = _position_center(effect["pos"]) - Vector2(0.0, cell_size * 0.48)
+			if effect.get("source", "") == "club":
+				draw_line(point + Vector2(-cell_size * 0.28, -cell_size * 0.26), point + Vector2(cell_size * 0.22, cell_size * 0.10), Color(0.84, 0.64, 0.35, 1.0 - phase), pixel * 3.0)
+			for index: int in range(6):
+				var angle: float = float(index) * TAU / 6.0
+				var start: Vector2 = point + Vector2(cos(angle), sin(angle)) * cell_size * (0.12 + phase * 0.28)
+				draw_line(start, start + Vector2(cos(angle), sin(angle)) * pixel * 4.0, Color(1.0, 0.83, 0.38, 1.0 - phase), pixel * 2.0)
+
+
+func _draw_stun_stars(tower: Dictionary, foot: Vector2, front: bool) -> void:
+	var remaining: float = float(tower.get("stunned_remaining", 0.0))
+	if remaining <= 0.0:
+		return
+	var cell_size: float = _cell_size()
+	var center: Vector2 = _tower_stun_center(tower, foot)
+	var radius: float = maxf(3.0, cell_size * 0.085)
+	for index: int in range(3):
+		# Actual remaining sim time drives the orbit: pause cannot consume stun.
+		var angle: float = -remaining * 2.6 + float(index) * TAU / 3.0
+		if (sin(angle) >= 0.0) != front:
+			continue
+		var point: Vector2 = center + Vector2(cos(angle) * cell_size * 0.31, sin(angle) * cell_size * 0.10)
+		draw_set_transform(point.round(), 0.0, Vector2.ONE * radius)
+		draw_colored_polygon(_stun_star_shape, Color("f5ce56"))
+		draw_polyline(_stun_star_shape, Color("8c5b2c"), maxf(1.0, cell_size * 0.018) / radius, false)
+		draw_set_transform(Vector2.ZERO)
+
+
+func _tower_stun_center(tower: Dictionary, foot: Vector2) -> Vector2:
+	var cell_size: float = _cell_size()
+	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	if artwork == null or artwork.icon_texture == null:
+		return foot - Vector2(0.0, cell_size * 1.15)
+	var variant: Dictionary = _tower_variant(tower, artwork)
+	var texture: Texture2D = variant.get("texture", artwork.icon_texture)
+	var rect: Rect2 = _sprite_rect(texture, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), foot)
+	var scale: float = rect.size.y / texture.get_height()
+	var top: float = rect.position.y + _texture_bounds[texture].position.y * scale
+	if artwork.archer_head_texture != null:
+		var definition: Dictionary = tower_types.get(tower["type_id"], {})
+		var advancement: Dictionary = _archer_advancement(tower, definition)
+		var count: int = int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer" else 1))
+		var pivot: Vector2 = variant.get("archer_pivot", artwork.archer_pivot)
+		for index: int in range(count):
+			var offset: Vector2 = _archer_offset(artwork, index, variant)
+			top = minf(top, rect.position.y + (pivot.y + offset.y - 15.0) * scale)
+	return Vector2(foot.x, top - cell_size * 0.07)

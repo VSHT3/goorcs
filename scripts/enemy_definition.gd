@@ -10,6 +10,7 @@ extends Resource
 @export var base_damage: int = 1
 @export var fire_immune: bool = false
 @export var ice_immune: bool = false
+@export var nonphysical_damage_multiplier: float = 1.0
 @export var spawn_weight: int = 1
 @export var first_wave: int = 1
 # Zero means unlimited. Share caps this type's total weight, not its head count.
@@ -44,6 +45,21 @@ extends Resource
 @export var summon_min: int = 0
 @export var summon_max: int = 0
 @export var summon_limit: int = 0
+@export var summon_pool: PackedStringArray = PackedStringArray()
+@export var summon_weights: PackedInt32Array = PackedInt32Array()
+@export var stomp_interval: float = 0.0
+@export var stomp_radius: float = 0.0
+@export var stomp_health_fraction: float = 0.0
+@export var tower_attack_kind: StringName = &""
+@export var tower_attack_interval: float = 0.0
+@export var tower_attack_range: float = 0.0
+@export var tower_attack_cast_duration: float = 0.0
+@export var tower_stun_duration: float = 0.0
+@export var direct_movement: bool = false
+@export var road_speed_multiplier: float = 1.0
+@export var grass_speed_multiplier: float = 1.0
+@export var jump_charge_duration: float = 0.0
+@export var jump_duration: float = 0.0
 @export var animation_frames: SpriteFrames
 @export var texture: Texture2D
 @export var source_faces_left: bool = false

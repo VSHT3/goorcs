@@ -1,0 +1,50 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/orc_war_machine_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/orc_war_machine.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"orc_war_machine"
+title = "Orc King War Machine"
+description = "The Orc King rides a fortress of iron, timber and cannons. Wheels roll over road, mechanical legs cross grass, and charged leaps carry it over towers."
+; Provisional round-100 siege encounter. Terrain speed and charge windows allow counterplay.
+health_multiplier = 450.0
+speed_multiplier = 0.07
+base_damage = 10
+spawn_weight = 100
+first_wave = 100
+max_per_wave = 1
+max_weight_share = 0.75
+boss = true
+boss_spawn_chance = 0.025
+boss_spawn_chance_growth = 0.002
+boss_spawn_chance_cap = 0.12
+send_enabled = false
+kill_bounty = 250
+reroll_drop_chance = 1.0
+reroll_drop_amount = 16
+tower_attack_kind = &"cannon"
+tower_attack_interval = 12.0
+tower_attack_range = 4.5
+tower_attack_cast_duration = 1.4
+tower_stun_duration = 8.0
+direct_movement = true
+road_speed_multiplier = 1.0
+grass_speed_multiplier = 0.45
+jump_charge_duration = 2.5
+jump_duration = 1.5
+summon_interval = 11.0
+summon_cast_duration = 1.2
+summon_pool = PackedStringArray("orcling", "grunt", "runner")
+summon_weights = PackedInt32Array(8, 1, 1)
+summon_min = 2
+summon_max = 4
+summon_limit = 12
+board_height = 2.8
+board_anchor = Vector2(0.5, 0.86)
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+blood_color = Color(0, 0, 0, 0)

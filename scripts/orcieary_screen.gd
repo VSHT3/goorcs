@@ -46,6 +46,8 @@ func _ready() -> void:
 	MenuAudio.bind_action(back_button)
 	back_button.pressed.connect(_request_back)
 	visibility_changed.connect(_visibility_changed)
+	_details_scroll.resized.connect(_resize_stats)
+	_resize_stats()
 	portrait = EnemyPortrait.new()
 	portrait.name = "EnemyPortrait"
 	portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -118,16 +120,19 @@ func _build_catalog() -> void:
 	entries.assign(catalog.enemies)
 	var availability: Dictionary[StringName, int] = {}
 	for definition: EnemyDefinition in entries:
-		availability[definition.id] = mini(definition.first_wave if definition.regular_spawn_enabled else 2147483647, definition.send_first_wave if definition.send_enabled else 2147483647)
+		availability[definition.id] = mini(definition.first_wave if definition.regular_spawn_enabled or definition.boss else 2147483647, definition.send_first_wave if definition.send_enabled and not definition.boss else 2147483647)
 	# Propagate through summon chains; unreachable cycles retain the last-place sentinel.
 	for pass_index: int in range(entries.size()):
 		var changed: bool = false
 		for source: EnemyDefinition in entries:
-			if source.summon_interval <= 0.0 or not availability.has(source.summon_type):
+			if source.summon_interval <= 0.0:
 				continue
-			if availability[source.id] < availability[source.summon_type]:
-				availability[source.summon_type] = availability[source.id]
-				changed = true
+			var children: PackedStringArray = source.summon_pool if not source.summon_pool.is_empty() else PackedStringArray([String(source.summon_type)])
+			for child: String in children:
+				var child_id := StringName(child)
+				if availability.has(child_id) and availability[source.id] < availability[child_id]:
+					availability[child_id] = availability[source.id]
+					changed = true
 		if not changed:
 			break
 	entries.sort_custom(func(a: EnemyDefinition, b: EnemyDefinition) -> bool:
@@ -231,8 +236,8 @@ func _select(index: int) -> void:
 	_stat_values[&"damage"].text = str(int(preview["base_damage"]))
 	var bounty: int = rules.kill_bounty if definition.kill_bounty < 0 else definition.kill_bounty
 	_stat_values[&"bounty"].text = "%d %s" % [bounty, "Coin" if bounty == 1 else "Coins"]
-	_stat_values[&"cost"].text = "%d %s" % [definition.send_cost, "Coin" if definition.send_cost == 1 else "Coins"] if definition.send_enabled else "—"
-	_stat_values[&"income"].text = "+%d / clear" % definition.send_income if definition.send_enabled else "—"
+	_stat_values[&"cost"].text = "%d %s" % [definition.send_cost, "Coin" if definition.send_cost == 1 else "Coins"] if definition.send_enabled and not definition.boss else "—"
+	_stat_values[&"income"].text = "+%d / clear" % definition.send_income if definition.send_enabled and not definition.boss else "—"
 	mechanics_label.text = _mechanics(definition)
 	if definition.boss:
 		mechanics_label.text = "Later waves %s%%–%s%% · Weight %d\n" % [String.num(definition.boss_spawn_chance * 100.0, 1), String.num(definition.boss_spawn_chance_cap * 100.0, 1), definition.spawn_weight] + mechanics_label.text
@@ -252,25 +257,44 @@ func _select(index: int) -> void:
 
 
 func _availability(definition: EnemyDefinition) -> String:
+	if definition.boss:
+		return "Boss round %d · No paid sends" % definition.first_wave
 	if not definition.regular_spawn_enabled and not definition.send_enabled:
 		var sources := PackedStringArray()
 		for candidate: EnemyDefinition in catalog.enemies:
-			if candidate.summon_type == definition.id:
+			if candidate.summon_type == definition.id or String(definition.id) in candidate.summon_pool:
 				sources.append(candidate.title)
 		var source: String = "Summoned by " + ", ".join(sources) if not sources.is_empty() else "Summon only"
 		return source + "\nNo regular waves or paid sends."
 	var regular: String = "Regular waves %d+" % definition.first_wave if definition.regular_spawn_enabled else "No regular waves"
-	if definition.boss:
-		regular = "Boss round %d" % definition.first_wave
 	var sends: String = "Sends %d+" % definition.send_first_wave if definition.send_enabled else "No paid sends"
 	return regular + " · " + sends
 
 
 func _mechanics(definition: EnemyDefinition) -> String:
+	var lines := PackedStringArray()
 	if definition.heal_interval > 0.0:
-		return "Heals allies %s%% every %ss\nWithin %s cells · cannot heal itself" % [String.num(definition.heal_fraction * 100.0, 1), String.num(definition.heal_interval, 2), String.num(definition.heal_radius, 2)]
+		lines.append("Heals allies %s%% every %ss\nWithin %s cells · cannot heal itself" % [String.num(definition.heal_fraction * 100.0, 1), String.num(definition.heal_interval, 2), String.num(definition.heal_radius, 2)])
 	if definition.summon_interval > 0.0:
-		return "Summons %d–%d every %ss\n%ss cast · at most %d living summons" % [definition.summon_min, definition.summon_max, String.num(definition.summon_interval, 2), String.num(definition.summon_cast_duration, 2), definition.summon_limit]
+		lines.append("Summons %d–%d every %ss · %ss cast\nAt most %d living summons" % [definition.summon_min, definition.summon_max, String.num(definition.summon_interval, 2), String.num(definition.summon_cast_duration, 2), definition.summon_limit])
+		if not definition.summon_pool.is_empty():
+			var troops := PackedStringArray()
+			for index: int in range(definition.summon_pool.size()):
+				var weight: int = definition.summon_weights[index] if index < definition.summon_weights.size() else 1
+				for child: EnemyDefinition in catalog.enemies:
+					if String(child.id) == definition.summon_pool[index]:
+						troops.append("%s ×%d" % [child.title, weight])
+			lines.append("Troop weights: " + " · ".join(troops))
+	if not is_equal_approx(definition.nonphysical_damage_multiplier, 1.0):
+		lines.append("Non-physical damage ×%s" % String.num(definition.nonphysical_damage_multiplier, 2))
+	if definition.stomp_interval > 0.0:
+		lines.append("Walking stomp every %ss · %s-cell radius\nHurts other enemies for %s%% of their max HP" % [String.num(definition.stomp_interval, 1), String.num(definition.stomp_radius, 1), String.num(definition.stomp_health_fraction * 100.0, 1)])
+	if definition.tower_attack_interval > 0.0:
+		lines.append("%s every %ss · %s-cell range\n%ss windup · stuns a tower for %ss" % [String(definition.tower_attack_kind).capitalize(), String.num(definition.tower_attack_interval, 1), String.num(definition.tower_attack_range, 1), String.num(definition.tower_attack_cast_duration, 1), String.num(definition.tower_stun_duration, 1)])
+	if definition.direct_movement:
+		lines.append("Direct to base · ignores the painted maze\nRoad speed ×%s · grass speed ×%s" % [String.num(definition.road_speed_multiplier, 2), String.num(definition.grass_speed_multiplier, 2)])
+	if definition.jump_duration > 0.0:
+		lines.append("Blocked by a tower: charges %ss, jumps %ss\nLands on the nearest vacant cell beyond it" % [String.num(definition.jump_charge_duration, 1), String.num(definition.jump_duration, 1)])
 	var minimum: int = 0
 	var maximum: int = 0
 	for index: int in range(definition.group_weights.size()):
@@ -279,8 +303,12 @@ func _mechanics(definition: EnemyDefinition) -> String:
 				minimum = index + 1
 			maximum = index + 1
 	if maximum > 1:
-		return "Arrives in groups of %d–%d\nOne send buys one whole group" % [minimum, maximum]
-	return ""
+		lines.append("Arrives in groups of %d–%d\nOne send buys one whole group" % [minimum, maximum])
+	return "\n".join(lines)
+
+
+func _resize_stats() -> void:
+	%Stats.columns = 2 if _details_scroll.size.x < 540.0 else (4 if _details_scroll.size.x < 820.0 else 6)
 
 
 func _refresh_counts() -> void:

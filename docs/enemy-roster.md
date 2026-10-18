@@ -15,6 +15,8 @@ Health and movement use the existing wave-scaled baseline in `CombatRules`: each
 | Orc Chief | 6 | 0.5 | 5 | 22 | 34 | 12 | 25% | 100 / +5 |
 | NecOrcmancer | 5 | 0.5 | 3 | 34 | 46 | 15 | 25% | 140 / +6 |
 | NecOrcmancer Mancer | 30 | 0.3 | 8 | 40, then occasional | Never | 40 | 50% | — |
+| Troll | 180 | 0.09 | 10 | 60, then occasional | Never | 60 | 65% | — |
+| Orc King War Machine | 450 | 0.07 | 10 | 100, then occasional | Never | 100 | 75% | — |
 | SkeleOrc | 0.5 | 1.05 | 1 | Summoned only | Not purchasable | Not in regular roster | — | — |
 
 The first five rounds allow only Orcling sends. Each later send unlock trails the next regular threat tier; the final NecOrcmancer send unlock is deliberately delayed until round 46, as chosen by the creator. UI previews and command validation use the same accepted gate. Earlier-round debug jumps relock later sends. SkeleOrcs remain available directly in sandbox.
@@ -28,6 +30,45 @@ NecOrcmancers begin at one regular selection per wave; the cap grows by one ever
 **NecOrcmancer Mancer** (`necorcmancer_mancer`) is a separate boss, never a paid send. One is guaranteed on round 40: its 40 weight is reserved before ordinary selections from that round's 84-weight budget. Later waves roll once for an encounter, starting at 5% on round 41 and gaining 0.5 percentage points per round, capped at 25% from round 81 onward. At most one boss appears per wave, still respecting budget/share limits. These encounter odds and combat values are provisional tuning.
 
 The boss uses the same seven-second / 1.15-second ritual, but raises **two to four ordinary NecOrcmancers**, capped at six living direct children. Those NecOrcmancers retain their own stats, bounty, and SkeleOrc rituals; newborn casters start their clocks at birth and cannot cascade a cast immediately. Every generation inherits its parent's captured route/current progress, and all descendants must clear before the wave ends. Catalog validation permits acyclic summon chains and rejects self/indirect cycles. The boss pays 40 Coins when killed; SkeleOrcs retain zero normal Coin bounty.
+
+## Late-game bosses
+
+All boss identities are barred from paid sends by the host, independently of their authored send flag. Each type reserves at most one encounter at its guaranteed debut, then rolls its own occasional later encounter; total weight/share rules still apply. Both new bosses are available directly in Sandbox and have debut-scaled Orcieary entries. Numeric balance below is provisional until real friend playtests.
+
+| Mechanic | Troll | Orc King War Machine |
+| --- | ---: | ---: |
+| Debut HP | 12,060 at round 60 | 48,150 at round 100 |
+| Later encounter chance | 4% + 0.3 percentage points/round, capped at 18% | 2.5% + 0.2 percentage points/round, capped at 12% |
+| Tower attack interval | 25 simulation seconds | 12 simulation seconds |
+| Attack reach | 2.4 cells | 4.5 cells |
+| Wind-up | 1.25 seconds | 1.4 seconds |
+| Tower stun | 30 seconds | 8 seconds |
+| Kill Coins / guaranteed Shards | 100 / 8 | 250 / 16 |
+
+**Troll:** a huge, very slow club bearer. Plain physical damage remains normal; magic, fire, lightning, explosions, and ice deal **1.5×** damage. Direct hits compose that multiplier once with bounty vulnerability; continuous damage/burn apply it before whole-HP accumulation, never by rounding every small tick. Fire-arrow shafts remain physical while their burns are fire; unenhanced Boulders are physical, Freeze Boulders use the ice damage category, and Onyx is magic. Existing SkeleOrc immunity behavior is unchanged: ice immunity blocks slow, not Boulders' HP damage; fire immunity blocks burns/Flamethrower rather than retroactively removing projectile impact.
+
+While walking, each heavy step every **2.4 simulation seconds** damages **other living enemies within a circular 1.1-cell radius** for **8% of their maximum HP**. These collateral deaths grant no tower kills, Coins, Shards, or player lifetime kills. The Troll periodically winds up and slams the nearest in-range tower; ties are stable, the attack is cancelled by death/leak, and a completed hit shows orbiting cartoon stars. A single tower can remain locked down by repeated club swings, so spread defenses rather than relying on one firing position.
+
+**Orc King War Machine:** a crewed timber/iron siege engine with a crowned king, multiple cannons, and rear troop doors. It heads directly from portal to base instead of following the maze. Road uses wheels at full authored speed; grass deploys mechanical legs at **45%** of road speed. It stops before a blocking tower, charges for **2.5 seconds**, then takes **1.5 seconds** to jump to the nearest available forward cell. Landings are revalidated against new construction; no available landing means waiting, never destroying a tower, overlapping it, or leaving the board. Cannon wind-ups stun the nearest in-range tower.
+
+Every **11 seconds**, a **1.2-second** door-opening action releases **2–4** host-rolled troops, capped at **12 living direct children**. Orcling / Orc / Runner weights are **8 / 1 / 1** per child. Troops join the nearest remaining captured painted route instead of inheriting the machine's off-road shortcut; all children still prevent wave clearance. Artwork exposes intact, damaged, and critical states at **66% / 33%** remaining HP across locomotion and action poses.
+
+**Stun ownership:** the host owns `stunned_remaining` and every impact. Stuns refresh nonstackingly, stop fresh attacks/continuous exposure and firing streaks, and expire in simulation time, respecting pause and playback speed. Existing burns already applied keep ticking; support and economy are not attacks. Reset/abandoned rounds clear status. Camera, stars, projectiles, and sound never decide outcomes.
+
+### Fixed-defense balance smoke
+
+Unrolled shipped capstones were placed along a 14×9 road-plus-detour layout, with each boss alone at its debut round. Physical = four Miniguns; mixed = two Flamethrowers, one fully reloaded A.O.M., one Minigun; siege = four Flamethrowers, three Miniguns and one fully reloaded A.O.M. Prices below come from actual normal-mode purchases; the simulation uses free Sandbox admission only to isolate the encounter. Different costs/placements mean this is **not** an equal-budget tier ranking.
+
+| Boss | Defense | Normal investment | Result | Simulation seconds | HP at leak |
+| --- | --- | ---: | --- | ---: | ---: |
+| Troll | Physical | 13,480 | Leaked | 68.30 | 891 |
+| Troll | Mixed | 17,630 | Killed | 33.80 | — |
+| Troll | Siege | 33,410 | Killed | 19.90 | — |
+| War machine | Physical | 13,480 | Leaked | 138.30 | 24,375 |
+| War machine | Mixed | 17,630 | Leaked | 138.30 | 26,557 |
+| War machine | Siege | 33,410 | Killed | 96.75 | — |
+
+Fine 0.05-second and coarse 0.5-second calls produced identical remaining HP and kill/leak outcomes; observed completion polling differs by at most one coarse step. The surviving machine exercised eleven cannon attacks/twelve troop batches; the siege kill exercised eight of each. This establishes feasible authored counterplay and a significant physical-only Troll challenge, not final competitive balance across every route, roll, send horde, or collection loadout.
 
 ## Health progression
 
@@ -61,14 +102,14 @@ Movement no longer gains a fixed 0.15 cells/second every round. `CombatRules.spe
 
 ## Presentation
 
-All eight enemies use a shared elevated three-quarter pixel-art language, material ramps, lighting and outlines, with separately authored faces/anatomy rather than a reused face or cut-out source limbs. Each has a twelve-frame articulated walk and death; Chief healing and both NecOrcmancer tiers have separate anticipation/action/recovery poses. Runtime stills match frame zero; historical source PNGs remain untouched. `tools/author_enemy_sprites.py` reproduces the original seven sheets/stills. `tools/author_necorcmancer_mancer.py` separately authors the boss's bone crown, armored shoulders, heavy robes, horned skull staff, seven-FPS walk, cast, and collapse on a 128×128 canvas. Per-enemy JSON files in `assets/enemies/animations/` record derivation, bounds, and hashes.
-Every enemy also has a twelve-frame, 0.8-second death animation. Living Orcs collapse with a small dark-red ground splatter; SkeleOrcs scatter into loose bones without blood. The host publishes short-lived, uniquely numbered confirmed-kill events; clients cannot manufacture damage, rewards, or new living enemies from them. Fallen bodies/bones linger briefly, fade, and are never selectable or targetable. Repeated snapshots cannot replay expired deaths. Playback respects simulation speed and explicit pause, but the final death can finish after wave clearance. Debug/map resets invalidate stale-coordinate effects.
+All ten enemies use a shared elevated three-quarter pixel-art language, material ramps, lighting and outlines, with separately authored faces/anatomy rather than a reused face or cut-out source limbs. Each has articulated walking and death; ability poses retain fixed canvases and foot anchors. Runtime stills match frame zero; historical source PNGs remain untouched. `tools/author_enemy_sprites.py` reproduces the original seven sheets/stills, `tools/author_necorcmancer_mancer.py` authors the round-40 boss, and `tools/author_late_bosses.py` authors the Troll and machine, including wheels, legs, club/cannons/doors, jumps, crew/king, and both damaged phases. Per-enemy JSON files record original authoring, bounds and hashes. No external generator or paid credits were used for the late-boss artwork.
+Every enemy has an authored collapse/debris animation: the original roster uses 0.8 seconds, while the two late bosses use weightier 1.2-second, twelve-frame collapses. Living Orcs/Trolls leave a small dark-red blood splatter; SkeleOrcs scatter into bloodless bones and the machine breaks into bloodless debris. The host publishes short-lived, uniquely numbered confirmed deaths; clients cannot manufacture damage, rewards, or new living enemies from them. Fallen bodies/effects fade and are never selectable or targetable. Repeated snapshots cannot replay expired deaths. Playback respects simulation speed and explicit pause, but the final death can finish after wave clearance. Debug/map resets invalidate stale-coordinate effects.
 
 ## Orcieary and lifetime records
 
 Open **Orcieary** from the main menu or press **B** there. Entries are ordered by earliest regular/send availability, with summoned-only types inheriting their summoner's earliest availability; ties use send/regular availability and stable IDs. The canonical content catalog is not reordered. Each entry shows encounter/send availability, description, portrait, base stats/scaling, mechanics, and lifetime killed/sent counts. Click the portrait, or focus it and press Enter/Space, to play its walk cycle or special action once and return to rest. Repeat activation restarts playback; selection changes clear it, and hidden previews do not run. Arrows navigate entries; Tab/Shift-Tab move between list, portrait, and Back; Escape returns.
 
-The boss entry shows actual round-40 debut stats, weight, later encounter odds, and no paid-send price/income. Other entries retain their wave-one baseline. Its longer identity and mechanics remain usable at both supported desktop widths without visible scrollbar chrome.
+Boss entries show their actual debut-round stats, weight, later encounter odds, and no paid-send price/income. Other entries retain their wave-one baseline. Long identities/mechanics use the existing focus-following, chrome-free scrolling at both supported desktop widths. Machine portrait playback demonstrates attacks, troop doors, legs, charged jumps, and damaged/critical poses using the battlefield's frame owner.
 
 
 `EnemyStatisticsStore` atomically saves `user://enemy_statistics.json`. Accepted cumulative per-side totals carry a unique model/match ID. Durable high-water marks make repeated, stale, reconnected, or restarted observations idempotent; the owned slot is bound for each ID, avoiding mirrored-solo/opponent duplication. Actual tower kills count; leaks/rejected sends do not. Sent groups count individuals. Sandbox never records progression. Invalid saves are not silently replaced; failures are shown in Orcieary and retried only from cumulative accepted state without granting phantom counts. This is a trusted local save, not account-backed anti-cheat.

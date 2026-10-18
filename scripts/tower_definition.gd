@@ -9,6 +9,7 @@ const FREEZE_DURATION: float = 2.0
 
 @export var reward: TowerReward
 @export var damage: int = 2
+@export var damage_type: StringName = &"physical"
 @export var range_cells: float = 3.0
 @export var interval: float = 0.75
 @export var cost: int = 45

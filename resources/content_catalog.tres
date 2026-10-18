@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ContentCatalog" load_steps=18 format=3]
+[gd_resource type="Resource" script_class="ContentCatalog" load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://scripts/content_catalog.gd" id="1_catalog"]
 [ext_resource type="Script" path="res://scripts/tower_definition.gd" id="2_tower"]
@@ -17,9 +17,11 @@
 [ext_resource type="Resource" path="res://resources/combat/towers/war_drums.tres" id="15_drums"]
 [ext_resource type="Resource" path="res://resources/combat/towers/gold_mine.tres" id="16_mine"]
 [ext_resource type="Resource" path="res://resources/combat/enemies/necorcmancer_mancer.tres" id="17_boss"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/troll.tres" id="18_troll"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/orc_war_machine.tres" id="19_machine"]
 
 [resource]
 script = ExtResource("1_catalog")
 towers = Array[ExtResource("2_tower")]([ExtResource("4_arrow"), ExtResource("5_ballista"), ExtResource("6_rune"), ExtResource("14_lightning"), ExtResource("15_drums"), ExtResource("16_mine")])
-enemies = Array[ExtResource("3_enemy")]([ExtResource("7_grunt"), ExtResource("8_runner"), ExtResource("9_brute"), ExtResource("10_orcling"), ExtResource("11_chief"), ExtResource("12_necro"), ExtResource("13_skeleton"), ExtResource("17_boss")])
+enemies = Array[ExtResource("3_enemy")]([ExtResource("7_grunt"), ExtResource("8_runner"), ExtResource("9_brute"), ExtResource("10_orcling"), ExtResource("11_chief"), ExtResource("12_necro"), ExtResource("13_skeleton"), ExtResource("17_boss"), ExtResource("18_troll"), ExtResource("19_machine")])
 starter_tower_id = &"arrow_tower"

@@ -165,6 +165,13 @@ FAMILIES = {
     "upgrade": (0.325, 0.25, 0.0, 1, "rising three-part material resonance, affirmative not a fanfare"),
     "reject": (0.105, 0.20, 0.0, 1, "restrained low double latch click, no buzzer or alarm"),
     "menu_click": (0.115, 0.16, 0.0, 1, "muted single woody clack with a short dull metal edge; no pitched reward or rejection"),
+    "troll_stomp": (0.590, 0.42, -4.0, 2, "massive low earth thud, stone grit and settling dust"),
+    "club_impact": (0.455, 0.39, -4.0, 2, "splintering timber club crack with hollow wooden body"),
+    "cannon": (0.610, 0.42, -4.0, 2, "iron cannon report, deep pressure and recoiling metal"),
+    "tower_stun": (0.520, 0.28, -7.0, 2, "descending cartoon bell wobble with a dry contact"),
+    "machine_gear": (0.660, 0.30, -7.0, 2, "irregular iron ratchet and loaded mechanical creak"),
+    "machine_jump": (0.680, 0.35, -5.0, 2, "compressed spring release and heavy lifting air rush"),
+    "machine_door": (0.570, 0.30, -6.0, 2, "heavy hinged timber doors opening with iron latch clanks"),
 }
 
 
@@ -256,6 +263,43 @@ def recipe(kind: str, variant: int, duration: float, seed: int) -> Sound:
         s.modes(0.002, 0.102, 0.36, (286, 557, 1043), 0.014, 0.46, -0.04)
         s.modes(0.003, 0.045, 0.055, (1370, 2310, 3680), 0.005, 0.37)
         s.noise(0.006, 0.065, 0.20, 140, 1350, 0.012, 0.002)
+    elif kind == "troll_stomp":
+        s.modes(0.003, 0.520, 0.65, (43 * tuning, 71, 109, 163), 0.110, 0.54, -0.3)
+        s.noise(0.002, 0.370, 2.1, 32, 520, 0.086)
+        s.noise(0.012, 0.450, 0.90, 210, 2400, 0.095, 0.006)
+        for at in (0.055, 0.110, 0.186):
+            s.noise(at, 0.065, 0.28, 650, 3900, 0.014)
+    elif kind == "club_impact":
+        s.noise(0.002, 0.050, 1.25, 350, 6800, 0.009)
+        s.modes(0.003, 0.380, 0.58, (79 * tuning, 183, 377, 693), 0.065, 0.61, -0.17)
+        s.pluck(0.006, 0.310, 92 * tuning, 0.80, 0.972)
+        s.noise(0.022, 0.270, 0.80, 160, 2100, 0.066)
+    elif kind == "cannon":
+        s.noise(0.002, 0.095, 2.0, 70, 5600, 0.019)
+        s.noise(0.004, 0.500, 2.2, 28, 710, 0.120)
+        s.modes(0.005, 0.540, 0.43, (48 * tuning, 97, 203, 477), 0.095, 0.48, -0.28)
+        for at in (0.060, 0.107, 0.180):
+            s.modes(at, 0.180, 0.16, (370 * tuning, 883, 1657), 0.029, 0.58)
+    elif kind == "tower_stun":
+        s.noise(0.002, 0.036, 0.50, 700, 4400, 0.008)
+        for at, frequency in ((0.005, 930), (0.125, 770), (0.253, 640)):
+            s.modes(at, 0.260, 0.26, (frequency * tuning, frequency * 1.91, frequency * 3.13), 0.065, 0.48, -0.14)
+    elif kind == "machine_gear":
+        for index, at in enumerate((0.003, 0.061, 0.129, 0.212, 0.317, 0.447)):
+            s.noise(at, 0.050, 0.58, 280, 3600, 0.013)
+            s.modes(at, 0.170, 0.22, ((133 + index * 17) * tuning, 437, 933), 0.037, 0.58, 0.08)
+        s.noise(0.030, 0.580, 0.42, 90, 980, 0.260, 0.030, True)
+    elif kind == "machine_jump":
+        s.pluck(0.004, 0.420, 54 * tuning, 1.1, 0.991)
+        s.modes(0.005, 0.480, 0.35, (62 * tuning, 137, 307, 683), 0.090, 0.55, 0.32)
+        s.air(0.030, 0.580, 1.5, 380, 2900 * tuning, True)
+        s.noise(0.012, 0.085, 0.95, 150, 2200, 0.019)
+    elif kind == "machine_door":
+        s.modes(0.004, 0.500, 0.39, (86 * tuning, 193, 418, 911), 0.100, 0.59, -0.12)
+        s.noise(0.008, 0.450, 0.70, 130, 1600, 0.180, 0.010, True)
+        for at in (0.010, 0.090, 0.360):
+            s.modes(at, 0.180, 0.31, (294 * tuning, 677, 1397), 0.033, 0.56)
+            s.noise(at, 0.035, 0.55, 570, 4200, 0.007)
     else:
         raise ValueError(f"Unknown sound recipe: {kind}")
     return s

@@ -27,6 +27,8 @@ func validation_errors() -> PackedStringArray:
 		if id == &"" or tower_ids.has(id):
 			errors.append("Tower catalog contains an empty or duplicate ID '%s'." % id)
 		tower_ids[id] = true
+		if tower.damage_type not in [&"physical", &"fire", &"magic", &"lightning", &"explosive", &"ice"]:
+			errors.append("Tower '%s' has an unknown damage type." % id)
 		if tower.reward.title.is_empty() or tower.damage < 0 or (tower.behavior_kind in ["attack", "chain"] and tower.damage == 0) or not is_finite(tower.range_cells) or tower.range_cells <= 0.0 or not is_finite(tower.interval) or tower.interval <= 0.0 or tower.cost <= 0 or tower.upgrade_base_cost <= 0 or tower.damage_upgrade_bonus <= 0 or not is_finite(tower.speed_upgrade_multiplier) or tower.speed_upgrade_multiplier <= 0.0 or tower.speed_upgrade_multiplier >= 1.0:
 			errors.append("Tower '%s' requires a title, positive attack stats/prices, nonnegative passive damage, and speed multiplier between zero and one." % id)
 		if not TowerDefinition.valid_behavior(tower):
@@ -77,7 +79,20 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' requires positive group odds." % enemy.id)
 		if not is_finite(enemy.heal_interval) or enemy.heal_interval < 0.0 or not is_finite(enemy.heal_radius) or enemy.heal_radius < 0.0 or not is_finite(enemy.heal_fraction) or enemy.heal_fraction < 0.0 or enemy.heal_fraction > 1.0 or (enemy.heal_interval > 0.0 and (enemy.heal_radius <= 0.0 or enemy.heal_fraction <= 0.0)):
 			errors.append("Enemy '%s' has invalid healing metadata." % enemy.id)
-		if not is_finite(enemy.summon_interval) or enemy.summon_interval < 0.0 or not is_finite(enemy.summon_cast_duration) or enemy.summon_cast_duration < 0.0 or enemy.summon_min < 0 or enemy.summon_max < enemy.summon_min or enemy.summon_limit < 0 or (enemy.summon_interval > 0.0 and (enemy.summon_cast_duration <= 0.0 or enemy.summon_type == &"" or enemy.summon_min < 1 or enemy.summon_limit < 1)):
+		if not is_finite(enemy.nonphysical_damage_multiplier) or enemy.nonphysical_damage_multiplier <= 0.0:
+			errors.append("Enemy '%s' requires a finite positive nonphysical damage multiplier." % enemy.id)
+		if not is_finite(enemy.stomp_interval) or enemy.stomp_interval < 0.0 or not is_finite(enemy.stomp_radius) or enemy.stomp_radius < 0.0 or not is_finite(enemy.stomp_health_fraction) or enemy.stomp_health_fraction < 0.0 or enemy.stomp_health_fraction > 1.0 or (enemy.stomp_interval > 0.0 and (enemy.stomp_radius <= 0.0 or enemy.stomp_health_fraction <= 0.0)):
+			errors.append("Enemy '%s' has invalid stomp metadata." % enemy.id)
+		if not is_finite(enemy.tower_attack_interval) or enemy.tower_attack_interval < 0.0 or not is_finite(enemy.tower_attack_range) or enemy.tower_attack_range < 0.0 or not is_finite(enemy.tower_attack_cast_duration) or enemy.tower_attack_cast_duration < 0.0 or not is_finite(enemy.tower_stun_duration) or enemy.tower_stun_duration < 0.0 or (enemy.tower_attack_interval > 0.0 and (enemy.tower_attack_kind not in [&"club", &"cannon"] or enemy.tower_attack_range <= 0.0 or enemy.tower_attack_cast_duration <= 0.0 or enemy.tower_stun_duration <= 0.0)) or (enemy.tower_attack_interval == 0.0 and enemy.tower_attack_kind != &""):
+			errors.append("Enemy '%s' has invalid tower attack metadata." % enemy.id)
+		if not is_finite(enemy.road_speed_multiplier) or enemy.road_speed_multiplier <= 0.0 or not is_finite(enemy.grass_speed_multiplier) or enemy.grass_speed_multiplier <= 0.0 or not is_finite(enemy.jump_charge_duration) or enemy.jump_charge_duration < 0.0 or not is_finite(enemy.jump_duration) or enemy.jump_duration < 0.0 or (enemy.direct_movement and (enemy.jump_charge_duration <= 0.0 or enemy.jump_duration <= 0.0)):
+			errors.append("Enemy '%s' has invalid direct movement metadata." % enemy.id)
+		if enemy.summon_pool.size() != enemy.summon_weights.size():
+			errors.append("Enemy '%s' requires matching summon pool and weight counts." % enemy.id)
+		for weight: int in enemy.summon_weights:
+			if weight <= 0:
+				errors.append("Enemy '%s' requires positive summon weights." % enemy.id)
+		if not is_finite(enemy.summon_interval) or enemy.summon_interval < 0.0 or not is_finite(enemy.summon_cast_duration) or enemy.summon_cast_duration < 0.0 or enemy.summon_min < 0 or enemy.summon_max < enemy.summon_min or enemy.summon_limit < 0 or (enemy.summon_interval > 0.0 and (enemy.summon_cast_duration <= 0.0 or (enemy.summon_type == &"" and enemy.summon_pool.is_empty()) or enemy.summon_min < 1 or enemy.summon_limit < 1)):
 			errors.append("Enemy '%s' has invalid summoning metadata." % enemy.id)
 		if not is_finite(enemy.board_height) or enemy.board_height <= 0.0 or not enemy.board_anchor.is_finite():
 			errors.append("Enemy '%s' has invalid presentation metadata." % enemy.id)
@@ -87,24 +102,39 @@ func validation_errors() -> PackedStringArray:
 				required.append(&"heal")
 			if enemy.summon_interval > 0.0:
 				required.append(&"cast")
+			if enemy.tower_attack_interval > 0.0:
+				required.append(&"attack")
+			if enemy.direct_movement:
+				required.append_array([&"legs", &"jump_charge", &"jump"])
 			for animation: StringName in required:
 				if not enemy.animation_frames.has_animation(animation) or enemy.animation_frames.get_frame_count(animation) == 0 or not is_finite(enemy.animation_frames.get_animation_speed(animation)) or enemy.animation_frames.get_animation_speed(animation) <= 0.0:
 					errors.append("Enemy '%s' requires a playable '%s' animation." % [enemy.id, animation])
 	for enemy: EnemyDefinition in enemies:
-		if enemy == null or enemy.summon_interval <= 0.0:
+		if enemy == null or (enemy.summon_interval <= 0.0 and enemy.summon_pool.is_empty()):
 			continue
-		var visited: Dictionary[StringName, bool] = {}
-		var source: EnemyDefinition = enemy
-		while source.summon_interval > 0.0:
-			if visited.has(source.id):
-				errors.append("Enemy '%s' has a cyclic summon chain." % enemy.id)
-				break
-			visited[source.id] = true
-			if not enemy_ids.has(source.summon_type):
-				errors.append("Enemy '%s' requires a registered summon child." % source.id)
-				break
-			source = enemy_ids[source.summon_type]
+		_validate_summons(enemy, enemy_ids, {}, errors)
 	return errors
+
+
+static func _validate_summons(source: EnemyDefinition, definitions: Dictionary[StringName, EnemyDefinition], ancestors: Dictionary, errors: PackedStringArray) -> void:
+	if ancestors.has(source.id):
+		errors.append("Enemy '%s' has a cyclic summon chain." % source.id)
+		return
+	if source.summon_interval <= 0.0 and source.summon_pool.is_empty():
+		return
+	ancestors[source.id] = true
+	var children: PackedStringArray = source.summon_pool
+	if children.is_empty():
+		children = PackedStringArray([String(source.summon_type)])
+	for child_id: String in children:
+		if not definitions.has(StringName(child_id)):
+			errors.append("Enemy '%s' requires a registered summon child '%s'." % [source.id, child_id])
+			continue
+		var child: EnemyDefinition = definitions[StringName(child_id)]
+		if child.boss:
+			errors.append("Enemy '%s' cannot summon boss '%s'." % [source.id, child_id])
+		_validate_summons(child, definitions, ancestors, errors)
+	ancestors.erase(source.id)
 
 
 static func _valid_directional_weapon(art: TowerReward) -> bool:

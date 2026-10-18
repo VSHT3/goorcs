@@ -20,10 +20,17 @@ const STREAMS: Array = [
 	[preload("res://assets/audio/sfx/upgrade_01.wav")],
 	[preload("res://assets/audio/sfx/portal_01.wav"), preload("res://assets/audio/sfx/portal_02.wav")],
 	[preload("res://assets/audio/sfx/reject_01.wav")],
+	[preload("res://assets/audio/sfx/troll_stomp_01.wav"), preload("res://assets/audio/sfx/troll_stomp_02.wav")],
+	[preload("res://assets/audio/sfx/club_impact_01.wav"), preload("res://assets/audio/sfx/club_impact_02.wav")],
+	[preload("res://assets/audio/sfx/cannon_01.wav"), preload("res://assets/audio/sfx/cannon_02.wav")],
+	[preload("res://assets/audio/sfx/tower_stun_01.wav"), preload("res://assets/audio/sfx/tower_stun_02.wav")],
+	[preload("res://assets/audio/sfx/machine_gear_01.wav"), preload("res://assets/audio/sfx/machine_gear_02.wav")],
+	[preload("res://assets/audio/sfx/machine_jump_01.wav"), preload("res://assets/audio/sfx/machine_jump_02.wav")],
+	[preload("res://assets/audio/sfx/machine_door_01.wav"), preload("res://assets/audio/sfx/machine_door_02.wav")],
 ]
-const GAINS_DB: Array[float] = [-7.0, -5.0, -8.0, -7.0, -11.0, -9.0, -9.0, -8.0, -4.0, -3.0, -3.0, -8.0, -4.0]
-const GAPS_MSEC: Array[int] = [75, 100, 150, 140, 110, 170, 170, 220, 180, 65, 100, 160, 180]
-const PRIORITY: Array[int] = [30, 35, 40, 60, 10, 45, 45, 25, 100, 100, 100, 100, 100]
+const GAINS_DB: Array[float] = [-7.0, -5.0, -8.0, -7.0, -11.0, -9.0, -9.0, -8.0, -4.0, -3.0, -3.0, -8.0, -4.0, -4.0, -4.0, -4.0, -7.0, -7.0, -5.0, -6.0]
+const GAPS_MSEC: Array[int] = [75, 100, 150, 140, 110, 170, 170, 220, 180, 65, 100, 160, 180, 260, 180, 200, 160, 300, 250, 220]
+const PRIORITY: Array[int] = [30, 35, 40, 60, 10, 45, 45, 25, 100, 100, 100, 100, 100, 65, 75, 80, 75, 50, 70, 60]
 
 var world: MatchWorld
 var _world_players: Array[AudioStreamPlayer2D] = []
@@ -94,7 +101,7 @@ func observe(state: Dictionary, own_slot: int, active: bool, combat_paused: bool
 		var slot: int = int(event["slot"])
 		if cue < 0 or cue >= STREAMS.size() or slot not in [0, 1]:
 			continue
-		var ui: bool = cue >= Cues.PURCHASE
+		var ui: bool = CombatSoundEvents.is_ui_cue(cue)
 		if ui and slot != own_slot:
 			continue # Includes the solo mirror: one confirmation per local action.
 		if not ui and (_paused or (clock - float(event["time"])) / speed > 0.35):
@@ -110,7 +117,7 @@ func observe(state: Dictionary, own_slot: int, active: bool, combat_paused: bool
 			_candidates[cue] = {"id": id, "gain": gain, "point": point}
 	_last_id = maxi(_last_id, latest)
 	# Prioritize urgent feedback before disposable contacts; no audio backlog.
-	for cue: int in [Cues.CRYSTAL, Cues.PURCHASE, Cues.UPGRADE, Cues.SEND, Cues.EXPLOSION, Cues.DEATH, Cues.BONES, Cues.RUNE, Cues.BALLISTA, Cues.BOW, Cues.PORTAL, Cues.HIT]:
+	for cue: int in [Cues.CRYSTAL, Cues.PURCHASE, Cues.UPGRADE, Cues.SEND, Cues.CANNON, Cues.CLUB_IMPACT, Cues.TOWER_STUN, Cues.MACHINE_JUMP, Cues.TROLL_STOMP, Cues.MACHINE_DOOR, Cues.MACHINE_GEAR, Cues.EXPLOSION, Cues.DEATH, Cues.BONES, Cues.RUNE, Cues.BALLISTA, Cues.BOW, Cues.PORTAL, Cues.HIT]:
 		var candidate: Dictionary = _candidates[cue]
 		if candidate.is_empty():
 			continue
@@ -194,7 +201,7 @@ func _play(cue: int, id: int, gain: float, point: Vector2, now: int) -> void:
 	var bus: int = AudioServer.get_bus_index(&"Sound")
 	if bus < 0 or AudioServer.is_bus_mute(bus) or now < _next_allowed[cue]:
 		return
-	var ui: bool = cue >= Cues.PURCHASE
+	var ui: bool = CombatSoundEvents.is_ui_cue(cue)
 	var stream: AudioStream = STREAMS[cue][posmod(id * 7 + cue, STREAMS[cue].size())]
 	# Cosmetic variation is deterministic and never consumes combat RNG.
 	var pitch: float = 1.0 + (posmod(id * 13 + cue, 7) - 3) * 0.008

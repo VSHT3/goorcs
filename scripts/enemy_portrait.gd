@@ -22,6 +22,7 @@ var _preview_time: float = 0.0
 var _action: StringName = &""
 var _playing: bool = false
 var _action_duration: float = 0.0
+var _actions: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -60,20 +61,18 @@ func set_preview_time(seconds: float) -> void:
 func replay_action() -> void:
 	if not is_visible_in_tree() or definition == null:
 		return
-	_action = &""
-	_playing = true
+	_actions.clear()
 	if definition.animation_frames != null:
-		if definition.animation_frames.has_animation(&"heal"):
-			_action = &"heal"
-		elif definition.animation_frames.has_animation(&"cast"):
-			_action = &"cast"
-	_action_duration = 0.55 if _action == &"heal" else 1.15
-	if _action == &"":
-		_action_duration = 0.0
-		if definition.animation_frames != null:
-			var frames: SpriteFrames = definition.animation_frames
-			for index: int in range(frames.get_frame_count(&"walk")):
-				_action_duration += frames.get_frame_duration(&"walk", index) / frames.get_animation_speed(&"walk")
+		for action: StringName in [&"heal", &"attack", &"cast", &"legs", &"jump_charge", &"jump", &"walk_damaged", &"walk_critical"]:
+			if definition.animation_frames.has_animation(action):
+				_actions.append(action)
+	if _actions.is_empty():
+		_actions.append(&"walk")
+	_action = _actions[0]
+	_playing = true
+	_action_duration = 0.0
+	for action: StringName in _actions:
+		_action_duration += EnemyVisuals.animation_duration(definition, action)
 	set_preview_time(0.0)
 	_sync_processing()
 
@@ -101,9 +100,16 @@ func _update_animation() -> void:
 	preview_elapsed = 0.0
 	if definition == null or definition.animation_frames == null or not _playing:
 		return
-	if _preview_time < _action_duration:
-		preview_animation = _action if _action != &"" else &"walk"
-		preview_elapsed = _preview_time
+	var cursor: float = _preview_time
+	if cursor < _action_duration:
+		for action: StringName in _actions:
+			var duration: float = EnemyVisuals.animation_duration(definition, action)
+			if cursor < duration:
+				_action = action
+				preview_animation = action
+				preview_elapsed = cursor
+				return
+			cursor -= duration
 	else:
 		_action = &""
 		_playing = false
@@ -119,6 +125,9 @@ func _draw() -> void:
 	if texture == null:
 		return
 	var bounds: Rect2 = EnemyVisuals.union_bounds(definition)
+	var jump_room: float = 32.0 if definition.animation_frames != null and definition.animation_frames.has_animation(&"jump") else 0.0
+	bounds.position.y -= jump_room
+	bounds.size.y += jump_room
 	var available: Vector2 = (size - Vector2(40, 48)).max(Vector2.ONE)
 	var scale: float = minf(available.x / maxf(1.0, bounds.size.x), available.y / maxf(1.0, bounds.size.y))
 	if scale >= 1.0:
@@ -128,6 +137,9 @@ func _draw() -> void:
 	draw_set_transform(foot, 0.0, Vector2(1.0, 0.27))
 	draw_circle(Vector2.ZERO, bounds.size.x * scale * 0.32, Color(0.035, 0.07, 0.05, 0.55))
 	draw_set_transform(Vector2.ZERO)
-	if preview_animation != &"walk":
+	if preview_animation == &"heal" or (preview_animation == &"cast" and not definition.direct_movement):
 		EnemyVisuals.draw_action_effect(self, foot, minf(available.x * 0.28, bounds.size.x * scale * 0.55), preview_animation, preview_elapsed)
+	if preview_animation == &"jump":
+		var duration: float = maxf(0.001, EnemyVisuals.animation_duration(definition, &"jump"))
+		origin.y -= sin(clampf(preview_elapsed / duration, 0.0, 1.0) * PI) * jump_room * scale
 	draw_texture_rect(texture, Rect2(origin, texture.get_size() * scale), false)

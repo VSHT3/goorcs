@@ -1,0 +1,281 @@
+{
+  "authoring": "Original local integer-coordinate pixel geometry. Articulated anatomy, mechanical joints, crew, material planes and wear clusters authored in generator; no image sampling, raster rotation, AI image generation or external assets.",
+  "identity": "Gargantuan bare-skinned tusked troll; muscular barrel belly, iron shoulder, diagonal leather straps, tremendous bound-timber club.",
+  "generator": "tools/author_late_bosses.py",
+  "generator_sha256": "51096954962162b4fa55b94bd1a7ec4043d8c758175c8013ca4bb287e4ab3220",
+  "shared_pixel_primitives": "tools/author_enemy_sprites.py: Pixels, segment and material ramps",
+  "source_origin": "Locally authored Pillow geometry; no external artist or service credits claimed",
+  "frame_size": [
+    192,
+    192
+  ],
+  "sheet_size": [
+    2304,
+    576
+  ],
+  "layout": "one animation per row, up to 12 columns",
+  "base_anchor": [
+    0.5,
+    0.89
+  ],
+  "source_faces_left": true,
+  "alpha": "binary 0/255; crisp native pixels, no antialiasing or alpha fading",
+  "camera": "elevated three-quarter left-facing; upper-left material highlights",
+  "sheet_sha256": "af84835bc591ecb36e0721ad6e845329d521b0d7b300260873b29823284fe4f7",
+  "still": "assets/enemies/animations/troll_still.png",
+  "still_sha256": "dbe7026a6df0619fe95fe3aba9790a70468bec9e3caf4f98a7903aaddca61ef8",
+  "still_dimensions": [
+    192,
+    192
+  ],
+  "damage_phase_thresholds": {},
+  "action_support": "Overhead club windup, heavy ground follow-through, articulated opposed walk and collapse",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 7.5,
+      "duration_seconds": 1.6,
+      "frame_count": 12,
+      "loop": true,
+      "atlas_row": 0,
+      "alpha_bounds": [
+        [
+          5,
+          25,
+          156,
+          182
+        ],
+        [
+          7,
+          26,
+          155,
+          183
+        ],
+        [
+          9,
+          27,
+          154,
+          184
+        ],
+        [
+          13,
+          27,
+          151,
+          185
+        ],
+        [
+          16,
+          27,
+          149,
+          186
+        ],
+        [
+          19,
+          26,
+          147,
+          185
+        ],
+        [
+          21,
+          25,
+          146,
+          184
+        ],
+        [
+          19,
+          26,
+          147,
+          185
+        ],
+        [
+          17,
+          27,
+          148,
+          186
+        ],
+        [
+          13,
+          27,
+          151,
+          185
+        ],
+        [
+          9,
+          27,
+          154,
+          184
+        ],
+        [
+          7,
+          26,
+          155,
+          183
+        ]
+      ]
+    },
+    {
+      "name": "attack",
+      "fps": 9.6,
+      "duration_seconds": 1.25,
+      "frame_count": 12,
+      "loop": false,
+      "atlas_row": 1,
+      "alpha_bounds": [
+        [
+          17,
+          25,
+          151,
+          179
+        ],
+        [
+          2,
+          24,
+          152,
+          171
+        ],
+        [
+          24,
+          23,
+          154,
+          171
+        ],
+        [
+          58,
+          20,
+          155,
+          171
+        ],
+        [
+          58,
+          13,
+          155,
+          171
+        ],
+        [
+          57,
+          16,
+          154,
+          171
+        ],
+        [
+          16,
+          24,
+          150,
+          171
+        ],
+        [
+          7,
+          29,
+          146,
+          176
+        ],
+        [
+          7,
+          31,
+          144,
+          190
+        ],
+        [
+          28,
+          29,
+          146,
+          187
+        ],
+        [
+          20,
+          27,
+          149,
+          184
+        ],
+        [
+          17,
+          25,
+          151,
+          179
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 10,
+      "duration_seconds": 1.2,
+      "frame_count": 12,
+      "loop": false,
+      "atlas_row": 2,
+      "alpha_bounds": [
+        [
+          24,
+          25,
+          151,
+          171
+        ],
+        [
+          36,
+          29,
+          152,
+          176
+        ],
+        [
+          39,
+          33,
+          153,
+          179
+        ],
+        [
+          38,
+          38,
+          154,
+          183
+        ],
+        [
+          37,
+          44,
+          159,
+          186
+        ],
+        [
+          32,
+          49,
+          163,
+          188
+        ],
+        [
+          28,
+          55,
+          167,
+          189
+        ],
+        [
+          25,
+          59,
+          171,
+          189
+        ],
+        [
+          22,
+          66,
+          174,
+          190
+        ],
+        [
+          21,
+          74,
+          177,
+          189
+        ],
+        [
+          20,
+          81,
+          179,
+          187
+        ],
+        [
+          18,
+          90,
+          181,
+          186
+        ]
+      ]
+    }
+  ]
+}

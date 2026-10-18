@@ -26,7 +26,12 @@ func refresh(enemy: Dictionary, type_stats: Dictionary) -> void:
 	health_bar.max_value = float(enemy["max_hp"])
 	health_bar.value = float(enemy["hp"])
 	hp_value.text = str(int(enemy["hp"]))
-	speed_value.text = "%.2f" % float(enemy["speed"])
+	var speed: float = float(enemy["speed"])
+	if bool(enemy.get("direct_movement", false)):
+		var route: Array = enemy.get("route", [])
+		if route.size() >= 2:
+			speed *= Vector2(route[0]).distance_to(Vector2(route[route.size() - 1]))
+	speed_value.text = "%.2f" % speed
 	damage_value.text = str(int(enemy["damage"]))
 	show()
 

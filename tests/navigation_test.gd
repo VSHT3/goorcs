@@ -80,7 +80,7 @@ func _run() -> void:
 	_check(sandbox.layout.is_ready(), "Sandbox accepts a complete route")
 	var route: Array = sandbox.layout.route.duplicate()
 	await _click(sandbox.menu_button.get_global_rect().get_center())
-	await _click(sandbox.cell_screen_position(Vector2i(4, 0)))
+	await _click(sandbox.cell_screen_position(Vector2i(0, 0)))
 	_check(sandbox.layout.route == route and sandbox.layout.used_tiles() == 12, "Hidden sandbox cannot accept edits")
 	await _key(KEY_B)
 	_check(main.orcieary_screen.visible and not sandbox.visible, "Field guide shortcut opens Orcieary without exposing sandbox")

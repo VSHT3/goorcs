@@ -64,7 +64,7 @@ func _run() -> void:
 		var without_blood: Image = await _capture()
 		definition.blood_color = blood_color
 		board.queue_redraw()
-		_check((falling.get_data() != without_blood.get_data()) == (definition.id != &"skeleorc"), "Map splatter is visible for living Orcs and absent for SkeleOrcs: %s" % definition.id)
+		_check((falling.get_data() != without_blood.get_data()) == (blood_color.a > 0.0), "Corpse splatter follows the authored blood visibility, including bloodless machines and skeletons: %s" % definition.id)
 		var age: float = board._corpse_traces[0]["age"]
 		board.apply_deaths(state,0,2.0,true)
 		board._process(0.3)

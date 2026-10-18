@@ -2,7 +2,7 @@ class_name CombatSoundEvents
 extends RefCounted
 ## Host-owned cosmetic facts. Dropping/coalescing cues never changes combat.
 
-enum Cue { BOW, BALLISTA, RUNE, EXPLOSION, HIT, DEATH, BONES, PORTAL, CRYSTAL, PURCHASE, UPGRADE, SEND, REJECT }
+enum Cue { BOW, BALLISTA, RUNE, EXPLOSION, HIT, DEATH, BONES, PORTAL, CRYSTAL, PURCHASE, UPGRADE, SEND, REJECT, TROLL_STOMP, CLUB_IMPACT, CANNON, TOWER_STUN, MACHINE_GEAR, MACHINE_JUMP, MACHINE_DOOR }
 
 const CAPACITY: int = 128
 const LIFETIME: float = 1.2
@@ -16,6 +16,10 @@ var _count: int = 0
 var _last_times: PackedFloat64Array = []
 
 
+static func is_ui_cue(cue: int) -> bool:
+	return cue in [Cue.PURCHASE, Cue.UPGRADE, Cue.SEND, Cue.REJECT]
+
+
 func _init() -> void:
 	_events.resize(CAPACITY)
 	_last_times.resize(Cue.size() * 2)
@@ -26,7 +30,7 @@ func record(cue: int, slot: int, position: Vector2, time: float) -> void:
 	var key: int = slot * Cue.size() + cue
 	# A horde/AoE contributes one representative contact per short sim interval.
 	# Purchase acknowledgements remain separate and are locally voice-limited.
-	if cue < Cue.PURCHASE and time - _last_times[key] < COMBAT_SPACING:
+	if not is_ui_cue(cue) and time - _last_times[key] < COMBAT_SPACING:
 		return
 	_last_times[key] = time
 	last_id += 1

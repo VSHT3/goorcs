@@ -7,6 +7,7 @@
 script = ExtResource("1_definition")
 reward = ExtResource("2_reward")
 damage = 1
+damage_type = &"magic"
 range_cells = 1.0
 interval = 0.7
 cost = 70

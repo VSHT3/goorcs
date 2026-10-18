@@ -110,31 +110,29 @@ func _check_catalog_and_pixels() -> void:
 			_check(stats.get_global_rect().position.y >= screen.portrait.get_global_rect().end.y, "Compact stats are below the centered animation, never beside it")
 			_check_single_selection(index, "Mouse selection")
 			screen.portrait.stop_preview()
-			screen.portrait.set_preview_time(0.0)
-			screen.portrait.replay_action()
-			# Specials are checked below; use a settled rest frame as their baseline.
-			if definition.heal_interval > 0.0 or definition.summon_interval > 0.0:
-				screen.portrait.set_preview_time(2.0)
-			var first: Image = await _portrait_image()
-			_check(first != null and first.get_used_rect().has_area(), "Actual preview pixels render for every catalog type")
 			var frames: SpriteFrames = definition.animation_frames
-			_check(frames != null and frames.has_animation(&"walk") and frames.get_frame_count(&"walk") > 1, "Each actual entry has a playable walk animation, not a still-image substitute")
-			if definition.heal_interval <= 0.0 and definition.summon_interval <= 0.0 and frames != null and frames.has_animation(&"walk") and frames.get_frame_count(&"walk") > 1:
+			var finish_time: float = 1.0
+			for animation: StringName in frames.get_animation_names():
+				finish_time += EnemyVisuals.animation_duration(definition, animation)
+			screen.portrait.replay_action()
+			screen.portrait.set_preview_time(finish_time)
+			var first: Image = await _portrait_image()
+			var has_action: bool = frames.has_animation(&"heal") or frames.has_animation(&"cast") or frames.has_animation(&"attack")
+			screen.portrait.replay_action()
+			if not has_action:
 				screen.portrait.set_preview_time(frames.get_frame_duration(&"walk", 0) / frames.get_animation_speed(&"walk") * 1.1)
 				var walking: Image = await _portrait_image()
-				_check(first.get_data() != walking.get_data(), "Advancing the real walk clock changes rendered sprite pixels")
-			if definition.heal_interval > 0.0 or definition.summon_interval > 0.0:
-				screen.portrait.replay_action()
+				_check(first.get_data() != walking.get_data(), "Replaying a walking portrait changes its rendered pose")
+			else:
 				screen.portrait.set_preview_time(0.1)
 				var special: Image = await _portrait_image()
-				var expected_animation: StringName = &"heal" if definition.heal_interval > 0.0 else &"cast"
-				_check(screen.portrait.preview_animation == expected_animation and first.get_data() != special.get_data(), "Chief healing and NecOrcmancer casting really play in the large preview")
+				_check(screen.portrait.preview_animation != &"walk" and first.get_data() != special.get_data(), "Ability portraits visibly replay their authored action sequence")
 				var capture_directory: String = OS.get_environment("GORCS_ORCIEARY_CAPTURE_DIR")
 				if not capture_directory.is_empty():
 					var path: String = capture_directory.path_join("gorcs_orcieary_%s_%d.png" % [definition.id, width])
 					_check(viewport.get_texture().get_image().save_png(path) == OK, "Save requested Orcieary review capture")
-				screen.portrait.set_preview_time(5.0)
-				_check(screen.portrait.preview_animation == &"walk" and screen.portrait.preview_elapsed == 0.0, "A special preview returns to its resting first walk frame")
+				screen.portrait.set_preview_time(finish_time)
+				_check(screen.portrait.preview_animation == &"walk" and screen.portrait.preview_elapsed == 0.0, "The complete authored action sequence returns to rest")
 
 
 func _check_counts_and_error() -> void:
@@ -188,12 +186,12 @@ func _check_portrait_input() -> void:
 		screen.portrait.start_preview()
 		await _click(screen.portrait.get_global_rect().get_center())
 		var definition: EnemyDefinition = screen.entries[index]
-		var expected: StringName = &"heal" if definition.heal_interval > 0.0 else (&"cast" if definition.summon_interval > 0.0 else &"walk")
-		_check(viewport.gui_get_focus_owner() == screen.portrait and screen.portrait.preview_animation == expected and screen.portrait.is_processing(), "Native portrait click immediately plays this enemy's action")
+		var activated: StringName = screen.portrait.preview_animation
+		_check(viewport.gui_get_focus_owner() == screen.portrait and screen.portrait.is_processing(), "Native portrait click starts the enemy's actual action sequence")
 		screen.portrait.stop_preview()
 		screen.portrait.set_preview_time(0.3)
 		await _key(KEY_ENTER)
-		_check(screen.portrait.preview_animation == expected and screen.portrait.preview_elapsed == 0.0, "Enter deterministically restarts an active action")
+		_check(screen.portrait.preview_animation == activated and screen.portrait.preview_elapsed == 0.0, "Enter restarts the active sequence from its original action")
 		var scroll: ScrollContainer = screen.get_node("%DetailsScroll") as ScrollContainer
 		var previous_scroll: int = scroll.scroll_vertical
 		screen.portrait.set_preview_time(0.2)

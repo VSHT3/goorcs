@@ -33,7 +33,39 @@ static func frame_texture(definition: EnemyDefinition, animation: StringName = &
 
 
 static func enemy_texture(definition: EnemyDefinition, enemy: Dictionary) -> Texture2D:
-	return frame_texture(definition, StringName(enemy.get("animation", "walk")), float(enemy.get("animation_elapsed", enemy.get("age", 0.0))))
+	var animation: StringName = StringName(enemy.get("animation", "walk"))
+	var locomotion: StringName = StringName(enemy.get("locomotion", "path"))
+	if animation == &"walk" and locomotion in [&"legs", &"jump_charge", &"jump"]:
+		animation = locomotion
+	animation = damage_animation(definition, animation, float(enemy.get("hp", 1.0)), float(enemy.get("max_hp", 1.0)))
+	return frame_texture(definition, animation, float(enemy.get("animation_elapsed", enemy.get("age", 0.0))))
+
+
+static func damage_animation(definition: EnemyDefinition, animation: StringName, hp: float, max_hp: float) -> StringName:
+	var fraction: float = hp / maxf(1.0, max_hp)
+	var suffix: String = "_critical" if fraction <= 0.33 else ("_damaged" if fraction <= 0.66 else "")
+	var variant := StringName(String(animation) + suffix)
+	if not suffix.is_empty() and definition.animation_frames != null and definition.animation_frames.has_animation(variant):
+		return variant
+	return animation
+
+
+static func jump_lift(enemy: Dictionary) -> float:
+	if enemy.get("locomotion", "path") != "jump":
+		return 0.0
+	var duration: float = maxf(0.001, float(enemy.get("jump_duration", 1.0)))
+	var phase: float = clampf(1.0 - float(enemy.get("jump_remaining", duration)) / duration, 0.0, 1.0)
+	return sin(phase * PI) * 0.85
+
+
+static func animation_duration(definition: EnemyDefinition, animation: StringName) -> float:
+	var frames: SpriteFrames = definition.animation_frames
+	if frames == null or not frames.has_animation(animation):
+		return 0.0
+	var duration: float = 0.0
+	for index: int in range(frames.get_frame_count(animation)):
+		duration += frames.get_frame_duration(animation, index)
+	return duration / maxf(0.001, frames.get_animation_speed(animation))
 
 
 static func image(texture: Texture2D) -> Image:

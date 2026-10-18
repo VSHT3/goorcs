@@ -74,24 +74,30 @@ layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 8
 
-[node name="DetailsScroll" type="ScrollContainer" parent="Margin/Content/Workspace"]
+[node name="DetailColumn" type="VBoxContainer" parent="Margin/Content/Workspace"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="DetailsScroll" type="ScrollContainer" parent="Margin/Content/Workspace/DetailColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 3
 horizontal_scroll_mode = 0
 vertical_scroll_mode = 3
 
-[node name="Details" type="VBoxContainer" parent="Margin/Content/Workspace/DetailsScroll"]
+[node name="Details" type="VBoxContainer" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="EnemyTitle" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="EnemyTitle" type="Label" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
 
-[node name="Availability" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Availability" type="Label" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.71, 0.85, 0.62, 1)
@@ -99,26 +105,26 @@ theme_override_fonts/font = ExtResource("3_digits")
 theme_override_font_sizes/font_size = 16
 autowrap_mode = 3
 
-[node name="Description" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Description" type="Label" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 autowrap_mode = 3
 
-[node name="Preview" type="CenterContainer" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Preview" type="CenterContainer" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 custom_minimum_size = Vector2(0, 220)
 size_flags_horizontal = 3
 
-[node name="Stats" type="GridContainer" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Stats" type="GridContainer" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/h_separation = 16
 theme_override_constants/v_separation = 10
 columns = 6
 
-[node name="Mechanics" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Mechanics" type="Label" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.88, 0.82, 0.65, 1)
@@ -126,7 +132,7 @@ theme_override_fonts/font = ExtResource("3_digits")
 theme_override_font_sizes/font_size = 16
 autowrap_mode = 3
 
-[node name="Scaling" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Scaling" type="Label" parent="Margin/Content/Workspace/DetailColumn/DetailsScroll/Details"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.72, 0.78, 0.70, 1)
@@ -134,25 +140,25 @@ theme_override_fonts/font = ExtResource("3_digits")
 theme_override_font_sizes/font_size = 16
 autowrap_mode = 3
 
-[node name="Separator" type="HSeparator" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Separator" type="HSeparator" parent="Margin/Content/Workspace/DetailColumn"]
 layout_mode = 2
 
-[node name="LifetimeTitle" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="LifetimeTitle" type="Label" parent="Margin/Content/Workspace/DetailColumn"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 text = "Your lifetime totals"
 tooltip_text = "Your own board's kills and your accepted individual sends, across real matches on this computer. Leaks and sandbox play do not count."
 
-[node name="Counters" type="HBoxContainer" parent="Margin/Content/Workspace/DetailsScroll/Details"]
+[node name="Counters" type="HBoxContainer" parent="Margin/Content/Workspace/DetailColumn"]
 layout_mode = 2
 theme_override_constants/separation = 18
 
-[node name="KillsCaption" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+[node name="KillsCaption" type="Label" parent="Margin/Content/Workspace/DetailColumn/Counters"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Killed"
 
-[node name="KillsValue" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+[node name="KillsValue" type="Label" parent="Margin/Content/Workspace/DetailColumn/Counters"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -160,12 +166,12 @@ theme_override_fonts/font = ExtResource("3_digits")
 theme_override_font_sizes/font_size = 22
 text = "0"
 
-[node name="SentCaption" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+[node name="SentCaption" type="Label" parent="Margin/Content/Workspace/DetailColumn/Counters"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Sent"
 
-[node name="SentValue" type="Label" parent="Margin/Content/Workspace/DetailsScroll/Details/Counters"]
+[node name="SentValue" type="Label" parent="Margin/Content/Workspace/DetailColumn/Counters"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
