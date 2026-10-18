@@ -103,13 +103,10 @@ var content_catalog: ContentCatalog = preload("res://resources/content_catalog.t
 		for definition: EnemyDefinition in value.enemies:
 			_enemy_art[String(definition.id)] = definition
 			_cache_texture_bounds(definition.texture)
-			_cache_status_textures(definition.texture)
 			if definition.animation_frames != null:
 				for animation: StringName in definition.animation_frames.get_animation_names():
 					for frame: int in range(definition.animation_frames.get_frame_count(animation)):
-						var texture: Texture2D = definition.animation_frames.get_frame_texture(animation, frame)
-						_cache_texture_bounds(texture)
-						_cache_status_textures(texture)
+						_cache_texture_bounds(definition.animation_frames.get_frame_texture(animation, frame))
 		queue_redraw()
 var placement_enabled: bool = true:
 	set(value):
@@ -916,11 +913,18 @@ func _cache_texture_bounds(texture: Texture2D) -> void:
 	_texture_bounds[texture] = Rect2(image.get_used_rect()) if image != null else Rect2(Vector2.ZERO, texture.get_size())
 
 
-func _cache_status_textures(texture: Texture2D) -> void:
-	if texture == null or _slowed_enemy_textures.has(texture):
-		return
-	_slowed_enemy_textures[texture] = EnemyVisuals.slowed_texture(texture)
-	_burning_enemy_textures[texture] = EnemyVisuals.burning_texture(texture)
+# Status tints are built per frame on first use; eagerly tinting every frame of
+# every enemy froze the first board for seconds once the boss rosters landed.
+func _slowed_texture(texture: Texture2D) -> Texture2D:
+	if not _slowed_enemy_textures.has(texture):
+		_slowed_enemy_textures[texture] = EnemyVisuals.slowed_texture(texture)
+	return _slowed_enemy_textures[texture]
+
+
+func _burning_texture(texture: Texture2D) -> Texture2D:
+	if not _burning_enemy_textures.has(texture):
+		_burning_enemy_textures[texture] = EnemyVisuals.burning_texture(texture)
+	return _burning_enemy_textures[texture]
 
 
 func _sprite_rect(texture: Texture2D, height: float, anchor: Vector2, foot: Vector2, flip: bool = false) -> Rect2:
@@ -1268,9 +1272,9 @@ func _draw_enemy(item: Dictionary) -> void:
 	var burning: bool = bool(enemy.get("burning", false)) and not bool(enemy.get("fire_immune", false))
 	var texture: Texture2D = frame
 	if burning:
-		texture = _burning_enemy_textures.get(frame, frame)
+		texture = _burning_texture(frame)
 	elif bool(enemy.get("slowed", false)) and not bool(enemy.get("ice_immune", false)):
-		texture = _slowed_enemy_textures.get(frame, frame)
+		texture = _slowed_texture(frame)
 	draw_texture_rect(texture, rect, false)
 	if burning:
 		var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))

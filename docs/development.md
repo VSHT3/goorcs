@@ -587,6 +587,8 @@ The original `assets/enemies/runner.png` and `brute.png` are locally authored ha
 
 Facing derives from `source_faces_left` and the captured route. `EnemyVisuals` supplies the same current-frame texture to drawing, slow tint, alpha picking, and Orcieary previews, retaining stable foot anchors across raised-staff/heal poses. Read the roster guide's verification checklist before calling new content balanced.
 
+`PathBoard` builds each frame's slowed/burning tint on first use rather than tinting every frame of every enemy when a catalog is assigned. The eager pass froze the first board for over four seconds once the Troll/Orc King frames landed (0.16 seconds lazily on the same machine), long enough to break `gameplay_peer_test`'s five-second host/guest agreement while the guest built its Ballista probe boards. Check: time the first `PathBoard` catalog assignment, and run `tests/gameplay_peer_test.gd` and `tests/path_board_test.gd`.
+
 ### Shared pacing
 
 In multiplayer the fixed HUD's > / >> button requests normal/double simulation speed through the existing unanimous votes; the loop-arrow button requests autoplay. Either withdrawal stops the shared effect without erasing the other vote. Gold means pending and green means active. Solo instead cycles > / >> / >>> through 1×/2×/3× using the host-owned multiplier, while autoplay mirrors consent immediately. Votes/speed survive ordinary waves; results, disconnect, new runs, and round-changing debug resets clear them.

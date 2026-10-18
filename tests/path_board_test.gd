@@ -1500,7 +1500,6 @@ func _check_slowed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			var region := Rect2i(center + Vector2i(-40, -100), Vector2i(80, 140))
 			var original_body: Dictionary = _changed_geometry(empty, ordinary, region)
 			var texture: Texture2D = EnemyVisuals.enemy_texture(board._enemy_art[type_id], enemy)
-			var cached: Texture2D = board._slowed_enemy_textures[texture]
 			enemy = enemy.duplicate(true)
 			enemy["slowed"] = true
 			enemy["slow_remaining"] = 2.0
@@ -1508,6 +1507,7 @@ func _check_slowed_enemies(board: PathBoard, viewport: SubViewport) -> void:
 			var accepted: Dictionary = enemy.duplicate(true)
 			board.combat_enemies = [enemy]
 			var slowed: Image = await _board_image(board, viewport)
+			var cached: Texture2D = board._slowed_enemy_textures[texture]
 			var slowed_body: Dictionary = _changed_geometry(empty, slowed, region)
 			_check(int(_changed_geometry(ordinary, slowed, region)["pixels"]) > 25,
 				"Slowed enemy gains a visible restrained blue tint, type=%s mirrored=%s" % [type_id, mirrored])
