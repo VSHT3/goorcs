@@ -328,6 +328,8 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 			return "Marks enemies for increased damage taken and kill rewards."
 		"income_aura":
 			return "Increases nearby towers' kill rewards."
+		"catapult":
+			return "Grabs the nearest enemies in range, slams its bucket into their neighbours and hurls them onto your opponent's board. Bosses and already-thrown enemies cannot be lifted."
 		"chain":
 			return "Chains through nearby enemies, dealing more damage with each jump." if float(config.get("successive_hit_bonus", 0.0)) > 0.0 else "Chains through nearby enemies at full damage."
 	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
@@ -386,6 +388,16 @@ func _populate_role_stats(tower: Dictionary, stats: Dictionary) -> void:
 			_add_stat(_stats, &"mark_income", "Marked normal kill Coins", "+%s%%" % _number(float(config["mark_income_bonus"]) * 100.0))
 		"income_aura":
 			_add_stat(_stats, &"kill_income", "Normal kill Coins", "+%s%%" % _number(float(config["kill_income_bonus"]) * 100.0))
+		"catapult":
+			_add_stat(_stats, &"throws", "Enemies per throw", str(int(config["throw_count"])))
+			_add_stat(_stats, &"interval", "Throw interval", "%s s" % _number(float(tower["interval"])))
+			_add_stat(_stats, &"lift", "Heaviest lift", "%s× Grunt HP" % _number(float(config["lift"])))
+			_add_stat(_stats, &"damage", "Bucket slam damage", str(int(tower["damage"])))
+			_add_stat(_stats, &"slam_radius", "Slam radius", "%s cells" % _number(float(config["slam_radius"])))
+			if float(config["landing_progress"]) > 0.0:
+				_add_stat(_stats, &"landing", "Lands down their path", "%s cells" % _number(float(config["landing_progress"])))
+			if float(config["landing_haste"]) > 1.0:
+				_add_stat(_stats, &"haste", "Landed enemy speed", "+%s%%" % _number((float(config["landing_haste"]) - 1.0) * 100.0))
 		"crystal":
 			_add_stat(_stats, &"clear_shards", "Round-clear Shards", "%d Shards" % int(config["clear_shards"]))
 			if int(config["periodic_shards"]) > 0:
@@ -596,6 +608,7 @@ func _role_title(role: String) -> String:
 		"support": return "Tower support"
 		"economy": return "Coin production"
 		"crystal": return "Shard production"
+		"catapult": return "Enemy throwing"
 		"bounty": return "Enemy marking"
 		"income_aura": return "Kill-income support"
 		_: return role.replace("_", " ").capitalize()

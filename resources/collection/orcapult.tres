@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="TowerReward" load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult.png" id="2_icon"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_base.png" id="3_base"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_arm.png" id="4_arm"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_siege_base.png" id="5_siege"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_siege_arm.png" id="6_siege_arm"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_trebuchet_base.png" id="7_trebuchet"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_trebuchet_arm.png" id="8_trebuchet_arm"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_long_base.png" id="9_long"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_long_arm.png" id="10_long_arm"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_wall_base.png" id="11_wall"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_wall_arm.png" id="12_wall_arm"]
+[ext_resource type="Texture2D" path="res://assets/towers/orcapult_scoop_arm.png" id="13_scoop_arm"]
+
+[resource]
+script = ExtResource("1_reward")
+id = &"orcapult"
+title = "Orcapult"
+description = "A siege mangonel that grabs the nearest enemies and hurls them onto your opponent's board."
+icon_texture = ExtResource("2_icon")
+accent = Color(0.72, 0.5, 0.3, 1)
+board_height = 0.86
+board_anchor = Vector2(0.516, 0.9375)
+board_texture = ExtResource("3_base")
+mirror_board = true
+catapult_arm_texture = ExtResource("4_arm")
+catapult_pivot = Vector2(70, 92)
+catapult_arm_pivot = Vector2(16, 70)
+board_variants = {
+"double_scoop": {"texture": ExtResource("3_base"), "catapult_arm_texture": ExtResource("13_scoop_arm")},
+"siege_arm": {"texture": ExtResource("5_siege"), "catapult_arm_texture": ExtResource("6_siege_arm")},
+"warlords_trebuchet": {"texture": ExtResource("7_trebuchet"), "catapult_arm_texture": ExtResource("8_trebuchet_arm")},
+"long_toss": {"texture": ExtResource("9_long"), "catapult_arm_texture": ExtResource("10_long_arm")},
+"over_the_wall": {"texture": ExtResource("11_wall"), "catapult_arm_texture": ExtResource("12_wall_arm")}
+}

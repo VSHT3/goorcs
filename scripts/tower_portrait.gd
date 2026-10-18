@@ -39,7 +39,8 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 	if art_branch.is_empty():
 		art_branch = String(tower.get("evolution", ""))
 	var variant: Dictionary = reward.board_variant(art_branch, tower.get("followup", ""), tower.get("branch_upgrades", []), _stat_tiers(tower))
-	var texture: Texture2D = variant.get("texture", reward.icon_texture)
+	# Orcapult layers share the icon's framing, as on the battlefield.
+	var texture: Texture2D = variant.get("texture", reward.icon_texture) if reward.catapult_arm_texture == null else reward.icon_texture
 	if texture == null:
 		return
 	_cache_texture_bounds(texture)
@@ -53,6 +54,13 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 		for layer: Texture2D in layers:
 			var layer_bounds: Rect2 = _texture_bounds[layer]
 			_frame = _frame.merge(Rect2((layer_bounds.position - texture.get_size() * anchor) * units, layer_bounds.size * units))
+	if reward.catapult_arm_texture != null:
+		# The resting arm leans back past the base; longer branch arms reach further.
+		var arm: Texture2D = variant.get("catapult_arm_texture", reward.catapult_arm_texture)
+		_cache_texture_bounds(arm)
+		var reach := Vector2(0.0, _texture_bounds[arm].position.y - reward.catapult_arm_pivot.y).rotated(deg_to_rad(CATAPULT_COCKED))
+		var cup: Vector2 = reward.catapult_pivot + reach
+		_frame = _frame.merge(Rect2((cup - Vector2.ONE * 12.0 - texture.get_size() * anchor) * units, Vector2.ONE * 24.0 * units))
 	# Reserve the battlefield's orbit envelope, even as stones pass behind it.
 	_frame = _frame.merge(Rect2(-0.7, -0.85, 1.4, 0.65))
 	_reserve_effects(tower)
@@ -85,6 +93,9 @@ func _reserve_effects(tower: Dictionary) -> void:
 	if evolution == "onyx_ring":
 		_frame = _frame.merge(Rect2(-0.8, -1.35, 1.6, 1.4))
 	var art_top: float = _frame.position.y
+	if String(tower.get("type_id", "")) == "lightning":
+		# Tesla sparks crackle above and beside the coil's prongs.
+		_frame = _frame.merge(Rect2(-0.7, art_top - 0.45, 1.4, 0.45))
 	if _has_finale(tower):
 		_frame = _frame.merge(Rect2(-0.5, art_top - 0.85, 1.0, 0.85))
 		if evolution == "bounce":

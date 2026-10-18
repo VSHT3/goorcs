@@ -214,6 +214,8 @@ static func _stat_title(definition: TowerDefinition, command: String) -> String:
 		return "Damage aura" if command == "damage" else "Attack-speed aura"
 	if definition.behavior_kind == "economy":
 		return "Income upgrade I" if command == "damage" else "Income upgrade II"
+	if definition.behavior_kind == "catapult":
+		return "Slam upgrade" if command == "damage" else "Speed upgrade"
 	return "Damage upgrade" if command == "damage" else "Speed upgrade"
 
 

@@ -23,7 +23,7 @@ func _run() -> void:
 	await _settle()
 	screen.open()
 	await _settle()
-	_check(screen.tower_buttons.size() == rules.catalog.towers.size() and screen.tower_buttons.size() == 6, "All six catalog identities are discoverable without an ownership store")
+	_check(screen.tower_buttons.size() == rules.catalog.towers.size() and screen.tower_buttons.size() == 7, "All seven catalog identities are discoverable without an ownership store")
 	_check(viewport.gui_get_focus_owner() == screen.tower_buttons[0], "Open focuses the selected tower index")
 	await _check_input()
 	for width: int in [1000, 1280]:

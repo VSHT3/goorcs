@@ -7,6 +7,8 @@ enum TargetMode { FURTHEST, CLOSEST, STRONGEST, LAST = 3 }
 const DEATH_EVENT_LIFETIME: float = 2.0
 # Bounded redirects per bolt; decaying Magic odds normally stop far earlier.
 const MAX_BOUNCE_POINTS: int = 24
+# Seconds an Orcapult-thrown enemy spends in the air between the two boards.
+const FLIGHT_DURATION: float = 1.6
 const NO_BONUS: Dictionary = {}
 
 var phase: Phase = Phase.PLANNING
@@ -23,6 +25,9 @@ var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
 var enemies: Array[Array] = [[], []]
+# Enemies thrown by an Orcapult, airborne until they land on the target board.
+var flights: Array[Dictionary] = []
+var _next_flight_id: int = 1
 # One host-generated ordered regular stream, replayed independently on both boards.
 var wave_roster: Array[String] = []
 var spawn_times: Array[float] = []
@@ -280,7 +285,7 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"pierce_active": false, "pierce_aim": Vector2(cell),
 		"bounce_points": [] as Array[Vector2], "split_paths": [] as Array[Array], "branch_upgrades": [] as Array[String],
 		"branch_pierce": 0, "bolt_scale": 1.0, "bolt_reach": 0.0, "magic_bounce": {}, "magic_split": 1,
-		"orbit_bonus": 0, "max_hp_drain": 0.0, "shards_generated": 0,
+		"orbit_bonus": 0, "max_hp_drain": 0.0, "shards_generated": 0, "thrown": 0,
 		"damage": definition["damage"], "interval": definition["interval"],
 		"range": definition["range"], "base_damage": definition["damage"], "base_interval": definition["interval"],
 		"behavior_kind": definition["behavior_kind"], "behavior_config": definition["behavior_config"].duplicate(true),
@@ -405,7 +410,7 @@ func _refresh_board(slot: int) -> void:
 			interval_scale *= float(step.get("periodic_interval_multiplier", 1.0))
 			var added: Dictionary = step.get("behavior_add", {})
 			for key: String in added:
-				behavior[key] = int(behavior.get(key, 0)) + int(added[key])
+				behavior[key] = behavior.get(key, 0) + added[key]
 		if kind == "crystal":
 			behavior["periodic_interval"] = float(behavior["periodic_interval"]) * interval_scale
 		tower["branch_pierce"] = branch_pierce
@@ -453,6 +458,9 @@ func _refresh_board(slot: int) -> void:
 			behavior["mark_income_bonus"] = float(behavior["mark_income_bonus"]) * (1.0 + income_bonus)
 		elif kind == "income_aura":
 			behavior["kill_income_bonus"] = float(behavior["kill_income_bonus"]) * (1.0 + income_bonus)
+		elif kind == "catapult":
+			if tower["special_upgraded"]:
+				behavior["throw_count"] += int(definition["special_upgrade_config"].get("extra_throws", 0))
 		elif kind == "chain":
 			behavior["hit_count"] += int(modifiers.get("chain_jumps", 0.0))
 			if tower["special_upgraded"]:
@@ -666,7 +674,7 @@ static func tower_level(tower: Dictionary) -> int:
 
 
 static func _tower_has_separate_special(tower: Dictionary) -> bool:
-	return tower.get("behavior_kind", "") == "chain"
+	return tower.get("behavior_kind", "") in ["chain", "catapult"]
 
 
 static func tower_upgrade_cost(tower: Dictionary, definition: Dictionary) -> int:
@@ -771,6 +779,7 @@ func debug_set_round(round_number: int) -> bool:
 	winner = -1
 	coin_flip = false
 	enemies = [[], []]
+	flights.clear()
 	_reset_death_events()
 	wave_roster.clear()
 	wave_groups.clear()
@@ -1049,6 +1058,7 @@ func advance(delta: float) -> bool:
 				_attack(slot, 0.0)
 			for tower: Dictionary in towers[slot]:
 				_update_tracking_target(slot, tower)
+		_land_flights()
 		remaining -= step
 		if (periodic or _boss_stream) and (base_health[0] == 0 or base_health[1] == 0 or _wave_cleared()):
 			break
@@ -1076,6 +1086,7 @@ func advance(delta: float) -> bool:
 				_clear_stun(tower)
 				tower["production_elapsed"] = 0.0
 			_refresh_board(slot)
+		flights.clear()
 	elif _wave_cleared():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
 		_recap.rounds_cleared += 1
@@ -1105,6 +1116,8 @@ func advance(delta: float) -> bool:
 
 func _next_event_step(maximum: float, periodic: bool = false) -> float:
 	var duration: float = maximum
+	for flight: Dictionary in flights:
+		duration = minf(duration, float(flight["land_time"]) - _elapsed)
 	for slot: int in range(2):
 		if _spawned[slot] < spawn_times.size():
 			duration = minf(duration, spawn_times[_spawned[slot]] - _elapsed)
@@ -1150,7 +1163,7 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 
 
 func _wave_cleared() -> bool:
-	return _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and _pending_sends(0) == 0 and _pending_sends(1) == 0 and enemies[0].is_empty() and enemies[1].is_empty()
+	return _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and _pending_sends(0) == 0 and _pending_sends(1) == 0 and enemies[0].is_empty() and enemies[1].is_empty() and flights.is_empty()
 
 
 func _has_periodic_production() -> bool:
@@ -1443,6 +1456,7 @@ func snapshot() -> Dictionary:
 		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
 		"enemy_types": _enemy_types_snapshot(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
+		"flights": flights.duplicate(true), "flight_duration": FLIGHT_DURATION,
 		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
 		"death_generation": _death_generation,
 		"sounds": _sound_events.snapshot(_death_time),
@@ -1733,7 +1747,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"jump_remaining": 0.0, "jump_duration": _enemy_types[type_id]["jump_duration"],
 		"jump_from": _position(route, progress), "jump_to": _position(route, progress),
 		"jump_target_progress": progress,
-		"stepped": false,
+		"stepped": false, "launched": false,
 	})
 	EnemyMechanics.initialize(enemies[slot].back(), definition)
 	_enemy_spawn_times[_next_enemy_id] = spawn_time
@@ -1921,6 +1935,9 @@ func _attack(slot: int, delta: float) -> void:
 		if float(tower["stunned_remaining"]) > 0.000000001:
 			continue
 		var definition: Dictionary = _tower_types[tower["type_id"]]
+		if tower["behavior_kind"] == "catapult":
+			_attack_catapult(slot, tower, delta)
+			continue
 		if tower["behavior_kind"] not in ["attack", "chain"]:
 			continue
 		var config: Dictionary = definition["advancements"].get(tower["advancement"], {})
@@ -2209,6 +2226,118 @@ func _attack_chain(slot: int, tower: Dictionary, primary_index: int) -> void:
 		points.append(position)
 		_hit(slot, tower, selected, ceili(float(tower["damage"]) * (1.0 + contact * float(config["successive_hit_bonus"]))))
 		selected = _nearest_unhit(slot, position, hit_ids, float(config["jump_distance"]))
+
+
+# Orcapult: grab the nearest throwable enemies in range, slam the bucket into
+# their neighbours, and fling the grabbed ones onto the opponent's board
+# (back to this board's own portal in Sandbox). A thrown enemy keeps its HP and
+# can never be thrown again, so two Orcapults cannot juggle it forever.
+func _attack_catapult(slot: int, tower: Dictionary, delta: float) -> void:
+	tower["cooldown"] = maxf(0.0, float(tower["cooldown"]) - delta)
+	if float(tower["cooldown"]) > 0.000000001:
+		return
+	var config: Dictionary = tower["behavior_config"]
+	var origin := Vector2(tower["cell"])
+	var candidates: Array[Dictionary] = []
+	for enemy: Dictionary in enemies[slot]:
+		if not throwable(enemy, _enemy_types[enemy["type_id"]], float(config["lift"])) or float(_enemy_spawn_times[enemy["id"]]) > _elapsed + 0.000000001:
+			continue
+		if not cell_in_range(tower["cell"], Vector2i(enemy["pos"].round()), tower["range"]):
+			continue
+		candidates.append(enemy)
+	if candidates.is_empty():
+		return
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var da: float = origin.distance_squared_to(a["pos"])
+		var db: float = origin.distance_squared_to(b["pos"])
+		return da < db or (da == db and int(a["id"]) < int(b["id"])))
+	var grabbed: Array[Dictionary] = candidates.slice(0, int(config["throw_count"]))
+	var grabbed_ids: Dictionary = {}
+	for enemy: Dictionary in grabbed:
+		grabbed_ids[int(enemy["id"])] = true
+	tower["cooldown"] = tower["interval"]
+	tower["shot"] += 1
+	tower["target_id"] = grabbed[0]["id"]
+	tower["aim"] = grabbed[0]["pos"]
+	_sound_events.record(CombatSoundEvents.Cue.BALLISTA, slot, origin, _death_time)
+	# The bucket slams down around each grabbed enemy before it is hurled.
+	var radius: float = float(config["slam_radius"])
+	var splashed: Array[int] = []
+	if radius > 0.0:
+		for enemy: Dictionary in enemies[slot]:
+			if grabbed_ids.has(int(enemy["id"])) or int(enemy["hp"]) <= 0:
+				continue
+			for victim: Dictionary in grabbed:
+				if Vector2(enemy["pos"]).distance_to(victim["pos"]) <= radius:
+					splashed.append(int(enemy["id"]))
+					break
+	for enemy: Dictionary in grabbed:
+		_launch(slot, tower, enemy)
+	for id: int in splashed:
+		var index: int = _enemy_index(slot, id)
+		if index >= 0:
+			_hit(slot, tower, index)
+
+
+static func throwable(enemy: Dictionary, definition: Dictionary, lift: float) -> bool:
+	return int(enemy["hp"]) > 0 and not bool(enemy.get("launched", false)) and not bool(definition.get("boss", false)) and float(definition.get("health_multiplier", 1.0)) <= lift + 0.000000001 and BossMechanics.can_act(enemy)
+
+
+func _launch(slot: int, tower: Dictionary, enemy: Dictionary) -> void:
+	var config: Dictionary = tower["behavior_config"]
+	var target: int = slot if _sandbox_mode else 1 - slot
+	var index: int = _enemy_index(slot, enemy["id"])
+	if index < 0:
+		return
+	var from: Vector2 = enemy["pos"]
+	enemies[slot].remove_at(index)
+	_retire_enemy(enemy["id"])
+	# Statuses and marks belong to the board it leaves.
+	enemy["burning"] = false
+	enemy["burn_remaining"] = 0.0
+	enemy["slowed"] = false
+	enemy["slow_remaining"] = 0.0
+	enemy["bounty_tower_id"] = -1
+	enemy["bounty_damage_bonus"] = 0.0
+	enemy["bounty_income_bonus"] = 0.0
+	enemy["cast_remaining"] = 0.0
+	enemy["tower_attack_remaining"] = 0.0
+	enemy["launched"] = true
+	var route: Array[Vector2i] = _assign_route(target)
+	var progress: float = minf(float(config["landing_progress"]), float(route.size() - 1) * 0.6)
+	tower["thrown"] = int(tower.get("thrown", 0)) + 1
+	flights.append({
+		"id": _next_flight_id, "from_slot": slot, "to_slot": target,
+		"tower_id": tower["id"], "tower_cell": Vector2(tower["cell"]),
+		"from": from, "to": _position(route, progress), "route": route, "progress": progress,
+		"haste": float(config["landing_haste"]),
+		"launch_time": _elapsed, "land_time": _elapsed + FLIGHT_DURATION, "clock": _death_time,
+		"enemy": enemy,
+	})
+	_next_flight_id += 1
+
+
+func _land_flights() -> void:
+	var index: int = 0
+	while index < flights.size():
+		var flight: Dictionary = flights[index]
+		if float(flight["land_time"]) > _elapsed + 0.000000001:
+			index += 1
+			continue
+		flights.remove_at(index)
+		var enemy: Dictionary = flight["enemy"]
+		var target: int = flight["to_slot"]
+		enemy["base_speed"] = float(enemy["base_speed"]) * float(flight["haste"])
+		enemy["speed"] = enemy["base_speed"]
+		enemy["route"] = flight["route"]
+		enemy["progress"] = float(flight["progress"]) + (_elapsed - float(flight["land_time"])) * float(enemy["base_speed"])
+		enemy["pos"] = _position(enemy["route"], enemy["progress"])
+		enemy["jump_from"] = enemy["pos"]
+		enemy["jump_to"] = enemy["pos"]
+		enemy["jump_target_progress"] = enemy["progress"]
+		_enemy_spawn_times[enemy["id"]] = float(flight["land_time"])
+		enemies[target].append(enemy)
+		_sound_events.record(CombatSoundEvents.Cue.CLUB_IMPACT, target, flight["to"], _death_time)
 
 
 func _nearest_unhit(slot: int, origin: Vector2, excluded: Dictionary, radius: float = INF, time: float = -1.0) -> int:

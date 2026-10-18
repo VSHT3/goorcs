@@ -33,6 +33,12 @@ extends Resource
 @export var secondary_sprite_offset: Vector2
 # Rear archers reuse the same layered rig with these texture-local offsets.
 @export var additional_archer_offsets: PackedVector2Array = PackedVector2Array()
+# Orcapult throwing arm: a separate layer rotated about catapult_arm_pivot
+# (arm-texture pixels), placed at catapult_pivot in the icon's texture space.
+# Variants may swap it with "catapult_arm_texture".
+@export var catapult_arm_texture: Texture2D
+@export var catapult_pivot: Vector2 = Vector2.ZERO
+@export var catapult_arm_pivot: Vector2 = Vector2.ZERO
 
 
 func board_variant(evolution: String, followup: String = "", steps: Array = [], tiers: Array = []) -> Dictionary:

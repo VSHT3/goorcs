@@ -52,7 +52,7 @@ func _planning_rules() -> CombatRules:
 		if _lane == "guest":
 			# These are valid, deliberately divergent local resources, not mocks.
 			tower.cost = 1
-			tower.damage = 1 if tower.behavior_kind in ["attack", "chain"] else 0
+			tower.damage = 1 if tower.behavior_kind in ["attack", "chain", "catapult"] else 0
 			for branch: Dictionary in tower.evolutions.values():
 				branch["cost"] = 1
 		towers.append(tower)

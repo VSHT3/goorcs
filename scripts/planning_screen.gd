@@ -1076,10 +1076,12 @@ static func tower_stats_text(tower: Dictionary, stats: Dictionary) -> String:
 	var kind: String = String(tower.get("behavior_kind", stats.get("behavior_kind", "attack")))
 	var lines := PackedStringArray()
 	lines.append("Kills %d" % int(tower.get("kills", 0)))
-	if kind in ["attack", "chain"] or int(tower.get("damage_dealt", 0)) > 0:
+	if kind in ["attack", "chain", "catapult"] or int(tower.get("damage_dealt", 0)) > 0:
 		lines.append("Damage dealt %d" % int(tower.get("damage_dealt", 0)))
 	if kind in ["economy", "bounty", "income_aura"] or int(tower.get("coins_generated", 0)) > 0:
 		lines.append("Coins generated %d" % int(tower.get("coins_generated", 0)))
+	if kind == "catapult":
+		lines.append("Enemies thrown %d" % int(tower.get("thrown", 0)))
 	if kind == "crystal" or int(tower.get("shards_generated", 0)) > 0:
 		lines.append("Shards generated %d" % int(tower.get("shards_generated", 0)))
 	if kind == "bounty" or int(tower.get("indirect_damage", 0)) > 0:
@@ -1110,6 +1112,11 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 				result += "\n%d Shards / %.2fs combat" % [int(config["periodic_shards"]), float(config.get("periodic_interval", 0.0))]
 		"bounty":
 			result = "Auto mark: highest max HP\n+%.1f%% damage taken\n+%.1f%% normal kill Coins\nOne persistent, exclusive target" % [float(config.get("mark_damage_bonus", 0.0)) * 100.0, float(config.get("mark_income_bonus", 0.0)) * 100.0]
+		"catapult":
+			var interval: float = float(state.get("interval", fallback.get("interval", 1.0)))
+			result = "Throws %d enem%s every %.2fs\nLifts up to %s× Grunt HP · no bosses\nSlam %d damage · %s cells" % [int(config.get("throw_count", 1)), "y" if int(config.get("throw_count", 1)) == 1 else "ies", interval, String.num(float(config.get("lift", 0.0)), 2), int(state.get("damage", fallback.get("damage", 0))), String.num(float(config.get("slam_radius", 0.0)), 2)]
+			if float(config.get("landing_progress", 0.0)) > 0.0 or float(config.get("landing_haste", 1.0)) > 1.0:
+				result += "\nLands %s cells down their path · +%.0f%% speed" % [String.num(float(config.get("landing_progress", 0.0)), 1), (float(config.get("landing_haste", 1.0)) - 1.0) * 100.0]
 		"income_aura":
 			result = "Nearby killing towers:\n+%.1f%% kill Coins\nStrongest duplicate only" % (float(config.get("kill_income_bonus", 0.0)) * 100.0)
 		_:
@@ -1150,11 +1157,13 @@ static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dicti
 		if effects.has(command):
 			benefit = effect_description(effects[command])
 		else:
-			benefit = "+%d damage" % int(stats.get("damage_upgrade_bonus", 0)) if command == "damage" else "%.0f%% faster" % ((1.0 / float(stats.get("speed_upgrade_multiplier", 1.0)) - 1.0) * 100.0)
+			benefit = ("+%d slam damage" if stats.get("behavior_kind", "") == "catapult" else "+%d damage") % int(stats.get("damage_upgrade_bonus", 0)) if command == "damage" else "%.0f%% faster" % ((1.0 / float(stats.get("speed_upgrade_multiplier", 1.0)) - 1.0) * 100.0)
 		actions[command] = {"title": benefit, "cost": MatchCombat.tower_upgrade_cost(tower, stats), "purchased": bool(tower.get(command + "_upgraded", false)), "locked": false, "description": "One-time upgrade: " + benefit + ". Preserved through evolutions."}
 	var special: String = String(stats.get("special_upgrade", ""))
 	if not special.is_empty() and not (special == "second_archer" and bool(tower.get("special_upgraded", false))):
 		var description: String = "Adds a second archer and 10% more attacks per second. Both use the tower's targeting policy, preferring distinct enemies and sharing when necessary." if special == "second_archer" else "Each successive chain hit gains +%.0f%% damage. Preserved through evolution." % (float(stats.get("special_upgrade_config", {}).get("successive_hit_bonus", 0.0)) * 100.0)
+		if special == "double_scoop":
+			description = "Grabs and throws %d more enem%s per swing. Preserved through evolution." % [int(stats.get("special_upgrade_config", {}).get("extra_throws", 1)), "y" if int(stats.get("special_upgrade_config", {}).get("extra_throws", 1)) == 1 else "ies"]
 		actions["special"] = {"title": stats.get("special_upgrade_title", special.capitalize()), "cost": int(stats.get("special_upgrade_cost", 0)), "purchased": bool(tower.get("special_upgraded", false)), "locked": not base_ready, "description": description}
 	var evolutions: Dictionary = stats.get("evolutions", {})
 	var chosen: String = String(tower.get("evolution", ""))

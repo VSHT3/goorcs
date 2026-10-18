@@ -29,7 +29,7 @@ func validation_errors() -> PackedStringArray:
 		tower_ids[id] = true
 		if tower.damage_type not in [&"physical", &"fire", &"magic", &"lightning", &"explosive", &"ice"]:
 			errors.append("Tower '%s' has an unknown damage type." % id)
-		if tower.reward.title.is_empty() or tower.damage < 0 or (tower.behavior_kind in ["attack", "chain"] and tower.damage == 0) or not is_finite(tower.range_cells) or tower.range_cells <= 0.0 or not is_finite(tower.interval) or tower.interval <= 0.0 or tower.cost <= 0 or tower.upgrade_base_cost <= 0 or tower.damage_upgrade_bonus <= 0 or not is_finite(tower.speed_upgrade_multiplier) or tower.speed_upgrade_multiplier <= 0.0 or tower.speed_upgrade_multiplier >= 1.0:
+		if tower.reward.title.is_empty() or tower.damage < 0 or (tower.behavior_kind in ["attack", "chain", "catapult"] and tower.damage == 0) or not is_finite(tower.range_cells) or tower.range_cells <= 0.0 or not is_finite(tower.interval) or tower.interval <= 0.0 or tower.cost <= 0 or tower.upgrade_base_cost <= 0 or tower.damage_upgrade_bonus <= 0 or not is_finite(tower.speed_upgrade_multiplier) or tower.speed_upgrade_multiplier <= 0.0 or tower.speed_upgrade_multiplier >= 1.0:
 			errors.append("Tower '%s' requires a title, positive attack stats/prices, nonnegative passive damage, and speed multiplier between zero and one." % id)
 		if not TowerDefinition.valid_behavior(tower):
 			errors.append("Tower '%s' has invalid behavior or role-upgrade metadata." % id)
@@ -42,7 +42,7 @@ func validation_errors() -> PackedStringArray:
 		if tower.attack_sound not in [CombatSoundEvents.Cue.BOW, CombatSoundEvents.Cue.BALLISTA, CombatSoundEvents.Cue.RUNE]:
 			errors.append("Tower '%s' has an unknown attack sound family." % id)
 		var art: TowerReward = tower.reward
-		if not is_finite(art.board_height) or art.board_height <= 0.0 or not art.board_anchor.is_finite() or not art.projectile_origin.is_finite() or not is_finite(art.projectile_length) or art.projectile_length <= 0.0 or not is_finite(art.projectile_width) or art.projectile_width <= 0.0 or not art.archer_pivot.is_finite() or not art.secondary_sprite_offset.is_finite():
+		if not is_finite(art.board_height) or art.board_height <= 0.0 or not art.board_anchor.is_finite() or not art.projectile_origin.is_finite() or not is_finite(art.projectile_length) or art.projectile_length <= 0.0 or not is_finite(art.projectile_width) or art.projectile_width <= 0.0 or not art.archer_pivot.is_finite() or not art.secondary_sprite_offset.is_finite() or not art.catapult_pivot.is_finite() or not art.catapult_arm_pivot.is_finite():
 			errors.append("Tower '%s' has invalid presentation metadata." % id)
 		if not _valid_board_variants(tower):
 			errors.append("Tower '%s' has invalid branch presentation metadata." % id)
@@ -213,9 +213,11 @@ static func _valid_board_variants(tower: TowerDefinition) -> bool:
 			return false
 		var variant: Dictionary = art.board_variants[branch]
 		for field: Variant in variant:
-			if typeof(field) != TYPE_STRING or field not in ["texture", "board_height", "board_anchor", "archer_pivot", "secondary_sprite_offset", "additional_archer_offsets", "portrait_bounds", "directional_weapon_textures"]:
+			if typeof(field) != TYPE_STRING or field not in ["texture", "board_height", "board_anchor", "archer_pivot", "secondary_sprite_offset", "additional_archer_offsets", "portrait_bounds", "directional_weapon_textures", "catapult_arm_texture"]:
 				return false
 		if not variant.get("texture") is Texture2D:
+			return false
+		if variant.has("catapult_arm_texture") and (art.catapult_arm_texture == null or not variant["catapult_arm_texture"] is Texture2D):
 			return false
 		if variant.has("directional_weapon_textures"):
 			# A directional look replaces the base and all eight poses on the

@@ -10,6 +10,9 @@ const FREEZE_DURATION: float = 2.0
 const MAX_MAGIC_SPLIT: int = 5
 # Rune evolutions that deal continuous (rather than pulsed) damage.
 const CONTINUOUS_RUNE_BRANCHES: Array[String] = ["boulders", "void_monolith"]
+# Orcapult evolutions and the arm properties their steps may raise.
+const CATAPULT_BRANCHES: Array[String] = ["siege_arm", "long_toss"]
+const CATAPULT_KEYS: Array[String] = ["lift", "throw_count", "slam_radius", "landing_progress", "landing_haste"]
 
 @export var reward: TowerReward
 @export var damage: int = 2
@@ -23,7 +26,7 @@ const CONTINUOUS_RUNE_BRANCHES: Array[String] = ["boulders", "void_monolith"]
 @export var area_attack: bool = false
 # "attack" retains the original direct/area attack rules. Other kinds are
 # mechanics, never collection identities; configs are captured by the host.
-@export_enum("attack", "chain", "support", "economy") var behavior_kind: String = "attack"
+@export_enum("attack", "chain", "support", "economy", "catapult") var behavior_kind: String = "attack"
 @export var behavior_config: Dictionary = {}
 # Passive buildings use role-specific effects for the existing damage/speed
 # purchase actions; attack kinds retain the ordinary numerical stat upgrades.
@@ -190,10 +193,17 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 			return false
 		if config.has("behavior_add"):
 			var added: Variant = config["behavior_add"]
-			if branch != "crystal_mine" or not added is Dictionary or (added as Dictionary).is_empty():
+			if branch not in ["crystal_mine"] + CATAPULT_BRANCHES or not added is Dictionary or (added as Dictionary).is_empty():
 				return false
 			for key: Variant in added:
-				if key not in ["clear_shards", "periodic_shards"] or not added[key] is int or int(added[key]) <= 0:
+				if branch == "crystal_mine":
+					if key not in ["clear_shards", "periodic_shards"] or not added[key] is int or int(added[key]) <= 0:
+						return false
+				elif key not in CATAPULT_KEYS or not _positive_number(added[key]) or (key == "throw_count" and not added[key] is int):
+					return false
+		if branch in CATAPULT_BRANCHES:
+			for field: Variant in config:
+				if field not in ["id", "title", "cost", "description", "damage_multiplier", "attack_rate_multiplier", "range_bonus", "behavior_add"]:
 					return false
 		if config.has("damage_type") and String(config["damage_type"]) not in ["physical", "magic"]:
 			return false
@@ -211,7 +221,7 @@ static func valid_behavior(definition: TowerDefinition) -> bool:
 		return definition.behavior_config.is_empty() and definition.upgrade_effects.is_empty()
 	if definition.area_attack or not _valid_behavior_config(definition.behavior_kind, definition.behavior_config):
 		return false
-	if definition.behavior_kind == "chain":
+	if definition.behavior_kind in ["chain", "catapult"]:
 		return definition.upgrade_effects.is_empty()
 	if definition.behavior_kind not in ["support", "economy"] or definition.upgrade_effects.size() != 2:
 		return false
@@ -233,6 +243,8 @@ static func valid_special_upgrade(definition: TowerDefinition) -> bool:
 			return definition.behavior_kind == "attack" and not definition.area_attack and not definition.special_upgrade_title.is_empty() and definition.special_upgrade_cost > 0 and definition.special_upgrade_config.is_empty()
 		"escalating_chain":
 			return definition.behavior_kind == "chain" and not definition.special_upgrade_title.is_empty() and definition.special_upgrade_cost > 0 and _positive_effect(definition.special_upgrade_config, "successive_hit_bonus")
+		"double_scoop":
+			return definition.behavior_kind == "catapult" and not definition.special_upgrade_title.is_empty() and definition.special_upgrade_cost > 0 and definition.special_upgrade_config.size() == 1 and definition.special_upgrade_config.get("extra_throws") is int and int(definition.special_upgrade_config["extra_throws"]) > 0
 	return false
 
 
@@ -247,6 +259,8 @@ static func valid_roll_attributes(definition: TowerDefinition) -> bool:
 				allowed.append_array(PackedStringArray(["pierce", "bounce"]))
 		"chain":
 			allowed = PackedStringArray(["damage", "attack_speed", "range", "chain_jumps"])
+		"catapult":
+			allowed = PackedStringArray(["damage", "attack_speed", "range"])
 		"support":
 			allowed = PackedStringArray(["range", "support_buff"])
 		"economy":
@@ -275,15 +289,18 @@ static func _valid_behavior_config(kind: String, config: Dictionary) -> bool:
 			# Shards instead of Coins. Periodic Shards may start at zero with a
 			# ready interval that later upgrades switch on.
 			return config.size() == 3 and config.get("clear_shards") is int and int(config["clear_shards"]) > 0 and config.get("periodic_shards") is int and int(config["periodic_shards"]) >= 0 and _positive_number(config.get("periodic_interval"))
+		"catapult":
+			# lift: heaviest enemy health multiplier the arm can grab.
+			return config.size() == 5 and _positive_number(config.get("lift")) and config.get("throw_count") is int and int(config["throw_count"]) > 0 and _nonnegative_number(config.get("slam_radius")) and _nonnegative_number(config.get("landing_progress")) and _positive_number(config.get("landing_haste")) and float(config["landing_haste"]) >= 1.0
 		"income_aura":
 			return config.size() == 2 and config.get("stack_group") is String and not String(config["stack_group"]).is_empty() and _positive_number(config.get("kill_income_bonus"))
 	return false
 
 
 static func _valid_role_evolutions(definition: TowerDefinition) -> bool:
-	if definition.behavior_kind not in ["chain", "support", "economy"] or not _valid_behavior_config(definition.behavior_kind, definition.behavior_config):
+	if definition.behavior_kind not in ["chain", "support", "economy", "catapult"] or not _valid_behavior_config(definition.behavior_kind, definition.behavior_config):
 		return false
-	if definition.behavior_kind != "chain" and not definition.special_upgrade.is_empty():
+	if definition.behavior_kind not in ["chain", "catapult"] and not definition.special_upgrade.is_empty():
 		return false
 	for branch: Variant in definition.evolutions:
 		if not branch is String or not definition.evolutions[branch] is Dictionary:
@@ -292,6 +309,16 @@ static func _valid_role_evolutions(definition: TowerDefinition) -> bool:
 		if not _valid_role_branch(config):
 			return false
 		match definition.behavior_kind:
+			"catapult":
+				if branch not in CATAPULT_BRANCHES or config["behavior_kind"] != "catapult" or definition.special_upgrade != "double_scoop":
+					return false
+				for field: Variant in config:
+					if field not in ["title", "cost", "behavior_kind", "behavior_config", "description", "upgrades"]:
+						return false
+				if config.has("description") and not config["description"] is String:
+					return false
+				if config.has("upgrades") and not valid_branch_upgrades(String(branch), config["upgrades"]):
+					return false
 			"chain":
 				if branch != "longer_reach" or definition.special_upgrade != "escalating_chain" or config.size() != 5 or config["behavior_kind"] != "chain" or not _positive_number(config.get("range_cells")) or float(config["range_cells"]) <= definition.range_cells or float(config["behavior_config"]["jump_distance"]) <= float(definition.behavior_config.get("jump_distance", INF)):
 					return false

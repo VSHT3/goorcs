@@ -58,6 +58,12 @@ const ENDPOINT_FRAME_SECONDS: float = 0.2
 const ONYX_PULSE_DURATION: float = 0.30
 const BOULDER_ORBIT_SPEED: float = 1.8
 const CORPSE_LIFETIME: float = 1.8
+# Orcapult arm angles (degrees from upright, positive leaning back from the
+# throw) and the seconds of its swing and landing-dust presentation.
+const CATAPULT_COCKED: float = 62.0
+const CATAPULT_FIRED: float = -18.0
+const CATAPULT_SWING_TIME: float = 0.12
+const FLIGHT_DUST_TIME: float = 0.7
 const BLOOD_DROPS := [Vector2(-3, 0), Vector2(-1, 1), Vector2(0, 0), Vector2(1, -1), Vector2(2, 1), Vector2(4, 0), Vector2(-2, -2)]
 static var _rune_stone_shape := PackedVector2Array([
 	Vector2(-0.85, -0.45), Vector2(-0.25, -0.95), Vector2(0.60, -0.75),
@@ -149,6 +155,14 @@ var _last_painted := Vector2i(-1, -1)
 var _seen_shots: Dictionary = {}
 var _archer_poses: Dictionary[Vector2i, Dictionary] = {}
 var _has_archer_motion: bool = false
+# Orcapult arm swings, keyed by tower ID: {shot, age, interval}.
+var _catapult_swings: Dictionary = {}
+var _has_catapult_motion: bool = false
+# Orcapult throws seen in accepted snapshots, kept locally until their landing
+# dust settles: {id, type_id, out, in, from, to, tower_id, tower_cell, age}.
+var _flight_traces: Array[Dictionary] = []
+var _last_flight_id: int = 0
+var _flight_duration: float = 1.6
 var _shot_traces: Array[Dictionary] = []
 # Onyx Ring presentation: seconds since each tower's last accepted slam.
 var _ring_clocks: Dictionary = {}
@@ -242,7 +256,7 @@ func _advance_endpoints() -> void:
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or _has_catapult_motion or not _flight_traces.is_empty() or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty()))
 
 
 func _process(delta: float) -> void:
@@ -267,6 +281,14 @@ func _process(delta: float) -> void:
 			_bounty_hit_life[id] = life
 	for id: Variant in _ring_clocks.keys():
 		_ring_clocks[id] = minf(float(_ring_clocks[id]) + visual_delta, 30.0)
+	_has_catapult_motion = false
+	for swing: Dictionary in _catapult_swings.values():
+		swing["age"] = minf(float(swing["age"]) + visual_delta, 30.0)
+		_has_catapult_motion = _has_catapult_motion or float(swing["age"]) < _catapult_reload_end(float(swing["interval"]))
+	for index: int in range(_flight_traces.size() - 1, -1, -1):
+		_flight_traces[index]["age"] += visual_delta
+		if float(_flight_traces[index]["age"]) >= _flight_duration + FLIGHT_DUST_TIME:
+			_flight_traces.remove_at(index)
 	for index: int in range(_shot_traces.size() - 1, -1, -1):
 		_shot_traces[index]["life"] -= visual_delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
@@ -299,6 +321,8 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 		_enemy_lifts.clear()
 		_enemy_position_from.clear()
 		_enemy_position_to.clear()
+		_flight_traces.clear()
+		_last_flight_id = 0
 		_death_match_id = match_id
 		_death_generation = generation
 	_corpse_speed = maxf(0.0, speed)
@@ -309,6 +333,7 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 		trace["age"] = maxf(float(trace["age"]), clock - float(trace["time"]))
 		if float(trace["age"]) >= CORPSE_LIFETIME:
 			_corpse_traces.remove_at(index)
+	_capture_flights(state, slot, clock)
 	var deaths: Array = state.get("deaths", [[], []])
 	if slot >= 0 and slot < deaths.size():
 		for event: Dictionary in deaths[slot]:
@@ -347,7 +372,7 @@ func _capture_shots() -> void:
 		var weapon: String = advancement.get("weapon", "arrow")
 		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0 or weapon == "minigun" or not tower.get("magic_bounce", {}).is_empty()
 		var archer_count: int = int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer" else 1))
-		_capture_archer(tower, definition, 0, int(tower.get("shot", 0)), tower.get("aim", Vector2(tower["cell"])), not boulders and weapon != "flamethrower")
+		_capture_archer(tower, definition, 0, int(tower.get("shot", 0)), tower.get("aim", Vector2(tower["cell"])), not boulders and weapon != "flamethrower" and tower.get("behavior_kind", "") != "catapult")
 		active_archers[Vector2i(int(tower["id"]), 0)] = true
 		if archer_count > 1:
 			_capture_archer(tower, definition, 1, int(tower.get("secondary_shot", 0)), tower.get("secondary_aim", Vector2(tower["cell"])))
@@ -369,6 +394,7 @@ func _capture_shots() -> void:
 	_has_archer_motion = false
 	for pose: Dictionary in _archer_poses.values():
 		_has_archer_motion = _has_archer_motion or float(pose["age"]) < maxf(0.14, float(pose["interval"]))
+	_capture_catapult_swings()
 
 
 func _archer_advancement(tower: Dictionary, definition: Dictionary) -> Dictionary:
@@ -1074,6 +1100,17 @@ func visual_headroom() -> float:
 				offsets.append(offset)
 			for offset: Vector2 in offsets:
 				headroom = maxf(headroom, -(rect.position.y + (reward.archer_pivot.y + offset.y - 25.0) * scale.y - 6.0))
+		if reward.catapult_arm_texture != null:
+			# The fired arm rises above the icon; every layer shares its framing.
+			var arms: Array[Texture2D] = [reward.catapult_arm_texture]
+			for variant: Dictionary in reward.board_variants.values():
+				if variant.get("catapult_arm_texture") is Texture2D:
+					arms.append(variant["catapult_arm_texture"])
+			for arm: Texture2D in arms:
+				_cache_texture_bounds(arm)
+				var reach: float = (reward.catapult_arm_pivot.y - _texture_bounds[arm].position.y) * scale.y
+				headroom = maxf(headroom, -(rect.position.y + reward.catapult_pivot.y * scale.y - reach))
+			continue
 		for variant: Dictionary in reward.board_variants.values():
 			var texture: Texture2D = variant.get("texture")
 			if texture == null:
@@ -1183,6 +1220,7 @@ func _draw_combat() -> void:
 				_draw_enemy(item)
 			3:
 				_draw_enemy_death(item)
+	_draw_flights()
 	# Bars are an information overlay; foreground bodies must not cover them.
 	for item: Dictionary in _draw_order:
 		if int(item["kind"]) == 2:
@@ -1204,11 +1242,19 @@ func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
 		var texture: Texture2D = variant.get("texture", artwork.board_texture if artwork.board_texture != null else artwork.icon_texture)
 		var directional: bool = not artwork.directional_weapon_textures.is_empty()
 		var flip: bool = not directional and artwork.mirror_board and mirror_horizontal
-		var framing: Texture2D = texture if not variant.is_empty() else artwork.icon_texture
+		var catapult: bool = artwork.catapult_arm_texture != null
+		# Every Orcapult layer shares the icon's canvas and framing.
+		var framing: Texture2D = texture if not variant.is_empty() and not catapult else artwork.icon_texture
 		var rect: Rect2 = _directional_weapon_rect(artwork, foot) if directional else _sprite_rect(framing, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), foot, flip)
+		var frame_rect: Rect2 = rect
 		if flip:
 			rect.size.x = -rect.size.x
-		draw_texture_rect(texture, rect, false)
+		# A loaded, resting plain Orcapult is its single composed icon (arm cocked,
+		# boulder in the cup); the arm becomes its own layer only while it moves.
+		var resting: bool = catapult and not variant.has("catapult_arm_texture") and _catapult_angle(int(tower.get("id", -1))) == CATAPULT_COCKED
+		draw_texture_rect(artwork.icon_texture if resting else texture, rect, false)
+		if catapult and not resting:
+			_draw_catapult_arm(tower, artwork, variant, frame_rect, flip)
 		if directional:
 			var poses: Array = variant.get("directional_weapon_textures", artwork.directional_weapon_textures)
 			draw_texture_rect(poses[_directional_weapon_index(tower)], rect, false)
@@ -1322,6 +1368,209 @@ func _draw_boulders(tower: Dictionary, foot: Vector2, front: bool) -> void:
 			_draw_zigzag(a, b, Color(STORM_COLOR, 0.75), 1.5, index + int(_boulder_phase * 6.0))
 
 
+func _capture_catapult_swings() -> void:
+	var seen: Dictionary = {}
+	for tower: Dictionary in combat_towers:
+		if tower.get("behavior_kind", "") != "catapult":
+			continue
+		var id: int = int(tower["id"])
+		seen[id] = true
+		var shot: int = int(tower.get("shot", 0))
+		var interval: float = float(tower.get("interval", 6.0))
+		if not _catapult_swings.has(id):
+			# A tower first seen mid-reload starts cocked, never replaying a throw.
+			_catapult_swings[id] = {"shot": shot, "age": 30.0, "interval": interval}
+		elif int(_catapult_swings[id]["shot"]) != shot:
+			_catapult_swings[id] = {"shot": shot, "age": 0.0 if shot > int(_catapult_swings[id]["shot"]) else 30.0, "interval": interval}
+		else:
+			_catapult_swings[id]["interval"] = interval
+	for id: Variant in _catapult_swings.keys():
+		if not seen.has(id):
+			_catapult_swings.erase(id)
+	_has_catapult_motion = false
+	for swing: Dictionary in _catapult_swings.values():
+		_has_catapult_motion = _has_catapult_motion or float(swing["age"]) < _catapult_reload_end(float(swing["interval"]))
+
+
+func _catapult_reload_end(interval: float) -> float:
+	return 0.3 + clampf(interval * 0.45, 0.6, 1.6)
+
+
+# Snap forward against the padded stop beam, rebound, then crank back down.
+func _catapult_angle(tower_id: int) -> float:
+	var swing: Dictionary = _catapult_swings.get(tower_id, {})
+	if swing.is_empty():
+		return CATAPULT_COCKED
+	var age: float = float(swing["age"])
+	if age < CATAPULT_SWING_TIME:
+		var t: float = age / CATAPULT_SWING_TIME
+		return lerpf(CATAPULT_COCKED, CATAPULT_FIRED, t * t)
+	if age < 0.3:
+		var t: float = (age - CATAPULT_SWING_TIME) / (0.3 - CATAPULT_SWING_TIME)
+		return CATAPULT_FIRED + 7.0 * sin(t * PI) * (1.0 - t)
+	var end: float = _catapult_reload_end(float(swing["interval"]))
+	if age < end:
+		return lerpf(CATAPULT_FIRED, CATAPULT_COCKED, smoothstep(0.3, end, age))
+	return CATAPULT_COCKED
+
+
+# Pivot, scale and arm art of an Orcapult, in board pixels.
+func _catapult_geometry(tower: Dictionary) -> Dictionary:
+	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	if artwork == null or artwork.catapult_arm_texture == null:
+		return {}
+	var variant: Dictionary = _tower_variant(tower, artwork)
+	var flip: bool = artwork.mirror_board and mirror_horizontal
+	var rect: Rect2 = _sprite_rect(artwork.icon_texture, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), _tower_foot(tower["cell"]), flip)
+	return _catapult_frame(artwork, variant, rect, flip)
+
+
+func _catapult_frame(artwork: TowerReward, variant: Dictionary, rect: Rect2, flip: bool) -> Dictionary:
+	var scale: float = rect.size.y / artwork.icon_texture.get_height()
+	var local: Vector2 = artwork.catapult_pivot
+	if flip:
+		local.x = artwork.icon_texture.get_width() - local.x
+	var arm: Texture2D = variant.get("catapult_arm_texture", artwork.catapult_arm_texture)
+	_cache_texture_bounds(arm)
+	return {"pivot": rect.position + local * scale, "scale": scale, "flip": flip, "arm": arm, "arm_pivot": artwork.catapult_arm_pivot}
+
+
+# Board position of the arm's cup at a given swing angle.
+func _catapult_cup(geometry: Dictionary, angle_degrees: float) -> Vector2:
+	var arm: Texture2D = geometry["arm"]
+	var arm_pivot: Vector2 = geometry["arm_pivot"]
+	var local := Vector2(-3.0, _texture_bounds[arm].position.y + 9.0 - arm_pivot.y) * float(geometry["scale"])
+	var sign: float = -1.0 if bool(geometry["flip"]) else 1.0
+	local.x *= sign
+	return Vector2(geometry["pivot"]) + local.rotated(deg_to_rad(angle_degrees) * sign)
+
+
+func _draw_catapult_arm(tower: Dictionary, artwork: TowerReward, variant: Dictionary, rect: Rect2, flip: bool) -> void:
+	var geometry: Dictionary = _catapult_frame(artwork, variant, rect, flip)
+	var scale: float = geometry["scale"]
+	var sign: float = -1.0 if flip else 1.0
+	var angle: float = deg_to_rad(_catapult_angle(int(tower.get("id", -1)))) * sign
+	draw_set_transform(geometry["pivot"], angle, Vector2(scale * sign, scale))
+	draw_texture(geometry["arm"], -Vector2(geometry["arm_pivot"]))
+	draw_set_transform(Vector2.ZERO)
+
+
+func _capture_flights(state: Dictionary, slot: int, clock: float) -> void:
+	_flight_duration = float(state.get("flight_duration", _flight_duration))
+	for flight: Dictionary in state.get("flights", []):
+		var id: int = int(flight["id"])
+		var outgoing: bool = int(flight["from_slot"]) == slot
+		var incoming: bool = int(flight["to_slot"]) == slot
+		if id <= _last_flight_id or not (outgoing or incoming):
+			continue
+		_last_flight_id = id
+		var enemy: Dictionary = flight["enemy"]
+		if not _enemy_art.has(enemy["type_id"]):
+			continue
+		_flight_traces.append({
+			"id": id, "type_id": enemy["type_id"], "out": outgoing, "in": incoming,
+			"from": flight["from"], "to": flight["to"], "tower_id": int(flight["tower_id"]),
+			"tower_cell": Vector2i(Vector2(flight["tower_cell"]).round()),
+			"age": maxf(0.0, clock - float(flight["clock"])),
+		})
+
+
+# Thrown enemies leave over the board edge facing the opponent and fall back
+# in over this board's portal edge; impacts kick up dust.
+func _draw_flights() -> void:
+	var cell_size: float = _cell_size()
+	var half: float = _flight_duration * 0.5
+	for trace: Dictionary in _flight_traces:
+		var age: float = trace["age"]
+		var artwork: EnemyDefinition = _enemy_art[trace["type_id"]]
+		var spin_sign: float = 1.0 if mirror_horizontal else -1.0
+		if bool(trace["out"]) and age < half:
+			var tower: Dictionary = {}
+			for candidate: Dictionary in combat_towers:
+				if int(candidate["id"]) == int(trace["tower_id"]):
+					tower = candidate
+					break
+			var geometry: Dictionary = _catapult_geometry(tower) if not tower.is_empty() else {}
+			var release: Vector2 = _catapult_cup(geometry, CATAPULT_FIRED) if not geometry.is_empty() else _tower_foot(trace["tower_cell"]) - Vector2(0, cell_size)
+			if age < CATAPULT_SWING_TIME and not geometry.is_empty():
+				# Riding the cup as the arm whips forward.
+				var angle: float = lerpf(CATAPULT_COCKED, CATAPULT_FIRED, pow(age / CATAPULT_SWING_TIME, 2.0))
+				_draw_flight_enemy(artwork, _catapult_cup(geometry, angle), deg_to_rad(angle) * -spin_sign, 0.8)
+			else:
+				var u: float = clampf((age - CATAPULT_SWING_TIME) / maxf(0.01, half - CATAPULT_SWING_TIME), 0.0, 1.0)
+				var exit := Vector2(size.x + cell_size * 1.5 if mirror_horizontal else -cell_size * 1.5, release.y - cell_size * 5.0)
+				for trail: int in range(1, 5):
+					var past: float = maxf(0.0, u - trail * 0.035)
+					var dust: Vector2 = _flight_arc(release, exit, past)
+					var pixel: float = maxf(2.0, roundf(cell_size * 0.03))
+					draw_rect(Rect2((dust - Vector2.ONE * pixel * 0.5).floor(), Vector2.ONE * pixel), Color(Color("e9dcc0"), 0.55 * (1.0 - trail / 5.0) * (1.0 - u)))
+				_draw_flight_enemy(artwork, _flight_arc(release, exit, u), age * 11.0 * spin_sign, 0.85 + 0.45 * u)
+		if not bool(trace["in"]):
+			continue
+		var landing: Vector2 = _position_center(trace["to"]) + Vector2(0, cell_size * 0.28)
+		if age >= half and age < _flight_duration:
+			var u: float = (age - half) / half
+			var entrance: Vector2 = cell_center(layout.entrance)
+			var side: float = 1.0 if entrance.x > landing.x + 0.5 else (-1.0 if entrance.x < landing.x - 0.5 else (1.0 if mirror_horizontal else -1.0))
+			var start: Vector2 = landing + Vector2(side * cell_size * 6.0, -cell_size * 7.0)
+			var position := Vector2(lerpf(start.x, landing.x, u), lerpf(start.y, landing.y - cell_size * 0.3, u * u))
+			draw_set_transform(landing, 0.0, Vector2(1.0, 0.32))
+			draw_circle(Vector2.ZERO, cell_size * (0.08 + 0.24 * u), Color(0.06, 0.10, 0.07, 0.38 * u))
+			draw_set_transform(Vector2.ZERO)
+			_draw_flight_enemy(artwork, position, age * 11.0 * -side, 1.3 - 0.3 * u)
+		elif age >= _flight_duration:
+			_draw_landing_dust(landing, (age - _flight_duration) / FLIGHT_DUST_TIME, int(trace["id"]))
+
+
+func _flight_arc(start: Vector2, end: Vector2, u: float) -> Vector2:
+	return Vector2(lerpf(start.x, end.x, u), start.y + (end.y - start.y) * (2.0 * u - u * u))
+
+
+func _draw_flight_enemy(artwork: EnemyDefinition, center: Vector2, rotation: float, scale: float) -> void:
+	var frame: Texture2D = EnemyVisuals.frame_texture(artwork)
+	if frame == null:
+		return
+	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, Vector2.ZERO, false)
+	rect.position -= rect.get_center()
+	draw_set_transform(center, rotation, Vector2.ONE * scale)
+	draw_texture_rect(frame, rect, false)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_landing_dust(foot: Vector2, t: float, seed_value: int) -> void:
+	var cell_size: float = _cell_size()
+	var fade: float = 1.0 - t
+	draw_set_transform(foot, 0.0, Vector2(1.0, 0.34))
+	draw_circle(Vector2.ZERO, cell_size * (0.2 + 0.4 * t), Color(Color("8a7a62"), 0.35 * fade))
+	draw_arc(Vector2.ZERO, cell_size * (0.15 + 0.55 * t), 0.0, TAU, 28, Color(Color("e9dcc0"), 0.8 * fade), maxf(2.0, cell_size * 0.06 * fade), false)
+	draw_set_transform(Vector2.ZERO)
+	var pixel: float = maxf(3.0, roundf(cell_size * 0.05))
+	for index: int in range(12):
+		var angle: float = float(index) * TAU / 12.0 + float(seed_value % 7) * 0.4
+		var reach: float = cell_size * (0.12 + 0.5 * sqrt(t))
+		var lift: float = sin(t * PI) * cell_size * (0.18 + 0.06 * (index % 3))
+		var puff: Vector2 = foot + Vector2(cos(angle) * reach, sin(angle) * reach * 0.34 - lift)
+		var color: Color = Color("cdb894") if index % 3 else Color("8a7a62")
+		draw_rect(Rect2((puff - Vector2.ONE * pixel * 0.5).floor(), Vector2.ONE * pixel * (1.0 if index % 2 else 1.5)), Color(color, 0.85 * fade))
+	if t < 0.18:
+		for index: int in range(4):
+			var direction := Vector2.from_angle(-PI * 0.15 - float(index) * PI * 0.23)
+			draw_line(foot + direction * cell_size * 0.12, foot + direction * cell_size * (0.3 + t), Color(1, 1, 1, 0.8 * (1.0 - t / 0.18)), 2.0)
+
+
+# Thrown enemies stay dazed: two stars circle their heads.
+func _draw_dizzy_stars(enemy: Dictionary, center: Vector2) -> void:
+	var cell_size: float = _cell_size()
+	var radius: float = maxf(2.5, cell_size * 0.05)
+	var spin: float = float(enemy.get("age", 0.0)) * 3.2 + float(int(enemy["id"]) % 5)
+	for index: int in range(2):
+		var angle: float = spin + float(index) * PI
+		var point: Vector2 = center + Vector2(cos(angle) * cell_size * 0.16, sin(angle) * cell_size * 0.05)
+		draw_set_transform(point.round(), 0.0, Vector2.ONE * radius)
+		draw_colored_polygon(_stun_star_shape, Color("f5e08a"))
+		draw_set_transform(Vector2.ZERO)
+
+
 # Above-sprite effects: Crystal Mine crystals and every branch finale.
 func _draw_tower_overlay(tower: Dictionary, foot: Vector2, artwork: TowerReward, rect: Rect2) -> void:
 	var cell_size: float = _cell_size()
@@ -1330,7 +1579,8 @@ func _draw_tower_overlay(tower: Dictionary, foot: Vector2, artwork: TowerReward,
 	var top := Vector2(foot.x, rect.position.y + absf(rect.size.y) * 0.12)
 	if artwork.icon_texture != null and _texture_bounds.has(artwork.icon_texture) and artwork.directional_weapon_textures.is_empty():
 		top.y = rect.position.y + _texture_bounds[artwork.icon_texture].position.y * absf(rect.size.y) / artwork.icon_texture.get_height()
-	if tower["type_id"] == &"lightning":
+	# The drag ghost (negative ID) is a static preview without idle crackle.
+	if tower["type_id"] == &"lightning" and int(tower.get("id", -1)) >= 0:
 		_draw_tesla_sparks(tower, rect)
 	if not finale:
 		return
@@ -1418,7 +1668,7 @@ func _draw_tesla_sparks(tower: Dictionary, rect: Rect2) -> void:
 
 # Endgame sparks spiralling up from the tower, coloured by branch.
 func _draw_rising_motes(tower: Dictionary, foot: Vector2, top: Vector2) -> void:
-	var colors: Dictionary = {"boulders": Color("ffb347"), "onyx_ring": Color("d9c8ff"), "storm_sigil": STORM_COLOR, "void_monolith": Color("c79bff"), "bounce": MAGIC_CORE, "pierce": Color("ffcf7a"), "crystal_mine": SHARD_COLOR}
+	var colors: Dictionary = {"boulders": Color("ffb347"), "onyx_ring": Color("d9c8ff"), "storm_sigil": STORM_COLOR, "void_monolith": Color("c79bff"), "bounce": MAGIC_CORE, "pierce": Color("ffcf7a"), "crystal_mine": SHARD_COLOR, "siege_arm": Color("ff9a3a"), "long_toss": Color("b6e37a")}
 	var color: Color = colors.get(tower.get("evolution", ""), MAGIC_CORE)
 	var pixel: float = maxf(2.0, roundf(_cell_size() * 0.025))
 	for index: int in range(10):
@@ -1691,6 +1941,8 @@ func _draw_enemy(item: Dictionary) -> void:
 		var phase: int = int(float(enemy.get("age", 0.0)) * 10.0) + int(enemy["id"])
 		_draw_pixel_flame(item["foot"] + Vector2(-pixel * 3.0, -_cell_size() * artwork.board_height * 0.30), pixel, phase)
 		_draw_pixel_flame(item["foot"] + Vector2(pixel * 3.0, -_cell_size() * artwork.board_height * 0.48), pixel, phase + 2)
+	if bool(enemy.get("launched", false)):
+		_draw_dizzy_stars(enemy, item["foot"] - Vector2(0.0, _cell_size() * artwork.board_height * 0.92))
 
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
@@ -2410,7 +2662,7 @@ func _tower_stun_center(tower: Dictionary, foot: Vector2) -> Vector2:
 	if artwork == null or artwork.icon_texture == null:
 		return foot - Vector2(0.0, cell_size * 1.15)
 	var variant: Dictionary = _tower_variant(tower, artwork)
-	var texture: Texture2D = variant.get("texture", artwork.icon_texture)
+	var texture: Texture2D = variant.get("texture", artwork.icon_texture) if artwork.catapult_arm_texture == null else artwork.icon_texture
 	var rect: Rect2 = _sprite_rect(texture, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), foot)
 	var scale: float = rect.size.y / texture.get_height()
 	var top: float = rect.position.y + _texture_bounds[texture].position.y * scale
