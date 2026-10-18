@@ -342,7 +342,7 @@ func _capture_shots() -> void:
 	for tower: Dictionary in combat_towers:
 		var definition: Dictionary = tower_types.get(tower["type_id"], {})
 		var boulders: bool = tower.get("evolution", "") == "boulders"
-		_has_boulders = _has_boulders or boulders or tower.get("evolution", "") in RUNE_ORBITERS or _has_finale(tower) or tower.get("behavior_kind", "") == "crystal"
+		_has_boulders = _has_boulders or boulders or tower.get("evolution", "") in RUNE_ORBITERS or _has_finale(tower) or tower.get("behavior_kind", "") == "crystal" or tower["type_id"] == &"lightning"
 		var advancement: Dictionary = _archer_advancement(tower, definition)
 		var weapon: String = advancement.get("weapon", "arrow")
 		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0 or weapon == "minigun" or not tower.get("magic_bounce", {}).is_empty()
@@ -1170,7 +1170,8 @@ func _draw_combat() -> void:
 			0:
 				var texture: Texture2D = _portal_texture if item["cell"] == layout.entrance else _crystal_texture
 				var anchor := Vector2(0.5, 0.9609375) if item["cell"] == layout.entrance else Vector2(0.50390625, 0.9296875)
-				if item["cell"] == layout.entrance and mirror_horizontal:
+				# Source portal opens left; normal-board enemies emerge to the right.
+				if item["cell"] == layout.entrance and not mirror_horizontal:
 					draw_set_transform(item["foot"], 0.0, Vector2(-1.0, 1.0))
 					draw_texture_rect(texture, _sprite_rect(texture, 1.05, anchor, Vector2.ZERO), false)
 					draw_set_transform(Vector2.ZERO)
@@ -1329,6 +1330,8 @@ func _draw_tower_overlay(tower: Dictionary, foot: Vector2, artwork: TowerReward,
 	var top := Vector2(foot.x, rect.position.y + absf(rect.size.y) * 0.12)
 	if artwork.icon_texture != null and _texture_bounds.has(artwork.icon_texture) and artwork.directional_weapon_textures.is_empty():
 		top.y = rect.position.y + _texture_bounds[artwork.icon_texture].position.y * absf(rect.size.y) / artwork.icon_texture.get_height()
+	if tower["type_id"] == &"lightning":
+		_draw_tesla_sparks(tower, rect)
 	if not finale:
 		return
 	var pulse: float = 0.5 + 0.5 * sin(_boulder_phase * 2.0)
@@ -1374,6 +1377,43 @@ func _draw_tower_overlay(tower: Dictionary, foot: Vector2, artwork: TowerReward,
 		"bounce":
 			_draw_sumggm(tower, artwork, rect)
 	_draw_rising_motes(tower, foot, top)
+
+
+# Tesla coil: crackling pixel sparks and a flickering arc between the prongs,
+# a little livelier with every purchased tier. The sprite itself is unchanged.
+func _draw_tesla_sparks(tower: Dictionary, rect: Rect2) -> void:
+	var cell_size: float = _cell_size()
+	var tier: int = int(bool(tower.get("damage_upgraded", false))) + int(bool(tower.get("speed_upgraded", false))) + int(bool(tower.get("special_upgraded", false))) + int(not String(tower.get("evolution", "")).is_empty())
+	# Prong tips on the shipped sprites; Longer Reach arcs across its outer coils.
+	var reach_art: bool = tower.get("evolution", "") == "longer_reach"
+	var left: Vector2 = rect.position + (Vector2(0.18, 0.13) if reach_art else Vector2(0.29, 0.11)) * rect.size
+	var right: Vector2 = rect.position + (Vector2(0.57, 0.13) if reach_art else Vector2(0.44, 0.11)) * rect.size
+	var center: Vector2 = (left + right) * 0.5 + Vector2(0, -cell_size * 0.03)
+	var pixel: float = maxf(2.0, roundf(cell_size * 0.03))
+	var seed_value: int = int(tower["id"]) * 7
+	var beat: int = int(_boulder_phase * 9.0) + seed_value
+	if tier >= 4:
+		draw_circle(center, cell_size * (0.12 + 0.02 * sin(_boulder_phase * 5.0)), Color(STORM_COLOR, 0.14))
+	for tip: Vector2 in [left, right]:
+		draw_circle(tip, cell_size * (0.035 + 0.01 * tier) * (0.8 + 0.2 * sin(_boulder_phase * 7.0 + tip.x)), Color(STORM_COLOR, 0.3))
+	if posmod(beat, 5) < 1 + tier:
+		_draw_zigzag(left, right, Color(STORM_COLOR, 0.55 + 0.1 * tier), 1.0 + 0.25 * tier, beat)
+	for index: int in range(4 + tier * 2):
+		var raw: float = _boulder_phase * (0.9 + 0.1 * tier) + float(index) * 0.618 + float(seed_value) * 0.013
+		var life: float = raw - floorf(raw)
+		var cycle: int = int(floorf(raw))
+		var random: float = fposmod(sin(float(cycle) * 12.9898 + float(index) * 78.233) * 43758.5453, 1.0)
+		var origin: Vector2 = left if index % 2 == 0 else right
+		var angle: float = -PI * (0.1 + 0.8 * random)
+		var reach: float = cell_size * (0.05 + (0.16 + 0.04 * tier) * life)
+		var position: Vector2 = origin + Vector2(cos(angle), sin(angle)) * reach + Vector2(0, cell_size * 0.04 * life * life)
+		var color: Color = Color("f4fdff").lerp(STORM_COLOR, life)
+		draw_rect(Rect2((position - Vector2.ONE * pixel * 0.5).floor(), Vector2.ONE * pixel), Color(color, (1.0 - life) * 0.95))
+	if tier >= 2 and posmod(beat, 7) == 0:
+		var side: Vector2 = left if posmod(beat, 2) == 0 else right
+		var flick: float = fposmod(sin(float(beat) * 3.17) * 917.3, 1.0)
+		var away: Vector2 = Vector2(-1.0 if side == left else 1.0, -0.3 - flick).normalized() * cell_size * (0.14 + 0.05 * tier)
+		_draw_zigzag(side, side + away, Color(STORM_COLOR, 0.8), 1.0, beat)
 
 
 # Endgame sparks spiralling up from the tower, coloured by branch.

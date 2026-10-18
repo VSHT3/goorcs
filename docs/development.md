@@ -93,6 +93,12 @@ The recorded recap and post-loss read-only tower inspection passed their isolate
 
 A **4.67-second actual-main-scene graphical walkthrough**, using Compatibility/OpenGL on Apple M2 with dummy audio, passed native scrolling/keyboard focus, both desktop widths, real defeat, retained sold-tower ranking, boss reward history, final Mine/Arrow inspection without mutations, Escape precedence, and fresh replay. Its captures were inspected. Native-audio runs completed the scenario but retained audio playback resources at shutdown; dummy-audio visual proof does not establish physical audio teardown. Detailed accounting rules and limits live in [match results](match-results.md#recorded-recap). Isolated saves and throwaway scripts were removed afterward.
 
+### Portal facing
+
+The portal source artwork opens left. Normal boards flip it to open right; mirrored boards retain the source facing, so both entrances open along enemy travel into the board. Crystal artwork, endpoint anchors, and gameplay coordinates are unchanged. `path_board_test.gd` checks the rendered red aperture's horizontal position relative to its footing on both orientations.
+
+The focused rendered portal regression passed under isolated X11/Mesa llvmpipe, and actual-main-scene Sandbox captures were inspected with normal and mirrored boards. The broader rendered board suite passed the portal assertions but failed two Lightning drag-preview silhouette comparisons (one per orientation); that suite is not claimed green. Logs and captures: `.verify-logs/portal-facing-1f3e25b8/`. This does not establish native-GPU behavior or performance.
+
 ### Six-role gameplay verification
 
 The loadout/roll/roster expansion now implements all six identities and the agreed mechanics, with final Lightning naming/additional evolution choices still undecided. [Content authoring](content-pipeline.md#six-role-schemas-and-evolution-data) owns exact role schemas, rarity profiles/pools/bounds, branch art, Shard drops, effective-stat/evolution composition, quadratic reroll pricing, and payout rounding. These are **authored provisional resources**, not creator-approved final balance. [The gameplay roadmap](../TODO.md#gameplay-roadmap--loadouts-tower-rolls-and-roster-expansion) distinguishes delivered behavior from the two remaining design/visual boundaries.
