@@ -175,7 +175,7 @@ FAMILIES = {
     "machine_jump": (746322, 0.680, 0.35, -5.0, 2, "compressed spring release and heavy lifting air rush"),
     "machine_door": (747331, 0.570, 0.30, -6.0, 2, "heavy hinged timber doors opening with iron latch clanks"),
     "sale": (741277, 0.310, 0.23, 0.0, 1, "three bright falling coin contacts into a muted cash drawer"),
-    "rarity_tick": (748340, 0.065, 0.18, -5.0, 1, "short dry ratchet tooth with a muted metallic edge for reel crossings"),
+    "rarity_tick": (748340, 0.115, 0.28, -5.0, 1, "loaded hardwood ratchet release, rounded body, crisp brass snap and quiet spring rebound"),
     "rarity_reveal": (749349, 0.850, 0.28, -3.0, 1, "latch landing followed by a rising resonant crystal chord"),
 }
 
@@ -312,8 +312,11 @@ def recipe(kind: str, variant: int, duration: float, seed: int) -> Sound:
             s.modes(at, 0.180, 0.31, (294 * tuning, 677, 1397), 0.033, 0.56)
             s.noise(at, 0.035, 0.55, 570, 4200, 0.007)
     elif kind == "rarity_tick":
-        s.noise(0.001, 0.025, 0.70, 700, 4700, 0.004)
-        s.modes(0.001, 0.055, 0.30, (610, 1370, 2410), 0.009, 0.45)
+        s.noise(0.001, 0.018, 0.42, 1100, 6200, 0.003)
+        s.modes(0.001, 0.095, 0.68, (235, 482, 1090), 0.018, 0.48)
+        s.modes(0.002, 0.050, 0.18, (1730, 3120), 0.007, 0.34)
+        s.noise(0.017, 0.024, 0.16, 280, 2100, 0.006)
+        s.modes(0.021, 0.065, 0.12, (390, 865), 0.012, 0.40)
     elif kind == "rarity_reveal":
         s.noise(0.002, 0.060, 0.55, 180, 2400, 0.012)
         s.modes(0.002, 0.240, 0.40, (164, 337, 691), 0.055, 0.50)

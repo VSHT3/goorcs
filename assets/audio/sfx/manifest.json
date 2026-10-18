@@ -616,14 +616,14 @@
       "family": "rarity_tick",
       "variant": 1,
       "seed": 748340,
-      "duration_seconds": 0.065,
-      "measured_peak_dbfs": -14.895,
-      "measured_rms_dbfs": -35.183,
-      "mean_pcm_lsb": -0.00321,
-      "authored_peak_linear": 0.18,
+      "duration_seconds": 0.115,
+      "measured_peak_dbfs": -11.058,
+      "measured_rms_dbfs": -26.545,
+      "mean_pcm_lsb": -0.00217,
+      "authored_peak_linear": 0.28,
       "recommended_gain_db": -5.0,
-      "recipe": "short dry ratchet tooth with a muted metallic edge for reel crossings",
-      "sha256": "69c44e03def8d14befc8f404b83a82771f598388ceb6119b38f9b38af03a4f18"
+      "recipe": "loaded hardwood ratchet release, rounded body, crisp brass snap and quiet spring rebound",
+      "sha256": "6d15d3b009c9a971463c80ae7b628416a1ec149490720697bae92e0f9826fe0e"
     },
     {
       "file": "rarity_reveal_01.wav",

@@ -8,11 +8,15 @@ const TICK: AudioStream = preload("res://assets/audio/sfx/rarity_tick_01.wav")
 const REVEAL: AudioStream = preload("res://assets/audio/sfx/rarity_reveal_01.wav")
 const MENU_THEME: Theme = preload("res://resources/ui/menu_theme.tres")
 const RARITIES: PackedStringArray = ["broken", "shoddy", "common", "uncommon", "rare", "epic", "legendary", "mythic"]
-const SPIN_SECONDS: float = 4.1
+const ACCEL_SECONDS: float = 1.15
+const CRUISE_SECONDS: float = 1.35
+const BRAKE_SECONDS: float = 4.0
+const SPIN_SECONDS: float = ACCEL_SECONDS + CRUISE_SECONDS + BRAKE_SECONDS
 const REVEAL_SECONDS: float = 2.8
-const CARD_COUNT: int = 38
-const WINNER_INDEX: int = 32
+const CARD_COUNT: int = 141
+const WINNER_INDEX: int = 135
 const START_POSITION: float = 3.15
+const LANDING_RADIUS: int = 5
 const FRAME := Color("425744")
 const ACCENT := Color("bad98f")
 
@@ -20,6 +24,8 @@ var _rng := RandomNumberGenerator.new()
 var _busy: bool = false
 var _elapsed: float = 0.0
 var _last_crossing: int = 0
+var _landing_position: float = float(WINNER_INDEX)
+var _peak_speed: float = 0.0
 var _revealed: bool = false
 var _winner_rank: int = 0
 var _winner_name: String = ""
@@ -36,7 +42,7 @@ var _reveal: AudioStreamPlayer
 
 class ReelStrip extends Control:
 	const CARD_WIDTH: float = 136.0
-	const STRIDE: float = 148.0
+	const STRIDE: float = CARD_WIDTH
 	const CARD_HEIGHT: float = 184.0
 	const FONT: Font = preload("res://assets/fonts/PixelifySans.ttf")
 	const MARKER := Color("e0bc77")
@@ -51,7 +57,28 @@ class ReelStrip extends Control:
 	var winner_index: int = -1
 	var reveal: float = 0.0
 	var _top_marker := PackedVector2Array()
-	var _bottom_marker := PackedVector2Array()
+	var flap_angle: float = 0.0
+	var flap_velocity: float = 0.0
+
+	func release_contact() -> void:
+		# Release stored spring deflection; don't inject an unrelated full flip.
+		flap_velocity = minf(flap_velocity, 0.0)
+
+	func advance_flap(delta: float) -> void:
+		# Small spring steps stay stable even when the rendered frame is delayed.
+		var remaining: float = minf(delta, 0.1)
+		while remaining > 0.0:
+			var step: float = minf(remaining, 1.0 / 120.0)
+			var edge_phase: float = scroll_position + 0.5 - floorf(scroll_position + 0.5)
+			var contact: float = clampf((edge_phase - 0.82) / 0.18, 0.0, 1.0)
+			var pressed_angle: float = contact * 0.62
+			flap_velocity += (-640.0 * flap_angle - 19.0 * flap_velocity) * step
+			flap_angle += flap_velocity * step
+			# A passing tooth is solid: the pointer cannot spring through it.
+			if flap_angle < pressed_angle:
+				flap_angle = pressed_angle
+				flap_velocity = maxf(0.0, flap_velocity)
+			remaining -= step
 
 	func _ready() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -68,9 +95,7 @@ class ReelStrip extends Control:
 			artwork_bounds = Rect2(image.get_used_rect()) if image != null else Rect2(Vector2.ZERO, artwork.get_size())
 
 	func _layout_markers() -> void:
-		var center: float = floorf(size.x * 0.5)
-		_top_marker = PackedVector2Array([Vector2(center - 7.0, 0.0), Vector2(center + 7.0, 0.0), Vector2(center, 10.0)])
-		_bottom_marker = PackedVector2Array([Vector2(center - 7.0, size.y), Vector2(center + 7.0, size.y), Vector2(center, size.y - 10.0)])
+		_top_marker = PackedVector2Array([Vector2(-6, 0), Vector2(6, 0), Vector2(4, 8), Vector2(0, 17), Vector2(-4, 8)])
 		queue_redraw()
 
 	func _draw() -> void:
@@ -105,11 +130,11 @@ class ReelStrip extends Control:
 					draw_rect(card.grow(2.0), highlight, false, 2.0)
 				else:
 					draw_rect(card, Color(0.025, 0.045, 0.035, reveal * 0.60))
-		# These stay fixed while the strip moves beneath them.
-		draw_line(Vector2(center, 10.0), Vector2(center, 15.0), MARKER, 2.0)
-		draw_line(Vector2(center, size.y - 15.0), Vector2(center, size.y - 10.0), MARKER, 2.0)
+		# The top flapper catches shared card edges, resting freely over card centers.
+		draw_set_transform(Vector2(center, 1.0), flap_angle)
 		draw_colored_polygon(_top_marker, MARKER)
-		draw_colored_polygon(_bottom_marker, MARKER)
+		draw_circle(Vector2.ZERO, 2.5, Color("f5dca5"))
+		draw_set_transform(Vector2.ZERO)
 		# Quiet end masks reinforce the clipped horizontal window without a shader.
 		for step: int in range(6):
 			var shade := Color(0.051, 0.090, 0.075, float(6 - step) * 0.12)
@@ -173,7 +198,10 @@ func present(tower: Dictionary, artwork: Texture2D) -> void:
 	for index: int in range(CARD_COUNT):
 		_strip.rarities[index] = _rng.randi_range(0, RARITIES.size() - 1)
 	_strip.rarities[WINNER_INDEX] = _winner_rank
-	# Stage a cosmetic near-miss, never alter the accepted winning card.
+	# Clear every potentially visible landing neighbor before staging one near-miss.
+	for index: int in range(WINNER_INDEX - LANDING_RADIUS, WINNER_INDEX + LANDING_RADIUS + 1):
+		if index != WINNER_INDEX:
+			_strip.rarities[index] = _rng.randi_range(0, mini(_winner_rank, RARITIES.find("rare")))
 	if _winner_rank < RARITIES.size() - 1:
 		var offset: int = _rng.randi_range(1, 2)
 		if _rng.randi_range(0, 1) == 0:
@@ -183,6 +211,11 @@ func present(tower: Dictionary, artwork: Texture2D) -> void:
 	_strip.winner_index = WINNER_INDEX
 	_strip.scroll_position = START_POSITION
 	_strip.reveal = 0.0
+	_strip.flap_angle = 0.0
+	_strip.flap_velocity = 0.0
+	# Keep the accepted result inside its card; the pointer rests over its face.
+	_landing_position = float(WINNER_INDEX) + _rng.randf_range(-0.14, 0.14)
+	_peak_speed = (_landing_position - START_POSITION) / (ACCEL_SECONDS * 0.5 + CRUISE_SECONDS + BRAKE_SECONDS / 5.0)
 	_elapsed = 0.0
 	_revealed = false
 	_last_crossing = floori(START_POSITION + 0.5)
@@ -226,23 +259,56 @@ func cancel() -> void:
 func _process(delta: float) -> void:
 	_elapsed += delta
 	if not _revealed:
-		var progress: float = minf(_elapsed / SPIN_SECONDS, 1.0)
-		# Quartic ease-out gives long travel, then individually audible final crossings.
-		var remaining: float = 1.0 - progress
-		_strip.scroll_position = lerpf(START_POSITION, float(WINNER_INDEX), 1.0 - remaining * remaining * remaining * remaining)
+		var previous_position: float = _strip.scroll_position
+		var travel: float = _spin_position(_elapsed)
+		# Tooth resistance eases through each release point, most visible at low speed.
+		_strip.scroll_position = travel + 0.12 * sin(TAU * travel)
 		var crossing: int = floori(_strip.scroll_position + 0.5)
 		if crossing != _last_crossing:
 			_last_crossing = crossing
-			_tick.pitch_scale = lerpf(1.18, 0.86, progress)
-			_tick.volume_db = -12.0
+			var cards_per_second: float = (_strip.scroll_position - previous_position) / maxf(delta, 0.0001)
+			_tick.pitch_scale = lerpf(0.92, 1.08, clampf(cards_per_second / _peak_speed, 0.0, 1.0))
+			_tick.volume_db = lerpf(-5.0, -11.0, clampf(cards_per_second / 10.0, 0.0, 1.0))
 			_tick.play()
-		if progress >= 1.0:
+			_strip.release_contact()
+		if _elapsed >= SPIN_SECONDS:
 			_begin_reveal()
 	else:
 		_strip.reveal = minf((_elapsed - SPIN_SECONDS) / 0.45, 1.0)
 		if _elapsed >= SPIN_SECONDS + REVEAL_SECONDS:
 			cancel()
 			return
+	_strip.advance_flap(delta)
+	_strip.queue_redraw()
+	queue_redraw()
+
+
+func _spin_position(elapsed: float) -> float:
+	if elapsed >= SPIN_SECONDS:
+		return _landing_position
+	if elapsed < ACCEL_SECONDS:
+		var progress: float = elapsed / ACCEL_SECONDS
+		var ramp_area: float = progress * progress * progress * (1.0 - progress * 0.5)
+		return START_POSITION + _peak_speed * ACCEL_SECONDS * ramp_area
+	var cruise_start: float = START_POSITION + _peak_speed * ACCEL_SECONDS * 0.5
+	if elapsed < ACCEL_SECONDS + CRUISE_SECONDS:
+		return cruise_start + _peak_speed * (elapsed - ACCEL_SECONDS)
+	var progress: float = clampf((elapsed - ACCEL_SECONDS - CRUISE_SECONDS) / BRAKE_SECONDS, 0.0, 1.0)
+	var remaining: float = 1.0 - progress
+	# Fast early braking leaves time for distinct, progressively slower final teeth.
+	return _landing_position - _peak_speed * BRAKE_SECONDS * remaining * remaining * remaining * remaining * remaining / 5.0
+
+
+func _skip_to_result() -> void:
+	if _revealed:
+		cancel()
+		return
+	_tick.stop()
+	_strip.flap_angle = 0.0
+	_strip.flap_velocity = 0.0
+	_begin_reveal()
+	_elapsed = SPIN_SECONDS + 0.45
+	_strip.reveal = 1.0
 	_strip.queue_redraw()
 	queue_redraw()
 
@@ -251,8 +317,7 @@ func _begin_reveal() -> void:
 	_revealed = true
 	# Start the readable hold at the actual reveal, even after a delayed frame.
 	_elapsed = SPIN_SECONDS
-	_strip.scroll_position = float(WINNER_INDEX)
-	_tick.stop()
+	_strip.scroll_position = _landing_position + 0.12 * sin(TAU * _landing_position)
 	_reveal.pitch_scale = 0.92 + float(_winner_rank) * 0.035
 	_reveal.volume_db = -8.0 + float(_winner_rank) * 0.35
 	_reveal.play()
@@ -269,15 +334,22 @@ func _input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 	if event is InputEventKey:
 		if event.pressed and not event.echo:
-			if event.keycode in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+			if event.keycode == KEY_ESCAPE:
 				cancel()
+			elif event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+				_skip_to_result()
 			else:
 				_close.grab_focus()
 	elif event is InputEventMouseButton:
-		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT and _close.get_global_rect().has_point(event.position):
-			_close.pressed.emit()
-	elif event.is_action_pressed(&"ui_cancel") or event.is_action_pressed(&"ui_accept"):
+		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			if _close.get_global_rect().has_point(event.position):
+				cancel()
+			else:
+				_skip_to_result()
+	elif event.is_action_pressed(&"ui_cancel"):
 		cancel()
+	elif event.is_action_pressed(&"ui_accept"):
+		_skip_to_result()
 
 
 func _gui_input(_event: InputEvent) -> void:
