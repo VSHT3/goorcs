@@ -136,7 +136,7 @@ Menu action activation uses a short, muted wood/metal clack; hovering, moving ke
 - [Game brief (PDF)](docs/goorcs-brief.pdf): a three-page introduction for friends, with [editable source](docs/goorcs-brief.typ).
 - [Agent instructions](AGENTS.md): required reading, editing rules, state ownership, and completion criteria.
 - [Game direction](docs/game-direction.md): intended experience, technical decisions, and first playable milestone.
-- [Visual TODO](TODO.md): implemented presentation pass, real gameplay captures, shared actual-size lineup, and pending sprite-replacement approval.
+- [Visual and gameplay TODO](TODO.md): remaining sprite-consistency/approval work, Lightning design decisions, battlefield visual acceptance, and supporting references.
 - [Development workflow](docs/development.md): setup, verification, and optional MCP tooling.
 - [Enemy roster and sandbox](docs/enemy-roster.md): grouped spawns, abilities, staged sends, animated presentation, lifetime statistics, and testing controls.
 - [Content pipeline](docs/content-pipeline.md): six tower roles/branches, loadout authority, rarity profiles, reroll curves, Shard drops, support and economy resource mechanics.
