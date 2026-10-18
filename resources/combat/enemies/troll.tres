@@ -7,7 +7,7 @@
 [resource]
 script = ExtResource("1_enemy")
 id = &"troll"
-title = "Troll"
+title = "Trollorc"
 description = "A hulking club-wielding brute. Its heavy steps crush nearby enemies; its club leaves towers seeing stars."
 ; Provisional late-game encounter tuning; nonphysical damage is the intended counter.
 health_multiplier = 180.0

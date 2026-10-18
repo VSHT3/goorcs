@@ -15,8 +15,8 @@ Health and movement use the existing wave-scaled baseline in `CombatRules`: each
 | Orc Chief | 6 | 0.5 | 5 | 22 | 34 | 12 | 25% | 100 / +5 |
 | NecOrcmancer | 5 | 0.5 | 3 | 34 | 46 | 15 | 25% | 140 / +6 |
 | NecOrcmancer Mancer | 30 | 0.3 | 8 | 40, then occasional | Never | 40 | 50% | — |
-| Troll | 180 | 0.09 | 10 | 60, then occasional | Never | 60 | 65% | — |
-| Orc King War Machine | 450 | 0.07 | 10 | 100, then occasional | Never | 100 | 75% | — |
+| Trollorc | 180 | 0.09 | 10 | 60, then occasional | Never | 60 | 65% | — |
+| Orc king war orchine | 450 | 0.07 | 10 | 100, then occasional | Never | 100 | 75% | — |
 | SkeleOrc | 0.5 | 1.05 | 1 | Summoned only | Not purchasable | Not in regular roster | — | — |
 
 The first five rounds allow only Orcling sends. Each later send unlock trails the next regular threat tier; the final NecOrcmancer send unlock is deliberately delayed until round 46, as chosen by the creator. UI previews and command validation use the same accepted gate. Earlier-round debug jumps relock later sends. SkeleOrcs remain available directly in sandbox.
@@ -27,7 +27,7 @@ Chiefs begin at one regular selection per wave; the cap grows by one every ten w
 
 NecOrcmancers begin at one regular selection per wave; the cap grows by one every twelve waves after introduction. Every seven simulation seconds the caster stops for a 1.15-second staff-raising ritual, then raises two to four SkeleOrcs, limited to six living children per caster. Children inherit the caster's captured route and current progress instead of returning to the portal. A dead/leaked caster cannot finish its ritual. Living children still have to clear before the wave ends. SkeleOrcs have no kill bounty, preventing summon farming. Freeze slows movement, not the simulation ability clock; casting is stationary even while a slow expires. Two-times playback accelerates all of these simulation clocks consistently.
 
-**NecOrcmancer Mancer** (`necorcmancer_mancer`) is a separate boss, never a paid send. One is guaranteed on round 40: its 40 weight is reserved before ordinary selections from that round's 84-weight budget. Later waves roll once for an encounter, starting at 5% on round 41 and gaining 0.5 percentage points per round, capped at 25% from round 81 onward. At most one boss appears per wave, still respecting budget/share limits. These encounter odds and combat values are provisional tuning.
+**NecOrcmancer Mancer** (`necorcmancer_mancer`) is a separate boss, never a paid send. One is guaranteed on round 40: its 40 weight is reserved before ordinary selections from that round's 84-weight budget. Later waves roll once for an encounter, starting at 5% on round 41 and gaining 0.5 percentage points per round, capped at 25% from round 81 onward. At most one of this type appears per wave, still respecting budget/share limits; it may coexist with both other boss types later. These encounter odds and combat values are provisional tuning.
 
 The boss uses the same seven-second / 1.15-second ritual, but raises **two to four ordinary NecOrcmancers**, capped at six living direct children. Those NecOrcmancers retain their own stats, bounty, and SkeleOrc rituals; newborn casters start their clocks at birth and cannot cascade a cast immediately. Every generation inherits its parent's captured route/current progress, and all descendants must clear before the wave ends. Catalog validation permits acyclic summon chains and rejects self/indirect cycles. The boss pays 40 Coins when killed; SkeleOrcs retain zero normal Coin bounty.
 
@@ -35,40 +35,26 @@ The boss uses the same seven-second / 1.15-second ritual, but raises **two to fo
 
 All boss identities are barred from paid sends by the host, independently of their authored send flag. Each type reserves at most one encounter at its guaranteed debut, then rolls its own occasional later encounter; total weight/share rules still apply. Both new bosses are available directly in Sandbox and have debut-scaled Orcieary entries. Numeric balance below is provisional until real friend playtests.
 
-| Mechanic | Troll | Orc King War Machine |
+| Mechanic | Trollorc | Orc king war orchine |
 | --- | ---: | ---: |
 | Debut HP | 12,060 at round 60 | 48,150 at round 100 |
 | Later encounter chance | 4% + 0.3 percentage points/round, capped at 18% | 2.5% + 0.2 percentage points/round, capped at 12% |
 | Tower attack interval | 25 simulation seconds | 12 simulation seconds |
-| Attack reach | 2.4 cells | 4.5 cells |
+| Attack targeting | Nearest within 2.4 cells | Two distinct random towers anywhere on its board |
 | Wind-up | 1.25 seconds | 1.4 seconds |
 | Tower stun | 30 seconds | 8 seconds |
 | Kill Coins / guaranteed Shards | 100 / 8 | 250 / 16 |
 
-**Troll:** a huge, very slow club bearer. Plain physical damage remains normal; magic, fire, lightning, explosions, and ice deal **1.5×** damage. Direct hits compose that multiplier once with bounty vulnerability; continuous damage/burn apply it before whole-HP accumulation, never by rounding every small tick. Fire-arrow shafts remain physical while their burns are fire; unenhanced Boulders are physical, Freeze Boulders use the ice damage category, and Onyx is magic. Existing SkeleOrc immunity behavior is unchanged: ice immunity blocks slow, not Boulders' HP damage; fire immunity blocks burns/Flamethrower rather than retroactively removing projectile impact.
+**Trollorc** (`troll`): a huge, very slow club bearer. Plain physical damage remains normal; magic, fire, lightning, explosions, and ice deal **1.5×** damage. Direct hits compose that multiplier once with bounty vulnerability; continuous damage/burn apply it before whole-HP accumulation, never by rounding every small tick. Fire-arrow shafts remain physical while their burns are fire; unenhanced Boulders are physical, Freeze Boulders use the ice damage category, and Onyx is magic. Existing SkeleOrc immunity behavior is unchanged: ice immunity blocks slow, not Boulders' HP damage; fire immunity blocks burns/Flamethrower rather than retroactively removing projectile impact.
 
-While walking, each heavy step every **2.4 simulation seconds** damages **other living enemies within a circular 1.1-cell radius** for **8% of their maximum HP**. These collateral deaths grant no tower kills, Coins, Shards, or player lifetime kills. The Troll periodically winds up and slams the nearest in-range tower; ties are stable, the attack is cancelled by death/leak, and a completed hit shows orbiting cartoon stars. A single tower can remain locked down by repeated club swings, so spread defenses rather than relying on one firing position.
+While walking, each heavy step every **2.4 simulation seconds** damages **other living enemies within a circular 1.1-cell radius** for **8% of their maximum HP**. These collateral deaths grant no tower kills, Coins, Shards, or player lifetime kills. Trollorc periodically winds up and slams the nearest in-range tower; ties are stable, the attack is cancelled by death/leak, and a completed hit shows orbiting cartoon stars. A single tower can remain locked down by repeated club swings, so spread defenses rather than relying on one firing position.
 
-**Orc King War Machine:** a crewed timber/iron siege engine with a crowned king, multiple cannons, and rear troop doors. It heads directly from portal to base instead of following the maze. Road uses wheels at full authored speed; grass deploys mechanical legs at **45%** of road speed. It stops before a blocking tower, charges for **2.5 seconds**, then takes **1.5 seconds** to jump to the nearest available forward cell. Landings are revalidated against new construction; no available landing means waiting, never destroying a tower, overlapping it, or leaving the board. Cannon wind-ups stun the nearest in-range tower.
+**Orc king war orchine** (`orc_war_machine`): a crewed timber/iron siege engine with a crowned king, twin cannons, and rear troop doors. It follows the same captured shortest painted route as ordinary enemies, on wheels, never choosing a direct grass shortcut. Every **18 simulation seconds**, subject to finishing a current action, it rolls a forward **2–5-route-tile** jump with respective **45 / 35 / 15 / 5** weights. Only lengths fitting the remaining route are eligible; fewer than two tiles means no jump. It deploys legs for **0.6 seconds**, crouches for **2.5**, flies for **1.5**, lands/retracts for **0.65**, then resumes wheels. Logical progress traverses the captured route; the visible flight arcs between accepted endpoints. A base landing finishes before leaking. Cannons roll up to two distinct existing towers anywhere on that board; sold targets are not replaced mid-windup. Fire deals **1.2×**, lightning **0.9×**, and all other damage remains normal, composing once with bounty vulnerability before fractional accumulation.
 
-Every **11 seconds**, a **1.2-second** door-opening action releases **2–4** host-rolled troops, capped at **12 living direct children**. Orcling / Orc / Runner weights are **8 / 1 / 1** per child. Troops join the nearest remaining captured painted route instead of inheriting the machine's off-road shortcut; all children still prevent wave clearance. Artwork exposes intact, damaged, and critical states at **66% / 33%** remaining HP across locomotion and action poses.
+Every **8 seconds**, a **1.2-second** door-opening action releases **4–7** host-rolled troops, capped at **24 living direct children**. Orcling / Orc / Runner weights remain **8 / 1 / 1** per child. Troops inherit the carrier's captured painted route and current progress; all children still prevent wave clearance. Artwork exposes intact, damaged, and critical states at **66% / 33%** remaining HP across wheels, cannons, doors and every jump phase.
 
-**Stun ownership:** the host owns `stunned_remaining` and every impact. Stuns refresh nonstackingly, stop fresh attacks/continuous exposure and firing streaks, and expire in simulation time, respecting pause and playback speed. Existing burns already applied keep ticking; support and economy are not attacks. Reset/abandoned rounds clear status. Camera, stars, projectiles, and sound never decide outcomes.
+**Stun ownership:** the host owns `stunned_remaining` and every impact. Stuns refresh nonstackingly and suspend every tower role: fresh discrete/continuous attacks and firing streaks, emitted support buffs, mine production/round-clear payout, bounty marks, and income auras. Periodic production clocks freeze without accumulating catch-up income. Recovery restores eligible effects immediately, with strongest-duplicate stacking preserved. Already-applied burns keep ticking. Timers use simulation time, respecting pause and playback speed; reset/abandoned rounds clear status. Camera, stars, projectiles, and sound never decide outcomes. Display-name changes preserve the stable `troll` / `orc_war_machine` IDs and records.
 
-### Fixed-defense balance smoke
-
-Unrolled shipped capstones were placed along a 14×9 road-plus-detour layout, with each boss alone at its debut round. Physical = four Miniguns; mixed = two Flamethrowers, one fully reloaded A.O.M., one Minigun; siege = four Flamethrowers, three Miniguns and one fully reloaded A.O.M. Prices below come from actual normal-mode purchases; the simulation uses free Sandbox admission only to isolate the encounter. Different costs/placements mean this is **not** an equal-budget tier ranking.
-
-| Boss | Defense | Normal investment | Result | Simulation seconds | HP at leak |
-| --- | --- | ---: | --- | ---: | ---: |
-| Troll | Physical | 13,480 | Leaked | 68.30 | 891 |
-| Troll | Mixed | 17,630 | Killed | 33.80 | — |
-| Troll | Siege | 33,410 | Killed | 19.90 | — |
-| War machine | Physical | 13,480 | Leaked | 138.30 | 24,375 |
-| War machine | Mixed | 17,630 | Leaked | 138.30 | 26,557 |
-| War machine | Siege | 33,410 | Killed | 96.75 | — |
-
-Fine 0.05-second and coarse 0.5-second calls produced identical remaining HP and kill/leak outcomes; observed completion polling differs by at most one coarse step. The surviving machine exercised eleven cannon attacks/twelve troop batches; the siege kill exercised eight of each. This establishes feasible authored counterplay and a significant physical-only Troll challenge, not final competitive balance across every route, roll, send horde, or collection loadout.
 
 ## Health progression
 

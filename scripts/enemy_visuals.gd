@@ -35,7 +35,7 @@ static func frame_texture(definition: EnemyDefinition, animation: StringName = &
 static func enemy_texture(definition: EnemyDefinition, enemy: Dictionary) -> Texture2D:
 	var animation: StringName = StringName(enemy.get("animation", "walk"))
 	var locomotion: StringName = StringName(enemy.get("locomotion", "path"))
-	if animation == &"walk" and locomotion in [&"legs", &"jump_charge", &"jump"]:
+	if animation == &"walk" and locomotion in [&"jump_deploy", &"jump_charge", &"jump", &"jump_land"]:
 		animation = locomotion
 	animation = damage_animation(definition, animation, float(enemy.get("hp", 1.0)), float(enemy.get("max_hp", 1.0)))
 	return frame_texture(definition, animation, float(enemy.get("animation_elapsed", enemy.get("age", 0.0))))

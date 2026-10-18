@@ -2,7 +2,7 @@
   "authoring": "Original local integer-coordinate pixel geometry. Articulated anatomy, mechanical joints, crew, material planes and wear clusters authored in generator; no image sampling, raster rotation, AI image generation or external assets.",
   "identity": "Multi-storey timber-and-riveted-iron siege crawler; rotating wheels, articulated outrigger legs, two bronze-banded cannons, working rear troop doors, two orc crew and obese crowned king in ermine throne.",
   "generator": "tools/author_late_bosses.py",
-  "generator_sha256": "51096954962162b4fa55b94bd1a7ec4043d8c758175c8013ca4bb287e4ab3220",
+  "generator_sha256": "2d737b4ec0507ac89696d1e1a6f57146ea0208404dc420f2924c42c1b62162fb",
   "shared_pixel_primitives": "tools/author_enemy_sprites.py: Pixels, segment and material ramps",
   "source_origin": "Locally authored Pillow geometry; no external artist or service credits claimed",
   "frame_size": [
@@ -11,7 +11,7 @@
   ],
   "sheet_size": [
     3072,
-    5376
+    6144
   ],
   "layout": "one animation per row, up to 12 columns",
   "base_anchor": [
@@ -21,7 +21,7 @@
   "source_faces_left": true,
   "alpha": "binary 0/255; crisp native pixels, no antialiasing or alpha fading",
   "camera": "elevated three-quarter left-facing; upper-left material highlights",
-  "sheet_sha256": "bd1613ea8f40f4cccccd0e798618ae2dc662fc18ac03c128cbc5b3de91c245d0",
+  "sheet_sha256": "b88f4bf2b068b28e17c930840eaabe44a132c09cb3967fed474399a8591f03a3",
   "still": "assets/enemies/animations/orc_war_machine_still.png",
   "still_sha256": "512cc072d5ef2cb2cca809dd75adc2a276c5fd617b31bce65363aceda9a26c4b",
   "still_dimensions": [
@@ -32,7 +32,7 @@
     "damaged": 0.66,
     "critical": 0.33
   },
-  "action_support": "Mechanical legs visible for attack/cast in every damage phase; jump displacement supplied by accepted presentation position",
+  "action_support": "Wheels for normal travel, cannons and troop doors; articulated leg deployment, crouch, jump and landing/retraction in every damage phase; jump displacement supplied by accepted presentation position",
   "animations": [
     {
       "name": "walk",
@@ -117,163 +117,81 @@
       ]
     },
     {
-      "name": "legs",
-      "fps": 7,
-      "duration_seconds": 1.7142857142857142,
-      "frame_count": 12,
-      "loop": true,
-      "atlas_row": 1,
-      "alpha_bounds": [
-        [
-          25,
-          12,
-          233,
-          221
-        ],
-        [
-          26,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          14,
-          233,
-          221
-        ],
-        [
-          28,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          11,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          11,
-          233,
-          221
-        ],
-        [
-          28,
-          10,
-          233,
-          221
-        ],
-        [
-          26,
-          10,
-          233,
-          221
-        ]
-      ]
-    },
-    {
       "name": "attack",
       "fps": 8.571428571428571,
       "duration_seconds": 1.4000000000000001,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 2,
+      "atlas_row": 1,
       "alpha_bounds": [
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
@@ -286,71 +204,153 @@
       "duration_seconds": 1.2,
       "frame_count": 12,
       "loop": false,
+      "atlas_row": 2,
+      "alpha_bounds": [
+        [
+          28,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          13,
+          233,
+          221
+        ],
+        [
+          28,
+          13,
+          233,
+          221
+        ],
+        [
+          28,
+          13,
+          233,
+          221
+        ],
+        [
+          28,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ]
+      ]
+    },
+    {
+      "name": "jump_deploy",
+      "fps": 20.0,
+      "duration_seconds": 0.6,
+      "frame_count": 12,
+      "loop": false,
       "atlas_row": 3,
       "alpha_bounds": [
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
-          12,
+          28,
+          11,
           233,
-          221
+          220
         ],
         [
-          25,
-          13,
+          28,
+          11,
           233,
-          221
+          220
         ],
         [
-          25,
-          13,
-          233,
-          221
-        ],
-        [
-          25,
-          13,
-          233,
-          221
-        ],
-        [
-          25,
-          12,
-          233,
-          221
-        ],
-        [
-          25,
-          12,
-          233,
-          221
-        ],
-        [
-          25,
-          12,
-          233,
-          221
-        ],
-        [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
-          11,
+          28,
+          10,
           233,
           221
         ],
         [
-          25,
-          11,
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          10,
           233,
           221
         ],
@@ -444,37 +444,37 @@
           28,
           13,
           233,
-          213
+          219
         ],
         [
           28,
           11,
           233,
-          213
+          220
         ],
         [
           28,
           10,
           233,
-          213
+          221
         ],
         [
           28,
           9,
           233,
-          213
+          221
         ],
         [
           28,
           9,
           233,
-          213
+          221
         ],
         [
           28,
           10,
           233,
-          213
+          220
         ],
         [
           28,
@@ -503,12 +503,94 @@
       ]
     },
     {
+      "name": "jump_land",
+      "fps": 18.46153846153846,
+      "duration_seconds": 0.65,
+      "frame_count": 12,
+      "loop": false,
+      "atlas_row": 6,
+      "alpha_bounds": [
+        [
+          25,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          14,
+          233,
+          221
+        ],
+        [
+          28,
+          17,
+          233,
+          221
+        ],
+        [
+          28,
+          19,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          19,
+          233,
+          221
+        ],
+        [
+          28,
+          17,
+          233,
+          221
+        ],
+        [
+          28,
+          15,
+          233,
+          220
+        ],
+        [
+          28,
+          13,
+          233,
+          220
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ]
+      ]
+    },
+    {
       "name": "death",
       "fps": 10,
       "duration_seconds": 1.2,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 6,
+      "atlas_row": 7,
       "alpha_bounds": [
         [
           25,
@@ -590,98 +672,16 @@
       "duration_seconds": 1.5,
       "frame_count": 12,
       "loop": true,
-      "atlas_row": 7,
-      "alpha_bounds": [
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          14,
-          233,
-          221
-        ],
-        [
-          28,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          11,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          11,
-          233,
-          221
-        ],
-        [
-          28,
-          10,
-          233,
-          221
-        ],
-        [
-          28,
-          10,
-          233,
-          221
-        ]
-      ]
-    },
-    {
-      "name": "legs_damaged",
-      "fps": 7,
-      "duration_seconds": 1.7142857142857142,
-      "frame_count": 12,
-      "loop": true,
       "atlas_row": 8,
       "alpha_bounds": [
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          26,
+          28,
           13,
           233,
           221
@@ -741,7 +741,7 @@
           221
         ],
         [
-          26,
+          28,
           10,
           233,
           221
@@ -757,73 +757,73 @@
       "atlas_row": 9,
       "alpha_bounds": [
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
@@ -839,68 +839,150 @@
       "atlas_row": 10,
       "alpha_bounds": [
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ]
+      ]
+    },
+    {
+      "name": "jump_deploy_damaged",
+      "fps": 20.0,
+      "duration_seconds": 0.6,
+      "frame_count": 12,
+      "loop": false,
+      "atlas_row": 11,
+      "alpha_bounds": [
+        [
+          28,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          220
+        ],
+        [
+          28,
+          11,
+          233,
+          220
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ],
+        [
+          28,
+          10,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          10,
           233,
           221
         ],
@@ -918,7 +1000,7 @@
       "duration_seconds": 2.5,
       "frame_count": 8,
       "loop": false,
-      "atlas_row": 11,
+      "atlas_row": 12,
       "alpha_bounds": [
         [
           25,
@@ -976,7 +1058,7 @@
       "duration_seconds": 1.5,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 12,
+      "atlas_row": 13,
       "alpha_bounds": [
         [
           28,
@@ -994,37 +1076,37 @@
           28,
           13,
           233,
-          213
+          219
         ],
         [
           28,
           11,
           233,
-          213
+          220
         ],
         [
           28,
           10,
           233,
-          213
+          221
         ],
         [
           28,
           9,
           233,
-          213
+          221
         ],
         [
           28,
           9,
           233,
-          213
+          221
         ],
         [
           28,
           10,
           233,
-          213
+          220
         ],
         [
           28,
@@ -1053,12 +1135,94 @@
       ]
     },
     {
+      "name": "jump_land_damaged",
+      "fps": 18.46153846153846,
+      "duration_seconds": 0.65,
+      "frame_count": 12,
+      "loop": false,
+      "atlas_row": 14,
+      "alpha_bounds": [
+        [
+          25,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          14,
+          233,
+          221
+        ],
+        [
+          28,
+          17,
+          233,
+          221
+        ],
+        [
+          28,
+          19,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          19,
+          233,
+          221
+        ],
+        [
+          28,
+          17,
+          233,
+          221
+        ],
+        [
+          28,
+          15,
+          233,
+          220
+        ],
+        [
+          28,
+          13,
+          233,
+          220
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ]
+      ]
+    },
+    {
       "name": "death_damaged",
       "fps": 10,
       "duration_seconds": 1.2,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 13,
+      "atlas_row": 15,
       "alpha_bounds": [
         [
           25,
@@ -1140,7 +1304,7 @@
       "duration_seconds": 1.5,
       "frame_count": 12,
       "loop": true,
-      "atlas_row": 14,
+      "atlas_row": 16,
       "alpha_bounds": [
         [
           28,
@@ -1210,88 +1374,6 @@
         ],
         [
           28,
-          10,
-          233,
-          221
-        ]
-      ]
-    },
-    {
-      "name": "legs_critical",
-      "fps": 7,
-      "duration_seconds": 1.7142857142857142,
-      "frame_count": 12,
-      "loop": true,
-      "atlas_row": 15,
-      "alpha_bounds": [
-        [
-          25,
-          12,
-          233,
-          221
-        ],
-        [
-          26,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          14,
-          233,
-          221
-        ],
-        [
-          28,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          11,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          13,
-          233,
-          221
-        ],
-        [
-          28,
-          12,
-          233,
-          221
-        ],
-        [
-          28,
-          11,
-          233,
-          221
-        ],
-        [
-          28,
-          10,
-          233,
-          221
-        ],
-        [
-          26,
           10,
           233,
           221
@@ -1304,76 +1386,76 @@
       "duration_seconds": 1.4000000000000001,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 16,
+      "atlas_row": 17,
       "alpha_bounds": [
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
@@ -1386,71 +1468,153 @@
       "duration_seconds": 1.2,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 17,
+      "atlas_row": 18,
       "alpha_bounds": [
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           13,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           12,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
           233,
           221
         ],
         [
-          25,
+          28,
           11,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ]
+      ]
+    },
+    {
+      "name": "jump_deploy_critical",
+      "fps": 20.0,
+      "duration_seconds": 0.6,
+      "frame_count": 12,
+      "loop": false,
+      "atlas_row": 19,
+      "alpha_bounds": [
+        [
+          28,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          11,
+          233,
+          220
+        ],
+        [
+          28,
+          11,
+          233,
+          220
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ],
+        [
+          28,
+          10,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          9,
+          233,
+          221
+        ],
+        [
+          28,
+          10,
           233,
           221
         ],
@@ -1468,7 +1632,7 @@
       "duration_seconds": 2.5,
       "frame_count": 8,
       "loop": false,
-      "atlas_row": 18,
+      "atlas_row": 20,
       "alpha_bounds": [
         [
           25,
@@ -1526,7 +1690,7 @@
       "duration_seconds": 1.5,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 19,
+      "atlas_row": 21,
       "alpha_bounds": [
         [
           28,
@@ -1544,37 +1708,37 @@
           28,
           13,
           233,
-          213
+          219
         ],
         [
           28,
           11,
           233,
-          213
+          220
         ],
         [
           28,
           10,
           233,
-          213
+          221
         ],
         [
           28,
           9,
           233,
-          213
+          221
         ],
         [
           28,
           9,
           233,
-          213
+          221
         ],
         [
           28,
           10,
           233,
-          213
+          220
         ],
         [
           28,
@@ -1603,12 +1767,94 @@
       ]
     },
     {
+      "name": "jump_land_critical",
+      "fps": 18.46153846153846,
+      "duration_seconds": 0.65,
+      "frame_count": 12,
+      "loop": false,
+      "atlas_row": 22,
+      "alpha_bounds": [
+        [
+          25,
+          12,
+          233,
+          221
+        ],
+        [
+          28,
+          14,
+          233,
+          221
+        ],
+        [
+          28,
+          17,
+          233,
+          221
+        ],
+        [
+          28,
+          19,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          20,
+          233,
+          221
+        ],
+        [
+          28,
+          19,
+          233,
+          221
+        ],
+        [
+          28,
+          17,
+          233,
+          221
+        ],
+        [
+          28,
+          15,
+          233,
+          220
+        ],
+        [
+          28,
+          13,
+          233,
+          220
+        ],
+        [
+          28,
+          11,
+          233,
+          221
+        ]
+      ]
+    },
+    {
       "name": "death_critical",
       "fps": 10,
       "duration_seconds": 1.2,
       "frame_count": 12,
       "loop": false,
-      "atlas_row": 20,
+      "atlas_row": 23,
       "alpha_bounds": [
         [
           25,

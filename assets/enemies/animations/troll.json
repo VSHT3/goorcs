@@ -2,7 +2,7 @@
   "authoring": "Original local integer-coordinate pixel geometry. Articulated anatomy, mechanical joints, crew, material planes and wear clusters authored in generator; no image sampling, raster rotation, AI image generation or external assets.",
   "identity": "Gargantuan bare-skinned tusked troll; muscular barrel belly, iron shoulder, diagonal leather straps, tremendous bound-timber club.",
   "generator": "tools/author_late_bosses.py",
-  "generator_sha256": "51096954962162b4fa55b94bd1a7ec4043d8c758175c8013ca4bb287e4ab3220",
+  "generator_sha256": "2d737b4ec0507ac89696d1e1a6f57146ea0208404dc420f2924c42c1b62162fb",
   "shared_pixel_primitives": "tools/author_enemy_sprites.py: Pixels, segment and material ramps",
   "source_origin": "Locally authored Pillow geometry; no external artist or service credits claimed",
   "frame_size": [

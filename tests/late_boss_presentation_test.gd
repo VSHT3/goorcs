@@ -40,7 +40,7 @@ func _run() -> void:
 			core.enemies = [[], []]
 			_check(core.sandbox_spawn(0, type_id, 1), "Registered late boss can be previewed on the real battlefield")
 			var enemy: Dictionary = core.enemies[0][0].duplicate(true)
-			enemy["progress"] = 0.5 if type_id == &"orc_war_machine" else 4.0
+			enemy["progress"] = 4.0
 			enemy["pos"] = Vector2(4, 4)
 			board.combat_enemies = [enemy]
 			var walking: Image = await _image()
@@ -57,10 +57,12 @@ func _run() -> void:
 			if type_id == &"orc_war_machine":
 				enemy["animation"] = "walk"
 				enemy["animation_elapsed"] = 0.0
-				enemy["locomotion"] = "legs"
+				enemy["locomotion"] = "jump_deploy"
+				enemy["animation"] = "jump_deploy"
+				enemy["animation_elapsed"] = 0.5
 				board.combat_enemies = [enemy]
 				var legs: Image = await _image()
-				_check(_changed(walking, legs) > 100, "Grass mode visibly deploys mechanical legs instead of reusing wheels")
+				_check(_changed(walking, legs) > 100, "Jump preparation visibly deploys legs instead of reusing wheels")
 				for phase: float in [0.60, 0.25]:
 					enemy["hp"] = floori(float(enemy["max_hp"]) * phase)
 					board.combat_enemies = [enemy]
@@ -81,7 +83,36 @@ func _run() -> void:
 				board.combat_enemies = [enemy]
 				var airborne: Image = await _image()
 				_check(_changed(doors, airborne) > 100, "Charged jump produces a distinct airborne machine pose")
+				enemy["locomotion"] = "jump_land"
+				enemy["animation"] = "jump_land"
+				enemy["animation_elapsed"] = 0.1
+				enemy["jump_remaining"] = 0.0
+				enemy["progress"] = 5.0
+				enemy["pos"] = Vector2(5, 4)
+				board.combat_enemies = [enemy]
+				var landing: Image = await _image()
+				enemy = enemy.duplicate(true)
+				enemy["animation_elapsed"] = 0.6
+				board.combat_enemies = [enemy]
+				var retracting: Image = await _image()
+				_check(_changed(airborne, landing) > 100 and _changed(landing, retracting) > 100, "Landing visibly settles and retracts the legs on both orientations")
+				enemy["animation"] = "walk"
+				enemy["locomotion"] = "wheels"
+				enemy["animation_elapsed"] = 0.0
+				enemy["tower_attack_remaining"] = 0.0
+				board.combat_enemies = [enemy]
+				var before_cannons: Image = await _image()
+				enemy = enemy.duplicate(true)
+				enemy["tower_attack_count"] = 1
+				enemy["tower_attack_remaining"] = 1.4
+				enemy["tower_attack_aims"] = [Vector2(1, 3), Vector2(7, 3)]
+				board.combat_enemies = [enemy]
+				var aimed: Image = await _image()
+				for aim: Vector2 in enemy["tower_attack_aims"]:
+					var region := Rect2i(board.cell_center(Vector2i(aim)) - Vector2.ONE * 28.0, Vector2i(56, 56))
+					_check(_changed(before_cannons.get_region(region), aimed.get_region(region)) > 10, "Both accepted random cannon targets receive visible windup warnings")
 		board.combat_enemies = []
+		board._process(2.0)
 		core.towers = [[], []]
 		_check(core.build(0, Vector2i(4, 3), &"arrow_tower", MatchCombat.TargetMode.FURTHEST), "Tower status fixture uses an actual tower instance")
 		var tower: Dictionary = core.towers[0][0].duplicate(true)
@@ -104,7 +135,7 @@ func _run() -> void:
 	viewport.queue_free()
 	await process_frame
 	if failures == 0:
-		print("PASS: rendered late boss walk/actions, wheels/legs, progressive damage, doors/jump and transient tower stun stars on both board orientations")
+		print("PASS: rendered boss walk/actions, wheels/deploy/jump/land, progressive damage, troop doors, dual cannon targets and transient stun stars on both orientations")
 	quit(1 if failures else 0)
 
 func _image() -> Image:

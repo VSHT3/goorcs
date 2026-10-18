@@ -287,14 +287,27 @@ func _mechanics(definition: EnemyDefinition) -> String:
 			lines.append("Troop weights: " + " · ".join(troops))
 	if not is_equal_approx(definition.nonphysical_damage_multiplier, 1.0):
 		lines.append("Non-physical damage ×%s" % String.num(definition.nonphysical_damage_multiplier, 2))
+	if not is_equal_approx(definition.fire_damage_multiplier, 1.0):
+		lines.append("Fire damage ×%s" % String.num(definition.fire_damage_multiplier, 2))
+	if not is_equal_approx(definition.lightning_damage_multiplier, 1.0):
+		lines.append("Lightning damage ×%s" % String.num(definition.lightning_damage_multiplier, 2))
 	if definition.stomp_interval > 0.0:
 		lines.append("Walking stomp every %ss · %s-cell radius\nHurts other enemies for %s%% of their max HP" % [String.num(definition.stomp_interval, 1), String.num(definition.stomp_radius, 1), String.num(definition.stomp_health_fraction * 100.0, 1)])
 	if definition.tower_attack_interval > 0.0:
-		lines.append("%s every %ss · %s-cell range\n%ss windup · stuns a tower for %ss" % [String(definition.tower_attack_kind).capitalize(), String.num(definition.tower_attack_interval, 1), String.num(definition.tower_attack_range, 1), String.num(definition.tower_attack_cast_duration, 1), String.num(definition.tower_stun_duration, 1)])
-	if definition.direct_movement:
-		lines.append("Direct to base · ignores the painted maze\nRoad speed ×%s · grass speed ×%s" % [String.num(definition.road_speed_multiplier, 2), String.num(definition.grass_speed_multiplier, 2)])
-	if definition.jump_duration > 0.0:
-		lines.append("Blocked by a tower: charges %ss, jumps %ss\nLands on the nearest vacant cell beyond it" % [String.num(definition.jump_charge_duration, 1), String.num(definition.jump_duration, 1)])
+		var targets: String = "%d random towers · whole board" % definition.tower_attack_targets if definition.tower_attack_kind == &"cannon" else "Nearest tower · %s-cell range" % String.num(definition.tower_attack_range, 1)
+		lines.append("%s every %ss · %s\n%ss windup · %ss stun" % [String(definition.tower_attack_kind).capitalize(), String.num(definition.tower_attack_interval, 1), targets, String.num(definition.tower_attack_cast_duration, 1), String.num(definition.tower_stun_duration, 1)])
+	if definition.tower_stun_duration > 0.0:
+		lines.append("Stun suspends attacks, support and income")
+	if definition.jump_interval > 0.0:
+		lines.append("Follows the painted path on wheels\nJumps 2–5 path tiles every %ss" % String.num(definition.jump_interval, 1))
+		var odds := PackedStringArray()
+		var total: int = 0
+		for weight: int in definition.jump_weights:
+			total += weight
+		for index: int in range(definition.jump_weights.size()):
+			odds.append("%d tiles %s%%" % [index + 2, String.num(float(definition.jump_weights[index]) / total * 100.0, 1)])
+		lines.append(" · ".join(odds))
+		lines.append("Legs → crouch → jump → land → wheels")
 	var minimum: int = 0
 	var maximum: int = 0
 	for index: int in range(definition.group_weights.size()):

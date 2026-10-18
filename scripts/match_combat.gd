@@ -69,7 +69,7 @@ var _next_enemy_id: int = 1
 var _continuous_damage: Dictionary = {}
 # Spawn times cap first-tick exposure even when due events arrive mid-tick.
 var _enemy_spawn_times: Dictionary = {}
-# Only enemies slowed at tick start need a two-speed historical motion record.
+# Slows, stationary casts and jump phases retain historical route-cell motion.
 # Reused float records retain precision without per-tick history allocations.
 var _slow_motion: Dictionary = {}
 var _step_start_time: float = 0.0
@@ -138,6 +138,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"description": definition.description,
 			"fire_immune": definition.fire_immune, "ice_immune": definition.ice_immune,
 			"nonphysical_damage_multiplier": definition.nonphysical_damage_multiplier,
+			"fire_damage_multiplier": definition.fire_damage_multiplier,
+			"lightning_damage_multiplier": definition.lightning_damage_multiplier,
 			"death_sound": CombatSoundEvents.Cue.BONES if definition.blood_color.a == 0.0 else CombatSoundEvents.Cue.DEATH,
 			"speed_multiplier": definition.speed_multiplier,
 			"send_cost": definition.send_cost, "send_income": definition.send_income,
@@ -171,10 +173,11 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"tower_attack_range": definition.tower_attack_range,
 			"tower_attack_cast_duration": definition.tower_attack_cast_duration,
 			"tower_stun_duration": definition.tower_stun_duration,
-			"direct_movement": definition.direct_movement,
-			"road_speed_multiplier": definition.road_speed_multiplier,
-			"grass_speed_multiplier": definition.grass_speed_multiplier,
+			"tower_attack_targets": definition.tower_attack_targets,
+			"jump_interval": definition.jump_interval, "jump_weights": definition.jump_weights.duplicate(),
+			"jump_deploy_duration": definition.jump_deploy_duration,
 			"jump_charge_duration": definition.jump_charge_duration, "jump_duration": definition.jump_duration,
+			"jump_land_duration": definition.jump_land_duration,
 		}
 	var has_remainder_enemy: bool = false
 	for definition: EnemyDefinition in rules.catalog.enemies:
@@ -216,14 +219,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 
 
 func _can_build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
-	return _roster_configuration_valid and phase != Phase.FINISHED and _valid_slot(slot) and _valid_mode(mode) and _tower_types.has(String(type_id)) and not has_tower(slot, cell) and not _grounded_machine_at(slot, cell) and (_sandbox_mode or coins[slot] >= int(_tower_types[String(type_id)]["cost"]))
-
-
-func _grounded_machine_at(slot: int, cell: Vector2i) -> bool:
-	for enemy: Dictionary in enemies[slot]:
-		if bool(enemy["direct_movement"]) and enemy["locomotion"] != "jump" and Vector2i(Vector2(enemy["pos"]).round()) == cell:
-			return true
-	return false
+	return _roster_configuration_valid and phase != Phase.FINISHED and _valid_slot(slot) and _valid_mode(mode) and _tower_types.has(String(type_id)) and not has_tower(slot, cell) and (_sandbox_mode or coins[slot] >= int(_tower_types[String(type_id)]["cost"]))
 
 
 func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
@@ -402,7 +398,7 @@ func _refresh_board(slot: int) -> void:
 		var damage_groups: Dictionary[String, float] = {}
 		var speed_groups: Dictionary[String, float] = {}
 		for support: Dictionary in towers[slot]:
-			if support["behavior_kind"] != "support" or not cell_in_range(support["cell"], tower["cell"], support["range"]):
+			if support["behavior_kind"] != "support" or float(support["stunned_remaining"]) > 0.000000001 or not cell_in_range(support["cell"], tower["cell"], support["range"]):
 				continue
 			var config: Dictionary = support["behavior_config"]
 			var group: String = config["stack_group"]
@@ -423,7 +419,7 @@ func _refresh_board(slot: int) -> void:
 		tower["interval"] = float(tower["base_interval"]) / speed_multiplier
 		if old_interval > 0.0:
 			tower["cooldown"] *= float(tower["interval"]) / old_interval
-		if tower["behavior_kind"] == "bounty" and int(tower["bounty_target_id"]) >= 0:
+		if tower["behavior_kind"] == "bounty" and float(tower["stunned_remaining"]) <= 0.000000001 and int(tower["bounty_target_id"]) >= 0:
 			var index: int = _enemy_index(slot, tower["bounty_target_id"])
 			if index >= 0:
 				enemies[slot][index]["bounty_damage_bonus"] = tower["behavior_config"]["mark_damage_bonus"]
@@ -759,6 +755,8 @@ func debug_set_round(round_number: int) -> bool:
 			tower["bounce_active"] = false
 			tower["pierce_aim"] = Vector2(tower["cell"])
 			tower["pierce_active"] = false
+	for slot: int in range(2):
+		_refresh_board(slot)
 	return true
 
 func start_wave(routing: Array[Dictionary]) -> bool:
@@ -976,6 +974,8 @@ func advance(delta: float) -> bool:
 			_attack_flames(slot, step)
 			_apply_burns(slot)
 			_attack(slot, step)
+			if periodic and base_health[0] > 0 and base_health[1] > 0:
+				_produce_periodic(slot, step)
 			_advance_stuns(slot, step)
 			# A dead caster never resolves its due ritual.
 			_enemy_abilities(slot)
@@ -984,8 +984,6 @@ func advance(delta: float) -> bool:
 				_prepare_boss_motion(slot)
 				_attack(slot, 0.0)
 		remaining -= step
-		if periodic and base_health[0] > 0 and base_health[1] > 0:
-			_produce_periodic(step)
 		if (periodic or _boss_stream) and (base_health[0] == 0 or base_health[1] == 0 or _wave_cleared()):
 			break
 	for slot: int in range(2):
@@ -1011,16 +1009,18 @@ func advance(delta: float) -> bool:
 				_reset_firing(tower)
 				_clear_stun(tower)
 				tower["production_elapsed"] = 0.0
+			_refresh_board(slot)
 	elif _wave_cleared():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
 		for slot: int in range(2):
 			coins[slot] += reward + income[slot]
 			reroll_currency[slot] += _rules.clear_reroll_currency
 			for tower: Dictionary in towers[slot]:
+				if tower["behavior_kind"] == "economy" and float(tower["stunned_remaining"]) <= 0.000000001:
+					coins[slot] += int(tower["behavior_config"]["clear_income"])
 				_reset_firing(tower)
 				_clear_stun(tower)
-				if tower["behavior_kind"] == "economy":
-					coins[slot] += int(tower["behavior_config"]["clear_income"])
+			_refresh_board(slot)
 		phase = Phase.PLANNING
 	return true
 
@@ -1040,16 +1040,15 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 					duration = minf(duration, float(tower["cooldown"]))
 		if periodic:
 			for tower: Dictionary in towers[slot]:
-				if tower["behavior_kind"] == "economy" and int(tower["behavior_config"]["periodic_income"]) > 0:
+				if tower["behavior_kind"] == "economy" and float(tower["stunned_remaining"]) <= 0.000000001 and int(tower["behavior_config"]["periodic_income"]) > 0:
 					duration = minf(duration, float(tower["behavior_config"]["periodic_interval"]) - float(tower["production_elapsed"]))
 		for enemy: Dictionary in enemies[slot]:
 			var definition: Dictionary = _enemy_types[enemy["type_id"]]
 			if _boss_stream:
 				if float(enemy["slow_remaining"]) > 0.000000001:
 					duration = minf(duration, float(enemy["slow_remaining"]))
-				if bool(enemy["direct_movement"]):
-					duration = minf(duration, BossMechanics.event_step(enemy, towers[slot]))
-				elif float(enemy["speed"]) > 0.0:
+				duration = minf(duration, BossMechanics.event_step(enemy, definition))
+				if float(enemy["speed"]) > 0.0:
 					# Enter the new rounded cell, rather than stopping on the
 					# direction-dependent half-cell rounding tie.
 					var boundary: float = minf(float(enemy["route"].size() - 1), floorf(float(enemy["progress"]) + 0.5 + 0.000000001) + 0.5 + 0.00000001)
@@ -1083,24 +1082,23 @@ func _has_periodic_production() -> bool:
 	return false
 
 
-func _produce_periodic(delta: float) -> void:
-	for slot: int in range(2):
-		for tower: Dictionary in towers[slot]:
-			if tower["behavior_kind"] != "economy":
-				continue
-			var config: Dictionary = tower["behavior_config"]
-			if int(config["periodic_income"]) <= 0:
-				continue
-			tower["production_elapsed"] += delta
-			var count: int = floori((float(tower["production_elapsed"]) + 0.000000001) / float(config["periodic_interval"]))
-			if count > 0:
-				tower["production_elapsed"] = maxf(0.0, float(tower["production_elapsed"]) - count * float(config["periodic_interval"]))
-				coins[slot] += count * int(config["periodic_income"])
+func _produce_periodic(slot: int, delta: float) -> void:
+	for tower: Dictionary in towers[slot]:
+		if tower["behavior_kind"] != "economy" or float(tower["stunned_remaining"]) > 0.000000001:
+			continue
+		var config: Dictionary = tower["behavior_config"]
+		if int(config["periodic_income"]) <= 0:
+			continue
+		tower["production_elapsed"] += delta
+		var count: int = floori((float(tower["production_elapsed"]) + 0.000000001) / float(config["periodic_interval"]))
+		if count > 0:
+			tower["production_elapsed"] = maxf(0.0, float(tower["production_elapsed"]) - count * float(config["periodic_interval"]))
+			coins[slot] += count * int(config["periodic_income"])
 
 
 func _update_bounties(slot: int) -> void:
 	for tower: Dictionary in towers[slot]:
-		if tower["behavior_kind"] != "bounty" or int(tower["bounty_target_id"]) >= 0:
+		if tower["behavior_kind"] != "bounty" or float(tower["stunned_remaining"]) > 0.000000001 or int(tower["bounty_target_id"]) >= 0:
 			continue
 		var selected: Dictionary = {}
 		for enemy: Dictionary in enemies[slot]:
@@ -1119,7 +1117,7 @@ func _income_aura_bonus(slot: int, tower: Dictionary) -> float:
 	# Income auras never stack, including independently authored duplicate groups.
 	var strongest: float = 0.0
 	for source: Dictionary in towers[slot]:
-		if source["behavior_kind"] == "income_aura" and cell_in_range(source["cell"], tower["cell"], source["range"]):
+		if source["behavior_kind"] == "income_aura" and float(source["stunned_remaining"]) <= 0.000000001 and cell_in_range(source["cell"], tower["cell"], source["range"]):
 			strongest = maxf(strongest, float(source["behavior_config"]["kill_income_bonus"]))
 	return strongest
 
@@ -1131,12 +1129,12 @@ func _enemy_abilities(slot: int) -> void:
 	active.clear()
 	active.append_array(enemies[slot])
 	for enemy: Dictionary in active:
-		if int(enemy["hp"]) <= 0 or float(enemy["progress"]) >= enemy["route"].size() - 1:
+		if int(enemy["hp"]) <= 0 or (float(enemy["progress"]) >= enemy["route"].size() - 1 and BossMechanics.can_act(enemy)):
 			continue
 		var definition: Dictionary = _enemy_types[enemy["type_id"]]
 		if BossMechanics.has_abilities(definition):
 			_boss_abilities(slot, enemy, definition)
-			if int(enemy["hp"]) <= 0:
+			if int(enemy["hp"]) <= 0 or float(enemy["progress"]) >= enemy["route"].size() - 1:
 				continue
 		if enemy["animation"] == "heal" and float(enemy["animation_elapsed"]) >= 0.55:
 			enemy["animation"] = "walk"
@@ -1164,7 +1162,7 @@ func _enemy_abilities(slot: int) -> void:
 			enemy["animation"] = "cast"
 			enemy["animation_elapsed"] = 0.0
 			enemy["speed"] = 0.0
-			if bool(enemy["direct_movement"]):
+			if float(definition["jump_interval"]) > 0.0:
 				_sound_events.record(CombatSoundEvents.Cue.MACHINE_DOOR, slot, enemy["pos"], _death_time)
 
 
@@ -1178,13 +1176,8 @@ func _finish_summon(slot: int, caster: Dictionary, definition: Dictionary) -> vo
 		return
 	var count: int = mini(capacity, _group_random.randi_range(int(definition["summon_min"]), int(definition["summon_max"])))
 	caster["summon_count"] += 1
-	var child_route: Array[Vector2i] = []
+	var child_route: Array[Vector2i] = caster["route"]
 	var child_progress: float = caster["progress"]
-	if bool(caster["direct_movement"]):
-		child_route = _summon_join_route(slot, caster["pos"])
-		child_progress = 0.0
-	else:
-		child_route.assign(caster["route"])
 	for member: int in range(count):
 		_spawn_enemy(slot, _summon_type(definition), child_progress, _elapsed, child_route, caster["id"])
 
@@ -1206,71 +1199,83 @@ func _summon_type(definition: Dictionary) -> String:
 	return ""
 
 
-func _summon_join_route(slot: int, position: Vector2) -> Array[Vector2i]:
-	var nearest: Vector2i = _routes[slot].front()
-	var distance: float = INF
-	for cell: Vector2i in _routing_next[slot]:
-		var candidate: float = position.distance_squared_to(Vector2(cell))
-		if candidate < distance or (candidate == distance and (cell.y < nearest.y or (cell.y == nearest.y and cell.x < nearest.x))):
-			nearest = cell
-			distance = candidate
-	var route: Array[Vector2i] = [nearest]
-	while not _routing_next[slot][route.back()].is_empty():
-		var choices: Array = _routing_next[slot][route.back()]
-		var next: Vector2i = choices[0]
-		for cell: Vector2i in choices:
-			if cell.y < next.y or (cell.y == next.y and cell.x < next.x):
-				next = cell
-		route.append(next)
-	return route
-
-
 func _prepare_boss_motion(slot: int) -> void:
 	for enemy: Dictionary in enemies[slot]:
-		if not bool(enemy["direct_movement"]):
-			continue
-		var previous: String = enemy["locomotion"]
-		BossMechanics.prepare(enemy, _enemy_types[enemy["type_id"]], _routing_next[slot], towers[slot])
-		if previous != enemy["locomotion"] and enemy["locomotion"] in ["legs", "jump_charge"]:
-			_sound_events.record(CombatSoundEvents.Cue.MACHINE_GEAR, slot, enemy["pos"], _death_time)
+		if BossMechanics.has_abilities(_enemy_types[enemy["type_id"]]):
+			BossMechanics.prepare(enemy)
+
+
+func _jump_phase(enemy: Dictionary, phase_name: String, duration: float) -> void:
+	enemy["locomotion"] = phase_name
+	enemy["animation"] = "walk" if phase_name == "wheels" else phase_name
+	enemy["animation_elapsed"] = 0.0
+	enemy["jump_remaining"] = duration
+	BossMechanics.prepare(enemy)
+
+
+func _begin_jump(slot: int, enemy: Dictionary, definition: Dictionary) -> void:
+	enemy["next_jump"] = float(enemy["age"]) + float(definition["jump_interval"])
+	var remaining: float = float(enemy["route"].size() - 1) - float(enemy["progress"])
+	var weights: PackedInt32Array = definition["jump_weights"]
+	var total: int = 0
+	for index: int in range(weights.size()):
+		if float(index + 2) <= remaining + 0.000000001:
+			total += weights[index]
+	if total <= 0:
+		return
+	var roll: int = _group_random.randi_range(1, total)
+	for index: int in range(weights.size()):
+		if float(index + 2) > remaining + 0.000000001:
+			break
+		roll -= weights[index]
+		if roll <= 0:
+			enemy["jump_distance"] = index + 2
+			break
+	enemy["jump_from"] = enemy["pos"]
+	enemy["jump_target_progress"] = minf(float(enemy["route"].size() - 1), float(enemy["progress"]) + int(enemy["jump_distance"]))
+	enemy["jump_to"] = _position(enemy["route"], enemy["jump_target_progress"])
+	_jump_phase(enemy, "jump_deploy", definition["jump_deploy_duration"])
+	_sound_events.record(CombatSoundEvents.Cue.MACHINE_GEAR, slot, enemy["pos"], _death_time)
 
 
 func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> void:
-	if enemy["locomotion"] == "jump_charge" and float(enemy["jump_remaining"]) <= 0.000000001:
-		var landing: float = BossMechanics.landing(enemy, towers[slot], float(enemy["jump_blocker_exit"]))
-		if landing >= 0.0:
-			enemy["jump_target_progress"] = landing
-			enemy["jump_to"] = BossMechanics.origin_position(enemy, landing)
-			enemy["jump_from"] = enemy["pos"]
-			enemy["jump_remaining"] = definition["jump_duration"]
-			enemy["locomotion"] = "jump"
-			enemy["animation"] = "jump"
-			enemy["animation_elapsed"] = 0.0
-			_sound_events.record(CombatSoundEvents.Cue.MACHINE_JUMP, slot, enemy["pos"], _death_time)
-		else:
-			enemy["locomotion"] = "legs"
-			enemy["animation"] = "walk"
-			enemy["animation_elapsed"] = 0.0
-	elif enemy["locomotion"] == "jump" and float(enemy["jump_remaining"]) <= 0.000000001 and not bool(enemy["jump_landing_blocked"]):
-		enemy["progress"] = enemy["jump_target_progress"]
-		enemy["pos"] = enemy["jump_to"]
-		enemy["locomotion"] = "legs"
-		enemy["animation"] = "walk"
-		enemy["animation_elapsed"] = 0.0
+	if not BossMechanics.can_act(enemy) and float(enemy["jump_remaining"]) <= 0.000000001:
+		match String(enemy["locomotion"]):
+			"jump_deploy":
+				_jump_phase(enemy, "jump_charge", definition["jump_charge_duration"])
+			"jump_charge":
+				enemy["jump_count"] += 1
+				_jump_phase(enemy, "jump", definition["jump_duration"])
+				_sound_events.record(CombatSoundEvents.Cue.MACHINE_JUMP, slot, enemy["pos"], _death_time)
+			"jump":
+				enemy["progress"] = enemy["jump_target_progress"]
+				enemy["pos"] = enemy["jump_to"]
+				_jump_phase(enemy, "jump_land", definition["jump_land_duration"])
+			"jump_land":
+				_jump_phase(enemy, "wheels", 0.0)
+	if float(enemy["progress"]) >= enemy["route"].size() - 1:
+		return
 	if enemy["animation"] == "attack" and float(enemy["tower_attack_remaining"]) <= 0.000000001:
-		var target: Dictionary = _find_tower(slot, int(enemy["tower_attack_target_id"]))
 		var kind: String = definition["tower_attack_kind"]
 		_sound_events.record(CombatSoundEvents.Cue.CANNON if kind == "cannon" else CombatSoundEvents.Cue.CLUB_IMPACT, slot, enemy["pos"], _death_time)
-		if not target.is_empty():
+		for target_id: int in enemy["tower_attack_target_ids"]:
+			var target: Dictionary = _find_tower(slot, target_id)
+			if target.is_empty():
+				continue
 			target["stunned_remaining"] = maxf(float(target["stunned_remaining"]), float(definition["tower_stun_duration"]))
 			target["stun_count"] += 1
 			target["stun_source"] = kind
 			target["stun_position"] = enemy["pos"]
 			_reset_firing(target)
+			_clear_tower_mark(slot, target)
 			_sound_events.record(CombatSoundEvents.Cue.TOWER_STUN, slot, Vector2(target["cell"]), _death_time)
+		_refresh_board(slot)
+		_update_bounties(slot)
 		enemy["animation"] = "walk"
 		enemy["animation_elapsed"] = 0.0
-		enemy["speed"] = float(enemy["base_speed"]) * (TowerDefinition.FREEZE_SPEED_MULTIPLIER if enemy["slowed"] else 1.0)
+		BossMechanics.prepare(enemy)
+	if float(definition["jump_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_jump"]) and BossMechanics.can_act(enemy) and enemy["animation"] not in ["cast", "attack"]:
+		_begin_jump(slot, enemy, definition)
 	if float(definition["stomp_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_stomp"]):
 		enemy["next_stomp"] += float(definition["stomp_interval"])
 		if bool(enemy["stepped"]) and enemy["animation"] == "walk":
@@ -1289,18 +1294,35 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 	if float(definition["tower_attack_interval"]) <= 0.0 or float(enemy["age"]) + 0.000000001 < float(enemy["next_tower_attack"]) or enemy["animation"] in ["cast", "attack"] or not BossMechanics.can_act(enemy):
 		return
 	enemy["next_tower_attack"] = float(enemy["age"]) + float(definition["tower_attack_interval"])
-	var nearest: Dictionary = {}
-	var distance: float = float(definition["tower_attack_range"]) * float(definition["tower_attack_range"])
-	for tower: Dictionary in towers[slot]:
-		var candidate: float = Vector2(enemy["pos"]).distance_squared_to(Vector2(tower["cell"]))
-		if candidate < distance or (candidate == distance and (nearest.is_empty() or int(tower["id"]) < int(nearest["id"]))):
-			nearest = tower
-			distance = candidate
-	if nearest.is_empty():
+	var target_ids: Array[int] = enemy["tower_attack_target_ids"]
+	var aims: Array[Vector2] = enemy["tower_attack_aims"]
+	target_ids.clear()
+	aims.clear()
+	if definition["tower_attack_kind"] == "cannon":
+		for shot: int in range(mini(int(definition["tower_attack_targets"]), towers[slot].size())):
+			var rank: int = _group_random.randi_range(0, towers[slot].size() - target_ids.size() - 1)
+			for tower: Dictionary in towers[slot]:
+				if target_ids.has(int(tower["id"])):
+					continue
+				if rank == 0:
+					target_ids.append(int(tower["id"]))
+					aims.append(Vector2(tower["cell"]))
+					break
+				rank -= 1
+	else:
+		var nearest: Dictionary = {}
+		var distance: float = float(definition["tower_attack_range"]) * float(definition["tower_attack_range"])
+		for tower: Dictionary in towers[slot]:
+			var candidate: float = Vector2(enemy["pos"]).distance_squared_to(Vector2(tower["cell"]))
+			if candidate < distance or (candidate == distance and (nearest.is_empty() or int(tower["id"]) < int(nearest["id"]))):
+				nearest = tower
+				distance = candidate
+		if not nearest.is_empty():
+			target_ids.append(int(nearest["id"]))
+			aims.append(Vector2(nearest["cell"]))
+	if target_ids.is_empty():
 		return
 	enemy["tower_attack_count"] += 1
-	enemy["tower_attack_target_id"] = nearest["id"]
-	enemy["tower_attack_aim"] = Vector2(nearest["cell"])
 	enemy["tower_attack_remaining"] = definition["tower_attack_cast_duration"]
 	enemy["animation"] = "attack"
 	enemy["animation_elapsed"] = 0.0
@@ -1359,8 +1381,10 @@ static func enemy_preview(definition: EnemyDefinition, rules: CombatRules, wave_
 		"base_damage": definition.base_damage,
 		"fire_immune": definition.fire_immune, "ice_immune": definition.ice_immune,
 		"nonphysical_damage_multiplier": definition.nonphysical_damage_multiplier,
+		"fire_damage_multiplier": definition.fire_damage_multiplier,
+		"lightning_damage_multiplier": definition.lightning_damage_multiplier,
 		"boss": definition.boss, "send_enabled": definition.send_enabled and not definition.boss,
-		"direct_movement": definition.direct_movement,
+		"jump_interval": definition.jump_interval,
 		"burning": false, "burn_remaining": 0.0,
 	}
 
@@ -1484,19 +1508,19 @@ func _move_enemies(slot: int, delta: float) -> void:
 		enemy["cast_remaining"] = maxf(0.0, float(enemy["cast_remaining"]) - delta)
 		var base_speed: float = enemy["base_speed"]
 		var slowed_seconds: float = minf(delta, float(enemy["slow_remaining"]))
-		if bool(enemy["direct_movement"]):
+		if not BossMechanics.can_act(enemy):
 			if not _slow_motion.has(enemy["id"]):
 				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
-			var direct_motion: Array = _slow_motion[enemy["id"]]
-			direct_motion[0] = previous_progress
-			direct_motion[1] = delta
-			direct_motion[2] = enemy["speed"]
-			direct_motion[3] = enemy["speed"]
-			enemy["progress"] = minf(1.0, previous_progress + float(enemy["speed"]) * delta)
+			var jump_motion: Array = _slow_motion[enemy["id"]]
+			jump_motion[0] = previous_progress
+			jump_motion[1] = delta
+			jump_motion[2] = enemy["speed"]
+			jump_motion[3] = enemy["speed"]
+			if enemy["locomotion"] == "jump":
+				enemy["progress"] = minf(float(enemy["jump_target_progress"]), previous_progress + float(enemy["speed"]) * delta)
 			enemy["slow_remaining"] = maxf(0.0, float(enemy["slow_remaining"]) - delta)
 			enemy["slowed"] = float(enemy["slow_remaining"]) > 0.000000001
-			if enemy["locomotion"] in ["jump_charge", "jump"] and not bool(enemy["jump_landing_blocked"]):
-				enemy["jump_remaining"] = maxf(0.0, float(enemy["jump_remaining"]) - delta)
+			enemy["jump_remaining"] = maxf(0.0, float(enemy["jump_remaining"]) - delta)
 		elif casting:
 			if not _slow_motion.has(enemy["id"]):
 				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
@@ -1568,15 +1592,8 @@ func _spawn_send(slot: int) -> void:
 func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float, captured_route: Array[Vector2i] = [], summoner_id: int = -1) -> void:
 	var hp: int = _enemy_health(type_id, wave)
 	var definition: Dictionary = _enemy_types[type_id]
-	var route: Array[Vector2i] = []
+	var route: Array[Vector2i] = _assign_route(slot) if captured_route.is_empty() else captured_route.duplicate()
 	var speed: float = _enemy_speed(type_id, wave)
-	if bool(definition["direct_movement"]):
-		route = [_routes[slot].front(), _routes[slot].back()]
-		var distance: float = Vector2(route.front()).distance_to(Vector2(route.back()))
-		speed /= distance
-		progress /= distance
-	else:
-		route = _assign_route(slot) if captured_route.is_empty() else captured_route.duplicate()
 	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0
 	_boss_stream = _boss_stream or BossMechanics.has_abilities(definition)
 	enemies[slot].append({
@@ -1585,6 +1602,8 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"slowed": false, "slow_remaining": 0.0,
 		"fire_immune": _enemy_types[type_id]["fire_immune"], "ice_immune": _enemy_types[type_id]["ice_immune"],
 		"nonphysical_damage_multiplier": _enemy_types[type_id]["nonphysical_damage_multiplier"],
+		"fire_damage_multiplier": definition["fire_damage_multiplier"],
+		"lightning_damage_multiplier": definition["lightning_damage_multiplier"],
 		"burning": false, "burn_remaining": 0.0,
 		"bounty_tower_id": -1, "bounty_damage_bonus": 0.0, "bounty_income_bonus": 0.0,
 		"damage": _enemy_types[type_id]["base_damage"],
@@ -1594,14 +1613,14 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"heal_count": 0, "summon_count": 0, "summoner_id": summoner_id,
 		"next_heal": _enemy_types[type_id]["heal_interval"],
 		"next_summon": _enemy_types[type_id]["summon_interval"],
-		"tower_attack_count": 0, "tower_attack_target_id": -1, "tower_attack_aim": _position(route, progress),
+		"tower_attack_count": 0, "tower_attack_target_ids": [] as Array[int], "tower_attack_aims": [] as Array[Vector2],
 		"tower_attack_remaining": 0.0, "next_tower_attack": _enemy_types[type_id]["tower_attack_interval"],
 		"stomp_count": 0, "next_stomp": _enemy_types[type_id]["stomp_interval"],
-		"direct_movement": _enemy_types[type_id]["direct_movement"],
-		"locomotion": "wheels" if _enemy_types[type_id]["direct_movement"] else "path",
+		"locomotion": "wheels" if float(definition["jump_interval"]) > 0.0 else "path",
+		"next_jump": definition["jump_interval"], "jump_distance": 0, "jump_count": 0,
 		"jump_remaining": 0.0, "jump_duration": _enemy_types[type_id]["jump_duration"],
 		"jump_from": _position(route, progress), "jump_to": _position(route, progress),
-		"jump_target_progress": progress, "jump_blocker_exit": progress, "jump_landing_blocked": false,
+		"jump_target_progress": progress,
 		"stepped": false,
 	})
 	_enemy_spawn_times[_next_enemy_id] = spawn_time
@@ -1633,8 +1652,16 @@ func _clear_stun(tower: Dictionary) -> void:
 
 
 func _advance_stuns(slot: int, delta: float) -> void:
+	var expired: bool = false
 	for tower: Dictionary in towers[slot]:
-		tower["stunned_remaining"] = maxf(0.0, float(tower["stunned_remaining"]) - delta)
+		var previous: float = tower["stunned_remaining"]
+		tower["stunned_remaining"] = maxf(0.0, previous - delta)
+		if previous > 0.000000001 and float(tower["stunned_remaining"]) <= 0.000000001:
+			_clear_stun(tower)
+			expired = true
+	if expired:
+		_refresh_board(slot)
+		_update_bounties(slot)
 
 
 func _attack_minigun(slot: int, tower: Dictionary, delta: float) -> void:
@@ -1773,7 +1800,7 @@ func _flame_motion_boundary(slot: int, time: float, finish: float) -> float:
 		if speed <= 0.0:
 			continue
 		var progress: float = _historical_progress(enemy, time)
-		var next_cell: float = BossMechanics.next_cell_boundary(enemy, progress) if bool(enemy["direct_movement"]) else floorf(progress + 0.5 + 0.000000001) + 0.5
+		var next_cell: float = floorf(progress + 0.5 + 0.000000001) + 0.5
 		boundary = minf(boundary, time + (next_cell - progress) / speed)
 	return maxf(time + 0.000000001, boundary)
 
@@ -1798,7 +1825,7 @@ func _attack(slot: int, delta: float) -> void:
 				_attack_pulses(slot, tower, tower["range"], delta)
 			continue
 		tower["cooldown"] = maxf(0.0, tower["cooldown"] - delta)
-		if tower["cooldown"] > 0.0:
+		if float(tower["cooldown"]) > 0.000000001:
 			continue
 		var target_index: int = _target(slot, tower, tower["range"])
 		if target_index < 0:
@@ -2074,8 +2101,7 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 		if bool(tower["freeze_upgraded"]) and not bool(enemy["ice_immune"]):
 			enemy["slowed"] = true
 			enemy["slow_remaining"] = TowerDefinition.freeze_duration(int(enemy["max_hp"]))
-			if not bool(enemy["direct_movement"]):
-				enemy["speed"] = 0.0 if enemy["animation"] in ["cast", "attack"] else float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
+			BossMechanics.prepare(enemy)
 		var total: float = float(fractions.get(enemy["id"], 0.0)) + float(tower["base_damage"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * exposure * _damage_multiplier(enemy, _tower_damage_type(tower))
 		# Credit is already vulnerability-adjusted HP: mark changes affect only
 		# new exposure, not saved fractions. The epsilon corrects whole-HP sums.
@@ -2198,14 +2224,19 @@ func _tower_damage_type(tower: Dictionary) -> StringName:
 
 
 func _damage_multiplier(enemy: Dictionary, damage_type: StringName) -> float:
-	return (1.0 + float(enemy["bounty_damage_bonus"])) * (float(enemy["nonphysical_damage_multiplier"]) if damage_type != &"physical" else 1.0)
+	var multiplier: float = (1.0 + float(enemy["bounty_damage_bonus"])) * (float(enemy["nonphysical_damage_multiplier"]) if damage_type != &"physical" else 1.0)
+	if damage_type == &"fire":
+		multiplier *= float(enemy["fire_damage_multiplier"])
+	elif damage_type == &"lightning":
+		multiplier *= float(enemy["lightning_damage_multiplier"])
+	return multiplier
 
 
 func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, bounty_applied: bool = false, damage_type: StringName = &"") -> void:
 	var enemy: Dictionary = enemies[slot][enemy_index]
 	var incoming_damage: int = int(tower["damage"]) if damage < 0 else damage
 	if not bounty_applied:
-		incoming_damage = ceili(float(incoming_damage) * _damage_multiplier(enemy, _tower_damage_type(tower) if damage_type == &"" else damage_type))
+		incoming_damage = ceili(float(incoming_damage) * _damage_multiplier(enemy, _tower_damage_type(tower) if damage_type == &"" else damage_type) - 0.000000001)
 	var hit_damage: int = mini(int(enemy["hp"]), incoming_damage)
 	enemy["hp"] -= hit_damage
 	if hit_damage > 0:
@@ -2247,13 +2278,7 @@ func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, e
 		var position: Vector2 = enemy["pos"] if time < 0.0 else _position(enemy["route"], progress)
 		if not cell_in_range(tower["cell"], Vector2i(position.round()), range_cells):
 			continue
-		# All ordinary captured routes have equal length. Compare the new direct
-		# and shortened joined routes by remaining logical travel, not their
-		# incompatible local parameter (the direct line has just one segment).
-		var remaining_distance: float = float(enemy["route"].size() - 1) - progress
-		if bool(enemy["direct_movement"]):
-			remaining_distance *= Vector2(enemy["route"].front()).distance_to(Vector2(enemy["route"].back()))
-		var target_progress: float = float(_routes[slot].size() - 1) - remaining_distance
+		var target_progress: float = progress
 		var score: float
 		match int(tower["mode"]) if mode < 0 else mode:
 			TargetMode.CLOSEST:
@@ -2275,7 +2300,7 @@ func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, e
 func _apply_leaks(slot: int) -> void:
 	var index: int = enemies[slot].size() - 1
 	while index >= 0:
-		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1:
+		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1 and BossMechanics.can_act(enemies[slot][index]):
 			if not _sandbox_mode:
 				if base_health[slot] > 0:
 					_sound_events.record(CombatSoundEvents.Cue.CRYSTAL, slot, Vector2(enemies[slot][index]["route"].back()), _death_time)

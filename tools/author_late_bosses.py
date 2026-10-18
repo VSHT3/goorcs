@@ -326,24 +326,32 @@ def cannon(p,x,y,recoil=0,flash=False):
 def war_machine(frame,action='walk',damage=0):
     image=Image.new('RGBA',(256,256))
     q=frame*math.tau/(8 if action=='jump_charge' else 12)
-    bob=round(math.sin(q*2)) if action in ('walk','legs') else 0
+    bob=round(math.sin(q*2)) if action=='walk' else 0
     squash=0
     if action=='jump_charge':
         squash=round(frame/7*10)
+    if action=='jump_deploy':
+        squash=-round(math.sin(frame/11*math.pi)*3)
+    if action=='jump_land':
+        squash=round(math.sin(frame/11*math.pi)*8)
     if action=='jump':
         # Global flight trajectory belongs to accepted presentation position.
         # Art changes suspension/crew/leg articulation, never adds a second arc.
         squash=(7,3,0,-2,-3,-3,-3,-2,0,2,5,2)[frame]
     p=Pixels(image,x=-round(frame/11*18) if action=='death' else 0,y=bob+squash,angle=.29*frame/11 if action=='death' else 0,pivot=(128,195))
-    leg_mode=action in ('legs','attack','cast','jump_charge','jump','death')
+    leg_mode=action in ('jump_deploy','jump_charge','jump','jump_land','death')
     extend=1 if leg_mode else .18
+    if action=='jump_deploy':
+        extend=.18+.82*frame/11
+    if action=='jump_land':
+        extend=1-.82*frame/11
     if action=='jump':
         extend=(.8,.6,.35,.25,.2,.2,.2,.3,.5,.8,1,.9)[frame]
     if action=='jump_charge':
         extend=1-frame/7*.22
     wheel_phase=q if action=='walk' else 0
-    leg_phase=q if action=='legs' else 0
-    wheel_lift=8 if leg_mode else 0
+    leg_phase=0
+    wheel_lift=round(8*max(0,(extend-.18)/.82))
     # Three-dimensional chassis, far wheels and articulated far support legs.
     mechanical_leg(p,(182,162),leg_phase+math.pi,extend,True,218-bob-squash)
     mechanical_leg(p,(82,160),leg_phase,extend,False,218-bob-squash)
@@ -537,7 +545,7 @@ def export(kind,size,anchor,animations,identity):
         'sheet_sha256':digest(sheet_path),'still':str(still.relative_to(ROOT)),'still_sha256':digest(still),
         'still_dimensions':[size,size],
         'damage_phase_thresholds':{'damaged':.66,'critical':.33} if kind=='orc_war_machine' else {},
-        'action_support':'Mechanical legs visible for attack/cast in every damage phase; jump displacement supplied by accepted presentation position' if kind=='orc_war_machine' else 'Overhead club windup, heavy ground follow-through, articulated opposed walk and collapse',
+        'action_support':'Wheels for normal travel, cannons and troop doors; articulated leg deployment, crouch, jump and landing/retraction in every damage phase; jump displacement supplied by accepted presentation position' if kind=='orc_war_machine' else 'Overhead club windup, heavy ground follow-through, articulated opposed walk and collapse',
         'animations':[{'name':name,'fps':fps,'duration_seconds':len(frames)/fps,'frame_count':len(frames),'loop':loop,'atlas_row':row,'alpha_bounds':[list(im.getbbox()) for im in frames]} for row,(name,fps,frames,loop) in enumerate(animations)]}
     (OUT/f'{kind}.json').write_text(json.dumps(manifest,indent=2)+'\n')
 
@@ -557,7 +565,8 @@ def contact(kind,size,animations):
     result.save(path)
     if kind=='orc_war_machine':
         for phase in range(3):
-            result.crop((0,phase*7*(size+22),size*4,(phase+1)*7*(size+22))).save(f'/tmp/gorcs-{kind}-phase-{phase}-native.png')
+            rows=len(animations)//3
+            result.crop((0,phase*rows*(size+22),size*4,(phase+1)*rows*(size+22))).save(f'/tmp/gorcs-{kind}-phase-{phase}-native.png')
     walk=animations[0][2]
     gif=[]
     for image in walk:
@@ -573,7 +582,7 @@ def main():
     OUT.mkdir(parents=True,exist_ok=True)
     troll_animations=[('walk',7.5,[troll(i) for i in range(12)],True),('attack',12/1.25,[troll(i,'attack') for i in range(12)],False),('death',10,[troll(i,'death') for i in range(12)],False)]
     machine_animations=[]
-    machine_spec=(('walk',12,8,True),('legs',12,7,True),('attack',12,12/1.4,False),('cast',12,10,False),('jump_charge',8,8/2.5,False),('jump',12,8,False),('death',12,10,False))
+    machine_spec=(('walk',12,8,True),('attack',12,12/1.4,False),('cast',12,10,False),('jump_deploy',12,12/.6,False),('jump_charge',8,8/2.5,False),('jump',12,8,False),('jump_land',12,12/.65,False),('death',12,10,False))
     for damage,suffix in ((0,''),(1,'_damaged'),(2,'_critical')):
         for action,count,fps,loop in machine_spec:
             machine_animations.append((action+suffix,fps,[war_machine(i,action,damage) for i in range(count)],loop))

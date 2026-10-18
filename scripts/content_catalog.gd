@@ -79,14 +79,21 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' requires positive group odds." % enemy.id)
 		if not is_finite(enemy.heal_interval) or enemy.heal_interval < 0.0 or not is_finite(enemy.heal_radius) or enemy.heal_radius < 0.0 or not is_finite(enemy.heal_fraction) or enemy.heal_fraction < 0.0 or enemy.heal_fraction > 1.0 or (enemy.heal_interval > 0.0 and (enemy.heal_radius <= 0.0 or enemy.heal_fraction <= 0.0)):
 			errors.append("Enemy '%s' has invalid healing metadata." % enemy.id)
-		if not is_finite(enemy.nonphysical_damage_multiplier) or enemy.nonphysical_damage_multiplier <= 0.0:
-			errors.append("Enemy '%s' requires a finite positive nonphysical damage multiplier." % enemy.id)
+		if not is_finite(enemy.nonphysical_damage_multiplier) or enemy.nonphysical_damage_multiplier <= 0.0 or not is_finite(enemy.fire_damage_multiplier) or enemy.fire_damage_multiplier <= 0.0 or not is_finite(enemy.lightning_damage_multiplier) or enemy.lightning_damage_multiplier <= 0.0:
+			errors.append("Enemy '%s' requires finite positive incoming damage multipliers." % enemy.id)
 		if not is_finite(enemy.stomp_interval) or enemy.stomp_interval < 0.0 or not is_finite(enemy.stomp_radius) or enemy.stomp_radius < 0.0 or not is_finite(enemy.stomp_health_fraction) or enemy.stomp_health_fraction < 0.0 or enemy.stomp_health_fraction > 1.0 or (enemy.stomp_interval > 0.0 and (enemy.stomp_radius <= 0.0 or enemy.stomp_health_fraction <= 0.0)):
 			errors.append("Enemy '%s' has invalid stomp metadata." % enemy.id)
-		if not is_finite(enemy.tower_attack_interval) or enemy.tower_attack_interval < 0.0 or not is_finite(enemy.tower_attack_range) or enemy.tower_attack_range < 0.0 or not is_finite(enemy.tower_attack_cast_duration) or enemy.tower_attack_cast_duration < 0.0 or not is_finite(enemy.tower_stun_duration) or enemy.tower_stun_duration < 0.0 or (enemy.tower_attack_interval > 0.0 and (enemy.tower_attack_kind not in [&"club", &"cannon"] or enemy.tower_attack_range <= 0.0 or enemy.tower_attack_cast_duration <= 0.0 or enemy.tower_stun_duration <= 0.0)) or (enemy.tower_attack_interval == 0.0 and enemy.tower_attack_kind != &""):
+		if not is_finite(enemy.tower_attack_interval) or enemy.tower_attack_interval < 0.0 or not is_finite(enemy.tower_attack_range) or enemy.tower_attack_range < 0.0 or not is_finite(enemy.tower_attack_cast_duration) or enemy.tower_attack_cast_duration < 0.0 or not is_finite(enemy.tower_stun_duration) or enemy.tower_stun_duration < 0.0 or enemy.tower_attack_targets < 1 or (enemy.tower_attack_interval > 0.0 and (enemy.tower_attack_kind not in [&"club", &"cannon"] or (enemy.tower_attack_kind == &"club" and enemy.tower_attack_range <= 0.0) or enemy.tower_attack_cast_duration <= 0.0 or enemy.tower_stun_duration <= 0.0)) or (enemy.tower_attack_interval == 0.0 and enemy.tower_attack_kind != &""):
 			errors.append("Enemy '%s' has invalid tower attack metadata." % enemy.id)
-		if not is_finite(enemy.road_speed_multiplier) or enemy.road_speed_multiplier <= 0.0 or not is_finite(enemy.grass_speed_multiplier) or enemy.grass_speed_multiplier <= 0.0 or not is_finite(enemy.jump_charge_duration) or enemy.jump_charge_duration < 0.0 or not is_finite(enemy.jump_duration) or enemy.jump_duration < 0.0 or (enemy.direct_movement and (enemy.jump_charge_duration <= 0.0 or enemy.jump_duration <= 0.0)):
-			errors.append("Enemy '%s' has invalid direct movement metadata." % enemy.id)
+		if not is_finite(enemy.jump_interval) or enemy.jump_interval < 0.0 or not is_finite(enemy.jump_deploy_duration) or enemy.jump_deploy_duration < 0.0 or not is_finite(enemy.jump_charge_duration) or enemy.jump_charge_duration < 0.0 or not is_finite(enemy.jump_duration) or enemy.jump_duration < 0.0 or not is_finite(enemy.jump_land_duration) or enemy.jump_land_duration < 0.0 or (enemy.jump_interval > 0.0 and (enemy.jump_deploy_duration <= 0.0 or enemy.jump_charge_duration <= 0.0 or enemy.jump_duration <= 0.0 or enemy.jump_land_duration <= 0.0 or enemy.jump_weights.size() != 4)) or (enemy.jump_interval == 0.0 and not enemy.jump_weights.is_empty()):
+			errors.append("Enemy '%s' has invalid periodic jump metadata." % enemy.id)
+		var jump_total: int = 0
+		for weight: int in enemy.jump_weights:
+			if weight < 0:
+				errors.append("Enemy '%s' has negative jump odds." % enemy.id)
+			jump_total += weight
+		if enemy.jump_interval > 0.0 and jump_total <= 0:
+			errors.append("Enemy '%s' requires positive jump odds." % enemy.id)
 		if enemy.summon_pool.size() != enemy.summon_weights.size():
 			errors.append("Enemy '%s' requires matching summon pool and weight counts." % enemy.id)
 		for weight: int in enemy.summon_weights:
@@ -104,8 +111,8 @@ func validation_errors() -> PackedStringArray:
 				required.append(&"cast")
 			if enemy.tower_attack_interval > 0.0:
 				required.append(&"attack")
-			if enemy.direct_movement:
-				required.append_array([&"legs", &"jump_charge", &"jump"])
+			if enemy.jump_interval > 0.0:
+				required.append_array([&"jump_deploy", &"jump_charge", &"jump", &"jump_land"])
 			for animation: StringName in required:
 				if not enemy.animation_frames.has_animation(animation) or enemy.animation_frames.get_frame_count(animation) == 0 or not is_finite(enemy.animation_frames.get_animation_speed(animation)) or enemy.animation_frames.get_animation_speed(animation) <= 0.0:
 					errors.append("Enemy '%s' requires a playable '%s' animation." % [enemy.id, animation])

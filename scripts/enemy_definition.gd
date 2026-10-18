@@ -11,6 +11,8 @@ extends Resource
 @export var fire_immune: bool = false
 @export var ice_immune: bool = false
 @export var nonphysical_damage_multiplier: float = 1.0
+@export var fire_damage_multiplier: float = 1.0
+@export var lightning_damage_multiplier: float = 1.0
 @export var spawn_weight: int = 1
 @export var first_wave: int = 1
 # Zero means unlimited. Share caps this type's total weight, not its head count.
@@ -55,11 +57,14 @@ extends Resource
 @export var tower_attack_range: float = 0.0
 @export var tower_attack_cast_duration: float = 0.0
 @export var tower_stun_duration: float = 0.0
-@export var direct_movement: bool = false
-@export var road_speed_multiplier: float = 1.0
-@export var grass_speed_multiplier: float = 1.0
+@export var tower_attack_targets: int = 1
+@export var jump_interval: float = 0.0
+# Indices zero through three select two through five captured-route cells.
+@export var jump_weights: PackedInt32Array = PackedInt32Array()
+@export var jump_deploy_duration: float = 0.0
 @export var jump_charge_duration: float = 0.0
 @export var jump_duration: float = 0.0
+@export var jump_land_duration: float = 0.0
 @export var animation_frames: SpriteFrames
 @export var texture: Texture2D
 @export var source_faces_left: bool = false

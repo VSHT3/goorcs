@@ -63,7 +63,7 @@ func replay_action() -> void:
 		return
 	_actions.clear()
 	if definition.animation_frames != null:
-		for action: StringName in [&"heal", &"attack", &"cast", &"legs", &"jump_charge", &"jump", &"walk_damaged", &"walk_critical"]:
+		for action: StringName in [&"heal", &"attack", &"cast", &"jump_deploy", &"jump_charge", &"jump", &"jump_land", &"walk_damaged", &"walk_critical"]:
 			if definition.animation_frames.has_animation(action):
 				_actions.append(action)
 	if _actions.is_empty():
@@ -137,7 +137,7 @@ func _draw() -> void:
 	draw_set_transform(foot, 0.0, Vector2(1.0, 0.27))
 	draw_circle(Vector2.ZERO, bounds.size.x * scale * 0.32, Color(0.035, 0.07, 0.05, 0.55))
 	draw_set_transform(Vector2.ZERO)
-	if preview_animation == &"heal" or (preview_animation == &"cast" and not definition.direct_movement):
+	if preview_animation == &"heal" or (preview_animation == &"cast" and definition.summon_pool.is_empty()):
 		EnemyVisuals.draw_action_effect(self, foot, minf(available.x * 0.28, bounds.size.x * scale * 0.55), preview_animation, preview_elapsed)
 	if preview_animation == &"jump":
 		var duration: float = maxf(0.001, EnemyVisuals.animation_duration(definition, &"jump"))

@@ -464,9 +464,11 @@ func _blend_enemies() -> void:
 		var lift: float = EnemyVisuals.jump_lift(enemy)
 		var old_lift: Vector2 = _enemy_lifts.get(id, Vector2(lift, lift))
 		next_lifts[id] = Vector2(lerpf(old_lift.x, old_lift.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), lift)
-		if bool(enemy.get("direct_movement", false)):
-			var target_position: Vector2 = enemy["pos"]
-			var prior_target: Vector2 = _enemy_position_to.get(id, target_position)
+		if enemy.get("locomotion", "path") == "jump":
+			var duration: float = maxf(0.001, float(enemy["jump_duration"]))
+			var phase: float = clampf(1.0 - float(enemy["jump_remaining"]) / duration, 0.0, 1.0)
+			var target_position: Vector2 = Vector2(enemy["jump_from"]).lerp(enemy["jump_to"], phase)
+			var prior_target: Vector2 = _enemy_position_to.get(id, enemy["jump_from"])
 			var prior_from: Vector2 = _enemy_position_from.get(id, prior_target)
 			next_position_from[id] = prior_from.lerp(prior_target, _enemy_blend_elapsed / ENEMY_BLEND_DURATION)
 			next_position_to[id] = target_position
@@ -487,10 +489,12 @@ func _blend_enemies() -> void:
 
 
 func _enemy_position(enemy: Dictionary) -> Vector2:
-	if bool(enemy.get("direct_movement", false)):
+	if enemy.get("locomotion", "path") == "jump":
 		var id: int = int(enemy["id"])
 		var target: Vector2 = _enemy_position_to.get(id, enemy["pos"])
 		return _enemy_position_from.get(id, target).lerp(target, _enemy_blend_elapsed / ENEMY_BLEND_DURATION)
+	if enemy.get("locomotion", "path") == "jump_land":
+		return enemy["pos"]
 	var route: Array = enemy["route"]
 	if route.is_empty():
 		return enemy["pos"]
@@ -500,7 +504,7 @@ func _enemy_position(enemy: Dictionary) -> Vector2:
 
 
 func _enemy_visual_position(enemy: Dictionary) -> Vector2:
-	if bool(enemy.get("direct_movement", false)):
+	if float(enemy.get("jump_duration", 0.0)) > 0.0:
 		return _enemy_position(enemy)
 	var route: Array = enemy["route"]
 	if route.size() < 2:
@@ -1256,7 +1260,7 @@ func _draw_enemy(item: Dictionary) -> void:
 	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
 	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, item["foot"]), flip)
 	var animation: StringName = StringName(enemy.get("animation", "walk"))
-	if animation == &"heal" or (animation == &"cast" and not artwork.direct_movement):
+	if animation == &"heal" or (animation == &"cast" and artwork.summon_pool.is_empty()):
 		EnemyVisuals.draw_action_effect(self, item["foot"], _cell_size() * 0.38, animation, float(enemy.get("animation_elapsed", 0.0)))
 	if flip:
 		rect.size.x = -rect.size.x
@@ -1691,7 +1695,8 @@ func _capture_boss_actions() -> void:
 			continue
 		if count.x > previous.x and definition.tower_attack_kind == &"cannon" and float(enemy.get("tower_attack_remaining", 0.0)) > 0.0:
 			var duration: float = maxf(0.001, definition.tower_attack_cast_duration)
-			_boss_effects.append({"kind": "cannon", "from": enemy["pos"], "to": enemy.get("tower_attack_aim", enemy["pos"]), "age": maxf(0.0, duration - float(enemy["tower_attack_remaining"])), "duration": duration})
+			for aim: Vector2 in enemy.get("tower_attack_aims", []):
+				_boss_effects.append({"kind": "cannon", "from": enemy["pos"], "to": aim, "age": maxf(0.0, duration - float(enemy["tower_attack_remaining"])), "duration": duration})
 		if count.y > previous.y:
 			_boss_effects.append({"kind": "stomp", "pos": enemy["pos"], "radius": definition.stomp_radius, "age": 0.0, "duration": 0.55})
 		_boss_seen_enemy[id] = count
@@ -1725,23 +1730,24 @@ func _draw_boss_telegraphs() -> void:
 	var cell_size: float = _cell_size()
 	for enemy: Dictionary in combat_enemies:
 		var locomotion: String = enemy.get("locomotion", "path")
-		if locomotion in ["jump_charge", "jump"] and enemy.has("jump_to"):
+		if locomotion in ["jump_deploy", "jump_charge", "jump", "jump_land"] and enemy.has("jump_to"):
 			var landing: Vector2 = _position_center(enemy["jump_to"])
 			var rect := Rect2(landing - Vector2.ONE * cell_size * 0.38, Vector2.ONE * cell_size * 0.76)
 			draw_rect(rect, Color(0.90, 0.66, 0.27, 0.12))
 			draw_rect(rect, Color(0.95, 0.73, 0.33, 0.85), false, 2.0)
 			var foot: Vector2 = _position_center(_enemy_position(enemy))
-			if locomotion == "jump_charge":
+			if locomotion in ["jump_deploy", "jump_charge"]:
 				var phase: float = 0.5 + sin(float(enemy.get("animation_elapsed", 0.0)) * 12.0) * 0.5
 				draw_line(foot, landing, Color(0.93, 0.70, 0.31, 0.25 + phase * 0.35), 2.0)
 				draw_set_transform(foot, 0.0, Vector2(1.0, 0.35))
 				draw_arc(Vector2.ZERO, cell_size * (0.48 + phase * 0.12), 0.0, TAU, 24, Color(0.95, 0.73, 0.33, 0.80), 2.0, false)
 				draw_set_transform(Vector2.ZERO)
 		if float(enemy.get("tower_attack_remaining", 0.0)) > 0.0:
-			var target: Vector2 = _position_center(enemy.get("tower_attack_aim", enemy["pos"]))
-			draw_set_transform(target, 0.0, Vector2(1.0, 0.4))
-			draw_arc(Vector2.ZERO, cell_size * 0.33, 0.0, TAU, 24, Color(0.94, 0.45, 0.27, 0.9), 2.0, false)
-			draw_set_transform(Vector2.ZERO)
+			for aim: Vector2 in enemy.get("tower_attack_aims", []):
+				var target: Vector2 = _position_center(aim)
+				draw_set_transform(target, 0.0, Vector2(1.0, 0.4))
+				draw_arc(Vector2.ZERO, cell_size * 0.33, 0.0, TAU, 24, Color(0.94, 0.45, 0.27, 0.9), 2.0, false)
+				draw_set_transform(Vector2.ZERO)
 
 
 func _draw_boss_effects() -> void:
