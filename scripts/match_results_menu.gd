@@ -190,11 +190,15 @@ func open_result(state: Dictionary, slot: int, solo: bool) -> void:
 	var buttons: Array[Control] = [inspect_button, menu_button, scroll]
 	if solo:
 		buttons.insert(1, replay_button)
+	var footer_count: int = buttons.size() - 1
 	for index: int in range(buttons.size()):
 		buttons[index].focus_next = buttons[index].get_path_to(buttons[(index+1)%buttons.size()])
 		buttons[index].focus_previous = buttons[index].get_path_to(buttons[posmod(index-1,buttons.size())])
-		buttons[index].focus_neighbor_top = buttons[index].focus_previous
-		buttons[index].focus_neighbor_bottom = buttons[index].focus_next
+		if index < footer_count:
+			buttons[index].focus_neighbor_left = buttons[index].get_path_to(buttons[posmod(index - 1, footer_count)])
+			buttons[index].focus_neighbor_right = buttons[index].get_path_to(buttons[(index + 1) % footer_count])
+			buttons[index].focus_neighbor_top = buttons[index].get_path_to(scroll)
+			buttons[index].focus_neighbor_bottom = buttons[index].get_path_to(scroll)
 	scroll.scroll_vertical = 0
 	show()
 	var initial: Button = replay_button if solo else inspect_button
