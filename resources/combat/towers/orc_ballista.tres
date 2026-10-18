@@ -15,13 +15,19 @@ damage_upgrade_bonus = 3
 speed_upgrade_multiplier = 0.75
 roll_attributes = PackedStringArray("damage", "attack_speed", "range", "pierce", "bounce")
 attack_sound = 1
+; Branch upgrades are bought in order after their evolution. All prices and
+; values are provisional playtest balance. Multipliers compound with earlier
+; steps; "pierce" adds straight-through hits; "bolt_scale" adds bolt size (and
+; hit-lane width); "bolt_reach" adds cells a piercing bolt keeps flying past range.
 evolutions = {
 "pierce": {
 "title": "Pierce 2",
-"cost": 300
+"cost": 300,
+"upgrades": [{"id": "bigger_wood_1", "title": "Bigger Wood I", "cost": 350, "damage_multiplier": 1.5, "pierce": 1}, {"id": "bigger_wood_2", "title": "Bigger Wood II", "cost": 450, "damage_multiplier": 1.5, "pierce": 1}, {"id": "biggest_wood_1", "title": "The Biggest Wood I", "cost": 600, "damage_multiplier": 1.25, "pierce": 1, "attack_rate_multiplier": 0.875, "bolt_scale": 0.35, "bolt_reach": 1.0}, {"id": "biggest_wood_2", "title": "The Biggest Wood II", "cost": 750, "damage_multiplier": 1.25, "pierce": 1, "attack_rate_multiplier": 0.875, "bolt_scale": 0.35, "bolt_reach": 1.0}, {"id": "biggest_wood_3", "title": "The Biggest Wood III", "cost": 900, "damage_multiplier": 1.25, "pierce": 1, "attack_rate_multiplier": 0.875, "bolt_scale": 0.35, "bolt_reach": 1.0}]
 },
 "bounce": {
 "title": "Bounce 1",
-"cost": 300
+"cost": 300,
+"upgrades": [{"id": "magic_ballista", "title": "Magic Ballista", "cost": 800, "damage_type": "magic", "magic_bounce": {"chance": 0.75, "decay": 0.05}}]
 }
 }

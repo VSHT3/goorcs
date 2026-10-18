@@ -24,6 +24,13 @@ const STONE_DARK := Color("676b55")
 const ENEMY_BLEND_DURATION: float = 0.1
 const SHOT_DURATION: float = 0.18
 const PIERCE_SHOT_DURATION: float = SHOT_DURATION * 2.0
+# Each Magic Ballista redirect leg; ordinary Bounce legs keep SHOT_DURATION.
+const MAGIC_BOUNCE_DURATION: float = 0.13
+# Ballista bolts are drawn larger than arrows and grow out of the muzzle.
+const BALLISTA_BOLT_LENGTH: float = 0.46
+const BALLISTA_BOLT_WIDTH: float = 0.045
+const MAGIC_COLOR := Color("b48cff")
+const MAGIC_CORE := Color("f1e6ff")
 const PULSE_DURATION: float = 0.14
 const BOMB_IMPACT_DURATION: float = 0.28
 const THROW_FLIGHT_DURATION: float = 0.40
@@ -317,7 +324,7 @@ func _capture_shots() -> void:
 		_has_boulders = _has_boulders or boulders or tower.get("evolution", "") == "onyx_ring"
 		var advancement: Dictionary = _archer_advancement(tower, definition)
 		var weapon: String = advancement.get("weapon", "arrow")
-		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0 or weapon == "minigun"
+		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0 or weapon == "minigun" or not tower.get("magic_bounce", {}).is_empty()
 		var archer_count: int = int(advancement.get("archer_count", 2 if bool(tower.get("special_upgraded", false)) and definition.get("special_upgrade", "") == "second_archer" else 1))
 		_capture_archer(tower, definition, 0, int(tower.get("shot", 0)), tower.get("aim", Vector2(tower["cell"])), not boulders and weapon != "flamethrower")
 		active_archers[Vector2i(int(tower["id"]), 0)] = true
@@ -389,9 +396,18 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 	var pierce: bool = archer_index == 0 and bool(tower.get("pierce_active", false))
 	var bounce: bool = archer_index == 0 and not pierce and bool(tower.get("bounce_active", false))
 	var evolution: String = tower.get("evolution", "")
-	var duration: float = (ONYX_PULSE_DURATION if evolution == "onyx_ring" else PULSE_DURATION) if area_attack else SHOT_DURATION * (2.0 if bounce else 1.0)
+	var magic: bool = archer_index == 0 and not tower.get("magic_bounce", {}).is_empty()
+	var bounce_points: Array = []
+	if bounce:
+		bounce_points = tower.get("bounce_points", []).duplicate()
+		if bounce_points.is_empty():
+			bounce_points = [tower.get("bounce_aim", tower.get("aim", Vector2(tower["cell"])))]
+	var bounce_leg: float = MAGIC_BOUNCE_DURATION if magic else SHOT_DURATION
+	var duration: float = (ONYX_PULSE_DURATION if evolution == "onyx_ring" else PULSE_DURATION) if area_attack else SHOT_DURATION + bounce_leg * bounce_points.size()
 	if pierce:
-		duration = PIERCE_SHOT_DURATION
+		# Longer-reach bolts keep the same speed for their extra flight.
+		var range_cells: float = maxf(1.0, float(tower.get("range", definition.get("range", 1.0))))
+		duration = PIERCE_SHOT_DURATION * (1.0 + float(tower.get("bolt_reach", 0.0)) / range_cells)
 	var advancement: Dictionary = _archer_advancement(tower, definition)
 	var weapon: String = advancement.get("weapon", "arrow")
 	if weapon == "flamethrower":
@@ -435,6 +451,10 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 		"pierce_aim": tower.get("pierce_aim", tower.get("aim", Vector2(tower["cell"]))),
 		"bounce_active": bounce,
 		"bounce_aim": tower.get("bounce_aim", tower.get("aim", Vector2(tower["cell"]))),
+		"bounce_points": bounce_points,
+		"bounce_leg": bounce_leg,
+		"magic": magic,
+		"bolt_scale": float(tower.get("bolt_scale", 1.0)) if archer_index == 0 else 1.0,
 		"life": maxf(0.001, duration - initial_age),
 		"duration": duration,
 		"area_attack": area_attack,
@@ -1142,6 +1162,8 @@ func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
 		draw_texture_rect(texture, rect, false)
 		if directional:
 			draw_texture_rect(artwork.directional_weapon_textures[_directional_weapon_index(tower)], rect, false)
+			if not tower.get("magic_bounce", {}).is_empty():
+				_draw_magic_ballista(tower, artwork, rect)
 		_draw_support_context(tower, foot)
 		if artwork.archer_head_texture != null:
 			var definition: Dictionary = tower_types.get(tower["type_id"], {})
@@ -1442,13 +1464,38 @@ func _projectile_destination(trace: Dictionary) -> Vector2:
 
 
 func _projectile_position(trace: Dictionary) -> Vector2:
-	var elapsed: float = float(trace["duration"]) - float(trace["life"])
+	return _projectile_position_at(trace, float(trace["duration"]) - float(trace["life"]))
+
+
+func _bounce_point(point: Vector2) -> Vector2:
+	return _position_center(point) + Vector2(0, _cell_size() * 0.15)
+
+
+# The accepted redirect leg at this presentation time: its start, end and progress.
+func _bounce_leg(trace: Dictionary, elapsed: float) -> Dictionary:
+	var points: Array = trace.get("bounce_points", [])
+	if points.is_empty():
+		points = [trace["bounce_aim"]]
+	var leg: float = float(trace.get("bounce_leg", SHOT_DURATION))
+	var index: int = clampi(floori((elapsed - SHOT_DURATION) / leg), 0, points.size() - 1)
+	var start: Vector2 = _projectile_destination(trace) if index == 0 else _bounce_point(points[index - 1])
+	return {"index": index, "start": start, "end": _bounce_point(points[index]),
+		"fraction": clampf((elapsed - SHOT_DURATION - index * leg) / leg, 0.0, 1.0)}
+
+
+func _projectile_position_at(trace: Dictionary, elapsed: float) -> Vector2:
 	var primary: Vector2 = _projectile_destination(trace)
 	if bool(trace["pierce_active"]):
 		return _projectile_origin(trace).lerp(primary, clampf(elapsed / float(trace["duration"]), 0.0, 1.0))
 	if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
-		var bounce: Vector2 = _position_center(trace["bounce_aim"]) + Vector2(0, _cell_size() * 0.15)
-		return primary.lerp(bounce, clampf((elapsed - SHOT_DURATION) / SHOT_DURATION, 0.0, 1.0))
+		var leg: Dictionary = _bounce_leg(trace, elapsed)
+		var position: Vector2 = Vector2(leg["start"]).lerp(leg["end"], leg["fraction"])
+		if bool(trace.get("magic", false)):
+			# Homing arc: swing out sideways, then curve into the next victim.
+			var span: Vector2 = Vector2(leg["end"]) - Vector2(leg["start"])
+			var side := Vector2(-span.y, span.x).normalized() * (1.0 if int(leg["index"]) % 2 == 0 else -1.0)
+			position += side * sin(float(leg["fraction"]) * PI) * minf(_cell_size() * 0.7, span.length() * 0.35)
+		return position
 	var fraction: float = clampf(elapsed / float(trace.get("flight_duration", SHOT_DURATION)), 0.0, 1.0)
 	var position: Vector2 = _projectile_origin(trace).lerp(primary, fraction)
 	if trace.get("weapon", "arrow") in ["molotov", "grenade"]:
@@ -1472,6 +1519,10 @@ func _draw_projectiles() -> void:
 				ArrowWeaponVisuals.draw_impact(self, end, float(trace["splash_radius"]) * cell_size, phase, maxf(1, floorf(cell_size * 0.022)), weapon)
 			else:
 				_draw_bomb_impact(end, float(trace["splash_radius"]), phase)
+			continue
+		var bolt_art: TowerReward = _tower_art.get(trace["type_id"])
+		if bolt_art != null and not bolt_art.directional_weapon_textures.is_empty():
+			_draw_ballista_bolt(trace, elapsed)
 			continue
 		var start: Vector2 = _projectile_origin(trace)
 		if bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION:
@@ -1514,6 +1565,112 @@ func _draw_projectiles() -> void:
 					Color("ef7d35") if index == 0 else Color("b94a2c"))
 		draw_line(tail, tail + direction * length * 0.25 + side * length * 0.18, Color("d3cbab"), width, true)
 		draw_line(tail, tail + direction * length * 0.25 - side * length * 0.18, Color("d3cbab"), width, true)
+
+
+# A heavy Ballista bolt: dark-outlined shaft, iron head and fins, scaled by
+# Biggest Wood. On its first leg it grows out of the muzzle instead of appearing
+# whole over the masonry. Magic bolts glow violet and leave a sparkling trail.
+func _draw_ballista_bolt(trace: Dictionary, elapsed: float) -> void:
+	var cell_size: float = _cell_size()
+	var scale: float = float(trace.get("bolt_scale", 1.0))
+	var magic: bool = bool(trace.get("magic", false))
+	var tip: Vector2 = _projectile_position_at(trace, elapsed)
+	var direction: Vector2 = (tip - _projectile_position_at(trace, maxf(0.0, elapsed - 0.01))).normalized()
+	if direction == Vector2.ZERO:
+		direction = (_projectile_destination(trace) - _projectile_origin(trace)).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.RIGHT
+	var width: float = maxf(2.0, roundf(cell_size * BALLISTA_BOLT_WIDTH * scale))
+	var length: float = cell_size * BALLISTA_BOLT_LENGTH * scale
+	var redirected: bool = bool(trace["bounce_active"]) and elapsed >= SHOT_DURATION
+	if not redirected:
+		length = minf(length, _projectile_origin(trace).distance_to(tip))
+	_draw_bolt_trail(trace, elapsed, width, magic)
+	if magic:
+		_draw_magic_impacts(trace, elapsed, width)
+	if length < 1.0:
+		return
+	var side := Vector2(-direction.y, direction.x)
+	var tail: Vector2 = tip - direction * length
+	var head_length: float = minf(length * 0.45, maxf(4.0, length * 0.26))
+	var head_width: float = width * 1.5 + 1.0
+	var neck: Vector2 = tip - direction * head_length
+	var outline := Color("2a1745") if magic else Color("33241a")
+	var shaft := Color("8f6fd8") if magic else Color("a57a45")
+	var fin := Color("cdb2ff") if magic else Color("e2d6b0")
+	var iron := Color("efe4ff") if magic else Color("a7adb0")
+	if magic:
+		draw_line(tail, tip, Color(MAGIC_COLOR, 0.30), width + 6.0, true)
+	draw_line(tail, neck, outline, width + 2.0, true)
+	draw_line(tail, neck, shaft, width, true)
+	var fin_length: float = length * 0.24
+	var fin_width: float = width * 1.4 + 1.0
+	for fin_side: float in [-1.0, 1.0]:
+		var fin_points := PackedVector2Array([tail, tail + direction * fin_length, tail + direction * fin_length * 0.25 + side * fin_width * fin_side])
+		draw_colored_polygon(fin_points, fin)
+	var head := PackedVector2Array([tip, neck + side * head_width, neck + direction * head_length * 0.25, neck - side * head_width])
+	draw_colored_polygon(head, iron)
+	draw_polyline(PackedVector2Array([neck + side * head_width, tip, neck - side * head_width]), outline, 1.0, true)
+	if magic:
+		draw_circle(tip, width * 2.2, Color(MAGIC_COLOR, 0.35))
+		draw_circle(tip, width * 1.0, Color(MAGIC_CORE, 0.85))
+
+
+func _draw_bolt_trail(trace: Dictionary, elapsed: float, width: float, magic: bool) -> void:
+	var samples: int = 10 if magic else 3
+	var spacing: float = 0.014 if magic else 0.008
+	var previous: Vector2 = _projectile_position_at(trace, elapsed)
+	for index: int in range(1, samples + 1):
+		var time: float = elapsed - float(index) * spacing
+		if time < 0.0:
+			break
+		var point: Vector2 = _projectile_position_at(trace, time)
+		var fade: float = 1.0 - float(index) / float(samples + 1)
+		if magic:
+			draw_line(previous, point, Color(MAGIC_COLOR, 0.22 * fade), width * (1.5 + 3.5 * fade), true)
+			draw_line(previous, point, Color(MAGIC_COLOR, 0.75 * fade), width * (0.6 + 1.8 * fade), true)
+			if index % 2 == 0:
+				# Deterministic sparkle offsets: identical on every redraw of this trace.
+				var jitter := Vector2(sin(float(index * 7 + int(trace["tower_id"]))), cos(float(index * 5))) * width * 1.5
+				var pixel: float = maxf(1.0, roundf(width * 0.7))
+				draw_rect(Rect2((point + jitter - Vector2.ONE * pixel * 0.5).floor(), Vector2.ONE * pixel), Color(MAGIC_CORE, 0.8 * fade))
+		else:
+			draw_line(previous, point, Color(0.93, 0.89, 0.76, 0.25 * fade), width * 0.8, true)
+		previous = point
+
+
+func _draw_magic_impacts(trace: Dictionary, elapsed: float, width: float) -> void:
+	var points: Array = trace.get("bounce_points", [])
+	var leg: float = float(trace.get("bounce_leg", MAGIC_BOUNCE_DURATION))
+	for index: int in range(-1, points.size()):
+		var hit_time: float = SHOT_DURATION + float(index + 1) * leg
+		var age: float = elapsed - hit_time
+		if age < 0.0 or age > 0.16:
+			continue
+		var center: Vector2 = _projectile_destination(trace) if index < 0 else _bounce_point(points[index])
+		var phase: float = age / 0.16
+		draw_arc(center, width * (2.0 + 5.0 * phase), 0.0, TAU, 16, Color(MAGIC_COLOR, 0.8 * (1.0 - phase)), maxf(1.0, width * 0.6), true)
+		draw_circle(center, width * 1.4 * (1.0 - phase), Color(MAGIC_CORE, 0.7 * (1.0 - phase)))
+
+
+# Magic Ballista: a faint rune ring on the turret, a charged violet bolt tip at
+# the live muzzle, and three orbiting motes. Purely cosmetic and local.
+func _draw_magic_ballista(tower: Dictionary, artwork: TowerReward, rect: Rect2) -> void:
+	var cell_size: float = _cell_size()
+	var pulse: float = 0.5 + 0.5 * sin(_flame_elapsed * 4.0)
+	var canvas: Vector2 = _directional_canvas_sizes[artwork]
+	var center: Vector2 = rect.position + Vector2(canvas.x * 0.5, canvas.y * 0.36) * rect.size / canvas
+	draw_set_transform(center, 0.0, Vector2(1.0, 0.45))
+	draw_arc(Vector2.ZERO, cell_size * 0.30, 0.0, TAU, 24, Color(MAGIC_COLOR, 0.35 + 0.25 * pulse), maxf(1.0, cell_size * 0.018), true)
+	draw_set_transform(Vector2.ZERO)
+	for index: int in range(3):
+		var angle: float = _flame_elapsed * 1.8 + float(index) * TAU / 3.0
+		var mote: Vector2 = center + Vector2(cos(angle), sin(angle) * 0.45) * cell_size * 0.42 + Vector2(0, -cell_size * 0.08)
+		var pixel: float = maxf(2.0, roundf(cell_size * 0.028))
+		draw_rect(Rect2((mote - Vector2.ONE * pixel * 0.5).floor(), Vector2.ONE * pixel), Color(MAGIC_COLOR, 0.65 + 0.3 * pulse))
+	var muzzle: Vector2 = _tower_muzzle(tower, 0)
+	draw_circle(muzzle, cell_size * (0.055 + 0.015 * pulse), Color(MAGIC_COLOR, 0.40))
+	draw_circle(muzzle, cell_size * 0.026, Color(MAGIC_CORE, 0.9))
 
 
 func _archer_offset(artwork: TowerReward, archer_index: int, variant: Dictionary = {}) -> Vector2:

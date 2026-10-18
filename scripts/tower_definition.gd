@@ -115,7 +115,9 @@ static func valid_evolutions(definition: TowerDefinition) -> bool:
 		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
 			return false
 		if branch in ["pierce", "bounce"]:
-			if definition.area_attack or config.size() != 2:
+			if definition.area_attack or config.size() != (3 if config.has("upgrades") else 2):
+				return false
+			if config.has("upgrades") and not valid_branch_upgrades(String(branch), config["upgrades"]):
 				return false
 			for other_branch: Variant in definition.evolutions:
 				if other_branch not in ["pierce", "bounce"]:
@@ -137,6 +139,41 @@ static func valid_evolutions(definition: TowerDefinition) -> bool:
 				return false
 			var followup: Dictionary = config["followup"]
 			if followup.get("id") != "freeze_runes" or not followup.get("title") is String or String(followup["title"]).is_empty() or not followup.get("cost") is int or int(followup["cost"]) <= 0:
+				return false
+	return true
+
+
+# Ordered Ballista branch upgrades, bought one after another after Pierce/Bounce.
+static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
+	if not upgrades is Array or (upgrades as Array).is_empty():
+		return false
+	var seen: Dictionary = {}
+	for step: Variant in upgrades:
+		if not step is Dictionary:
+			return false
+		var config: Dictionary = step
+		var id: Variant = config.get("id")
+		if not id is String or String(id).is_empty() or seen.has(id) or id in ["damage", "speed", "special", "pierce", "bounce"]:
+			return false
+		seen[id] = true
+		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
+			return false
+		for field: Variant in config:
+			if field not in ["id", "title", "cost", "damage_multiplier", "pierce", "attack_rate_multiplier", "bolt_scale", "bolt_reach", "damage_type", "magic_bounce"]:
+				return false
+		for field: String in ["damage_multiplier", "attack_rate_multiplier"]:
+			if config.has(field) and not _positive_number(config[field]):
+				return false
+		for field: String in ["bolt_scale", "bolt_reach"]:
+			if config.has(field) and not _nonnegative_number(config[field]):
+				return false
+		if config.has("pierce") and (not config["pierce"] is int or int(config["pierce"]) < 0):
+			return false
+		if config.has("damage_type") and String(config["damage_type"]) not in ["physical", "magic"]:
+			return false
+		if config.has("magic_bounce"):
+			var magic: Variant = config["magic_bounce"]
+			if branch != "bounce" or not magic is Dictionary or (magic as Dictionary).size() != 2 or not _positive_number(magic.get("chance")) or float(magic["chance"]) > 1.0 or not _nonnegative_number(magic.get("decay")):
 				return false
 	return true
 

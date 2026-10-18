@@ -5,6 +5,8 @@ enum Phase { PLANNING, WAVE, FINISHED }
 enum TargetMode { FURTHEST, CLOSEST, STRONGEST, LAST = 3 }
 
 const DEATH_EVENT_LIFETIME: float = 2.0
+# Bounded redirects per bolt; decaying Magic odds normally stop far earlier.
+const MAX_BOUNCE_POINTS: int = 24
 const NO_BONUS: Dictionary = {}
 
 var phase: Phase = Phase.PLANNING
@@ -57,6 +59,8 @@ var _timing_random: RandomNumberGenerator
 var _group_random: RandomNumberGenerator = RandomNumberGenerator.new()
 var _roll_random := RandomNumberGenerator.new()
 var _drop_random := RandomNumberGenerator.new()
+# Magic Ballista bounce rolls never perturb waves, placement rolls or drops.
+var _magic_random := RandomNumberGenerator.new()
 var _roll_rules: TowerRollRules
 var _roster_configuration_valid: bool = true
 var _routes: Array[Array] = [[], []]
@@ -111,6 +115,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 	_drop_random = drop_random if drop_random != null else RandomNumberGenerator.new()
 	if drop_random == null:
 		_drop_random.seed = _wave_random.seed ^ 0x44524f50
+	_magic_random.seed = _wave_random.seed ^ 0x4d414749
 	reroll_currency = [rules.starting_reroll_currency, rules.starting_reroll_currency]
 	if rules.starting_reroll_currency < 0 or rules.clear_reroll_currency < 0:
 		push_error("Reroll currency grants must be nonnegative")
@@ -264,6 +269,8 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"firing": false, "continuous_fire_time": 0.0, "refuel_remaining": 0.0, "refuel_duration": 0.0,
 		"bounce_active": false, "bounce_aim": Vector2(cell),
 		"pierce_active": false, "pierce_aim": Vector2(cell),
+		"bounce_points": [] as Array[Vector2], "branch_upgrades": [] as Array[String],
+		"branch_pierce": 0, "bolt_scale": 1.0, "bolt_reach": 0.0, "magic_bounce": {},
 		"damage": definition["damage"], "interval": definition["interval"],
 		"range": definition["range"], "base_damage": definition["damage"], "base_interval": definition["interval"],
 		"behavior_kind": definition["behavior_kind"], "behavior_config": definition["behavior_config"].duplicate(true),
@@ -369,6 +376,22 @@ func _refresh_board(slot: int) -> void:
 		elif range_bonus < 0.0:
 			tower["range"] = maxf(minf(1.0, base_range), floorf(base_range * (1.0 + range_bonus)))
 		tower["behavior_config"] = behavior
+		var branch_pierce: int = 0
+		var bolt_scale: float = 1.0
+		var bolt_reach: float = 0.0
+		var magic_bounce: Dictionary = {}
+		for step: Dictionary in branch.get("upgrades", []):
+			if not tower.get("branch_upgrades", []).has(step["id"]):
+				continue
+			branch_pierce += int(step.get("pierce", 0))
+			bolt_scale += float(step.get("bolt_scale", 0.0))
+			bolt_reach += float(step.get("bolt_reach", 0.0))
+			if step.has("magic_bounce"):
+				magic_bounce = step["magic_bounce"].duplicate()
+		tower["branch_pierce"] = branch_pierce
+		tower["bolt_scale"] = bolt_scale
+		tower["bolt_reach"] = bolt_reach
+		tower["magic_bounce"] = magic_bounce
 		tower["support_damage_bonus"] = 0.0
 		tower["support_speed_bonus"] = 0.0
 		var damage_bonus: float = 0.0
@@ -477,6 +500,9 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 	var followup: bool = followups.has(upgrade)
 	var advancement: bool = definition["advancements"].has(upgrade)
 	var freeze: bool = upgrade == "freeze_runes" and current.get("followup", {}).get("id", "") == upgrade
+	var steps: Array = current.get("upgrades", [])
+	var purchased_steps: Array = tower.get("branch_upgrades", [])
+	var branch_step: bool = purchased_steps.size() < steps.size() and steps[purchased_steps.size()]["id"] == upgrade
 	var config: Dictionary = {}
 	var flag: String = ""
 	if upgrade in ["damage", "speed"]:
@@ -506,6 +532,8 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 			return false
 		flag = "freeze_upgraded"
 		config = current["followup"]
+	elif branch_step:
+		config = steps[purchased_steps.size()]
 	else:
 		return false
 	var cost: int = int(config["cost"]) if not config.is_empty() else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition))
@@ -554,6 +582,11 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 		tower["continuous_fire_time"] = 0.0
 		tower["refuel_remaining"] = 0.0
 		tower["refuel_duration"] = float(config.get("refuel_duration", 0.0))
+	elif branch_step:
+		tower["branch_upgrades"].append(upgrade)
+		# Compound on the evolved base, like Arrow attack-rate advancements.
+		tower["base_damage"] = float(tower["base_damage"]) * float(config.get("damage_multiplier", 1.0))
+		tower["base_interval"] = float(tower["base_interval"]) / float(config.get("attack_rate_multiplier", 1.0))
 	elif upgrade == "damage" and definition["upgrade_effects"].is_empty():
 		tower["base_damage"] += definition["damage_upgrade_bonus"]
 	elif upgrade == "speed" and definition["upgrade_effects"].is_empty():
@@ -590,7 +623,7 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 
 # Level is derived from accepted upgrades, never a second mutable copy of tower state.
 static func tower_level(tower: Dictionary) -> int:
-	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"])) + int(bool(tower.get("special_upgraded", false))) + int(bool(tower.get("freeze_upgraded", false))) + tower.get("advancement_path", []).size() + int(not String(tower.get("followup", "")).is_empty()) + int(not String(tower.get("evolution", "")).is_empty() and _tower_has_separate_special(tower))
+	return 1 + int(bool(tower["damage_upgraded"])) + int(bool(tower["speed_upgraded"])) + int(bool(tower.get("special_upgraded", false))) + int(bool(tower.get("freeze_upgraded", false))) + tower.get("advancement_path", []).size() + int(not String(tower.get("followup", "")).is_empty()) + int(not String(tower.get("evolution", "")).is_empty() and _tower_has_separate_special(tower)) + tower.get("branch_upgrades", []).size()
 
 
 static func _tower_has_separate_special(tower: Dictionary) -> bool:
@@ -629,6 +662,7 @@ func grow_for_main_round() -> void:
 			tower["tracking_aim"] += Vector2.DOWN
 			tower["secondary_aim"] += Vector2.DOWN
 			tower["chain_points"].clear()
+			tower["bounce_points"].clear()
 			for archer: Dictionary in tower["extra_archers"]:
 				archer["aim"] += Vector2.DOWN
 			tower["bounce_aim"] += Vector2.DOWN
@@ -740,6 +774,7 @@ func debug_set_round(round_number: int) -> bool:
 				archer["aim"] = Vector2(tower["cell"])
 			tower["bounce_aim"] = Vector2(tower["cell"])
 			tower["bounce_active"] = false
+			tower["bounce_points"].clear()
 			tower["pierce_aim"] = Vector2(tower["cell"])
 			tower["pierce_active"] = false
 	for slot: int in range(2):
@@ -1972,10 +2007,16 @@ func _burn_until(slot: int, id: int, time: float, index: int = -1) -> void:
 
 # Rolled pierce/bounce and purchased branches are independent additive capacities.
 # A bolt hits straight-through victims first, then redirects from its final hit.
+# Bigger Wood steps add pierce; Biggest Wood also widens the bolt's hit lane and
+# lets it fly bolt_reach cells past range. Magic Ballista keeps redirecting with a
+# decaying chance, revisiting earlier victims only when no new enemy remains.
 func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_index: int, time: float = -1.0) -> void:
 	var modifiers: Dictionary = tower["modifiers"]
-	var pierce: int = int(modifiers.get("pierce", 0.0)) + int(tower["evolution"] == "pierce")
+	var pierce: int = int(modifiers.get("pierce", 0.0)) + int(tower["evolution"] == "pierce") + int(tower.get("branch_pierce", 0))
 	var bounces: int = int(modifiers.get("bounce", 0.0)) + int(tower["evolution"] == "bounce")
+	var magic: Dictionary = tower.get("magic_bounce", {})
+	var points: Array = tower["bounce_points"]
+	points.clear()
 	if pierce == 0 and bounces == 0:
 		_hit(slot, tower, primary_index)
 		return
@@ -1983,16 +2024,19 @@ func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_in
 	var origin := Vector2(tower["cell"])
 	var direction: Vector2 = Vector2(tower["aim"]) - origin
 	var position: Vector2 = tower["aim"]
+	var current_id: int = int(enemies[slot][primary_index]["id"])
 	if pierce > 0:
 		tower["pierce_active"] = true
 		tower["pierce_aim"] = tower["aim"]
 	if pierce == 0 or direction == Vector2.ZERO:
-		hit_ids[int(enemies[slot][primary_index]["id"])] = true
+		hit_ids[current_id] = true
 		_hit(slot, tower, primary_index)
 	else:
 		direction = direction.normalized()
 		tower["pierce_active"] = true
-		var radius: float = floorf(range_cells) + 0.5 - 0.000001
+		var reach: float = range_cells + float(tower.get("bolt_reach", 0.0))
+		var lane: float = 0.25 * float(tower.get("bolt_scale", 1.0))
+		var radius: float = floorf(reach) + 0.5 - 0.000001
 		tower["pierce_aim"] = origin + direction * (radius / maxf(absf(direction.x), absf(direction.y)))
 		for contact: int in range(1 + pierce):
 			var selected: int = -1
@@ -2001,11 +2045,11 @@ func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_in
 			for index: int in range(enemies[slot].size()):
 				var enemy: Dictionary = enemies[slot][index]
 				var sampled: Vector2 = enemy["pos"] if time < 0.0 else _position(enemy["route"], _historical_progress(enemy, time))
-				if int(enemy["hp"]) <= 0 or hit_ids.has(int(enemy["id"])) or (time >= 0.0 and float(_enemy_spawn_times[enemy["id"]]) > time + 0.000000001) or not cell_in_range(tower["cell"], Vector2i(sampled.round()), range_cells):
+				if int(enemy["hp"]) <= 0 or hit_ids.has(int(enemy["id"])) or (time >= 0.0 and float(_enemy_spawn_times[enemy["id"]]) > time + 0.000000001) or not cell_in_range(tower["cell"], Vector2i(sampled.round()), reach):
 					continue
 				var offset: Vector2 = sampled - origin
 				var distance: float = offset.dot(direction)
-				if distance <= 0.0 or absf(offset.cross(direction)) > 0.25:
+				if distance <= 0.0 or absf(offset.cross(direction)) > lane:
 					continue
 				if selected < 0 or distance < best_distance or (distance == best_distance and int(enemy["id"]) < best_id):
 					selected = index
@@ -2014,16 +2058,27 @@ func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_in
 			if selected < 0:
 				break
 			position = enemies[slot][selected]["pos"] if time < 0.0 else _position(enemies[slot][selected]["route"], _historical_progress(enemies[slot][selected], time))
-			hit_ids[int(enemies[slot][selected]["id"])] = true
+			current_id = int(enemies[slot][selected]["id"])
+			hit_ids[current_id] = true
 			_hit(slot, tower, selected)
-	for jump: int in range(bounces):
+	var chance: float = float(magic.get("chance", 0.0))
+	var jump: int = 0
+	while jump < bounces or (not magic.is_empty() and chance > 0.000000001 and _magic_random.randf() < chance):
+		if jump >= bounces:
+			chance -= float(magic.get("decay", 0.0))
+		jump += 1
 		var selected: int = _nearest_unhit(slot, position, hit_ids, INF, time)
-		if selected < 0:
+		if selected < 0 and not magic.is_empty():
+			# Every living enemy was already struck: loop back, never onto itself.
+			selected = _nearest_unhit(slot, position, {current_id: true}, INF, time)
+		if selected < 0 or jump > MAX_BOUNCE_POINTS:
 			break
 		position = enemies[slot][selected]["pos"] if time < 0.0 else _position(enemies[slot][selected]["route"], _historical_progress(enemies[slot][selected], time))
-		hit_ids[int(enemies[slot][selected]["id"])] = true
+		current_id = int(enemies[slot][selected]["id"])
+		hit_ids[current_id] = true
 		tower["bounce_active"] = true
 		tower["bounce_aim"] = position
+		points.append(position)
 		_hit(slot, tower, selected, ceili(float(tower["damage"]) * TowerDefinition.BOUNCE_DAMAGE_MULTIPLIER))
 
 
@@ -2220,6 +2275,9 @@ func _tower_damage_type(tower: Dictionary) -> StringName:
 	if tower["evolution"] == "boulders":
 		return &"ice" if tower["freeze_upgraded"] else &"physical"
 	var definition: Dictionary = _tower_types[tower["type_id"]]
+	for step: Dictionary in definition["evolutions"].get(tower["evolution"], {}).get("upgrades", []):
+		if step.has("damage_type") and tower.get("branch_upgrades", []).has(step["id"]):
+			return StringName(step["damage_type"])
 	var config: Dictionary = definition["advancements"].get(tower["advancement"], {})
 	if config.get("weapon", "") in ["molotov", "flamethrower"]:
 		return &"fire"

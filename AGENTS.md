@@ -27,6 +27,7 @@ A single commit with a lot of work is acceptable. No need to produce multiple hu
 - Give mutable state one clear owner. UI selection and camera state must not become alternate copies of match state.
 - Preserve unsaved editor work and unrelated changes. Coordinate external file edits with editor saves.
 - Commit source resources and Godot UID sidecars; keep generated caches, builds, and credentials out of Git.
+- Tower levels always display as Roman numerals at every level (`MatchPlanningScreen.roman_numeral`); never fall back to Arabic digits or a fixed-length table.
 - Keep changes small and playable. Do not build extensive progression before proving the two-player core loop.
 
 ## UI presentation

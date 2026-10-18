@@ -4,7 +4,8 @@ extends Control
 signal leave_requested
 
 
-const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III", "IV", "V"]
+# Rule: tower levels always display as Roman numerals, at any level.
+const ROMAN_NUMERALS: Array[Array] = [[1000, "M"], [900, "CM"], [500, "D"], [400, "CD"], [100, "C"], [90, "XC"], [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"]]
 
 
 class CurrencyIcon extends Control:
@@ -928,9 +929,23 @@ static func tower_display_title(tower: Dictionary, stats: Dictionary) -> String:
 	var followup: Dictionary = followups.get(String(tower.get("followup", "")), {})
 	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
 	var title: String = String(advancement.get("title", followup.get("title", branch.get("title", stats.get("title", "Tower")))))
+	var steps: Array = branch.get("upgrades", [])
+	var purchased_steps: int = tower.get("branch_upgrades", []).size()
+	if purchased_steps > 0 and purchased_steps <= steps.size():
+		title = String(steps[purchased_steps - 1]["title"])
 	var level: int = MatchCombat.tower_level(tower)
 	var rarity: String = String(tower.get("rarity", ""))
-	return "%s%s · %s" % [rarity.capitalize() + " " if not rarity.is_empty() else "", title, TOWER_LEVEL_NUMERALS[level - 1] if level <= TOWER_LEVEL_NUMERALS.size() else str(level)]
+	return "%s%s · %s" % [rarity.capitalize() + " " if not rarity.is_empty() else "", title, roman_numeral(level)]
+
+
+static func roman_numeral(value: int) -> String:
+	var result: String = ""
+	var remaining: int = maxi(1, value)
+	for pair: Array in ROMAN_NUMERALS:
+		while remaining >= int(pair[0]):
+			result += String(pair[1])
+			remaining -= int(pair[0])
+	return result
 
 
 static func tower_rarity_color(tower: Dictionary) -> Color:
@@ -1055,12 +1070,40 @@ static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dicti
 	if not chosen_definition.get("followup", {}).is_empty():
 		var definition: Dictionary = chosen_definition["followup"]
 		actions["freeze_runes"] = {"title": definition.get("title", "Freeze Runes"), "cost": int(definition.get("cost", 0)), "purchased": bool(tower.get("freeze_upgraded", false)), "locked": false, "description": upgrade_description("freeze_runes", definition)}
+	# Ordered branch upgrades: purchased steps stay listed as purchased, and
+	# only the next step in the chain is offered.
+	var steps: Array = chosen_definition.get("upgrades", [])
+	var purchased_steps: Array = tower.get("branch_upgrades", [])
+	for index: int in range(mini(steps.size(), purchased_steps.size() + 1)):
+		var step: Dictionary = steps[index]
+		actions[step["id"]] = {"title": step["title"], "cost": int(step["cost"]), "purchased": index < purchased_steps.size(), "locked": false, "description": branch_upgrade_description(step) + ("\nNext: " + String(steps[index + 1]["title"]) if index + 1 < steps.size() else "")}
 	var followups: Dictionary = chosen_definition.get("followups", {})
 	var followup: String = String(tower.get("followup", ""))
 	for command: String in followups:
 		var definition: Dictionary = followups[command]
 		actions[command] = {"title": definition.get("title", command.capitalize()), "cost": int(definition.get("cost", 0)), "purchased": followup == command, "locked": not followup.is_empty() and followup != command, "description": upgrade_description(command, definition) + "\nChoose one permanent specialization."}
 	return actions
+
+
+static func branch_upgrade_description(step: Dictionary) -> String:
+	var parts := PackedStringArray()
+	if step.has("magic_bounce"):
+		var magic: Dictionary = step["magic_bounce"]
+		parts.append("Homing magic bolt. After its bounce it has a %.0f%% chance to bounce again to the nearest enemy, %.0f%% less likely each further bounce. With no new enemy left it loops back to earlier victims. Bounces deal 50%% damage." % [float(magic.get("chance", 0.0)) * 100.0, float(magic.get("decay", 0.0)) * 100.0])
+	if step.has("damage_type"):
+		parts.append("Deals %s damage." % String(step["damage_type"]).to_upper())
+	if step.has("damage_multiplier"):
+		parts.append("+%.0f%% damage" % ((float(step["damage_multiplier"]) - 1.0) * 100.0))
+	if int(step.get("pierce", 0)) > 0:
+		parts.append("+%d pierce" % int(step["pierce"]))
+	if float(step.get("bolt_scale", 0.0)) > 0.0:
+		parts.append("bigger bolt")
+	if float(step.get("bolt_reach", 0.0)) > 0.0:
+		parts.append("flies %s cell%s further" % [String.num(float(step["bolt_reach"]), 1), "" if float(step["bolt_reach"]) == 1.0 else "s"])
+	if step.has("attack_rate_multiplier"):
+		var change: float = (float(step["attack_rate_multiplier"]) - 1.0) * 100.0
+		parts.append("%s%s%% attack speed" % ["+" if change > 0.0 else "", String.num(change, 1)])
+	return " · ".join(parts)
 
 
 static func effect_description(effects: Dictionary) -> String:

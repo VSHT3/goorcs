@@ -185,6 +185,11 @@ static func _valid_board_variants(tower: TowerDefinition) -> bool:
 		if followups is Dictionary:
 			for followup_id: Variant in followups:
 				branches[followup_id] = true
+		var steps: Variant = config.get("upgrades")
+		if steps is Array:
+			for step: Variant in steps:
+				if step is Dictionary and typeof(step.get("id")) == TYPE_STRING:
+					branches[step["id"]] = true
 	for branch: Variant in art.board_variants:
 		if typeof(branch) != TYPE_STRING or String(branch).is_empty() or not branches.has(branch) or not art.board_variants[branch] is Dictionary:
 			return false

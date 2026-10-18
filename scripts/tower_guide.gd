@@ -191,6 +191,12 @@ static func _stages(definition: TowerDefinition) -> Array[Dictionary]:
 			var followup_path: Array[String] = branch_path.duplicate()
 			followup_path.append(followup_id)
 			stages.append(_stage(followup_path, branch["followups"][followup_id]["title"], branch_id))
+		var step_path: Array[String] = branch_path.duplicate()
+		var step_parent: String = branch_id
+		for step: Dictionary in branch.get("upgrades", []):
+			step_path.append(String(step["id"]))
+			stages.append(_stage(step_path, step["title"], step_parent))
+			step_parent = "/".join(step_path)
 	return stages
 
 
@@ -227,4 +233,7 @@ static func _command_title(catalog: ContentCatalog, type_id: StringName, command
 				return branch["followup"]["title"]
 			if branch.get("followups", {}).has(command):
 				return branch["followups"][command]["title"]
+			for step: Dictionary in branch.get("upgrades", []):
+				if step["id"] == command:
+					return step["title"]
 	return command
