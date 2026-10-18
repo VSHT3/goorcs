@@ -610,6 +610,34 @@
       "recipe": "Recorded CC0 roar_02; source trim 0.070\u20130.850s, mono 48 kHz PCM16; one-pole lowpass 6000 Hz minus 80 Hz lowpass, weighted DC removal, 1 ms sin\u00b2 entrance/15 ms sin\u00b2 exit, peak 0.32, triangular dither seed 918307. No pitch/time stretch or synthesized voice.",
       "vocal_attack_seconds": 0.03,
       "sha256": "cce78fe9c18dc96d9653b1b3dfaed9ca6d8b8343ae8e012b7055aef26dd6c8fb"
+    },
+    {
+      "file": "rarity_tick_01.wav",
+      "family": "rarity_tick",
+      "variant": 1,
+      "seed": 748340,
+      "duration_seconds": 0.065,
+      "measured_peak_dbfs": -14.895,
+      "measured_rms_dbfs": -35.183,
+      "mean_pcm_lsb": -0.00321,
+      "authored_peak_linear": 0.18,
+      "recommended_gain_db": -5.0,
+      "recipe": "short dry ratchet tooth with a muted metallic edge for reel crossings",
+      "sha256": "69c44e03def8d14befc8f404b83a82771f598388ceb6119b38f9b38af03a4f18"
+    },
+    {
+      "file": "rarity_reveal_01.wav",
+      "family": "rarity_reveal",
+      "variant": 1,
+      "seed": 749349,
+      "duration_seconds": 0.85,
+      "measured_peak_dbfs": -11.057,
+      "measured_rms_dbfs": -28.748,
+      "mean_pcm_lsb": 0.00284,
+      "authored_peak_linear": 0.28,
+      "recommended_gain_db": -3.0,
+      "recipe": "latch landing followed by a rising resonant crystal chord",
+      "sha256": "79d2c5e3bf67b8201f87fe65a3718c702445d542376980f2ecf4d9592d000f50"
     }
   ],
   "third_party_sources": {

@@ -175,6 +175,8 @@ FAMILIES = {
     "machine_jump": (746322, 0.680, 0.35, -5.0, 2, "compressed spring release and heavy lifting air rush"),
     "machine_door": (747331, 0.570, 0.30, -6.0, 2, "heavy hinged timber doors opening with iron latch clanks"),
     "sale": (741277, 0.310, 0.23, 0.0, 1, "three bright falling coin contacts into a muted cash drawer"),
+    "rarity_tick": (748340, 0.065, 0.18, -5.0, 1, "short dry ratchet tooth with a muted metallic edge for reel crossings"),
+    "rarity_reveal": (749349, 0.850, 0.28, -3.0, 1, "latch landing followed by a rising resonant crystal chord"),
 }
 
 
@@ -309,6 +311,14 @@ def recipe(kind: str, variant: int, duration: float, seed: int) -> Sound:
         for at in (0.010, 0.090, 0.360):
             s.modes(at, 0.180, 0.31, (294 * tuning, 677, 1397), 0.033, 0.56)
             s.noise(at, 0.035, 0.55, 570, 4200, 0.007)
+    elif kind == "rarity_tick":
+        s.noise(0.001, 0.025, 0.70, 700, 4700, 0.004)
+        s.modes(0.001, 0.055, 0.30, (610, 1370, 2410), 0.009, 0.45)
+    elif kind == "rarity_reveal":
+        s.noise(0.002, 0.060, 0.55, 180, 2400, 0.012)
+        s.modes(0.002, 0.240, 0.40, (164, 337, 691), 0.055, 0.50)
+        for at, frequency in ((0.025, 523.25), (0.085, 659.25), (0.145, 783.99), (0.205, 1046.50)):
+            s.modes(at, 0.600, 0.13, (frequency, frequency * 2.01, frequency * 3.98), 0.150, 0.32)
     else:
         raise ValueError(f"Unknown sound recipe: {kind}")
     return s

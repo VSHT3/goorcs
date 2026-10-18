@@ -1120,14 +1120,12 @@ func _draw_combat() -> void:
 	var cell_size: float = _cell_size()
 	for trace: Dictionary in _corpse_traces:
 		_draw_death_blood(trace, _position_center(trace["pos"]) + Vector2(0, cell_size * 0.28))
-	# Buildings sit directly on their foundations; only units/endpoints cast ovals.
+	# Only units and corpses cast ovals; structures sit on their foundations.
 	for item: Dictionary in _draw_order:
-		if int(item["kind"]) == 1:
+		if int(item["kind"]) < 2:
 			continue
-		var width: float = cell_size * 0.35
-		if int(item["kind"]) == 2 or int(item["kind"]) == 3:
-			var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
-			width = cell_size * artwork.board_height * 0.26
+		var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
+		var width: float = cell_size * artwork.board_height * 0.26
 		draw_set_transform(item["foot"], 0.0, Vector2(1.0, 0.30))
 		var alpha: float = 0.35 * (_corpse_alpha(float(item["data"]["age"])) if int(item["kind"]) == 3 else 1.0)
 		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, alpha))

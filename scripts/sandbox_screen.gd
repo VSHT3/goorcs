@@ -55,6 +55,7 @@ var sound_player: GameSoundPlayer
 var _roll_details: Label
 var rarity_reroll: Button
 var attribute_reroll: Button
+var _rarity_reel: RarityReel
 
 @onready var world: SandboxWorld = $World
 @onready var board: PathBoard = world.boards[0]
@@ -86,6 +87,9 @@ func _ready() -> void:
 	sound_player.world = world
 	add_child(sound_player)
 	_build_interface()
+	_rarity_reel = RarityReel.new()
+	add_child(_rarity_reel)
+	_rarity_reel.finished.connect(_rarity_reel_finished)
 	board.content_catalog = catalog
 	board.edit_requested.connect(_edit)
 	board.cell_clicked.connect(_cell_clicked)
@@ -111,6 +115,7 @@ func cell_screen_position(cell: Vector2i) -> Vector2:
 
 
 func prepare_to_leave() -> void:
+	_rarity_reel.cancel()
 	sound_player.deactivate()
 	_active = false
 	controller.set_active(false)
@@ -584,8 +589,8 @@ func _refresh_management(state: Dictionary) -> void:
 	_tower_title.add_theme_color_override("font_color", MatchPlanningScreen.tower_rarity_color(tower))
 	_tower_stats.text = MatchPlanningScreen.tower_stats_text(tower, stats)
 	_roll_details.text = MatchPlanningScreen.roll_details_text(tower)
-	rarity_reroll.disabled = not _active or int(tower.get("rarity_reroll_cost", -1)) < 0
-	attribute_reroll.disabled = not _active or int(tower.get("attribute_reroll_cost", -1)) < 0
+	rarity_reroll.disabled = not _active or int(tower.get("rarity_reroll_cost", -1)) < 0 or _rarity_reel.is_busy()
+	attribute_reroll.disabled = not _active or int(tower.get("attribute_reroll_cost", -1)) < 0 or _rarity_reel.is_busy()
 	targeting.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
 	targeting.mode = int(tower["mode"])
 	targeting.disabled = not _active
@@ -637,8 +642,20 @@ func _upgrade(command: String) -> void:
 
 func _reroll(kind: String) -> void:
 	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
-	if button.is_visible_in_tree() and not button.disabled:
-		controller.reroll_tower(selected_tower_id, kind)
+	if not button.is_visible_in_tree() or button.disabled or _rarity_reel.is_busy():
+		return
+	if controller.reroll_tower(selected_tower_id, kind) and kind == "rarity":
+		var tower: Dictionary = _find(controller.state["towers"][0], selected_tower_id)
+		var shop: TowerShopButton = shop_buttons[StringName(tower["type_id"])]
+		world.boards[0].cancel_stroke()
+		world.set_input_blocked(true)
+		_rarity_reel.present(tower, shop.tower_artwork)
+		_refresh()
+
+
+func _rarity_reel_finished() -> void:
+	world.set_input_blocked(resize_dialog.visible or reset_dialog.visible)
+	_refresh()
 
 
 func _show_notice(message: String) -> void:
@@ -649,6 +666,8 @@ func _show_notice(message: String) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _rarity_reel.is_busy():
+		return
 	if not _active or not is_visible_in_tree() or resize_dialog.visible or reset_dialog.visible:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT and (placement_id != &"" or selected_enemy_id >= 0 or selected_tower_id >= 0):
@@ -678,6 +697,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if _rarity_reel.is_busy():
+		return
 	if not _active or not is_visible_in_tree() or resize_dialog.visible or reset_dialog.visible or get_viewport().gui_is_dragging():
 		return
 	var focus: Control = get_viewport().gui_get_focus_owner()

@@ -44,6 +44,9 @@ var rarity_reroll: Button
 var attribute_reroll: Button
 var _extra_upgrade_buttons: Dictionary[String, Button] = {}
 var _reroll_balance: Label
+var _rarity_reel: RarityReel
+var _pending_rarity_id: int = -1
+var _pending_rarity_count: int = -1
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -148,6 +151,9 @@ func _ready() -> void:
 	results_menu.replay_requested.connect(_replay_results)
 	visibility_changed.connect(_visibility_changed)
 	_feedback_timer.timeout.connect(_clear_feedback)
+	_rarity_reel = RarityReel.new()
+	add_child(_rarity_reel)
+	_rarity_reel.finished.connect(_rarity_reel_finished)
 	if planning != null:
 		planning.changed.connect(_refresh)
 		planning.feedback.connect(_show_feedback)
@@ -280,8 +286,37 @@ func _build_currencies() -> void:
 
 func _reroll(kind: String) -> void:
 	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
-	if planning != null and button.is_visible_in_tree() and not button.disabled and not _selected_tower().is_empty():
-		planning.reroll_tower(planning.local_slot(), selected_tower_id, kind)
+	var tower: Dictionary = _selected_tower()
+	if planning == null or not button.is_visible_in_tree() or button.disabled or tower.is_empty() or _rarity_reel.is_busy() or _pending_rarity_id >= 0:
+		return
+	if kind == "rarity":
+		_pending_rarity_id = selected_tower_id
+		_pending_rarity_count = int(tower["rarity_rerolls"])
+		rarity_reroll.disabled = true
+	if not planning.reroll_tower(planning.local_slot(), selected_tower_id, kind):
+		_pending_rarity_id = -1
+		_refresh()
+
+
+func _observe_rarity_reroll() -> void:
+	if _pending_rarity_id < 0:
+		return
+	for tower: Dictionary in planning.combat.get("towers", [[], []])[planning.local_slot()]:
+		if int(tower["id"]) != _pending_rarity_id:
+			continue
+		if int(tower["rarity_rerolls"]) > _pending_rarity_count:
+			_pending_rarity_id = -1
+			cancel_strokes()
+			world.set_input_blocked(true)
+			var button: TowerShopButton = shop_buttons[StringName(tower["type_id"])]
+			_rarity_reel.present(tower, button.tower_artwork)
+		return
+	_pending_rarity_id = -1
+
+
+func _rarity_reel_finished() -> void:
+	world.set_input_blocked(pause_menu.visible or debug_popup.visible or results_menu.visible)
+	_refresh()
 
 
 func cancel_strokes() -> void:
@@ -342,6 +377,8 @@ func _visibility_changed() -> void:
 	if not is_node_ready():
 		return
 	if not is_visible_in_tree():
+		_pending_rarity_id = -1
+		_rarity_reel.cancel()
 		sound_player.deactivate()
 		debug_popup.hide()
 		_close_results()
@@ -393,6 +430,8 @@ func _debug_window_input(event: InputEvent) -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if _rarity_reel.is_busy():
+		return
 	if not is_visible_in_tree() or pause_menu.visible or debug_popup.visible or (_placement_id == &"" and selected_enemy_id < 0):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
@@ -401,6 +440,8 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if _rarity_reel.is_busy():
+		return
 	if not is_visible_in_tree() or planning == null or not planning.active or pause_menu.visible or debug_popup.visible or results_menu.visible or get_viewport().gui_is_dragging():
 		return
 	var focus: Control = get_viewport().gui_get_focus_owner()
@@ -908,7 +949,7 @@ func _refresh_action(button: Button, action: Dictionary) -> void:
 func _refresh_reroll(button: Button, tower: Dictionary, kind: String, balance: int) -> void:
 	var price: int = int(tower.get("rarity_reroll_cost" if kind == "rarity" else "attribute_reroll_cost", -1))
 	button.text = "%s · %s" % ["Reroll rarity" if kind == "rarity" else "Reroll attributes", ("%d Shards" if kind == "rarity" else "%d Coins") % price if price >= 0 else "Unavailable"]
-	button.disabled = targeting_button.disabled or price < 0 or balance < price
+	button.disabled = targeting_button.disabled or price < 0 or balance < price or _pending_rarity_id >= 0 or _rarity_reel.is_busy()
 	button.tooltip_text = reroll_tooltip(kind)
 	if balance < price:
 		button.tooltip_text += "\nNeed %d more %s." % [price - balance, "Shards" if kind == "rarity" else "Coins"]
@@ -1262,6 +1303,11 @@ func _refresh() -> void:
 		_status.text = "Planning unavailable"
 		return
 	var own_slot: int = planning.local_slot()
+	if not planning.active or not is_visible_in_tree() or int(planning.combat.get("phase", -1)) == MatchCombat.Phase.FINISHED:
+		_pending_rarity_id = -1
+		_rarity_reel.cancel()
+	else:
+		_observe_rarity_reroll()
 	for slot: int in range(boards.size()):
 		boards[slot].layout = planning.layouts[slot]
 	world.configure(planning.layouts[0].dimensions, own_slot, int(planning.combat.get("board_origin_y", 0)))
@@ -1414,12 +1460,14 @@ func handle_results_escape() -> void:
 
 
 func _show_feedback(message: String) -> void:
+	_pending_rarity_id = -1
 	if is_visible_in_tree():
 		sound_player.reject()
 	_pending_tower_cell = Vector2i(-1, -1)
 	_feedback.text = message
 	_feedback.show()
 	_feedback_timer.start()
+	_refresh_targeting()
 
 
 func _clear_feedback() -> void:
