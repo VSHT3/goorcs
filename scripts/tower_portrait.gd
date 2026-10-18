@@ -38,7 +38,7 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 	var art_branch: String = String(tower.get("advancement", ""))
 	if art_branch.is_empty():
 		art_branch = String(tower.get("evolution", ""))
-	var variant: Dictionary = reward.board_variant(art_branch, tower.get("followup", ""), tower.get("branch_upgrades", []))
+	var variant: Dictionary = reward.board_variant(art_branch, tower.get("followup", ""), tower.get("branch_upgrades", []), _stat_tiers(tower))
 	var texture: Texture2D = variant.get("texture", reward.icon_texture)
 	if texture == null:
 		return

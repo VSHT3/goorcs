@@ -168,7 +168,8 @@ static func _valid_board_variants(tower: TowerDefinition) -> bool:
 	var art: TowerReward = tower.reward
 	if art.board_variants.is_empty():
 		return true
-	var branches: Dictionary = {}
+	# Stat tiers may carry art too (see PathBoard._stat_tiers).
+	var branches: Dictionary = {"damage": true, "speed": true, "damage_speed": true}
 	if not tower.special_upgrade.is_empty():
 		branches[tower.special_upgrade] = true
 	for branch: Variant in tower.advancements:

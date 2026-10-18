@@ -372,7 +372,21 @@ func _archer_advancement(tower: Dictionary, definition: Dictionary) -> Dictionar
 
 func _tower_variant(tower: Dictionary, artwork: TowerReward) -> Dictionary:
 	var advancement: String = tower.get("advancement", "")
-	return artwork.board_variant(advancement if not advancement.is_empty() else tower.get("evolution", ""), tower.get("followup", ""), tower.get("branch_upgrades", []))
+	return artwork.board_variant(advancement if not advancement.is_empty() else tower.get("evolution", ""), tower.get("followup", ""), tower.get("branch_upgrades", []), _stat_tiers(tower))
+
+
+# Purchased pre-branch tiers that may carry their own art: "damage", "speed"
+# or "damage_speed", then the tower's special upgrade.
+func _stat_tiers(tower: Dictionary) -> Array:
+	var tiers: Array = []
+	var damage: bool = bool(tower.get("damage_upgraded", false))
+	var speed: bool = bool(tower.get("speed_upgraded", false))
+	if damage or speed:
+		tiers.append("damage_speed" if damage and speed else ("damage" if damage else "speed"))
+	var special: String = String(tower_types.get(tower["type_id"], {}).get("special_upgrade", ""))
+	if bool(tower.get("special_upgraded", false)) and not special.is_empty():
+		tiers.append(special)
+	return tiers
 
 
 

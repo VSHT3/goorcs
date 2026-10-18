@@ -35,8 +35,9 @@ extends Resource
 @export var additional_archer_offsets: PackedVector2Array = PackedVector2Array()
 
 
-func board_variant(evolution: String, followup: String = "", steps: Array = []) -> Dictionary:
-	# The latest purchased branch upgrade with its own art wins.
+func board_variant(evolution: String, followup: String = "", steps: Array = [], tiers: Array = []) -> Dictionary:
+	# The latest purchased branch upgrade with its own art wins, then the
+	# follow-up and evolution, then the latest stat/special tier.
 	for index: int in range(steps.size() - 1, -1, -1):
 		if board_variants.has(steps[index]):
 			return board_variants[steps[index]]
@@ -44,6 +45,9 @@ func board_variant(evolution: String, followup: String = "", steps: Array = []) 
 		return board_variants[followup]
 	if board_variants.has(evolution):
 		return board_variants[evolution]
+	for index: int in range(tiers.size() - 1, -1, -1):
+		if board_variants.has(tiers[index]):
+			return board_variants[tiers[index]]
 	return EMPTY_BOARD_VARIANT
 
 
