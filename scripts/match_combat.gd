@@ -271,6 +271,7 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"pierce_active": false, "pierce_aim": Vector2(cell),
 		"bounce_points": [] as Array[Vector2], "split_paths": [] as Array[Array], "branch_upgrades": [] as Array[String],
 		"branch_pierce": 0, "bolt_scale": 1.0, "bolt_reach": 0.0, "magic_bounce": {}, "magic_split": 1,
+		"orbit_bonus": 0, "max_hp_drain": 0.0, "shards_generated": 0,
 		"damage": definition["damage"], "interval": definition["interval"],
 		"range": definition["range"], "base_damage": definition["damage"], "base_interval": definition["interval"],
 		"behavior_kind": definition["behavior_kind"], "behavior_config": definition["behavior_config"].duplicate(true),
@@ -366,21 +367,16 @@ func _refresh_board(slot: int) -> void:
 		var modifiers: Dictionary = TowerRollRules.modifiers(tower["attributes"])
 		tower["modifiers"] = modifiers
 		tower["behavior_kind"] = kind
-		var base_range: float = float(config.get("range_cells", definition["range"]))
-		var range_bonus: float = float(modifiers.get("range", 0.0))
-		tower["range"] = base_range
-		# A signed range roll must change usable tiles, not just a fractional label.
-		# Zero preserves authored geometry; drawbacks floor at one cell or a smaller base.
-		if range_bonus > 0.0:
-			tower["range"] = ceilf(base_range * (1.0 + range_bonus))
-		elif range_bonus < 0.0:
-			tower["range"] = maxf(minf(1.0, base_range), floorf(base_range * (1.0 + range_bonus)))
-		tower["behavior_config"] = behavior
+		# Totals of purchased branch upgrades, derived here rather than stored.
 		var branch_pierce: int = 0
 		var bolt_scale: float = 1.0
 		var bolt_reach: float = 0.0
 		var magic_bounce: Dictionary = {}
 		var magic_split: int = 1
+		var orbit_bonus: int = 0
+		var extra_range: int = 0
+		var max_hp_drain: float = float(branch.get("max_hp_damage", 0.0))
+		var interval_scale: float = 1.0
 		for step: Dictionary in branch.get("upgrades", []):
 			if not tower.get("branch_upgrades", []).has(step["id"]):
 				continue
@@ -390,11 +386,32 @@ func _refresh_board(slot: int) -> void:
 			if step.has("magic_bounce"):
 				magic_bounce = step["magic_bounce"].duplicate()
 			magic_split = maxi(magic_split, int(step.get("magic_split", 1)))
+			orbit_bonus += int(step.get("orbit_bonus", 0))
+			extra_range += int(step.get("range_bonus", 0))
+			max_hp_drain += float(step.get("max_hp_damage", 0.0))
+			interval_scale *= float(step.get("periodic_interval_multiplier", 1.0))
+			var added: Dictionary = step.get("behavior_add", {})
+			for key: String in added:
+				behavior[key] = int(behavior.get(key, 0)) + int(added[key])
+		if kind == "crystal":
+			behavior["periodic_interval"] = float(behavior["periodic_interval"]) * interval_scale
 		tower["branch_pierce"] = branch_pierce
 		tower["magic_split"] = magic_split
 		tower["bolt_scale"] = bolt_scale
 		tower["bolt_reach"] = bolt_reach
 		tower["magic_bounce"] = magic_bounce
+		tower["orbit_bonus"] = orbit_bonus
+		tower["max_hp_drain"] = max_hp_drain
+		var base_range: float = float(config.get("range_cells", definition["range"])) + extra_range
+		var range_bonus: float = float(modifiers.get("range", 0.0))
+		tower["range"] = base_range
+		# A signed range roll must change usable tiles, not just a fractional label.
+		# Zero preserves authored geometry; drawbacks floor at one cell or a smaller base.
+		if range_bonus > 0.0:
+			tower["range"] = ceilf(base_range * (1.0 + range_bonus))
+		elif range_bonus < 0.0:
+			tower["range"] = maxf(minf(1.0, base_range), floorf(base_range * (1.0 + range_bonus)))
+		tower["behavior_config"] = behavior
 		tower["support_damage_bonus"] = 0.0
 		tower["support_speed_bonus"] = 0.0
 		var damage_bonus: float = 0.0
@@ -416,6 +433,9 @@ func _refresh_board(slot: int) -> void:
 		elif kind == "economy":
 			behavior["clear_income"] = ceili(float(behavior["clear_income"]) * (1.0 + income_bonus))
 			behavior["periodic_income"] = ceili(float(behavior["periodic_income"]) * (1.0 + income_bonus))
+		elif kind == "crystal":
+			behavior["clear_shards"] = ceili(float(behavior["clear_shards"]) * (1.0 + income_bonus))
+			behavior["periodic_shards"] = ceili(float(behavior["periodic_shards"]) * (1.0 + income_bonus))
 		elif kind == "bounty":
 			behavior["mark_income_bonus"] = float(behavior["mark_income_bonus"]) * (1.0 + income_bonus)
 		elif kind == "income_aura":
@@ -1049,6 +1069,10 @@ func advance(delta: float) -> bool:
 					var produced: int = int(tower["behavior_config"]["clear_income"])
 					coins[slot] += produced
 					tower["coins_generated"] += produced
+				elif tower["behavior_kind"] == "crystal" and float(tower["stunned_remaining"]) <= 0.000000001:
+					var dug: int = int(tower["behavior_config"]["clear_shards"])
+					reroll_currency[slot] += dug
+					tower["shards_generated"] += dug
 				_reset_firing(tower)
 				_clear_stun(tower)
 			_refresh_board(slot)
@@ -1071,7 +1095,7 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 					duration = minf(duration, float(tower["cooldown"]))
 		if periodic:
 			for tower: Dictionary in towers[slot]:
-				if tower["behavior_kind"] == "economy" and float(tower["stunned_remaining"]) <= 0.000000001 and int(tower["behavior_config"]["periodic_income"]) > 0:
+				if float(tower["stunned_remaining"]) <= 0.000000001 and _periodic_amount(tower) > 0:
 					duration = minf(duration, float(tower["behavior_config"]["periodic_interval"]) - float(tower["production_elapsed"]))
 		for enemy: Dictionary in enemies[slot]:
 			var definition: Dictionary = _enemy_types[enemy["type_id"]]
@@ -1108,25 +1132,37 @@ func _wave_cleared() -> bool:
 func _has_periodic_production() -> bool:
 	for board: Array in towers:
 		for tower: Dictionary in board:
-			if tower["behavior_kind"] == "economy" and int(tower["behavior_config"]["periodic_income"]) > 0:
+			if _periodic_amount(tower) > 0:
 				return true
 	return false
 
 
+# Coins (Gold Mine/Royal Mint) or Shards (Crystal Mine) produced per cycle.
+static func _periodic_amount(tower: Dictionary) -> int:
+	match String(tower["behavior_kind"]):
+		"economy":
+			return int(tower["behavior_config"]["periodic_income"])
+		"crystal":
+			return int(tower["behavior_config"]["periodic_shards"])
+	return 0
+
+
 func _produce_periodic(slot: int, delta: float) -> void:
 	for tower: Dictionary in towers[slot]:
-		if tower["behavior_kind"] != "economy" or float(tower["stunned_remaining"]) > 0.000000001:
+		if _periodic_amount(tower) <= 0 or float(tower["stunned_remaining"]) > 0.000000001:
 			continue
 		var config: Dictionary = tower["behavior_config"]
-		if int(config["periodic_income"]) <= 0:
-			continue
 		tower["production_elapsed"] += delta
 		var count: int = floori((float(tower["production_elapsed"]) + 0.000000001) / float(config["periodic_interval"]))
 		if count > 0:
 			tower["production_elapsed"] = maxf(0.0, float(tower["production_elapsed"]) - count * float(config["periodic_interval"]))
-			var produced: int = count * int(config["periodic_income"])
-			coins[slot] += produced
-			tower["coins_generated"] += produced
+			var produced: int = count * _periodic_amount(tower)
+			if tower["behavior_kind"] == "crystal":
+				reroll_currency[slot] += produced
+				tower["shards_generated"] += produced
+			else:
+				coins[slot] += produced
+				tower["coins_generated"] += produced
 
 
 func _update_bounties(slot: int) -> void:
@@ -1853,7 +1889,7 @@ func _attack(slot: int, delta: float) -> void:
 		if config.get("weapon", "arrow") == "minigun":
 			_attack_minigun(slot, tower, delta)
 			continue
-		if tower["evolution"] == "boulders" or tower["evolution"] == "onyx_ring":
+		if definition["area_attack"] and definition["evolutions"].has(tower["evolution"]):
 			if definition["evolutions"][tower["evolution"]]["continuous"]:
 				_attack_continuous(slot, tower, tower["range"], delta)
 			else:
@@ -2193,7 +2229,9 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 			enemy["slowed"] = true
 			enemy["slow_remaining"] = TowerDefinition.freeze_duration(int(enemy["max_hp"]))
 			BossMechanics.prepare(enemy)
-		var base_damage: float = float(tower["base_damage"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * exposure * _elemental_damage_multiplier(enemy, _tower_damage_type(tower))
+		# Void Monolith also drains a fraction of maximum HP per exposed second.
+		var per_second: float = float(tower["base_damage"]) * float(tower["speed_multiplier"]) + float(enemy["max_hp"]) * float(tower.get("max_hp_drain", 0.0))
+		var base_damage: float = per_second * float(tower["damage_multiplier"]) * exposure * _elemental_damage_multiplier(enemy, _tower_damage_type(tower))
 		var total: float = float(fractions.get(enemy["id"], 0.0)) + base_damage * (1.0 + float(enemy["bounty_damage_bonus"]))
 		var bonus: Dictionary = _continuous_bonus_stream(tower_id, enemy["id"], float(enemy["bounty_damage_bonus"]) > 0.0)
 		_accumulate_bonus(slot, enemy, bonus, base_damage)
@@ -2311,7 +2349,10 @@ func _tower_damage_type(tower: Dictionary) -> StringName:
 	if tower["evolution"] == "boulders":
 		return &"ice" if tower["freeze_upgraded"] else &"physical"
 	var definition: Dictionary = _tower_types[tower["type_id"]]
-	for step: Dictionary in definition["evolutions"].get(tower["evolution"], {}).get("upgrades", []):
+	var evolved: Dictionary = definition["evolutions"].get(tower["evolution"], {})
+	if evolved.has("damage_type"):
+		return StringName(evolved["damage_type"])
+	for step: Dictionary in evolved.get("upgrades", []):
 		if step.has("damage_type") and tower.get("branch_upgrades", []).has(step["id"]):
 			return StringName(step["damage_type"])
 	var config: Dictionary = definition["advancements"].get(tower["advancement"], {})

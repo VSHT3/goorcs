@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TowerReward" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="TowerReward" load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
 [ext_resource type="Texture2D" path="res://assets/towers/gold_mine.png" id="2_art"]
@@ -6,12 +6,15 @@
 [ext_resource type="Texture2D" path="res://assets/towers/bounty_board.png" id="4_bounty"]
 [ext_resource type="Texture2D" path="res://assets/towers/greater_bounty.png" id="5_greater"]
 [ext_resource type="Texture2D" path="res://assets/towers/tribute_office.png" id="6_tribute"]
+[ext_resource type="Texture2D" uid="uid://b1tk31an6a2ne" path="res://assets/towers/crystal_mine.png" id="7_crystal"]
+[ext_resource type="Texture2D" uid="uid://cdq3nldvukhwi" path="res://assets/towers/crystal_geode.png" id="8_geode"]
+[ext_resource type="Texture2D" uid="uid://cd67xx73l3148" path="res://assets/towers/crystal_mother_lode.png" id="9_lode"]
 
 [resource]
 script = ExtResource("1_reward")
 id = &"gold_mine"
 title = "Gold Mine"
-description = "A timber-braced mine produces Coins when a round clears. Evolve into a Royal Mint or a Bounty Board."
+description = "A timber-braced mine produces Coins when a round clears. Evolve into a Royal Mint, a Bounty Board, or a Shard-digging Crystal Mine."
 icon_texture = ExtResource("2_art")
 accent = Color(0.88, 0.71, 0.28, 1)
 board_height = 0.84919355
@@ -21,5 +24,8 @@ board_variants = {
 "royal_mint": {"texture": ExtResource("3_mint"), "board_height": 0.97155172, "board_anchor": Vector2(0.515625, 0.9296875)},
 "bounty_board": {"texture": ExtResource("4_bounty"), "board_height": 1.24541667, "board_anchor": Vector2(0.5, 0.9765625)},
 "stronger_mark": {"texture": ExtResource("5_greater"), "board_height": 1.12792453, "board_anchor": Vector2(0.5, 0.96875)},
-"income_aura": {"texture": ExtResource("6_tribute"), "board_height": 1.06320755, "board_anchor": Vector2(0.5, 0.9375)}
+"income_aura": {"texture": ExtResource("6_tribute"), "board_height": 1.06320755, "board_anchor": Vector2(0.5, 0.9375)},
+"crystal_mine": {"texture": ExtResource("7_crystal"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)},
+"geode_drill": {"texture": ExtResource("8_geode"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)},
+"mother_lode": {"texture": ExtResource("9_lode"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)}
 }

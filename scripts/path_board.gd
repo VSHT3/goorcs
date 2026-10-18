@@ -31,6 +31,17 @@ const BALLISTA_BOLT_LENGTH: float = 0.46
 const BALLISTA_BOLT_WIDTH: float = 0.045
 const MAGIC_COLOR := Color("b48cff")
 const MAGIC_CORE := Color("f1e6ff")
+# Onyx Ring: the ring drops onto the ground on each pulse, then rises again.
+const RING_FALL: float = 0.09
+const RING_RISE: float = 0.33
+const ONYX_STONE := Color("1c1b27")
+const ONYX_GLOW := Color("b48cff")
+# Rune evolutions drawn with orbiting objects; the first five share the inner ring.
+const RUNE_ORBITERS: Array[String] = ["boulders", "onyx_ring", "storm_sigil", "void_monolith"]
+const INNER_ORBIT_LIMIT: int = 5
+const STORM_COLOR := Color("7fe3ff")
+const VOID_COLOR := Color("8a4dff")
+const SHARD_COLOR := Color("74e0f0")
 # Curve side/strength per extra split bolt, relative to the original bolt.
 const SPLIT_FAN: Array[float] = [-1.0, 0.55, -0.55, 1.45]
 const PULSE_DURATION: float = 0.14
@@ -135,6 +146,8 @@ var _seen_shots: Dictionary = {}
 var _archer_poses: Dictionary[Vector2i, Dictionary] = {}
 var _has_archer_motion: bool = false
 var _shot_traces: Array[Dictionary] = []
+# Onyx Ring presentation: seconds since each tower's last accepted slam.
+var _ring_clocks: Dictionary = {}
 var _has_boulders: bool = false
 var _has_idle_flames: bool = false
 var _flame_elapsed: float = 0.0
@@ -248,6 +261,8 @@ func _process(delta: float) -> void:
 			_bounty_hit_life.erase(id)
 		else:
 			_bounty_hit_life[id] = life
+	for id: Variant in _ring_clocks.keys():
+		_ring_clocks[id] = minf(float(_ring_clocks[id]) + visual_delta, 30.0)
 	for index: int in range(_shot_traces.size() - 1, -1, -1):
 		_shot_traces[index]["life"] -= visual_delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
@@ -323,7 +338,7 @@ func _capture_shots() -> void:
 	for tower: Dictionary in combat_towers:
 		var definition: Dictionary = tower_types.get(tower["type_id"], {})
 		var boulders: bool = tower.get("evolution", "") == "boulders"
-		_has_boulders = _has_boulders or boulders or tower.get("evolution", "") == "onyx_ring"
+		_has_boulders = _has_boulders or boulders or tower.get("evolution", "") in RUNE_ORBITERS or _has_finale(tower) or tower.get("behavior_kind", "") == "crystal"
 		var advancement: Dictionary = _archer_advancement(tower, definition)
 		var weapon: String = advancement.get("weapon", "arrow")
 		_has_idle_flames = _has_idle_flames or float(advancement.get("burn_dps", 0.0)) > 0.0 or weapon == "minigun" or not tower.get("magic_bounce", {}).is_empty()
@@ -357,7 +372,7 @@ func _archer_advancement(tower: Dictionary, definition: Dictionary) -> Dictionar
 
 func _tower_variant(tower: Dictionary, artwork: TowerReward) -> Dictionary:
 	var advancement: String = tower.get("advancement", "")
-	return artwork.board_variant(advancement if not advancement.is_empty() else tower.get("evolution", ""), tower.get("followup", ""))
+	return artwork.board_variant(advancement if not advancement.is_empty() else tower.get("evolution", ""), tower.get("followup", ""), tower.get("branch_upgrades", []))
 
 
 
@@ -427,6 +442,8 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 	var splash_radius: float = float(advancement.get("splash_radius", 0.0))
 	if splash_radius > 0.0:
 		duration += impact
+	if area_attack and evolution == "onyx_ring":
+		_ring_clocks[int(tower["id"])] = maxf(0.0, initial_age)
 	var hits: Array[Vector2] = []
 	if area_attack:
 		for enemy: Dictionary in combat_enemies:
@@ -1153,7 +1170,8 @@ func _draw_combat() -> void:
 
 func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
 	var artwork: TowerReward = _tower_art.get(tower["type_id"])
-	var orbiting: bool = tower.get("evolution", "") in ["boulders", "onyx_ring"]
+	var orbiting: bool = tower.get("evolution", "") in RUNE_ORBITERS
+	_draw_tower_underlay(tower, foot)
 	if orbiting:
 		_draw_boulders(tower, foot, false)
 	_draw_stun_stars(tower, foot, false)
@@ -1168,10 +1186,12 @@ func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
 			rect.size.x = -rect.size.x
 		draw_texture_rect(texture, rect, false)
 		if directional:
-			draw_texture_rect(artwork.directional_weapon_textures[_directional_weapon_index(tower)], rect, false)
+			var poses: Array = variant.get("directional_weapon_textures", artwork.directional_weapon_textures)
+			draw_texture_rect(poses[_directional_weapon_index(tower)], rect, false)
 			if not tower.get("magic_bounce", {}).is_empty():
 				_draw_magic_ballista(tower, artwork, rect)
 		_draw_support_context(tower, foot)
+		_draw_tower_overlay(tower, foot, artwork, rect)
 		if artwork.archer_head_texture != null:
 			var definition: Dictionary = tower_types.get(tower["type_id"], {})
 			var advancement: Dictionary = _archer_advancement(tower, definition)
@@ -1227,19 +1247,317 @@ func _draw_bounty_indicator(item: Dictionary) -> void:
 			draw_line(hit + Vector2(pixel * 3.0 * side, pixel * 2.0), hit + Vector2(pixel * 6.0 * side, -pixel * 3.0), Color(1.0, 0.58, 0.32, fade), pixel * 2.0)
 
 
+func _orbit_count(tower: Dictionary) -> int:
+	return 3 + int(tower.get("orbit_bonus", 0))
+
+
+# Up to five objects share the original inner orbit; more circle on a wider,
+# higher outer ring turning the other way.
 func _boulder_offset(tower: Dictionary, index: int) -> Vector2:
-	var angle: float = _boulder_phase + float(index) * TAU / 3.0 + float(int(tower["id"]) % 17) * 0.37
-	return Vector2(cos(angle) * (-1.0 if mirror_horizontal else 1.0) * 0.51, sin(angle) * 0.20) * _cell_size()
+	var count: int = _orbit_count(tower)
+	var inner: int = mini(count, INNER_ORBIT_LIMIT)
+	var flip: float = -1.0 if mirror_horizontal else 1.0
+	if index < inner:
+		var angle: float = _boulder_phase + float(index) * TAU / float(inner) + float(int(tower["id"]) % 17) * 0.37
+		return Vector2(cos(angle) * flip * 0.51, sin(angle) * 0.20) * _cell_size()
+	var outer: int = count - inner
+	var outer_angle: float = -_boulder_phase * 0.7 + float(index - inner) * TAU / float(outer) + float(int(tower["id"]) % 13) * 0.29
+	return Vector2(cos(outer_angle) * flip * 0.80, sin(outer_angle) * 0.30 - 0.16) * _cell_size()
+
+
+# The last branch upgrade of a Rune/Ballista/Crystal Mine branch is its finale.
+func _has_finale(tower: Dictionary) -> bool:
+	var steps: Array = tower_types.get(tower["type_id"], {}).get("evolutions", {}).get(tower.get("evolution", ""), {}).get("upgrades", [])
+	return not steps.is_empty() and tower.get("branch_upgrades", []).size() >= steps.size()
 
 
 func _draw_boulders(tower: Dictionary, foot: Vector2, front: bool) -> void:
 	# The orbit is cosmetic, not a contact/range boundary or a damage event.
-	for index: int in range(3):
+	var evolution: String = tower.get("evolution", "")
+	for index: int in range(_orbit_count(tower)):
 		var offset: Vector2 = _boulder_offset(tower, index)
 		if (offset.y >= 0.0) != front:
 			continue
-		_draw_rune_stone(foot + offset + Vector2(0, -_cell_size() * 0.46),
-			_cell_size() * 0.14, _boulder_phase * 0.35 + index, tower.get("evolution", "") == "onyx_ring", 1.0, bool(tower.get("freeze_upgraded", false)))
+		var position: Vector2 = foot + offset + Vector2(0, -_cell_size() * 0.46)
+		match evolution:
+			"onyx_ring":
+				continue
+			"storm_sigil":
+				_draw_storm_orb(position, _cell_size() * 0.085, index)
+			"void_monolith":
+				_draw_void_shard(position, _cell_size() * 0.12, _boulder_phase * 0.8 + index)
+			_:
+				_draw_rune_stone(position, _cell_size() * 0.14, _boulder_phase * 0.35 + index, evolution == "onyx_ring", 1.0, bool(tower.get("freeze_upgraded", false)))
+	if evolution == "onyx_ring":
+		_draw_onyx_rings(tower, foot, front)
+	if front and evolution == "storm_sigil" and _has_finale(tower):
+		# Wrath of the Storm: arcs jump between neighbouring orbs.
+		for index: int in range(0, _orbit_count(tower) - 1, 2):
+			var a: Vector2 = foot + _boulder_offset(tower, index) + Vector2(0, -_cell_size() * 0.46)
+			var b: Vector2 = foot + _boulder_offset(tower, index + 1) + Vector2(0, -_cell_size() * 0.46)
+			_draw_zigzag(a, b, Color(STORM_COLOR, 0.75), 1.5, index + int(_boulder_phase * 6.0))
+
+
+# Above-sprite effects: Crystal Mine crystals and every branch finale.
+func _draw_tower_overlay(tower: Dictionary, foot: Vector2, artwork: TowerReward, rect: Rect2) -> void:
+	var cell_size: float = _cell_size()
+	var evolution: String = tower.get("evolution", "")
+	var finale: bool = _has_finale(tower)
+	var top := Vector2(foot.x, rect.position.y + absf(rect.size.y) * 0.12)
+	if artwork.icon_texture != null and _texture_bounds.has(artwork.icon_texture) and artwork.directional_weapon_textures.is_empty():
+		top.y = rect.position.y + _texture_bounds[artwork.icon_texture].position.y * absf(rect.size.y) / artwork.icon_texture.get_height()
+	if not finale:
+		return
+	var pulse: float = 0.5 + 0.5 * sin(_boulder_phase * 2.0)
+	match evolution:
+		"onyx_ring":
+			# Eclipse: a dark sun crowned by a violet corona.
+			var sun: Vector2 = top + Vector2(0, -cell_size * 0.32)
+			draw_circle(sun, cell_size * (0.30 + 0.03 * pulse), Color("b9a6e6", 0.16))
+			for index: int in range(16):
+				var angle: float = _boulder_phase * 0.4 + float(index) * TAU / 16.0
+				var length: float = cell_size * (0.24 + 0.06 * sin(_boulder_phase * 3.0 + index))
+				draw_line(sun + Vector2(cos(angle), sin(angle)) * cell_size * 0.17, sun + Vector2(cos(angle), sin(angle)) * length, Color("d9c8ff", 0.65), maxf(1.0, cell_size * 0.012), true)
+			draw_circle(sun, cell_size * 0.16, Color("0c0814"))
+			draw_arc(sun, cell_size * 0.16, 0.0, TAU, 28, Color("f2e8ff", 0.9), maxf(1.0, cell_size * 0.012), true)
+		"void_monolith":
+			# Singularity: a black hole with a tilted, spinning accretion ring.
+			var hole: Vector2 = top + Vector2(0, -cell_size * 0.30)
+			draw_set_transform(hole, 0.35, Vector2(1.0, 0.32))
+			for ring: int in range(3):
+				draw_arc(Vector2.ZERO, cell_size * (0.24 + 0.05 * ring), _boulder_phase * (2.0 - ring * 0.5), _boulder_phase * (2.0 - ring * 0.5) + PI * 1.4, 24, Color(VOID_COLOR.lerp(Color("ff8ad8"), ring * 0.3), 0.85 - ring * 0.2), maxf(1.5, cell_size * 0.025), true)
+			draw_set_transform(Vector2.ZERO)
+			draw_circle(hole, cell_size * 0.13, Color("030106"))
+			draw_arc(hole, cell_size * 0.13, 0.0, TAU, 24, Color(VOID_COLOR, 0.9), maxf(1.0, cell_size * 0.012), true)
+		"storm_sigil":
+			# Wrath of the Storm: a brooding cloud that throws lightning down.
+			var cloud: Vector2 = top + Vector2(0, -cell_size * 0.38)
+			for puff: Vector3 in [Vector3(-0.18, 0.02, 0.15), Vector3(0.0, -0.05, 0.19), Vector3(0.19, 0.02, 0.14), Vector3(0.05, 0.06, 0.15)]:
+				draw_circle(cloud + Vector2(puff.x, puff.y) * cell_size, puff.z * cell_size, Color("39445a"))
+			draw_circle(cloud + Vector2(0, -0.08) * cell_size, 0.12 * cell_size, Color("56657f"))
+			if fposmod(_boulder_phase * 1.7, 1.0) < 0.35:
+				_draw_zigzag(cloud + Vector2(0, cell_size * 0.1), top + Vector2(0, cell_size * 0.05), Color(STORM_COLOR, 0.95), 2.0, int(_boulder_phase * 5.0))
+		"boulders":
+			# Heart of the Mountain: a molten core pulsing above the obelisk.
+			var core: Vector2 = top + Vector2(0, -cell_size * 0.26)
+			draw_circle(core, cell_size * (0.22 + 0.04 * pulse), Color("ff9a2e", 0.20))
+			draw_circle(core, cell_size * 0.12, Color("ffb347"))
+			draw_circle(core, cell_size * 0.07, Color("fff1b8"))
+			for index: int in range(6):
+				var angle: float = float(index) * TAU / 6.0 + _boulder_phase * 0.3
+				draw_line(core + Vector2(cos(angle), sin(angle)) * cell_size * 0.13, core + Vector2(cos(angle), sin(angle)) * cell_size * (0.2 + 0.05 * pulse), Color("ffcf7a", 0.8), maxf(1.0, cell_size * 0.014), true)
+		"pierce":
+			_draw_giant_bolt(tower, artwork, rect)
+		"bounce":
+			_draw_sumggm(tower, artwork, rect)
+	_draw_rising_motes(tower, foot, top)
+
+
+# Endgame sparks spiralling up from the tower, coloured by branch.
+func _draw_rising_motes(tower: Dictionary, foot: Vector2, top: Vector2) -> void:
+	var colors: Dictionary = {"boulders": Color("ffb347"), "onyx_ring": Color("d9c8ff"), "storm_sigil": STORM_COLOR, "void_monolith": Color("c79bff"), "bounce": MAGIC_CORE, "pierce": Color("ffcf7a"), "crystal_mine": SHARD_COLOR}
+	var color: Color = colors.get(tower.get("evolution", ""), MAGIC_CORE)
+	var pixel: float = maxf(2.0, roundf(_cell_size() * 0.025))
+	for index: int in range(10):
+		var life: float = fposmod(_boulder_phase * 0.32 + float(index) * 0.1 + float(int(tower["id"]) % 7) * 0.05, 1.0)
+		var x: float = sin(life * TAU * 1.5 + index * 1.7) * _cell_size() * 0.32
+		var position: Vector2 = Vector2(foot.x + x, lerpf(foot.y - _cell_size() * 0.1, top.y - _cell_size() * 0.5, life))
+		draw_rect(Rect2((position - Vector2.ONE * pixel * 0.5).floor(), Vector2.ONE * pixel), Color(color, sin(life * PI) * 0.9))
+
+
+# Direction of the displayed directional weapon pose, in screen space.
+func _pose_direction(tower: Dictionary) -> Vector2:
+	var angle: float = float(_directional_weapon_index(tower)) * PI * 0.25
+	return Vector2(sin(angle), -cos(angle))
+
+
+# The Biggest Wood III: the loaded bolt tip glows forge-hot, shedding pixel
+# embers that drift off along the weapon's facing.
+func _draw_giant_bolt(tower: Dictionary, artwork: TowerReward, rect: Rect2) -> void:
+	var cell_size: float = _cell_size()
+	var muzzle: Vector2 = _tower_muzzle(tower, 0)
+	var direction: Vector2 = _pose_direction(tower)
+	var heat: float = 0.5 + 0.5 * sin(_boulder_phase * 3.0)
+	var pixel: float = maxf(2.0, roundf(cell_size * 0.022))
+	draw_circle(muzzle, cell_size * (0.07 + 0.02 * heat), Color("ff8a2a", 0.22))
+	draw_rect(Rect2((muzzle - Vector2.ONE * pixel).floor(), Vector2.ONE * pixel * 2.0), Color("ffd27a").lerp(Color("fff4d6"), heat))
+	for index: int in range(6):
+		var life: float = fposmod(_boulder_phase * 0.45 + float(index) / 6.0, 1.0)
+		var drift: Vector2 = direction * cell_size * 0.25 * life + Vector2(sin(life * TAU + index) * cell_size * 0.05, -cell_size * 0.22 * life)
+		draw_rect(Rect2((muzzle + drift).floor(), Vector2.ONE * pixel), Color("ff9a3a" if index % 2 == 0 else "ffd27a", (1.0 - life) * 0.9))
+
+
+# S.U.M.G.G.M.: five orbs (one per split bolt) on a wide tilted orbit well
+# clear of the sprite, passing behind and in front of the tower with comet
+# tails, linked by a faint pentagram.
+func _draw_sumggm(tower: Dictionary, artwork: TowerReward, rect: Rect2) -> void:
+	_draw_sumggm_orbs(tower, _tower_foot(tower["cell"]), true)
+
+
+func _sumggm_orb(foot: Vector2, angle: float) -> Vector2:
+	var cell_size: float = _cell_size()
+	return foot + Vector2(cos(angle) * 1.02, -1.30 + sin(angle) * 0.30) * cell_size
+
+
+func _draw_sumggm_orbs(tower: Dictionary, foot: Vector2, front: bool) -> void:
+	var cell_size: float = _cell_size()
+	var spin: float = -1.0 if mirror_horizontal else 1.0
+	var turn: float = _flame_elapsed * 1.6 * spin
+	var angles: Array[float] = []
+	for index: int in range(5):
+		angles.append(turn + float(index) * TAU / 5.0)
+	if front:
+		# Pentagram: each orb links to the orb two places along.
+		for index: int in range(5):
+			draw_line(_sumggm_orb(foot, angles[index]), _sumggm_orb(foot, angles[(index + 2) % 5]), Color(MAGIC_COLOR, 0.18), maxf(1.0, cell_size * 0.012), true)
+	for index: int in range(5):
+		var angle: float = angles[index]
+		if (sin(angle) >= 0.0) != front:
+			continue
+		var depth: float = 0.8 + 0.2 * sin(angle)
+		for tail: int in range(6, 0, -1):
+			var behind: Vector2 = _sumggm_orb(foot, angle - float(tail) * 0.07 * spin)
+			draw_circle(behind, cell_size * 0.035 * depth * (1.0 - tail / 7.0), Color(MAGIC_COLOR, 0.45 * (1.0 - tail / 7.0)))
+		var orb: Vector2 = _sumggm_orb(foot, angle)
+		draw_circle(orb, cell_size * 0.085 * depth, Color(MAGIC_COLOR, 0.28))
+		draw_circle(orb, cell_size * 0.048 * depth, Color(MAGIC_COLOR))
+		draw_circle(orb, cell_size * 0.022 * depth, Color(MAGIC_CORE))
+
+
+# Height above the tower foot of ring `index` (0 = lowest) right now. Each
+# accepted pulse slams the ring down; it then floats back up. A second ring
+# lands a beat later for a double impact.
+func _ring_height(tower: Dictionary, index: int) -> float:
+	var cell_size: float = _cell_size()
+	var top: float = cell_size * (0.78 + 0.22 * index)
+	var ground: float = cell_size * (0.04 + 0.05 * index)
+	var bob: float = sin(_boulder_phase * 1.3 + index) * cell_size * 0.02
+	if not _ring_clocks.has(int(tower["id"])):
+		return top + bob
+	var t: float = float(_ring_clocks[int(tower["id"])]) - 0.06 * index
+	if t < 0.0:
+		return top + bob
+	if t < RING_FALL:
+		var fall: float = t / RING_FALL
+		return lerpf(top, ground, fall * fall)
+	var rise: float = clampf((t - RING_FALL) / RING_RISE, 0.0, 1.0)
+	return lerpf(ground, top, 1.0 - pow(1.0 - rise, 3.0)) + bob * rise
+
+
+# Onyx Ring(s): a carved onyx band around the obelisk with glowing runes and
+# riding stones. Back halves draw behind the sprite, front halves in front.
+func _draw_onyx_rings(tower: Dictionary, foot: Vector2, front: bool) -> void:
+	var cell_size: float = _cell_size()
+	var bought: Array = tower.get("branch_upgrades", [])
+	var rings: int = 2 if bought.has("twin_rings") else 1
+	var from: float = 0.0 if front else PI
+	var stones: int = 3 + int(tower.get("orbit_bonus", 0))
+	var spin: float = _boulder_phase * 0.6 * (-1.0 if mirror_horizontal else 1.0)
+	for index: int in range(rings):
+		var height: float = _ring_height(tower, index)
+		var center: Vector2 = foot + Vector2(0, -height)
+		var radius := Vector2(cell_size * (0.56 + 0.08 * index), cell_size * (0.21 + 0.03 * index))
+		var charge: float = clampf(1.0 - (height - cell_size * 0.05) / (cell_size * 0.6), 0.0, 1.0)
+		draw_set_transform(center, 0.0, Vector2(1.0, radius.y / radius.x))
+		draw_arc(Vector2.ZERO, radius.x, from, from + PI, 28, ONYX_STONE, cell_size * 0.085, true)
+		draw_arc(Vector2.ZERO, radius.x + cell_size * 0.03, from, from + PI, 28, Color("4a4160"), maxf(1.0, cell_size * 0.012), true)
+		draw_arc(Vector2.ZERO, radius.x, from, from + PI, 28, Color(ONYX_GLOW, 0.35 + 0.5 * charge), maxf(1.0, cell_size * 0.016), true)
+		# Rune ticks carved into the band, turning with it.
+		for tick: int in range(10):
+			var angle: float = spin * (1.0 if index == 0 else -1.0) + float(tick) * TAU / 10.0
+			if fposmod(angle, TAU) < PI != front:
+				continue
+			var a := Vector2(cos(angle), sin(angle)) * (radius.x - cell_size * 0.025)
+			var b := Vector2(cos(angle + 0.09), sin(angle + 0.09)) * (radius.x + cell_size * 0.02)
+			draw_line(a, b, Color("d9c8ff", 0.5 + 0.4 * charge), maxf(1.0, cell_size * 0.012), true)
+		draw_set_transform(Vector2.ZERO)
+		# Onyx stones ride on the lowest ring.
+		if index == 0:
+			for stone: int in range(stones):
+				var angle: float = spin + float(stone) * TAU / float(stones)
+				var offset := Vector2(cos(angle) * radius.x, sin(angle) * radius.y)
+				if (offset.y >= 0.0) != front:
+					continue
+				_draw_rune_stone(center + offset + Vector2(0, -cell_size * 0.05), cell_size * 0.09, angle, true)
+	if front and bought.has("obsidian_crown"):
+		_draw_obsidian_crown(tower, foot)
+
+
+# Obsidian Crown: a spiked crown spinning near the obelisk tip, flaring on slams.
+func _draw_obsidian_crown(tower: Dictionary, foot: Vector2) -> void:
+	var cell_size: float = _cell_size()
+	var center: Vector2 = foot + Vector2(0, -cell_size * 1.18)
+	var flare: float = 0.0
+	if _ring_clocks.has(int(tower["id"])):
+		flare = clampf(1.0 - (float(_ring_clocks[int(tower["id"])]) - RING_FALL) / 0.3, 0.0, 1.0)
+	var spikes: int = 8
+	for spike: int in range(spikes):
+		var angle: float = -_boulder_phase * 0.9 + float(spike) * TAU / float(spikes)
+		var base := Vector2(cos(angle) * cell_size * 0.20, sin(angle) * cell_size * 0.07)
+		var tip: Vector2 = base + Vector2(0, -cell_size * (0.10 + 0.03 * (spike % 2)))
+		var width := Vector2(cell_size * 0.03, 0)
+		draw_colored_polygon(PackedVector2Array([center + base - width, center + tip, center + base + width]), Color("1a1424"))
+		draw_line(center + base, center + tip, Color(ONYX_GLOW, 0.4 + 0.6 * flare), maxf(1.0, cell_size * 0.01), true)
+	draw_set_transform(center, 0.0, Vector2(1.0, 0.35))
+	draw_arc(Vector2.ZERO, cell_size * 0.2, 0.0, TAU, 24, Color(ONYX_GLOW, 0.5 + 0.5 * flare), maxf(1.0, cell_size * 0.02), true)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_storm_orb(position: Vector2, radius: float, index: int) -> void:
+	var flicker: float = 0.75 + 0.25 * sin(_boulder_phase * 9.0 + float(index) * 2.1)
+	draw_circle(position, radius * 1.9, Color(STORM_COLOR, 0.22 * flicker))
+	draw_circle(position, radius, Color("2f7fb8"))
+	draw_circle(position, radius * 0.62, Color(STORM_COLOR, flicker))
+	draw_circle(position, radius * 0.28, Color(1, 1, 1, 0.95))
+
+
+func _draw_void_shard(position: Vector2, radius: float, rotation: float) -> void:
+	draw_circle(position, radius * 1.3, Color(VOID_COLOR, 0.18))
+	draw_set_transform(position, rotation * 0.4, Vector2(0.7, 1.0) * radius)
+	draw_colored_polygon(PackedVector2Array([Vector2(0, -1), Vector2(0.6, 0), Vector2(0, 1), Vector2(-0.6, 0)]), Color("1a0f2e"))
+	draw_polyline(PackedVector2Array([Vector2(0, -1), Vector2(0.6, 0), Vector2(0, 1), Vector2(-0.6, 0), Vector2(0, -1)]), Color(VOID_COLOR, 0.95), 0.12, true)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_zigzag(start: Vector2, end: Vector2, color: Color, width: float, seed_value: int) -> void:
+	var direction: Vector2 = end - start
+	var normal := Vector2(-direction.y, direction.x).normalized() * minf(_cell_size() * 0.08, direction.length() * 0.18)
+	var points := PackedVector2Array([start])
+	for step: int in range(1, 4):
+		points.append(start.lerp(end, float(step) / 4.0) + normal * (1.0 if (step + seed_value) % 2 == 0 else -1.0))
+	points.append(end)
+	draw_polyline(points, Color(color, color.a * 0.45), width + 2.0, true)
+	draw_polyline(points, color, width, true)
+
+
+# Effects drawn before the tower sprite: the Void drain and the back half of
+# the S.U.M.G.G.M. orb orbit.
+func _draw_tower_underlay(tower: Dictionary, foot: Vector2) -> void:
+	var evolution: String = tower.get("evolution", "")
+	var finale: bool = _has_finale(tower)
+	if evolution == "void_monolith":
+		_draw_void_drain(tower, foot)
+	if finale and evolution == "bounce":
+		_draw_sumggm_orbs(tower, foot, false)
+
+
+func _draw_void_drain(tower: Dictionary, foot: Vector2) -> void:
+	# Cosmetic tendrils to enemies currently inside the drained neighborhood.
+	var origin: Vector2 = foot + Vector2(0, -_cell_size() * 0.5)
+	var range_cells: float = float(tower.get("range", 1.0))
+	var drawn: int = 0
+	for enemy: Dictionary in combat_enemies:
+		if drawn >= 8 or float(enemy.get("hp", 0)) <= 0.0 or not MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), range_cells):
+			continue
+		var target: Vector2 = _position_center(_enemy_position(enemy)) + Vector2(0, _cell_size() * 0.05)
+		var bend := Vector2(-(target - origin).y, (target - origin).x).normalized() * _cell_size() * 0.12 * sin(_boulder_phase * 3.0 + drawn)
+		var points := PackedVector2Array()
+		for step: int in range(7):
+			var t: float = float(step) / 6.0
+			points.append(origin.lerp(target, t) + bend * sin(t * PI))
+		draw_polyline(points, Color(VOID_COLOR, 0.30), 4.0, true)
+		draw_polyline(points, Color("d6b8ff", 0.55), 1.5, true)
+		drawn += 1
 
 
 func _draw_rune_stone(position: Vector2, radius: float, rotation: float, onyx: bool, alpha: float = 1.0, frozen: bool = false) -> void:
@@ -1380,6 +1698,16 @@ func _draw_attacks() -> void:
 			var onyx: bool = trace.get("evolution", "") == "onyx_ring"
 			if onyx:
 				_draw_onyx_pulse(trace, remaining)
+			if trace.get("evolution", "") == "storm_sigil":
+				# Each accepted strike is a lightning bolt from the sigil to its victim.
+				var sky: Vector2 = _tower_foot(trace["cell"]) + Vector2(0, -_cell_size() * 1.25)
+				var index: int = 0
+				for hit: Vector2 in trace["hits"]:
+					var victim: Vector2 = _position_center(hit) + Vector2(0, _cell_size() * 0.05)
+					_draw_zigzag(sky, victim, Color(STORM_COLOR, remaining), 2.0, index + int(trace.get("tower_id", 0)))
+					draw_circle(victim, _cell_size() * 0.09 * remaining, Color(1, 1, 1, 0.8 * remaining))
+					index += 1
+				continue
 			# Both discrete Rune attacks communicate the actual neighborhood footprint.
 			for y: int in range(layout.dimensions.y):
 				for x: int in range(layout.dimensions.x):
@@ -1421,8 +1749,11 @@ func _draw_chain(trace: Dictionary, remaining: float) -> void:
 func _draw_onyx_pulse(trace: Dictionary, remaining: float) -> void:
 	var foot: Vector2 = _tower_foot(trace["cell"])
 	var radius: float = _cell_size() * lerpf(0.30, 1.25, 1.0 - remaining)
-	# An expanding, fading stone ring exists only for a captured discrete shot.
+	# An expanding, fading stone ring exists only for a captured discrete shot:
+	# the shockwave of the Onyx Ring slamming the ground, with a magic aura.
 	draw_set_transform(foot, 0.0, Vector2(1.0, 0.55))
+	draw_circle(Vector2.ZERO, radius * 0.92, Color(ONYX_GLOW, 0.16 * remaining))
+	draw_arc(Vector2.ZERO, radius * 0.7, 0.0, TAU, 32, Color(ONYX_GLOW, 0.45 * remaining), maxf(1.0, _cell_size() * 0.025), true)
 	draw_arc(Vector2.ZERO, radius, 0.0, TAU, 32, Color(0.10, 0.08, 0.15, remaining * 0.9), _cell_size() * 0.07, true)
 	draw_arc(Vector2.ZERO, radius - 2.0, 0.0, TAU, 32, Color(0.65, 0.58, 0.76, remaining * 0.65), 1.0, true)
 	draw_set_transform(Vector2.ZERO)
@@ -1693,6 +2024,12 @@ func _draw_magic_ballista(tower: Dictionary, artwork: TowerReward, rect: Rect2) 
 	var pulse: float = 0.5 + 0.5 * sin(_flame_elapsed * 4.0)
 	var canvas: Vector2 = _directional_canvas_sizes[artwork]
 	var center: Vector2 = rect.position + Vector2(canvas.x * 0.5, canvas.y * 0.36) * rect.size / canvas
+	if _has_finale(tower):
+		# The S.U.M.G.G.M. orbs replace the small ring and motes; keep the charged tip.
+		var tip: Vector2 = _tower_muzzle(tower, 0)
+		draw_circle(tip, cell_size * (0.065 + 0.02 * pulse), Color(MAGIC_COLOR, 0.40))
+		draw_circle(tip, cell_size * 0.03, Color(MAGIC_CORE, 0.95))
+		return
 	draw_set_transform(center, 0.0, Vector2(1.0, 0.45))
 	draw_arc(Vector2.ZERO, cell_size * 0.30, 0.0, TAU, 24, Color(MAGIC_COLOR, 0.35 + 0.25 * pulse), maxf(1.0, cell_size * 0.018), true)
 	draw_set_transform(Vector2.ZERO)

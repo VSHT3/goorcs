@@ -1030,6 +1030,8 @@ static func tower_stats_text(tower: Dictionary, stats: Dictionary) -> String:
 		lines.append("Damage dealt %d" % int(tower.get("damage_dealt", 0)))
 	if kind in ["economy", "bounty", "income_aura"] or int(tower.get("coins_generated", 0)) > 0:
 		lines.append("Coins generated %d" % int(tower.get("coins_generated", 0)))
+	if kind == "crystal" or int(tower.get("shards_generated", 0)) > 0:
+		lines.append("Shards generated %d" % int(tower.get("shards_generated", 0)))
 	if kind == "bounty" or int(tower.get("indirect_damage", 0)) > 0:
 		lines.append("Indirect damage %d" % int(tower.get("indirect_damage", 0)))
 	lines.append(behavior_summary(tower, stats))
@@ -1052,6 +1054,10 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 			result = "%s Coins / round clear" % String.num(float(config.get("clear_income", 0.0)), 1)
 			if float(config.get("periodic_income", 0.0)) > 0.0:
 				result += "\n%s Coins / %.2fs combat" % [String.num(float(config["periodic_income"]), 1), float(config.get("periodic_interval", 0.0))]
+		"crystal":
+			result = "%d Shards / round clear" % int(config.get("clear_shards", 0))
+			if int(config.get("periodic_shards", 0)) > 0:
+				result += "\n%d Shards / %.2fs combat" % [int(config["periodic_shards"]), float(config.get("periodic_interval", 0.0))]
 		"bounty":
 			result = "Auto mark: highest max HP\n+%.1f%% damage taken\n+%.1f%% normal kill Coins\nOne persistent, exclusive target" % [float(config.get("mark_damage_bonus", 0.0)) * 100.0, float(config.get("mark_income_bonus", 0.0)) * 100.0]
 		"income_aura":
@@ -1063,6 +1069,8 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 				result = "%d DPS · Continuous" % damage
 			else:
 				result = "Damage %d · %.2f attacks/s\nEvery %.2fs" % [damage, 1.0 / interval, interval]
+			if float(state.get("max_hp_drain", 0.0)) > 0.0:
+				result += "\n+%s%% max HP / s drain" % String.num(float(state["max_hp_drain"]) * 100.0, 1)
 			if kind == "chain":
 				result += "\n%d chain hits · %.2f jump reach\n+%.0f%% damage / successive hit" % [int(config.get("hit_count", 1)), float(config.get("jump_distance", 0.0)), float(config.get("successive_hit_bonus", 0.0)) * 100.0]
 	var advancement: Dictionary = fallback.get("advancements", {}).get(state.get("advancement", ""), {})
@@ -1127,6 +1135,8 @@ static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dicti
 
 
 static func branch_upgrade_description(step: Dictionary) -> String:
+	if step.has("description"):
+		return String(step["description"])
 	var parts := PackedStringArray()
 	if step.has("magic_bounce"):
 		var magic: Dictionary = step["magic_bounce"]

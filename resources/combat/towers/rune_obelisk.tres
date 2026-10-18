@@ -17,6 +17,10 @@ speed_upgrade_multiplier = 0.85
 area_attack = true
 roll_attributes = PackedStringArray("damage", "attack_speed", "range")
 attack_sound = 2
+; Every branch continues with ordered upgrades (bought one after another). All
+; values are provisional. "orbit_bonus" adds orbiting objects (cosmetic);
+; "range_bonus" adds whole cells; "max_hp_damage" adds that fraction of each
+; exposed enemy's maximum HP per second (Void Monolith only).
 evolutions = {
 "boulders": {
 "title": "Boulders",
@@ -28,6 +32,38 @@ evolutions = {
 "id": "freeze_runes",
 "title": "Freeze Runes",
 "cost": 250
+},
+"upgrades": [{"id": "rolling_stones", "title": "Rolling Stones", "cost": 350, "damage_multiplier": 1.4, "orbit_bonus": 2, "description": "Two more boulders join the orbit: +40% damage."}, {"id": "landslide", "title": "Landslide", "cost": 550, "damage_multiplier": 1.4, "range_bonus": 1, "orbit_bonus": 1, "description": "The orbit widens into a grinding landslide: +40% damage and +1 range."}, {"id": "mountain_heart", "title": "Heart of the Mountain", "cost": 1500, "damage_multiplier": 2.0, "range_bonus": 1, "orbit_bonus": 3, "description": "Endgame. A living mountain core: double damage, +1 range and a second ring of boulders."}]
+},
+"onyx_ring": {
+"title": "Onyx Ring",
+"cost": 250,
+"damage": 6,
+"interval": 0.75,
+"continuous": false,
+"upgrades": [{"id": "twin_rings", "title": "Twin Rings", "cost": 350, "damage_multiplier": 1.4, "orbit_bonus": 3, "description": "A second onyx ring orbits the obelisk: +40% damage."}, {"id": "obsidian_crown", "title": "Obsidian Crown", "cost": 550, "attack_rate_multiplier": 1.25, "orbit_bonus": 2, "description": "A crown of obsidian quickens the pulse: 25% faster pulses."}, {"id": "eclipse", "title": "Eclipse", "cost": 1600, "damage_multiplier": 2.0, "range_bonus": 1, "orbit_bonus": 3, "description": "Endgame. The rings eclipse the sky: double damage and +1 range."}]
+},
+"storm_sigil": {
+"title": "Storm Sigil",
+"cost": 300,
+"damage": 5,
+"interval": 0.5,
+"continuous": false,
+"damage_type": &"lightning",
+"description": "Charged orbs circle the obelisk and strike every enemy in the neighborhood with LIGHTNING every 0.5s.",
+"upgrades": [{"id": "charged_orbs", "title": "Charged Orbs", "cost": 350, "damage_multiplier": 1.4, "orbit_bonus": 2, "description": "Two more storm orbs: +40% damage."}, {"id": "tempest", "title": "Tempest", "cost": 600, "attack_rate_multiplier": 1.3, "range_bonus": 1, "orbit_bonus": 1, "description": "A tempest rises: 30% faster strikes and +1 range."}, {"id": "wrath_of_the_storm", "title": "Wrath of the Storm", "cost": 1700, "damage_multiplier": 2.0, "orbit_bonus": 3, "description": "Endgame. The sky answers: double damage and a crackling second ring of orbs."}]
+},
+"void_monolith": {
+"title": "Void Monolith",
+"cost": 350,
+"damage": 3,
+"interval": 0.0,
+"continuous": true,
+"damage_type": &"magic",
+"max_hp_damage": 0.015,
+"description": "Void shards drain nearby enemies: continuous MAGIC damage plus 1.5% of their maximum HP per second. Built for bosses.",
+"upgrades": [{"id": "gravity_well", "title": "Gravity Well", "cost": 400, "damage_multiplier": 1.4, "orbit_bonus": 2, "description": "Gravity drags two more shards into orbit: +40% damage."}, {"id": "event_horizon", "title": "Event Horizon", "cost": 650, "max_hp_damage": 0.015, "range_bonus": 1, "orbit_bonus": 1, "description": "Drain rises to 3% of maximum HP per second, with +1 range."}, {"id": "singularity", "title": "Singularity", "cost": 1800, "damage_multiplier": 2.0, "max_hp_damage": 0.03, "orbit_bonus": 3, "description": "Endgame. A singularity: double damage and a 6% maximum-HP drain per second."}]
+}
 }
 },
 "onyx_ring": {

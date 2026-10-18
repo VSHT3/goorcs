@@ -35,7 +35,11 @@ extends Resource
 @export var additional_archer_offsets: PackedVector2Array = PackedVector2Array()
 
 
-func board_variant(evolution: String, followup: String = "") -> Dictionary:
+func board_variant(evolution: String, followup: String = "", steps: Array = []) -> Dictionary:
+	# The latest purchased branch upgrade with its own art wins.
+	for index: int in range(steps.size() - 1, -1, -1):
+		if board_variants.has(steps[index]):
+			return board_variants[steps[index]]
 	if board_variants.has(followup):
 		return board_variants[followup]
 	if board_variants.has(evolution):

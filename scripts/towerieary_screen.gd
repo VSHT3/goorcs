@@ -301,6 +301,14 @@ func _refresh_preview() -> void:
 func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary) -> String:
 	var kind: String = tower.get("behavior_kind", "attack")
 	var config: Dictionary = tower.get("behavior_config", {})
+	# Authored branch-upgrade and evolution text describes its own stage.
+	var authored: Dictionary = stats.get("evolutions", {}).get(tower.get("evolution", ""), {})
+	var steps: Array = authored.get("upgrades", [])
+	var bought: int = tower.get("branch_upgrades", []).size()
+	if bought > 0 and bought <= steps.size() and steps[bought - 1].has("description"):
+		return String(steps[bought - 1]["description"])
+	if bought == 0 and authored.has("description"):
+		return String(authored["description"])
 	match kind:
 		"support":
 			if float(config.get("attack_speed_bonus", 0.0)) == 0.0:
@@ -312,6 +320,10 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 			if float(config.get("periodic_income", 0.0)) > 0.0:
 				return "Produces Coins on round clear and at regular intervals during combat."
 			return "Produces Coins when a round is cleared."
+		"crystal":
+			if int(config.get("periodic_shards", 0)) > 0:
+				return "Digs Shards instead of Coins on round clear and at regular intervals during combat."
+			return "Digs Shards instead of Coins when a round is cleared."
 		"bounty":
 			return "Marks enemies for increased damage taken and kill rewards."
 		"income_aura":
@@ -374,6 +386,11 @@ func _populate_role_stats(tower: Dictionary, stats: Dictionary) -> void:
 			_add_stat(_stats, &"mark_income", "Marked normal kill Coins", "+%s%%" % _number(float(config["mark_income_bonus"]) * 100.0))
 		"income_aura":
 			_add_stat(_stats, &"kill_income", "Normal kill Coins", "+%s%%" % _number(float(config["kill_income_bonus"]) * 100.0))
+		"crystal":
+			_add_stat(_stats, &"clear_shards", "Round-clear Shards", "%d Shards" % int(config["clear_shards"]))
+			if int(config["periodic_shards"]) > 0:
+				_add_stat(_stats, &"periodic_shards", "Periodic Shards", "%d Shards" % int(config["periodic_shards"]))
+				_add_stat(_stats, &"periodic_interval", "Production interval", "%s combat s" % _number(float(config["periodic_interval"])))
 		_:
 			_populate_attack_stats(tower, stats)
 
@@ -406,6 +423,8 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 		_add_stat(_stats, &"jump_distance", "Jump reach", "%s cells" % _number(float(config["jump_distance"])))
 		_add_stat(_stats, &"successive_bonus", "Each successive hit", "+%s%% base damage" % _number(float(config["successive_hit_bonus"]) * 100.0))
 	elif bool(stats.get("area_attack", false)):
+		if float(tower.get("max_hp_drain", 0.0)) > 0.0:
+			_add_stat(_stats, &"max_hp_drain", "Maximum-HP drain", "%s%% / s" % _number(float(tower["max_hp_drain"]) * 100.0))
 		if bool(tower.get("freeze_upgraded", false)):
 			_add_stat(_stats, &"freeze_hp_scale", "Thaw HP scale", "%s HP" % _number(TowerDefinition.FREEZE_HP_SCALE))
 			_add_stat(_stats, &"freeze_slow", "Movement reduction", "%s%%" % _number((1.0 - TowerDefinition.FREEZE_SPEED_MULTIPLIER) * 100.0))
@@ -576,6 +595,7 @@ func _role_title(role: String) -> String:
 		"chain": return "Chain damage"
 		"support": return "Tower support"
 		"economy": return "Coin production"
+		"crystal": return "Shard production"
 		"bounty": return "Enemy marking"
 		"income_aura": return "Kill-income support"
 		_: return role.replace("_", " ").capitalize()

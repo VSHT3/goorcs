@@ -627,7 +627,7 @@ func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 		_check(board.is_processing(), "Onyx keeps its local orbit active without enemies or attacks")
 		var onyx_idle: Image = await _board_image(board, viewport)
 		_check(int(_changed_geometry(ordinary, onyx_idle, region)["pixels"]) > 10,
-			"Idle Onyx has dark orbiting stones rather than a permanent range ring")
+			"Idle Onyx shows its floating onyx ring and riding stones rather than a permanent range ring")
 		board._process(0.5)
 		var onyx_waiting: Image = await _board_image(board, viewport)
 		_check(int(_changed_geometry(onyx_idle, onyx_waiting, region)["pixels"]) > 25 and board._shot_traces.is_empty(),

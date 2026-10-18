@@ -8,6 +8,8 @@ const FREEZE_SPEED_MULTIPLIER: float = 0.8
 const FREEZE_DURATION: float = 2.0
 # Most homing bolts one Magic Ballista shot may split into.
 const MAX_MAGIC_SPLIT: int = 5
+# Rune evolutions that deal continuous (rather than pulsed) damage.
+const CONTINUOUS_RUNE_BRANCHES: Array[String] = ["boulders", "void_monolith"]
 
 @export var reward: TowerReward
 @export var damage: int = 2
@@ -111,7 +113,7 @@ static func valid_evolutions(definition: TowerDefinition) -> bool:
 	if not definition.evolutions.is_empty() and not definition.special_upgrade.is_empty():
 		return false
 	for branch: Variant in definition.evolutions:
-		if not branch is String or branch not in ["boulders", "onyx_ring", "pierce", "bounce"] or not definition.evolutions[branch] is Dictionary:
+		if not branch is String or branch not in ["boulders", "onyx_ring", "storm_sigil", "void_monolith", "pierce", "bounce"] or not definition.evolutions[branch] is Dictionary:
 			return false
 		var config: Dictionary = definition.evolutions[branch]
 		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
@@ -132,7 +134,15 @@ static func valid_evolutions(definition: TowerDefinition) -> bool:
 		var interval: float = float(config["interval"])
 		if not is_finite(interval) or (bool(config["continuous"]) and interval != 0.0) or (not bool(config["continuous"]) and interval <= 0.0):
 			return false
-		if bool(config["continuous"]) != (branch == "boulders") or not definition.area_attack:
+		if bool(config["continuous"]) != (branch in CONTINUOUS_RUNE_BRANCHES) or not definition.area_attack:
+			return false
+		if config.has("damage_type") and String(config["damage_type"]) not in ["physical", "magic", "lightning"]:
+			return false
+		if config.has("max_hp_damage") and (branch != "void_monolith" or not _nonnegative_number(config["max_hp_damage"])):
+			return false
+		if config.has("description") and not config["description"] is String:
+			return false
+		if config.has("upgrades") and not valid_branch_upgrades(String(branch), config["upgrades"]):
 			return false
 		if branch == "boulders" and not config.has("followup"):
 			return false
@@ -161,7 +171,7 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
 			return false
 		for field: Variant in config:
-			if field not in ["id", "title", "cost", "damage_multiplier", "pierce", "attack_rate_multiplier", "bolt_scale", "bolt_reach", "damage_type", "magic_bounce", "magic_split"]:
+			if field not in ["id", "title", "cost", "description", "damage_multiplier", "pierce", "attack_rate_multiplier", "bolt_scale", "bolt_reach", "damage_type", "magic_bounce", "magic_split", "orbit_bonus", "range_bonus", "max_hp_damage", "behavior_add", "periodic_interval_multiplier"]:
 				return false
 		for field: String in ["damage_multiplier", "attack_rate_multiplier"]:
 			if config.has(field) and not _positive_number(config[field]):
@@ -169,8 +179,22 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		for field: String in ["bolt_scale", "bolt_reach"]:
 			if config.has(field) and not _nonnegative_number(config[field]):
 				return false
-		if config.has("pierce") and (not config["pierce"] is int or int(config["pierce"]) < 0):
+		for field: String in ["pierce", "orbit_bonus", "range_bonus"]:
+			if config.has(field) and (not config[field] is int or int(config[field]) < 0):
+				return false
+		if config.has("description") and not config["description"] is String:
 			return false
+		if config.has("max_hp_damage") and (branch != "void_monolith" or not _nonnegative_number(config["max_hp_damage"])):
+			return false
+		if config.has("periodic_interval_multiplier") and (branch != "crystal_mine" or not _positive_number(config["periodic_interval_multiplier"])):
+			return false
+		if config.has("behavior_add"):
+			var added: Variant = config["behavior_add"]
+			if branch != "crystal_mine" or not added is Dictionary or (added as Dictionary).is_empty():
+				return false
+			for key: Variant in added:
+				if key not in ["clear_shards", "periodic_shards"] or not added[key] is int or int(added[key]) <= 0:
+					return false
 		if config.has("damage_type") and String(config["damage_type"]) not in ["physical", "magic"]:
 			return false
 		if config.has("magic_split") and (branch != "bounce" or not config["magic_split"] is int or int(config["magic_split"]) < 2 or int(config["magic_split"]) > MAX_MAGIC_SPLIT):
@@ -247,6 +271,10 @@ static func _valid_behavior_config(kind: String, config: Dictionary) -> bool:
 			return (int(config["periodic_income"]) == 0) == (float(config["periodic_interval"]) == 0.0)
 		"bounty":
 			return config.size() == 2 and _positive_number(config.get("mark_damage_bonus")) and _positive_number(config.get("mark_income_bonus"))
+		"crystal":
+			# Shards instead of Coins. Periodic Shards may start at zero with a
+			# ready interval that later upgrades switch on.
+			return config.size() == 3 and config.get("clear_shards") is int and int(config["clear_shards"]) > 0 and config.get("periodic_shards") is int and int(config["periodic_shards"]) >= 0 and _positive_number(config.get("periodic_interval"))
 		"income_aura":
 			return config.size() == 2 and config.get("stack_group") is String and not String(config["stack_group"]).is_empty() and _positive_number(config.get("kill_income_bonus"))
 	return false
@@ -279,6 +307,12 @@ static func _valid_role_evolutions(definition: TowerDefinition) -> bool:
 				if branch == "royal_mint":
 					if config.size() != 4 or config["behavior_kind"] != "economy" or int(config["behavior_config"]["clear_income"]) < int(definition.behavior_config.get("clear_income", 0)) or int(config["behavior_config"]["periodic_income"]) <= 0:
 						return false
+				elif branch == "crystal_mine":
+					if config["behavior_kind"] != "crystal" or not config.get("upgrades") is Array or not valid_branch_upgrades("crystal_mine", config["upgrades"]):
+						return false
+					for field: Variant in config:
+						if field not in ["title", "cost", "behavior_kind", "behavior_config", "description", "upgrades"]:
+							return false
 				elif branch == "bounty_board":
 					if config.size() != 5 or config["behavior_kind"] != "bounty" or not config.get("followups") is Dictionary or not _valid_bounty_followups(config["followups"], config["behavior_config"]):
 						return false

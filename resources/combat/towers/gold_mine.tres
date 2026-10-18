@@ -26,6 +26,16 @@ evolutions = {
 "behavior_kind": "economy",
 "behavior_config": {"clear_income": 15, "periodic_income": 3, "periodic_interval": 5.0}
 },
+"crystal_mine": {
+"title": "Crystal Mine",
+"cost": 350,
+"behavior_kind": "crystal",
+; Produces Shards (the reroll currency) instead of Coins. Periodic Shards start
+; at zero; the interval applies once an upgrade adds periodic production.
+"behavior_config": {"clear_shards": 2, "periodic_shards": 0, "periodic_interval": 8.0},
+"description": "Digs Shards instead of Coins: 2 Shards each time a round is cleared.",
+"upgrades": [{"id": "deeper_veins", "title": "Deeper Veins", "cost": 400, "behavior_add": {"clear_shards": 2}, "description": "+2 Shards per cleared round."}, {"id": "geode_drill", "title": "Geode Drill", "cost": 550, "behavior_add": {"periodic_shards": 1}, "description": "Also drills 1 Shard every 8 combat seconds."}, {"id": "resonant_lattice", "title": "Resonant Lattice", "cost": 750, "periodic_interval_multiplier": 0.6, "behavior_add": {"periodic_shards": 1}, "description": "Drills 2 Shards per cycle, 40% more often."}, {"id": "mother_lode", "title": "Mother Lode", "cost": 1500, "periodic_interval_multiplier": 0.75, "behavior_add": {"clear_shards": 4, "periodic_shards": 1}, "description": "Endgame. +4 Shards per cleared round, 3 Shards per cycle, 25% more often."}]
+},
 "bounty_board": {
 "title": "Bounty Board",
 "cost": 300,

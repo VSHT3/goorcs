@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TowerReward" load_steps=12 format=3 uid="uid://bqsgjcarvhktj"]
+[gd_resource type="Resource" script_class="TowerReward" load_steps=30 format=3 uid="uid://bqsgjcarvhktj"]
 
 [ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
 [ext_resource type="Texture2D" path="res://assets/towers/ballista_tower.png" id="2_icon"]
@@ -12,6 +12,24 @@
 [ext_resource type="Texture2D" path="res://assets/towers/ballista_weapon_sw.png" id="9_sw"]
 [ext_resource type="Texture2D" path="res://assets/towers/ballista_weapon_w.png" id="10_w"]
 [ext_resource type="Texture2D" path="res://assets/towers/ballista_weapon_nw.png" id="11_nw"]
+[ext_resource type="Texture2D" uid="uid://dl42r17i47x1a" path="res://assets/towers/ballista_sumggm_base.png" id="12_ballista_sumggm_base"]
+[ext_resource type="Texture2D" uid="uid://c1pc0rfok4vsi" path="res://assets/towers/ballista_sumggm_weapon_n.png" id="13_ballista_sumggm_weapon_n"]
+[ext_resource type="Texture2D" uid="uid://25fw4v4txhbo" path="res://assets/towers/ballista_sumggm_weapon_ne.png" id="14_ballista_sumggm_weapon_ne"]
+[ext_resource type="Texture2D" uid="uid://cevygfaqgq3lq" path="res://assets/towers/ballista_sumggm_weapon_e.png" id="15_ballista_sumggm_weapon_e"]
+[ext_resource type="Texture2D" uid="uid://bsfdo6guebuws" path="res://assets/towers/ballista_sumggm_weapon_se.png" id="16_ballista_sumggm_weapon_se"]
+[ext_resource type="Texture2D" uid="uid://dlv8yc321h22p" path="res://assets/towers/ballista_sumggm_weapon_s.png" id="17_ballista_sumggm_weapon_s"]
+[ext_resource type="Texture2D" uid="uid://bihl7i86f2awh" path="res://assets/towers/ballista_sumggm_weapon_sw.png" id="18_ballista_sumggm_weapon_sw"]
+[ext_resource type="Texture2D" uid="uid://dk3u6jrvgtvpx" path="res://assets/towers/ballista_sumggm_weapon_w.png" id="19_ballista_sumggm_weapon_w"]
+[ext_resource type="Texture2D" uid="uid://clblm8lbwrhst" path="res://assets/towers/ballista_sumggm_weapon_nw.png" id="20_ballista_sumggm_weapon_nw"]
+[ext_resource type="Texture2D" uid="uid://c4yltjyhwpeqh" path="res://assets/towers/ballista_biggest_base.png" id="21_ballista_biggest_base"]
+[ext_resource type="Texture2D" uid="uid://bvktftxbcjtjl" path="res://assets/towers/ballista_biggest_weapon_n.png" id="22_ballista_biggest_weapon_n"]
+[ext_resource type="Texture2D" uid="uid://jpgh63kmwnx6" path="res://assets/towers/ballista_biggest_weapon_ne.png" id="23_ballista_biggest_weapon_ne"]
+[ext_resource type="Texture2D" uid="uid://ftrkk7mxmdsr" path="res://assets/towers/ballista_biggest_weapon_e.png" id="24_ballista_biggest_weapon_e"]
+[ext_resource type="Texture2D" uid="uid://hyl67y8n81f7" path="res://assets/towers/ballista_biggest_weapon_se.png" id="25_ballista_biggest_weapon_se"]
+[ext_resource type="Texture2D" uid="uid://df7ow32sxmqqn" path="res://assets/towers/ballista_biggest_weapon_s.png" id="26_ballista_biggest_weapon_s"]
+[ext_resource type="Texture2D" uid="uid://b7bj1ch7j3mwv" path="res://assets/towers/ballista_biggest_weapon_sw.png" id="27_ballista_biggest_weapon_sw"]
+[ext_resource type="Texture2D" uid="uid://05fkhh0pn4q2" path="res://assets/towers/ballista_biggest_weapon_w.png" id="28_ballista_biggest_weapon_w"]
+[ext_resource type="Texture2D" uid="uid://drsvyr50vc3vu" path="res://assets/towers/ballista_biggest_weapon_nw.png" id="29_ballista_biggest_weapon_nw"]
 
 [resource]
 script = ExtResource("1_reward")
@@ -28,3 +46,7 @@ directional_projectile_origins = PackedVector2Array(96.5, 28.125, 127.297, 42.67
 projectile_origin = Vector2(134, 77)
 projectile_length = 0.26
 projectile_width = 2.0
+board_variants = {
+"sumggm": {"texture": ExtResource("12_ballista_sumggm_base"), "directional_weapon_textures": [ExtResource("13_ballista_sumggm_weapon_n"), ExtResource("14_ballista_sumggm_weapon_ne"), ExtResource("15_ballista_sumggm_weapon_e"), ExtResource("16_ballista_sumggm_weapon_se"), ExtResource("17_ballista_sumggm_weapon_s"), ExtResource("18_ballista_sumggm_weapon_sw"), ExtResource("19_ballista_sumggm_weapon_w"), ExtResource("20_ballista_sumggm_weapon_nw")]},
+"biggest_wood_3": {"texture": ExtResource("21_ballista_biggest_base"), "directional_weapon_textures": [ExtResource("22_ballista_biggest_weapon_n"), ExtResource("23_ballista_biggest_weapon_ne"), ExtResource("24_ballista_biggest_weapon_e"), ExtResource("25_ballista_biggest_weapon_se"), ExtResource("26_ballista_biggest_weapon_s"), ExtResource("27_ballista_biggest_weapon_sw"), ExtResource("28_ballista_biggest_weapon_w"), ExtResource("29_ballista_biggest_weapon_nw")]}
+}

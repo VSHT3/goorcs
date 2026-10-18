@@ -195,10 +195,22 @@ static func _valid_board_variants(tower: TowerDefinition) -> bool:
 			return false
 		var variant: Dictionary = art.board_variants[branch]
 		for field: Variant in variant:
-			if typeof(field) != TYPE_STRING or field not in ["texture", "board_height", "board_anchor", "archer_pivot", "secondary_sprite_offset", "additional_archer_offsets", "portrait_bounds"]:
+			if typeof(field) != TYPE_STRING or field not in ["texture", "board_height", "board_anchor", "archer_pivot", "secondary_sprite_offset", "additional_archer_offsets", "portrait_bounds", "directional_weapon_textures"]:
 				return false
 		if not variant.get("texture") is Texture2D:
 			return false
+		if variant.has("directional_weapon_textures"):
+			# A directional look replaces the base and all eight poses on the
+			# shared canvas, keeping the authored release tips valid.
+			var poses: Variant = variant["directional_weapon_textures"]
+			if art.directional_weapon_textures.is_empty() or not poses is Array or (poses as Array).size() != 8:
+				return false
+			var canvas: Vector2 = art.icon_texture.get_size()
+			if (variant["texture"] as Texture2D).get_size() != canvas:
+				return false
+			for pose: Variant in poses:
+				if not pose is Texture2D or (pose as Texture2D).get_size() != canvas:
+					return false
 		var height: Variant = variant.get("board_height", art.board_height)
 		if typeof(height) not in [TYPE_FLOAT, TYPE_INT] or not is_finite(float(height)) or float(height) <= 0.0:
 			return false
