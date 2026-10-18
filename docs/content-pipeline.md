@@ -58,17 +58,17 @@ The following is the shipped **provisional** configuration, not creator-approved
 | Rarity | Weight | Attack/support +/− slots | Economy +/− slots | Positive fractional bounds¹ | Positive range | Drawback fractional bounds¹ | Drawback range |
 | --- | ---: | --- | --- | --- | --- | --- | --- |
 | Broken | 8 | 0/1 | 0/1 | — | — | −35%…−20% | −25%…−10% |
-| Shoddy | 15 | 0/2 | 0/1 | — | — | −20%…−10% | −12%…−5% |
-| Common | 38 | 1/1 | 1/0 | 3%…8% | 3%…6% | −8%…−3% | −6%…−2% |
-| Uncommon | 23 | 1/1 | 1/0 | 8%…15% | 5%…10% | −4%…−1% | −3%…−1% |
-| Rare | 10 | 2/0 | 1/0 | 12%…22% | 8%…15% | — | — |
+| Shoddy | 13 | 0/2 | 0/1 | — | — | −20%…−10% | −12%…−5% |
+| Common | 35 | 1/1 | 1/0 | 3%…8% | 3%…6% | −8%…−3% | −6%…−2% |
+| Uncommon | 26 | 1/1 | 1/0 | 8%…15% | 5%…10% | −4%…−1% | −3%…−1% |
+| Rare | 12 | 2/0 | 1/0 | 12%…22% | 8%…15% | — | — |
 | Epic | 4.5 | 2/0 | 1/0 | 20%…35% | 12%…22% | — | — |
 | Legendary | 1.3 | 2/0 | 1/0 | 30%…50% | 20%…35% | — | — |
 | Mythic | 0.2 | 2/0 | 1/0 | 45%…75% | 30%…50% | — | — |
 
 ¹ `damage`, `attack_speed`, `support_buff`, `economy_production`; eligible pools are intersected with the tower's declared effects. Mechanical positive pools begin at Rare: Pierce/Bounce/chain extra hits respectively are Rare `1/1/1`, Epic `1–2/1/1–2`, Legendary `1–3/1–2/2–3`, Mythic `2–4/2–3/3–5`. They never appear in drawback pools.
 
-Rarity rerolls exclude the current tier and renormalize the **same** base weights, allowing downgrades, then replace all attributes. Attribute rerolls retain rarity and regenerate all effects/values. There is no preview, offered choice, reveal modal, or permanent rolled collection item.
+Rarity rerolls exclude the current tier and renormalize the **same** base weights, allowing downgrades, then replace all attributes. Attribute rerolls retain rarity and regenerate all effects/values. There is no preview, offered choice, or permanent rolled collection item. Accepted rarity rerolls have a dismissible cosmetic reel, which cannot change the result. Its staged better-rarity neighbor is not an indication of actual odds.
 
 ### Effective stats, costs, and payout rules
 

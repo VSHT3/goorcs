@@ -360,6 +360,8 @@ The final integrated `python3 tools/verify.py all` run passed **51/51 checks**, 
 
 `RarityReel` is a local presentation overlay shared by match planning and Sandbox. Match UI records the requested tower ID and its accepted `rarity_rerolls` counter before dispatch, then starts the reel only when a subsequent accepted snapshot increments that counter. Sandbox starts it after its synchronous accepted transaction. Rejections do not start a reel; duplicate local requests are blocked while waiting or spinning. The winning card comes from accepted tower state; decorative cards use a separate cosmetic RNG and never change host odds, Shard spending, attributes, or simulation speed.
 
+The strip deliberately places one better Epic/Legendary/Mythic card one or two slots on either side of the accepted landing card. Epic results can neighbor Legendary/Mythic; Legendary results neighbor Mythic. Mythic results have no staged better card. Both spacing and eligible neighboring tier are cosmetic local draws, separate from gameplay RNG. This near-miss staging does not indicate how close the authoritative roll was to another tier.
+
 The horizontal strip decelerates beneath a fixed marker, with mechanical ticks on card crossings and a crystal-chord landing/reveal. Both original WAVs are reproduced by `tools/author_sound_effects.py`, recorded in the SFX manifest, and played on the existing Sound bus. X/Escape closes only the presentation; leaving cancels playback. Combat is not paused by the reel. Verification of the reel and its audio is explicitly deferred at the creator's request; no runtime or aesthetic approval is claimed.
 
 ### Menu and title sound

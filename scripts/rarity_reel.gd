@@ -173,6 +173,13 @@ func present(tower: Dictionary, artwork: Texture2D) -> void:
 	for index: int in range(CARD_COUNT):
 		_strip.rarities[index] = _rng.randi_range(0, RARITIES.size() - 1)
 	_strip.rarities[WINNER_INDEX] = _winner_rank
+	# Stage a cosmetic near-miss, never alter the accepted winning card.
+	if _winner_rank < RARITIES.size() - 1:
+		var offset: int = _rng.randi_range(1, 2)
+		if _rng.randi_range(0, 1) == 0:
+			offset = -offset
+		var better_rank: int = _rng.randi_range(maxi(RARITIES.find("epic"), _winner_rank + 1), RARITIES.size() - 1)
+		_strip.rarities[WINNER_INDEX + offset] = better_rank
 	_strip.winner_index = WINNER_INDEX
 	_strip.scroll_position = START_POSITION
 	_strip.reveal = 0.0

@@ -39,7 +39,7 @@ rarities = Array[Dictionary]([{
 }, {
 "id": "shoddy",
 "title": "Shoddy",
-"weight": 15.0,
+"weight": 13.0,
 "positive_slots": 0,
 "drawback_slots": 2,
 "positive_pool": {},
@@ -53,7 +53,7 @@ rarities = Array[Dictionary]([{
 }, {
 "id": "common",
 "title": "Common",
-"weight": 38.0,
+"weight": 35.0,
 "positive_slots": 1,
 "drawback_slots": 1,
 "positive_pool": {
@@ -73,7 +73,7 @@ rarities = Array[Dictionary]([{
 }, {
 "id": "uncommon",
 "title": "Uncommon",
-"weight": 23.0,
+"weight": 26.0,
 "positive_slots": 1,
 "drawback_slots": 1,
 "positive_pool": {
@@ -93,7 +93,7 @@ rarities = Array[Dictionary]([{
 }, {
 "id": "rare",
 "title": "Rare",
-"weight": 10.0,
+"weight": 12.0,
 "positive_slots": 2,
 "drawback_slots": 0,
 "positive_pool": {
