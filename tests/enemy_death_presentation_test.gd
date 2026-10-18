@@ -31,6 +31,8 @@ func _run() -> void:
 	viewport.add_child(board)
 	await process_frame
 	board._endpoint_timer.paused = true
+	# Exercise offscreen captures without depending on native-window presentation.
+	RenderingServer.set_render_loop_enabled(false)
 	var ground: Image = await _capture()
 	for definition: EnemyDefinition in board.content_catalog.enemies:
 		var rules := CombatRules.new()
@@ -87,6 +89,7 @@ func _run() -> void:
 		board.apply_deaths(model.snapshot(),0)
 	viewport.queue_free()
 	await process_frame
+	RenderingServer.set_render_loop_enabled(true)
 	if failures == 0:
 		print("PASS: actual corpse pixels, living blood/bloodless skeleton bones, pause/speed, non-targetability, duplicate-event rejection and complete visual cleanup")
 	quit(1 if failures else 0)
@@ -94,7 +97,7 @@ func _run() -> void:
 func _capture() -> Image:
 	board.set_process(false)
 	board.queue_redraw()
-	RenderingServer.force_draw.call_deferred(false)
 	await process_frame
+	RenderingServer.force_draw.call_deferred(false)
 	await RenderingServer.frame_post_draw
 	return viewport.get_texture().get_image()

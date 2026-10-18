@@ -1,0 +1,13 @@
+{
+  "approval": "Creator approved basic Orc still and requested install, verify, commit, push.",
+  "local_animation": "12-frame cutout walk and death; no paid generation.",
+  "verification": {
+    "main_scene_walkthrough": "Passed in6.54seconds using isolated saves, X11 Compatibility/Mesa llvmpipe, Dummy audio; native Sandbox pointer placement/upgrade, actual Orc walk and confirmed deaths, supported-width mirrored views, 128px endpoint playback and hide/resume.",
+    "captures": ".verify-logs/orc-endpoints-20261018/",
+    "native_gpu_performance": "Not verified",
+    "sound_quality": "Not verified",
+    "full_suite": "All headless checks passed in initial all-mode run (63/64 overall, death-rendering helper timed out). After correcting capture-signal ordering, standard rendered run passed12/12 including death pixels with native render loop disabled. No timeout increase, retry or assertion exemption.",
+    "all_logs": ".verify-logs/20261018T110737Z-all-0658f574/",
+    "final_rendered_logs": ".verify-logs/20261018T111453Z-rendered-7c8e786d/"
+  }
+}
