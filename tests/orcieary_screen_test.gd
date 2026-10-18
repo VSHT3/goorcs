@@ -124,7 +124,8 @@ func _check_catalog_and_pixels() -> void:
 				var walking: Image = await _portrait_image()
 				_check(first.get_data() != walking.get_data(), "Replaying a walking portrait changes its rendered pose")
 			else:
-				screen.portrait.set_preview_time(0.1)
+				var action_duration: float = EnemyVisuals.animation_duration(definition, screen.portrait.preview_animation)
+				screen.portrait.set_preview_time(action_duration * 0.8)
 				var special: Image = await _portrait_image()
 				_check(screen.portrait.preview_animation != &"walk" and first.get_data() != special.get_data(), "Ability portraits visibly replay their authored action sequence")
 				var capture_directory: String = OS.get_environment("GORCS_ORCIEARY_CAPTURE_DIR")

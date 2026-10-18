@@ -171,7 +171,7 @@ func _room_intact(code: String, accepted_peers: Array, description: String) -> v
 
 func _unused_port() -> int:
 	var socket := PacketPeerUDP.new()
-	var bind_error: Error = socket.bind(0, "127.0.0.1")
+	var bind_error: Error = socket.bind(0)
 	_check(bind_error == OK, "Reserve an available isolated UDP test endpoint")
 	if bind_error != OK:
 		return 0

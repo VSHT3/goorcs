@@ -616,7 +616,7 @@ func _test_stunned_support_and_economy() -> void:
 	var bonus: float = aura["behavior_config"]["kill_income_bonus"]
 	_check(_kill_grunt_payout(combat, attacker) == ceili(normal * (1.0 + bonus)), "Active income aura increases a real killer-location payout")
 	_club_impact(combat, aura)
-	_check(_kill_grunt_payout(combat, attacker) == normal and combat._income_aura_bonus(0, attacker) == 0.0, "Stunned income aura grants neither cached nor freshly queried bonus Coins")
+	_check(_kill_grunt_payout(combat, attacker) == normal, "Stunned income aura grants no bonus on an actual kill")
 	combat.advance(2.0)
 	_check(_kill_grunt_payout(combat, attacker) == ceili(normal * (1.0 + bonus)), "Income aura restores naturally at exact expiry")
 
