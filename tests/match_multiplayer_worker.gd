@@ -2,12 +2,14 @@ extends "res://tests/match_planning_worker.gd"
 
 
 class CommandFence extends Node:
+	signal received
 	signal completed(sequence: int)
 
 	@rpc("any_peer", "call_remote", "reliable")
 	func request(sequence: int) -> void:
 		var sender: int = multiplayer.get_remote_sender_id()
 		if sender in multiplayer.get_peers():
+			received.emit()
 			acknowledge.rpc_id(sender, sequence)
 
 	@rpc("any_peer", "call_remote", "reliable")
@@ -25,6 +27,7 @@ func _new_session() -> void:
 	super._new_session()
 	_command_fence = CommandFence.new()
 	_command_fence.name = "CommandFence"
+	_command_fence.received.connect(_publish)
 	_command_fence.completed.connect(func(sequence: int) -> void:
 		if sequence == _pending_fence:
 			_pending_fence = 0
@@ -135,8 +138,8 @@ func _execute_command(command: Dictionary) -> void:
 			planning._publish_snapshot()
 	else:
 		super._execute_command(command)
-	# Local dispatch only queues guest RPCs. The same reliable channel orders
-	# this fence after commands/snapshots and its reply after their remote effects.
+	# Publish the observing peer's captured state before acknowledging this fence;
+	# transport ordering alone does not order that process's next disk write.
 	if action in ["build", "target", "target_secondary", "upgrade", "sell", "send", "debug", "step", "edit", "clear", "ready"] and planning.active and _session.state == MultiplayerSession.State.CONNECTED:
 		_pending_fence = _command_id
 		var peer_id: int = planning._active_peer_id
