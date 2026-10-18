@@ -76,7 +76,8 @@ extends Resource
 @export var texture: Texture2D
 @export var source_faces_left: bool = false
 
-# Local board presentation only; never part of the host's combat rules.
+# Local presentation only; never part of the host's combat rules.
+@export var elite: bool = false
 @export var board_height: float = 0.50
 @export var board_anchor: Vector2 = Vector2(0.5, 0.90625)
 # Transparent for bloodless types; corpse anatomy is authored in the death frames.

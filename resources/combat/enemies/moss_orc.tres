@@ -8,6 +8,7 @@
 script = ExtResource("1_enemy")
 id = &"moss_orc"
 title = "MossOrc"
+elite = true
 description = "An ancient moss-covered orc. Regrows eight percent of its maximum health every four seconds."
 health_multiplier = 6.0
 speed_multiplier = 0.55

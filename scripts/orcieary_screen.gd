@@ -4,6 +4,8 @@ extends Control
 signal back_requested
 
 const NUMERIC_FONT: Font = preload("res://assets/fonts/silkscreen/Silkscreen-Regular.ttf")
+const CATEGORY_NAMES: Array[String] = ["Basic", "Elite", "Boss"]
+const CATEGORY_COLORS: Array[Color] = [Color.WHITE, Color("c79aef"), Color("ef7777")]
 
 var catalog: ContentCatalog
 var rules: CombatRules
@@ -110,9 +112,9 @@ func _visibility_changed() -> void:
 
 
 func _build_catalog() -> void:
-	for button: Button in enemy_buttons:
-		enemy_list.remove_child(button)
-		button.queue_free()
+	for child: Node in enemy_list.get_children():
+		enemy_list.remove_child(child)
+		child.queue_free()
 	enemy_buttons.clear()
 	entries.clear()
 	if catalog == null:
@@ -133,6 +135,10 @@ func _build_catalog() -> void:
 		if not changed:
 			break
 	entries.sort_custom(func(a: EnemyDefinition, b: EnemyDefinition) -> bool:
+		var a_category: int = _category(a)
+		var b_category: int = _category(b)
+		if a_category != b_category:
+			return a_category < b_category
 		if availability[a.id] != availability[b.id]:
 			return availability[a.id] < availability[b.id]
 		var a_send: int = a.send_first_wave if a.send_enabled else 2147483647
@@ -145,14 +151,28 @@ func _build_catalog() -> void:
 			return a_regular < b_regular
 		return String(a.id) < String(b.id)
 	)
+	var previous_category: int = -1
 	for index: int in range(entries.size()):
 		var definition: EnemyDefinition = entries[index]
+		var category: int = _category(definition)
+		var color: Color = CATEGORY_COLORS[category]
+		if category != previous_category:
+			var heading := Label.new()
+			heading.text = CATEGORY_NAMES[category]
+			heading.custom_minimum_size.y = 30.0
+			heading.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+			heading.add_theme_font_size_override("font_size", 18)
+			heading.add_theme_color_override("font_color", color)
+			enemy_list.add_child(heading)
+			previous_category = category
 		var button := Button.new()
 		button.name = String(definition.id)
 		button.text = definition.title
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.custom_minimum_size = Vector2(218.0, 48.0)
 		button.add_theme_font_size_override("font_size", 18)
+		for state: String in ["font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color", "font_disabled_color"]:
+			button.add_theme_color_override(state, color)
 		button.toggle_mode = true
 		button.button_group = _button_group
 		enemy_list.add_child(button)
@@ -219,6 +239,7 @@ func _select(index: int) -> void:
 	for button_index: int in range(enemy_buttons.size()):
 		enemy_buttons[button_index].set_pressed_no_signal(button_index == selected_index)
 	title_label.text = definition.title
+	title_label.add_theme_color_override("font_color", CATEGORY_COLORS[_category(definition)])
 	availability_label.text = _availability(definition)
 	description_label.text = definition.description
 	portrait.configure(definition)
@@ -251,6 +272,10 @@ func _select(index: int) -> void:
 	scaling_label.text = "Wave %d · HP ×%s · Speed ×%s" % [preview_wave, String.num(definition.health_multiplier, 2), String.num(definition.speed_multiplier, 2)]
 	_details_scroll.scroll_vertical = 0
 	_refresh_counts()
+
+
+func _category(definition: EnemyDefinition) -> int:
+	return 2 if definition.boss else (1 if definition.elite else 0)
 
 
 func _availability(definition: EnemyDefinition) -> String:

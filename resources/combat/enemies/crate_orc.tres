@@ -8,6 +8,7 @@
 script = ExtResource("1_enemy")
 id = &"crate_orc"
 title = "CrateOrc"
+elite = true
 description = "A lumbering crate carrier. Breaking the crate releases two Orclings onto its remaining route."
 health_multiplier = 2.2
 speed_multiplier = 0.7

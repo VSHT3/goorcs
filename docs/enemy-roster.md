@@ -1,5 +1,9 @@
 # Enemy roster and sandbox
 
+Orcieary groups names into **Basic** (white), **Elite** (purple), and **Boss** (red), including the selected detail heading. Basic contains Orcling, Orc, Runner, Brute and SkeleOrc. Elite contains Scrapguard, CrateOrc, Orc Chief, RageOrc, NecOrcmancer and MossOrc. The three existing bosses retain Boss classification. `EnemyDefinition.elite` is presentation metadata; the existing `boss` flag takes precedence. Encounter order is preserved within each group, and headings do not interrupt keyboard navigation. Classification changes no stats, rewards or spawning rules.
+
+Category verification: existing rendered Orcieary and headless navigation suites passed. A real main-scene walkthrough checked all fourteen name colors across normal/hover/selected/focused states, native keyboard crossing between groups, duplicate-free reconfiguration, and inspected **1000×720 / 1280×720** captures. Its functional assertions passed, but shutdown reported retained `menu_click.wav` playback resources; no clean main-scene exit is claimed. Evidence: `.verify-logs/gorcs-verify-enemy-categories-4ef5803fe0814a92a62b9eb99ce2fd68/`.
+
 ## Rules and provisional balance
 
 All abilities, group rolls, sends, damage, healing, summons, and counters belong to `MatchCombat` on the host. Clients render accepted state. These values establish distinct roles and a gradual introduction; they are not a claim of competitive balance without friend playtests.

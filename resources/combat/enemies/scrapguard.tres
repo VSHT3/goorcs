@@ -8,6 +8,7 @@
 script = ExtResource("1_enemy")
 id = &"scrapguard"
 title = "Scrapguard"
+elite = true
 description = "A shield-bearing orc wrapped in scavenged metal. Physical attacks deal half damage."
 health_multiplier = 2.0
 speed_multiplier = 0.8

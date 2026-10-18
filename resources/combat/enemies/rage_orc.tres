@@ -8,6 +8,7 @@
 script = ExtResource("1_enemy")
 id = &"rage_orc"
 title = "RageOrc"
+elite = true
 description = "A scarred berserker. Surviving a hit at half health permanently increases its speed."
 health_multiplier = 3.5
 speed_multiplier = 0.8
