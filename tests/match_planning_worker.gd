@@ -29,7 +29,7 @@ func _process(delta: float) -> bool:
 	if planning != null and _session.state == MultiplayerSession.State.CONNECTED and not planning.active and Time.get_ticks_msec() < _deadline_msec:
 		var command: Dictionary = _read_json(_path("command"))
 		var action: String = String(command.get("action", ""))
-		if int(command.get("id", 0)) > _command_id and action in ["edit", "clear", "ready", "build", "target", "target_secondary", "upgrade", "sell", "send", "debug", "step"]:
+		if int(command.get("id", 0)) > _command_id and action in ["edit", "clear", "ready", "build", "target", "upgrade", "sell", "send", "debug", "step"]:
 			# Transport admission precedes both explicit deck commits. Keep this
 			# command pending until gameplay is admitted, then dispatch it once.
 			_publish()
@@ -74,8 +74,6 @@ func _execute_command(command: Dictionary) -> void:
 			planning.build_tower(int(command["slot"]), Vector2i(int(command["x"]), int(command["y"])), StringName(command["type_id"]), int(command["mode"]))
 		"target":
 			planning.set_targeting(int(command["slot"]), int(command["tower_id"]), int(command["mode"]))
-		"target_secondary":
-			planning.set_secondary_targeting(int(command["slot"]), int(command["tower_id"]), int(command["mode"]))
 		"upgrade":
 			planning.upgrade_tower(int(command["slot"]), int(command["tower_id"]), String(command["upgrade"]))
 		"sell":

@@ -47,7 +47,7 @@ func _run() -> void:
 				_check(sandbox.upgrade(id, "freeze_runes") and tower["freeze_upgraded"], "Boulders follow-up is free and owned by normal combat rules")
 			_check(sandbox.set_targeting(id, MatchCombat.TargetMode.STRONGEST), "Sandbox targeting uses combat owner")
 			if definition.special_upgrade == "second_archer":
-				_check(sandbox.set_targeting(id, MatchCombat.TargetMode.CLOSEST, true), "Second archer has independent targeting")
+				_check(sandbox.set_targeting(id, MatchCombat.TargetMode.CLOSEST), "Upgraded archers accept the shared tower targeting policy")
 			_check(sandbox.sell(id), "Sandbox tower can be sold for a different branch")
 	_check(sandbox.combat.coins == initial_coins, "Free buys, upgrades, and sales do not spend or fabricate balances")
 	_check(not sandbox.build(sandbox.layout.entrance, catalog.towers[0].reward.id), "Towers cannot occupy an endpoint or path")
@@ -140,12 +140,8 @@ func _preserved_state(sandbox: SandboxController) -> Dictionary:
 	var towers: Array[Dictionary] = []
 	for tower: Dictionary in captured["towers"][0]:
 		var retained: Dictionary = {}
-		for key: String in ["id", "cell", "type_id", "mode", "secondary_mode", "kills", "damage_upgraded", "speed_upgraded", "special_upgraded", "freeze_upgraded", "evolution", "advancement", "advancement_path", "followup", "rarity", "attributes", "rarity_rerolls", "attribute_rerolls", "rarity_reroll_cost", "attribute_reroll_cost", "damage", "interval", "range", "behavior_kind", "behavior_config", "invested", "sell_value"]:
+		for key: String in ["id", "cell", "type_id", "mode", "kills", "damage_upgraded", "speed_upgraded", "special_upgraded", "freeze_upgraded", "evolution", "advancement", "advancement_path", "followup", "rarity", "attributes", "rarity_rerolls", "attribute_rerolls", "rarity_reroll_cost", "attribute_reroll_cost", "damage", "interval", "range", "behavior_kind", "behavior_config", "invested", "sell_value"]:
 			retained[key] = tower[key]
-		var archer_modes: Array[int] = []
-		for archer: Dictionary in tower["extra_archers"]:
-			archer_modes.append(archer["mode"])
-		retained["archer_modes"] = archer_modes
 		towers.append(retained)
 	return {
 		"towers": towers, "coins": captured["coins"], "shards": captured["reroll_currency"],
@@ -168,8 +164,7 @@ func _restart_exact_test() -> void:
 	for command: String in ["damage", "speed", "special", "four_archers"]:
 		_check(sandbox.upgrade(tower_id, command), "Replay fixture accepts real upgrade " + command)
 	_check(sandbox.reroll_tower(tower_id, "rarity") and sandbox.reroll_tower(tower_id, "attributes"), "Replay fixture records accepted roll traits and counters")
-	_check(sandbox.set_targeting(tower_id, MatchCombat.TargetMode.STRONGEST), "Replay fixture customizes main targeting")
-	_check(sandbox.set_targeting(tower_id, MatchCombat.TargetMode.CLOSEST, true) and sandbox.set_archer_targeting(tower_id, 2, MatchCombat.TargetMode.LAST), "Replay fixture customizes independent archer targeting")
+	_check(sandbox.set_targeting(tower_id, MatchCombat.TargetMode.STRONGEST), "Replay fixture customizes the shared tower targeting policy")
 	_check(sandbox.set_round(12) and sandbox.start_wave(), "Replay fixture begins a weighted test")
 	sandbox.set_active(true)
 	sandbox.speed = 4.0

@@ -238,7 +238,7 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"tracking_target_id": -1, "tracking_aim": Vector2(cell),
 		"kills": 0, "damage_dealt": 0, "coins_generated": 0, "indirect_damage": 0,
 		"damage_upgraded": false, "speed_upgraded": false,
-		"special_upgraded": false, "freeze_upgraded": false, "evolution": "", "secondary_mode": mode,
+		"special_upgraded": false, "freeze_upgraded": false, "evolution": "",
 		"secondary_shot": 0, "secondary_aim": Vector2(cell), "secondary_target_id": -1,
 		"advancement": "", "advancement_path": [] as Array[String], "extra_archers": [] as Array[Dictionary],
 		"firing": false, "continuous_fire_time": 0.0, "refuel_remaining": 0.0, "refuel_duration": 0.0,
@@ -435,33 +435,6 @@ func set_targeting(slot: int, tower_id: int, mode: int) -> bool:
 	return false
 
 
-func set_secondary_targeting(slot: int, tower_id: int, mode: int) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode):
-		return false
-	for tower: Dictionary in towers[slot]:
-		if tower["id"] != tower_id:
-			continue
-		if not tower["special_upgraded"] or _tower_types[tower["type_id"]]["special_upgrade"] != "second_archer" or _archer_count(tower) < 2 or tower["secondary_mode"] == mode:
-			return false
-		tower["secondary_mode"] = mode
-		return true
-	return false
-
-
-func set_archer_targeting(slot: int, tower_id: int, archer_index: int, mode: int) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode) or archer_index < 2:
-		return false
-	for tower: Dictionary in towers[slot]:
-		if tower["id"] != tower_id:
-			continue
-		var extra: Array = tower["extra_archers"]
-		if archer_index - 2 >= extra.size() or extra[archer_index - 2]["mode"] == mode:
-			return false
-		extra[archer_index - 2]["mode"] = mode
-		return true
-	return false
-
-
 func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> bool:
 	return _upgrade_tower(slot, tower_id, upgrade, false)
 
@@ -555,7 +528,7 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 		while extra.size() > count:
 			extra.pop_back()
 		while extra.size() < count:
-			extra.append({"mode": tower["mode"], "shot": 0, "aim": Vector2(tower["cell"]), "target_id": -1})
+			extra.append({"shot": 0, "aim": Vector2(tower["cell"]), "target_id": -1})
 		tower["secondary_target_id"] = -1
 		tower["firing"] = false
 		tower["continuous_fire_time"] = 0.0
@@ -1406,11 +1379,6 @@ func _position(route: Array, progress: float) -> Vector2:
 	return Vector2(route[index]).lerp(Vector2(route[index + 1]), progress - index)
 
 
-func _archer_count(tower: Dictionary) -> int:
-	var config: Dictionary = _tower_types[tower["type_id"]]["advancements"].get(tower["advancement"], {})
-	return int(config.get("archer_count", 2 if tower["special_upgraded"] else 1))
-
-
 func _reset_firing(tower: Dictionary) -> void:
 	tower["firing"] = false
 	tower["continuous_fire_time"] = 0.0
@@ -1615,9 +1583,9 @@ func _attack_archers(slot: int, tower: Dictionary, definition: Dictionary) -> vo
 	var config: Dictionary = definition["advancements"].get(tower["advancement"], {})
 	var secondary: int = -1
 	if int(config.get("archer_count", 2)) >= 2:
-		secondary = _target(slot, tower, tower["range"], tower["secondary_mode"], tower["target_id"])
+		secondary = _target(slot, tower, tower["range"], -1, tower["target_id"])
 		if secondary < 0:
-			secondary = _target(slot, tower, tower["range"], tower["secondary_mode"])
+			secondary = _target(slot, tower, tower["range"])
 	if secondary >= 0:
 		tower["secondary_target_id"] = enemies[slot][secondary]["id"]
 		tower["secondary_aim"] = enemies[slot][secondary]["pos"]
@@ -1625,9 +1593,9 @@ func _attack_archers(slot: int, tower: Dictionary, definition: Dictionary) -> vo
 	for index: int in range(tower["extra_archers"].size()):
 		var archer: Dictionary = tower["extra_archers"][index]
 		archer["target_id"] = -1
-		var selected: int = _target(slot, tower, tower["range"], archer["mode"], tower["target_id"], tower["secondary_target_id"], -1, -1.0, false, tower["extra_archers"], index)
+		var selected: int = _target(slot, tower, tower["range"], -1, tower["target_id"], tower["secondary_target_id"], -1, -1.0, false, tower["extra_archers"], index)
 		if selected < 0:
-			selected = _target(slot, tower, tower["range"], archer["mode"])
+			selected = _target(slot, tower, tower["range"])
 		if selected >= 0:
 			archer["target_id"] = enemies[slot][selected]["id"]
 			archer["aim"] = enemies[slot][selected]["pos"]

@@ -77,12 +77,12 @@ func _build_upgraded(planning: MatchPlanning) -> void:
 	var tower_id: int = planning.combat["towers"][0][0]["id"]
 	for upgrade: String in ["damage", "speed", "special"]:
 		planning.upgrade_tower(0, tower_id, upgrade)
-	planning.set_secondary_targeting(0, tower_id, MatchCombat.TargetMode.STRONGEST)
+	planning.set_targeting(0, tower_id, MatchCombat.TargetMode.STRONGEST)
 
 
 func _permanent_tower(tower: Dictionary) -> Dictionary:
 	var result: Dictionary = {}
-	for key: String in ["id", "type_id", "cell", "mode", "secondary_mode", "damage", "interval", "damage_upgraded", "speed_upgraded", "special_upgraded", "evolution", "freeze_upgraded", "invested", "sell_value", "kills"]:
+	for key: String in ["id", "type_id", "cell", "mode", "damage", "interval", "damage_upgraded", "speed_upgraded", "special_upgraded", "evolution", "freeze_upgraded", "invested", "sell_value", "kills"]:
 		if tower.has(key):
 			result[key] = tower[key]
 	return result

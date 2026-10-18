@@ -184,15 +184,8 @@ func sell(tower_id: int) -> bool:
 	return accepted
 
 
-func set_targeting(tower_id: int, mode: int, secondary: bool = false) -> bool:
-	var accepted: bool = combat.set_secondary_targeting(0, tower_id, mode) if secondary else combat.set_targeting(0, tower_id, mode)
-	if accepted:
-		_publish()
-	return accepted
-
-
-func set_archer_targeting(tower_id: int, archer_index: int, mode: int) -> bool:
-	var accepted: bool = combat.set_archer_targeting(0, tower_id, archer_index, mode)
+func set_targeting(tower_id: int, mode: int) -> bool:
+	var accepted: bool = combat.set_targeting(0, tower_id, mode)
 	if accepted:
 		_publish()
 	return accepted

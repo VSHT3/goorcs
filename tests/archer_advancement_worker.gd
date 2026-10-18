@@ -9,7 +9,7 @@ func _planning_rules() -> CombatRules:
 	rules.enemy_speed = 0.01
 	rules.speed_growth_fraction = 0.0
 	rules.wave_weight = 6
-	rules.spawn_interval = 0.0
+	rules.spawn_interval = 0.001
 	var enemy: EnemyDefinition = rules.catalog.enemies[0].duplicate() as EnemyDefinition
 	enemy.send_first_wave = 1
 	rules.catalog.enemies = [enemy]
@@ -26,9 +26,3 @@ func _planning_rules() -> CombatRules:
 	rules.catalog.towers = [tower]
 	return rules
 
-func _execute_command(command: Dictionary) -> void:
-	var action: String = command.get("action","")
-	if action in ["target_archer_3","target_archer_4","target_archer_5","target_archer_6","target_archer_7","target_archer_8"]:
-		planning.set_archer_targeting(int(command["slot"]),int(command["tower_id"]),int(action.trim_prefix("target_archer_"))-1,int(command["mode"]))
-	else:
-		super._execute_command(command)

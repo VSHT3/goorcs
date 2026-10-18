@@ -48,6 +48,8 @@ func _run() -> void:
 	_check(screen.controller.combat.towers[0].size() == 1 and screen.selected_tower_id >= 0, "Free palette click places and inspects accepted tower")
 	var placed_id: int = screen.selected_tower_id
 	_check(screen._management.visible, "Selected tower opens fixed management overlay")
+	await _check_upgrade_order(3)
+	_check(screen._upgrade_buttons["special"].disabled, "Locked Second Archer remains visible beside both base stat choices")
 	screen._upgrade_buttons["damage"].pressed.emit()
 	_check(not screen._upgrade_buttons["damage"].visible and screen._upgrade_buttons["speed"].visible and not screen._upgrade_buttons["speed"].disabled, "Sandbox hides the purchased stat while retaining its available sibling")
 	screen._upgrade_buttons["speed"].pressed.emit()
@@ -59,25 +61,13 @@ func _run() -> void:
 			await _press_cycle_button(screen.targeting.next_button if direction == 1 else screen.targeting.previous_button)
 			_check(screen.controller.state["towers"][0][0]["mode"] == expected and screen.targeting.mode == expected, "Sandbox native arrows wrap in both directions through accepted targeting policies")
 	screen._upgrade_buttons["special"].pressed.emit()
-	screen.advancement_buttons["four_archers"].pressed.emit()
-	_check(screen.controller.state["towers"][0][0]["advancement"] == "four_archers", "Sandbox exposes independent archer cycles after the real free advancement")
-	await _press_cycle_button(screen.secondary_targeting.next_button)
-	await _press_cycle_button(screen.third_targeting.next_button)
-	await _press_cycle_button(screen.third_targeting.next_button)
-	await _press_cycle_button(screen.fourth_targeting.previous_button)
-	var tower: Dictionary = screen.controller.state["towers"][0][0]
-	_check(tower["mode"] == MatchCombat.TargetMode.FURTHEST and tower["secondary_mode"] == MatchCombat.TargetMode.LAST and tower["extra_archers"][0]["mode"] == MatchCombat.TargetMode.CLOSEST and tower["extra_archers"][1]["mode"] == MatchCombat.TargetMode.STRONGEST, "All four sandbox archers retain distinct accepted targeting policies")
-	var selectors: Array[TargetingCycle] = [screen.targeting, screen.secondary_targeting, screen.third_targeting, screen.fourth_targeting]
-	var independent_modes: Array[int] = [MatchCombat.TargetMode.FURTHEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST]
-	for index: int in range(selectors.size()):
-		_check(selectors[index].is_visible_in_tree() and selectors[index].mode == independent_modes[index], "Each sandbox archer displays its accepted enum value, not a dropdown index")
-	for width: int in [1000, 1280]:
-		root.size = Vector2i(width, 720)
-		root.content_scale_size = Vector2i(width, 720)
-		await _settle()
-		for selector: TargetingCycle in selectors:
-			for control: Control in [selector.previous_button, selector.mode_label, selector.next_button]:
-				_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "Four labeled sandbox cycles fit inside the compact management panel")
+	await _check_shared_targeting(2)
+	await _check_upgrade_order(3)
+	await _press_cycle_button(screen.advancement_buttons["four_archers"])
+	_check(screen.controller.state["towers"][0][0]["advancement"] == "four_archers", "Sandbox accepts the real free four-archer advancement")
+	await _check_shared_targeting(4)
+	await _check_upgrade_order()
+	await _check_targeting_input_guards()
 	await _check_advancement_controls()
 	var header_rect: Rect2 = screen.play_button.get_global_rect()
 	screen.cancel_interaction()
@@ -158,13 +148,12 @@ func _check_advancement_controls() -> void:
 	await _press_cycle_button(screen.advancement_buttons["eight_archers"])
 	var tower: Dictionary = screen.controller.state["towers"][0][0]
 	_check(tower["advancement"] == "eight_archers" and tower["extra_archers"].size() == 6, "Native Eight Archers control purchases all eight streams")
-	for index: int in range(2, screen.extra_targeting.size()):
-		var selector: TargetingCycle = screen.extra_targeting[index]
-		_check(selector.is_visible_in_tree(), "All eight archer targeting selectors are exposed")
-		await _press_cycle_button(selector.next_button)
-		_check(screen.controller.state["towers"][0][0]["extra_archers"][index]["mode"] == selector.mode, "Additional archer controls dispatch their own accepted stream index")
+	await _check_shared_targeting(8)
+	await _check_upgrade_order()
 	await _press_cycle_button(screen.advancement_buttons["arrow_minigun"])
-	_check(screen.controller.state["towers"][0][0]["advancement"] == "arrow_minigun" and not screen.secondary_targeting.is_visible_in_tree(), "Native minigun purchase collapses targeting to its single stream")
+	_check(screen.controller.state["towers"][0][0]["advancement"] == "arrow_minigun", "Native minigun purchase reaches its accepted terminal tier")
+	await _check_shared_targeting(1)
+	await _check_upgrade_order()
 	for chain: Array in [
 		["fire_arrows", "molotov", "quick_pitch", "flamethrower"],
 		["bomb_arrows", "bigger_bombs", "anti_orc_grenades", "aom", "aom_speed_1", "aom_speed_2"],
@@ -174,6 +163,8 @@ func _check_advancement_controls() -> void:
 		screen._cell_clicked(Vector2i(3, 2), MOUSE_BUTTON_LEFT)
 		for command: String in ["damage", "speed", "special"]:
 			await _press_cycle_button(screen._upgrade_buttons[command])
+		await _check_shared_targeting(2)
+		await _check_upgrade_order()
 		for command: String in chain:
 			var button: Button = screen.advancement_buttons[command]
 			_check(button.is_visible_in_tree() and not button.disabled, "Only eligible next advancement is exposed for native purchase")
@@ -181,9 +172,94 @@ func _check_advancement_controls() -> void:
 			var accepted: Dictionary = screen.controller.state["towers"][0][0]
 			_check(accepted["advancement"] == command and accepted["advancement_path"].has(command), "Native branch control reaches the accepted advancement and history")
 			_check(not screen.advancement_buttons[command].is_visible_in_tree(), "Purchased advancement disappears while the next eligible purchase remains available")
-		_check(not screen.secondary_targeting.is_visible_in_tree(), "Single-weapon terminal branches hide secondary and extra selectors")
-		for selector: TargetingCycle in screen.extra_targeting:
-			_check(not selector.is_visible_in_tree(), "No obsolete multi-archer selector remains on a terminal operator")
+			await _check_shared_targeting(1 if command in ["flamethrower", "aom", "aom_speed_1", "aom_speed_2"] else 2)
+			await _check_upgrade_order()
+
+func _check_shared_targeting(count: int) -> void:
+	var selectors: int = 0
+	for control: Node in screen._management.find_children("*", "HBoxContainer", true, false):
+		if control is TargetingCycle and control.is_visible_in_tree():
+			selectors += 1
+	_check(selectors == 1, "Every Sandbox archer tier exposes one common targeting cycle")
+	for direction: int in [1, -1]:
+		var expected_modes: Array = [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.FURTHEST] if direction == 1 else [MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.FURTHEST]
+		for expected: int in expected_modes:
+			await _press_cycle_button(screen.targeting.next_button if direction == 1 else screen.targeting.previous_button)
+			var tower: Dictionary = screen.controller.state["towers"][0][0]
+			var stats: Dictionary = screen.controller.state["tower_types"][tower["type_id"]]
+			_check(tower["mode"] == expected and screen.targeting.mode == expected, "Sandbox native arrows update the accepted common tower policy")
+			_check(MatchPlanningScreen.independent_weapon_count(tower, stats) == count and tower["extra_archers"].size() == maxi(0, count - 2), "Common Sandbox targeting retains every visual firing stream")
+
+
+func _check_upgrade_order(expected_choices: int = -1) -> void:
+	var original_size: Vector2i = root.size
+	var scroll: ScrollContainer = screen.targeting.get_parent().get_parent().get_parent() as ScrollContainer
+	for width: int in [1000, 1280]:
+		root.size = Vector2i(width, 720)
+		root.content_scale_size = Vector2i(width, 720)
+		await _settle()
+		var buttons: Array = screen._upgrade_buttons.values()
+		buttons.append_array(screen.advancement_buttons.values())
+		var visible_buttons: Array[Button] = []
+		for button: Button in buttons:
+			if button.is_visible_in_tree():
+				visible_buttons.append(button)
+		if expected_choices >= 0:
+			_check(visible_buttons.size() == expected_choices, "Sandbox exposes all %d purchase choices together" % expected_choices)
+		if not visible_buttons.is_empty():
+			scroll.ensure_control_visible(visible_buttons[0])
+			await _settle()
+			visible_buttons.sort_custom(func(left: Button, right: Button) -> bool: return left.get_global_rect().position.x < right.get_global_rect().position.x)
+			var first_rect: Rect2 = visible_buttons[0].get_global_rect()
+			var previous_end: float = first_rect.position.x
+			for button: Button in visible_buttons:
+				var button_rect: Rect2 = button.get_global_rect()
+				_check(scroll.get_global_rect().encloses(button_rect), "Every Sandbox choice, including locked actions, fits simultaneously inside the inspector at width %d" % width)
+				_check(is_equal_approx(button_rect.position.y, first_rect.position.y) and is_equal_approx(button_rect.size.y, first_rect.size.y), "All Sandbox purchases share one horizontal row and consistent height at width %d" % width)
+				_check(button_rect.position.x >= previous_end, "Sandbox purchase choices sit side by side without overlap at width %d" % width)
+				_check(button_rect.end.y <= screen.sell_button.get_global_rect().position.y, "The single Sandbox purchase row consistently precedes Sell at width %d" % width)
+				var font: Font = button.get_theme_font("font")
+				var font_size: int = button.get_theme_font_size("font_size")
+				var text_width: float = button_rect.size.x - button.get_theme_stylebox("normal").get_minimum_size().x
+				for word: String in button.text.get_slice("\n", 0).split(" ", false):
+					_check(font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= text_width, "Sandbox upgrade titles retain whole readable words at width %d" % width)
+				previous_end = button_rect.end.x
+		scroll.ensure_control_visible(screen.sell_button)
+		await _settle()
+		_check(screen._management.get_global_rect().encloses(screen.sell_button.get_global_rect()), "Sandbox Sell remains the reachable final action at width %d" % width)
+		scroll.ensure_control_visible(screen.targeting)
+		await _settle()
+		for control: Control in [screen.targeting.previous_button, screen.targeting.mode_label, screen.targeting.next_button]:
+			_check(screen._management.get_global_rect().encloses(control.get_global_rect()), "One Sandbox targeting cycle fits the compact scrolled inspector at width %d" % width)
+	root.size = original_size
+	root.content_scale_size = original_size
+	await _settle()
+
+
+func _check_targeting_input_guards() -> void:
+	var frozen: Dictionary = screen.controller.state.duplicate(true)
+	screen.count_input.get_line_edit().grab_focus()
+	for pressed: bool in [true, false]:
+		var key: InputEventKey = _key(KEY_RIGHT)
+		key.pressed = pressed
+		root.push_input(key, true)
+		await process_frame
+	_check(screen.controller.state == frozen, "Typing navigation does not change the inspected common policy")
+	screen._request_reset()
+	await _settle()
+	var point: Vector2 = screen.targeting.next_button.get_global_rect().get_center()
+	for pressed: bool in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.position = point
+		click.global_position = point
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = pressed
+		root.push_input(click, true)
+		await process_frame
+	_check(screen.controller.state == frozen, "A confirmation modal blocks native targeting clicks behind it")
+	screen.reset_dialog.hide()
+	await _settle()
+
 
 func _key(code: Key) -> InputEventKey:
 	var event := InputEventKey.new()
@@ -198,6 +274,13 @@ func _settle() -> void:
 
 
 func _press_cycle_button(button: Button) -> void:
+	var ancestor: Node = button.get_parent()
+	while ancestor != null:
+		if ancestor is ScrollContainer:
+			ancestor.ensure_control_visible(button)
+			await _settle()
+			break
+		ancestor = ancestor.get_parent()
 	button.grab_focus()
 	_check(button.has_focus(), "Sandbox targeting arrows support native keyboard focus")
 	for pressed: bool in [true, false]:

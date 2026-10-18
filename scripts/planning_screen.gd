@@ -41,9 +41,7 @@ var sound_player: GameSoundPlayer
 var _roll_details: Label
 var rarity_reroll: Button
 var attribute_reroll: Button
-var _extra_upgrades: VBoxContainer
 var _extra_upgrade_buttons: Dictionary[String, Button] = {}
-var extra_targeting: Array[TargetingCycle] = []
 var _reroll_balance: Label
 
 @onready var world: MatchWorld = $World
@@ -78,12 +76,7 @@ var _reroll_balance: Label
 @onready var speed_upgrade: Button = %SpeedUpgrade
 @onready var special_upgrade: Button = %SpecialUpgrade
 @onready var alternate_upgrade: Button = %AlternateUpgrade
-@onready var secondary_targeting: TargetingCycle = %SecondaryTargeting
-@onready var _secondary_target_row: HBoxContainer = %SecondaryTargetRow
-@onready var third_targeting: TargetingCycle = %ThirdTargeting
-@onready var fourth_targeting: TargetingCycle = %FourthTargeting
-@onready var _extra_target_row: VBoxContainer = %ExtraTargetRow
-@onready var _advancement_row: HBoxContainer = %AdvancementRow
+@onready var _upgrade_row: HBoxContainer = %Upgrades
 @onready var sell_button: Button = %SellTower
 @onready var close_button: Button = %CloseTower
 @onready var targeting_button: TargetingCycle = %Targeting
@@ -123,26 +116,11 @@ func _ready() -> void:
 	alternate_upgrade.pressed.connect(_choice_upgrade_pressed.bind(true))
 	sell_button.pressed.connect(_sell)
 	targeting_button.mode_requested.connect(_target_selected)
-	secondary_targeting.mode_requested.connect(_secondary_target_selected)
-	third_targeting.mode_requested.connect(_extra_target_selected.bind(2))
-	fourth_targeting.mode_requested.connect(_extra_target_selected.bind(3))
-	extra_targeting.assign([third_targeting, fourth_targeting])
-	for archer_index: int in range(4, 8):
-		var row := HBoxContainer.new()
-		var caption := Label.new()
-		caption.text = "Archer %d" % (archer_index + 1)
-		row.add_child(caption)
-		var selector := TargetingCycle.new()
-		selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		selector.mode_requested.connect(_extra_target_selected.bind(archer_index))
-		row.add_child(selector)
-		_extra_target_row.add_child(row)
-		extra_targeting.append(selector)
 	for command: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
-		var button: Button = _advancement_row.get_node(NodePath(command)) as Button
+		var button: Button = _upgrade_row.get_node(NodePath(command)) as Button
 		advancement_buttons[command] = button
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.custom_minimum_size = Vector2(0, 84)
+		button.custom_minimum_size = Vector2(0, 56)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.pressed.connect(_upgrade.bind(command))
 	clear_button.pressed.connect(_clear)
@@ -188,9 +166,6 @@ func _build_tower_management() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	shell.add_child(scroll)
 	content.reparent(scroll, false)
-	# Keep the current/next purchase reachable while long targeting and
-	# modifier lists scroll independently above it.
-	_advancement_row.reparent(shell, false)
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_roll_details = Label.new()
 	_roll_details.name = "TowerRoll"
@@ -215,10 +190,8 @@ func _build_tower_management() -> void:
 			rarity_reroll = button
 		else:
 			attribute_reroll = button
-	_extra_upgrades = VBoxContainer.new()
-	content.add_child(_extra_upgrades)
-	content.move_child(_extra_upgrades, content.get_child_count() - 2)
-	for button: Button in [special_upgrade, alternate_upgrade]:
+	for button: Button in [damage_upgrade, speed_upgrade, special_upgrade, alternate_upgrade]:
+		button.custom_minimum_size = Vector2(0, 56)
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var heading := HBoxContainer.new()
 	shell.add_child(heading)
@@ -757,19 +730,6 @@ func _target_selected(mode: int) -> void:
 	_refresh_targeting()
 
 
-func _secondary_target_selected(mode: int) -> void:
-	if planning != null and secondary_targeting.is_visible_in_tree() and not secondary_targeting.disabled and not _selected_tower().is_empty():
-		planning.set_secondary_targeting(planning.local_slot(), selected_tower_id, mode)
-	_refresh_targeting()
-
-
-func _extra_target_selected(mode: int, archer_index: int) -> void:
-	var selector: TargetingCycle = extra_targeting[archer_index - 2]
-	if planning != null and selector.is_visible_in_tree() and not selector.disabled and not _selected_tower().is_empty():
-		planning.set_archer_targeting(planning.local_slot(), selected_tower_id, archer_index, mode)
-	_refresh_targeting()
-
-
 func _request_pacing(option: String) -> void:
 	if planning == null or not planning.active:
 		return
@@ -877,7 +837,6 @@ func _refresh_targeting() -> void:
 	_alternate_upgrade_command = choices[1] if choices.size() > 1 else ""
 	special_upgrade.visible = not _special_upgrade_command.is_empty()
 	alternate_upgrade.visible = not _alternate_upgrade_command.is_empty()
-	special_upgrade.custom_minimum_size.x = 140.0 if alternate_upgrade.visible else 288.0
 	if special_upgrade.visible:
 		_refresh_action(special_upgrade, actions[_special_upgrade_command])
 	if alternate_upgrade.visible:
@@ -889,51 +848,41 @@ func _refresh_targeting() -> void:
 		if not _extra_upgrade_buttons.has(command):
 			var button := Button.new()
 			button.custom_minimum_size.y = 56
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			button.add_theme_font_override("font", _coins.get_theme_font("font"))
 			button.add_theme_font_size_override("font_size", 16)
 			button.pressed.connect(_upgrade.bind(command))
-			_extra_upgrades.add_child(button)
+			_upgrade_row.add_child(button)
 			_extra_upgrade_buttons[command] = button
 		_extra_upgrade_buttons[command].show()
 		_refresh_action(_extra_upgrade_buttons[command], actions[command])
-	var count: int = independent_weapon_count(tower, stats)
 	var second_archer: bool = bool(tower.get("special_upgraded", false)) and String(stats.get("special_upgrade", "")) == "second_archer"
-	_secondary_target_row.visible = count > 1 and second_archer
-	secondary_targeting.disabled = targeting_button.disabled or not _secondary_target_row.visible
-	secondary_targeting.mode = int(tower.get("secondary_mode", tower["mode"]))
 	var advancements: Dictionary = stats.get("advancements", {})
 	var available: Dictionary = advancement_actions(tower, stats)
-	_advancement_row.visible = second_archer and not available.is_empty()
-	if _advancement_row.visible:
+	if second_archer and not available.is_empty():
 		special_upgrade.hide()
 		special_upgrade.disabled = true
 		_special_upgrade_command = ""
 	for command: String in advancements:
 		if not advancement_buttons.has(command):
 			var button := Button.new()
-			button.custom_minimum_size = Vector2(0, 84)
+			button.custom_minimum_size = Vector2(0, 56)
 			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.add_theme_font_override("font", _coins.get_theme_font("font"))
 			button.add_theme_font_size_override("font_size", 16)
 			button.pressed.connect(_upgrade.bind(command))
-			_advancement_row.add_child(button)
+			_upgrade_row.add_child(button)
 			advancement_buttons[command] = button
 	for command: String in advancement_buttons:
 		var button: Button = advancement_buttons[command]
-		button.visible = available.has(command)
-		if available.has(command):
+		button.visible = second_archer and available.has(command)
+		if button.visible:
 			_refresh_action(button, available[command])
 		else:
 			button.disabled = true
-	var extra_archers: Array = tower.get("extra_archers", [])
-	_extra_target_row.visible = count > 2
-	for index: int in range(extra_targeting.size()):
-		var selector: TargetingCycle = extra_targeting[index]
-		selector.get_parent_control().visible = index + 2 < count
-		selector.disabled = targeting_button.disabled or index + 2 >= count
-		if index + 2 < count and index < extra_archers.size():
-			selector.mode = int(extra_archers[index]["mode"])
+	_upgrade_row.visible = _upgrade_row.get_children().any(func(button: Button) -> bool: return button.visible)
 	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
 	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
 	sell_button.disabled = targeting_button.disabled
@@ -1091,7 +1040,7 @@ static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dicti
 		actions[command] = {"title": benefit, "cost": MatchCombat.tower_upgrade_cost(tower, stats), "purchased": bool(tower.get(command + "_upgraded", false)), "locked": false, "description": "One-time upgrade: " + benefit + ". Preserved through evolutions."}
 	var special: String = String(stats.get("special_upgrade", ""))
 	if not special.is_empty() and not (special == "second_archer" and bool(tower.get("special_upgraded", false))):
-		var description: String = "Adds a second archer with independent targeting and 10% more attacks per second. Prefers distinct enemies, sharing when necessary." if special == "second_archer" else "Each successive chain hit gains +%.0f%% damage. Preserved through evolution." % (float(stats.get("special_upgrade_config", {}).get("successive_hit_bonus", 0.0)) * 100.0)
+		var description: String = "Adds a second archer and 10% more attacks per second. Both use the tower's targeting policy, preferring distinct enemies and sharing when necessary." if special == "second_archer" else "Each successive chain hit gains +%.0f%% damage. Preserved through evolution." % (float(stats.get("special_upgrade_config", {}).get("successive_hit_bonus", 0.0)) * 100.0)
 		actions["special"] = {"title": stats.get("special_upgrade_title", special.capitalize()), "cost": int(stats.get("special_upgrade_cost", 0)), "purchased": bool(tower.get("special_upgraded", false)), "locked": not base_ready, "description": description}
 	var evolutions: Dictionary = stats.get("evolutions", {})
 	var chosen: String = String(tower.get("evolution", ""))
@@ -1193,7 +1142,7 @@ static func advancement_tooltip(_command: String, definition: Dictionary) -> Str
 		"grenade":
 			parts.append("Thrown anti-orc grenades; heavy impact and a wide blast.")
 		_:
-			parts.append("%d independently targeted archers." % int(definition.get("archer_count", 2)))
+			parts.append("%d archers share the tower's targeting policy, preferring distinct enemies and sharing when necessary." % int(definition.get("archer_count", 2)))
 	if definition.has("primary_multiplier"):
 		parts.append("Primary ×%s; splash ×%s within %s cells." % [String.num(float(definition["primary_multiplier"]), 2), String.num(float(definition.get("splash_multiplier", 0.0)), 2), String.num(float(definition.get("splash_radius", 0.0)), 2)])
 	if definition.has("burn_dps"):
