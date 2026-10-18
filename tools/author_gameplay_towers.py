@@ -4,7 +4,7 @@
 Native 96x112 RGBA pixels; integer polygons/rectangles, hard alpha, no source
 images, sampling, antialiasing, models, or third-party artwork. Upper-left light,
 front-dominant elevated timber/stone forms. Run with Pillow to reproduce only
-these seven PNGs; approved Lightning (including Longer Reach), Gold Mine and established tower PNGs are never written.
+these three support PNGs; accepted Lightning and Gold Mine families and established tower PNGs are never written.
 """
 from pathlib import Path
 
@@ -82,15 +82,6 @@ def timber(d, x, y, w, h):
         rect(d, (x + 2, yy, x + 2, yy), "iron_light")
 
 
-def coin(d, x, y, count=1):
-    for i in range(count - 1, -1, -1):
-        yy = y - i * 3
-        poly(d, [(x, yy), (x + 2, yy - 2), (x + 8, yy - 2), (x + 10, yy), (x + 10, yy + 3), (x + 8, yy + 5), (x + 2, yy + 5), (x, yy + 3)], "gold_dark")
-        rect(d, (x + 1, yy, x + 9, yy + 1), "gold")
-        line(d, [(x + 2, yy - 1), (x + 7, yy - 1)], "gold_light")
-        line(d, [(x + 4, yy + 2), (x + 6, yy + 2)], "gold")
-
-
 def roof(d, x, y, w, fill="cloth"):
     poly(d, [(x, y), (x + 7, y - 16), (x + w - 8, y - 16), (x + w, y - 3), (x + w - 7, y + 3)], fill)
     line(d, [(x + 7, y - 15), (x + w - 9, y - 15)], "cloth_light" if fill == "cloth" else "wood_top", 2)
@@ -165,91 +156,11 @@ def command_banner():
     return image
 
 
-def royal_mint():
-    image, d = canvas()
-    footing(d)
-    block(d, 22, 51, 52, 35)
-    timber(d, 24, 52, 5, 33)
-    timber(d, 61, 52, 5, 33)
-    roof(d, 15, 43, 65)
-    poly(d, [(31, 26), (34, 15), (41, 21), (48, 11), (56, 20), (64, 14), (62, 27)], "gold", "ink")
-    line(d, [(34, 17), (35, 24), (60, 24)], "gold_light", 2)
-    rect(d, (34, 58, 56, 78), "wood_dark", "ink")
-    rect(d, (39, 59, 44, 69), "iron", "ink")
-    rect(d, (35, 69, 57, 73), "iron_light", "iron_dark")
-    rect(d, (35, 78, 57, 82), "wood_top", "wood_dark")
-    coin(d, 40, 77, 2)
-    coin(d, 62, 87, 3)
-    coin(d, 19, 88, 2)
-    return image
-
-
-def bounty_board(greater=False):
-    image, d = canvas()
-    footing(d)
-    timber(d, 22, 43, 7, 44)
-    timber(d, 67, 43, 7, 44)
-    rect(d, (19, 37, 77, 73), "wood_dark", "ink")
-    for yy in (39, 47, 55, 63):
-        rect(d, (21, yy, 74, yy + 6), "wood")
-        line(d, [(22, yy), (73, yy)], "wood_light")
-    roof(d, 15, 33, 66, "wood")
-    rect(d, (31, 42, 59, 69), "paper_dark", "ink")
-    rect(d, (32, 43, 57, 67), "paper")
-    rect(d, (33, 43, 56, 45), "paper_light")
-    rect(d, (35, 48, 52, 49), "red_dark")
-    # A wanted portrait, not text pretending to be legible at sprite scale.
-    poly(d, [(38, 54), (35, 51), (36, 59), (40, 63), (48, 63), (52, 58), (53, 51), (49, 54)], "stone_dark", None)
-    rect(d, (40, 54, 48, 59), "deep")
-    rect(d, (40, 55, 41, 55), "paper_light")
-    rect(d, (47, 55, 48, 55), "paper_light")
-    line(d, [(39, 65), (49, 65)], "wood_dark")
-    poly(d, [(56, 63), (61, 62), (64, 66), (62, 71), (57, 71), (54, 67)], "red", "red_dark")
-    coin(d, 60, 85, 2)
-    if greater:
-        # Heavy red warrant pennants and a crown distinguish the stronger branch.
-        poly(d, [(18, 36), (27, 37), (27, 72), (22, 79), (17, 73)], "red", "ink")
-        poly(d, [(68, 37), (77, 36), (78, 73), (73, 79), (68, 72)], "red_dark", "ink")
-        line(d, [(19, 39), (19, 71), (22, 75)], "red_light")
-        poly(d, [(35, 18), (36, 10), (43, 15), (48, 7), (53, 15), (60, 10), (59, 19)], "gold", "ink")
-        line(d, [(37, 17), (57, 17)], "gold_light")
-        coin(d, 23, 86, 3)
-    return image
-
-
-def tribute_office():
-    image, d = canvas()
-    footing(d)
-    block(d, 22, 53, 52, 33)
-    roof(d, 15, 47, 65)
-    timber(d, 24, 53, 5, 33)
-    timber(d, 63, 53, 5, 33)
-    rect(d, (32, 60, 59, 81), "wood_dark", "ink")
-    rect(d, (33, 61, 57, 70), "ink")
-    for xx in (36, 43, 50):
-        line(d, [(xx, 62), (xx, 69)], "iron", 2)
-    rect(d, (30, 71, 61, 75), "wood_top", "wood_dark")
-    # Open ledger and money chest make this an office rather than another mark.
-    poly(d, [(28, 78), (39, 77), (45, 80), (56, 78), (59, 85), (47, 87), (40, 84), (29, 86)], "paper", "wood_dark")
-    line(d, [(43, 80), (44, 85)], "paper_dark")
-    line(d, [(31, 80), (37, 80)], "wood")
-    line(d, [(48, 82), (54, 81)], "wood")
-    rect(d, (62, 80, 77, 90), "wood", "ink")
-    rect(d, (64, 79, 75, 82), "gold", "gold_dark")
-    rect(d, (68, 83, 71, 87), "gold_light", "gold_dark")
-    timber(d, 46, 15, 3, 17)
-    poly(d, [(50, 15), (65, 17), (62, 23), (66, 28), (50, 26)], "cloth", "ink")
-    coin(d, 64, 90, 2)
-    return image
-
-
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     authored = {
         "war_drums": war_drums(), "forge": forge(),
         "command_banner": command_banner(),
-        "royal_mint": royal_mint(), "bounty_board": bounty_board(),
-        "greater_bounty": bounty_board(True), "tribute_office": tribute_office(),
     }
     for name, image in authored.items():
         image.save(OUT / f"{name}.png", optimize=True)

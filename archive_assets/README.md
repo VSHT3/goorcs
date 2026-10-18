@@ -85,6 +85,13 @@ Graphical verification played the installed sheets automatically through every f
 
 The raw chroma image and provider cutout are preserved. The cleaned candidate thresholds cutout alpha at 128 into 0/255 without changing RGB, dimensions or palette; its opaque bounds are `(5, 11)–(125, 115)`. The previous 96×112 procedural mine is preserved as `previous-procedural.png`; the procedural tower tool no longer generates or overwrites Gold Mine. Provider licensing/privacy terms have not been independently verified.
 
+### Approved Gold Mine upgrades
+
+[`towers/gold-mine/gamelab-20261018-upgrades/`](towers/gold-mine/gamelab-20261018-upgrades/) preserves the approved Royal Mint, Bounty Board, Greater Bounty and Tribute Office batch: provider cutouts, cleaned candidates, previous runtime sprites, review sheet and exact generation requests/job IDs. All four were generated without image references, at 128×128, high quality and requested 48-color pixel processing, costing eight reported credits together. The base mine is unchanged.
+
+Runtime uses the cleaned candidate pixels directly, with binary alpha thresholded at 128 and no RGB changes. Resource-specific opaque heights and foot anchors retain 0.98-cell visible widths. The procedural authoring tool now writes only War Drums, Forge and Command Banner, never these accepted upgrades. Runtime/rendered and gameplay verification is explicitly deferred at the creator's request; only an isolated headless asset import completed before the instruction to stop checks. Approval is not a claim of in-game visual verification.
+
+
 ## Approved Lightning still
 
 [`towers/lightning/gamelab-20261017/lightning_candidate.png`](towers/lightning/gamelab-20261017/lightning_candidate.png) is the approved 128×128 GameLab source for base Lightning. Generation job `5abadff5-12ea-47c7-9bd5-798ba48ecec3` used no references, requested high quality and 48-color pixel-art processing, and reported two credits. The cleaned source contains 47 opaque colors and binary alpha; raw output, provider cutout, previous procedural PNG, and exact prompt/settings are preserved beside it.

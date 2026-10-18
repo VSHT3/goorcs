@@ -18,8 +18,8 @@ board_height = 0.84919355
 board_anchor = Vector2(0.5078125, 0.8984375)
 mirror_board = true
 board_variants = {
-"royal_mint": {"texture": ExtResource("3_mint"), "board_height": 1.15, "board_anchor": Vector2(0.5, 0.928571)},
-"bounty_board": {"texture": ExtResource("4_bounty"), "board_height": 1.08, "board_anchor": Vector2(0.5, 0.928571)},
-"stronger_mark": {"texture": ExtResource("5_greater"), "board_height": 1.2, "board_anchor": Vector2(0.5, 0.928571)},
-"income_aura": {"texture": ExtResource("6_tribute"), "board_height": 1.1, "board_anchor": Vector2(0.5, 0.928571)}
+"royal_mint": {"texture": ExtResource("3_mint"), "board_height": 0.97155172, "board_anchor": Vector2(0.515625, 0.9296875)},
+"bounty_board": {"texture": ExtResource("4_bounty"), "board_height": 1.24541667, "board_anchor": Vector2(0.5, 0.9765625)},
+"stronger_mark": {"texture": ExtResource("5_greater"), "board_height": 1.12792453, "board_anchor": Vector2(0.5, 0.96875)},
+"income_aura": {"texture": ExtResource("6_tribute"), "board_height": 1.06320755, "board_anchor": Vector2(0.5, 0.9375)}
 }
