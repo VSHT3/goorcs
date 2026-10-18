@@ -1166,7 +1166,8 @@ func _draw_combat() -> void:
 			0:
 				var texture: Texture2D = _portal_texture if item["cell"] == layout.entrance else _crystal_texture
 				var anchor := Vector2(0.5, 0.9609375) if item["cell"] == layout.entrance else Vector2(0.50390625, 0.9296875)
-				if item["cell"] == layout.entrance and mirror_horizontal:
+				# Source portal opens left; normal-board enemies emerge to the right.
+				if item["cell"] == layout.entrance and not mirror_horizontal:
 					draw_set_transform(item["foot"], 0.0, Vector2(-1.0, 1.0))
 					draw_texture_rect(texture, _sprite_rect(texture, 1.05, anchor, Vector2.ZERO), false)
 					draw_set_transform(Vector2.ZERO)

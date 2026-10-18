@@ -87,6 +87,12 @@ The final isolated `python3 tools/verify.py all` run passed **72/73 checks**, in
 
 Publication integration preserved the incoming reel acceleration/braking, tooth/flap motion, and off-center winning-card landing alongside boss payout cards and shared skip behavior. Fresh import/save-isolation gates, all five focused enemy/reward/reel and real-peer suites, and a **4.01-second rendered reel smoke** passed after rebasing. Native Enter revealed an accepted **Common 140-Coin / 4-Shard** award and native pointer input revealed a tower reroll; the captured reward surface was inspected. This focused integration check does not supersede the full-run Discord failure above.
 
+### Portal facing
+
+The portal source artwork opens left. Normal boards flip it to open right; mirrored boards retain the source facing, so both entrances open along enemy travel into the board. Crystal artwork, endpoint anchors, and gameplay coordinates are unchanged. `path_board_test.gd` checks the rendered red aperture's horizontal position relative to its footing on both orientations.
+
+The focused rendered portal regression passed under isolated X11/Mesa llvmpipe, and actual-main-scene Sandbox captures were inspected with normal and mirrored boards. The broader rendered board suite passed the portal assertions but failed two Lightning drag-preview silhouette comparisons (one per orientation); that suite is not claimed green. Logs and captures: `.verify-logs/portal-facing-1f3e25b8/`. This does not establish native-GPU behavior or performance.
+
 ### Six-role gameplay verification
 
 The loadout/roll/roster expansion now implements all six identities and the agreed mechanics, with final Lightning naming/additional evolution choices still undecided. [Content authoring](content-pipeline.md#six-role-schemas-and-evolution-data) owns exact role schemas, rarity profiles/pools/bounds, branch art, Shard drops, effective-stat/evolution composition, quadratic reroll pricing, and payout rounding. These are **authored provisional resources**, not creator-approved final balance. [The gameplay roadmap](../TODO.md#gameplay-roadmap--loadouts-tower-rolls-and-roster-expansion) distinguishes delivered behavior from the two remaining design/visual boundaries.

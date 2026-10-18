@@ -28,6 +28,7 @@ func _run() -> void:
 	# Offscreen captures must work even when native-window drawing is suppressed.
 	RenderingServer.set_render_loop_enabled(false)
 	await _check_endpoint_idle(board, viewport)
+	await _check_portal_facing(board, viewport)
 	RenderingServer.set_render_loop_enabled(true)
 	board.combat_enemies = [_enemy(1, 1.8, Vector2(1.8, 1), route)]
 	board.set_process(false)
@@ -85,6 +86,25 @@ func _run() -> void:
 	if failures == 0:
 		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, tile ranges, attacks and mixed mirrored enemy sprites")
 	quit(1 if failures else 0)
+
+
+func _check_portal_facing(board: PathBoard, viewport: SubViewport) -> void:
+	# The red aperture sits on the opening side of the asymmetric stone rim.
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		var image: Image = await _board_image(board, viewport)
+		var foot: Vector2 = board.cell_center(board.layout.entrance) + Vector2(0, board._cell_size() * 0.28)
+		var red_weight: float = 0.0
+		var horizontal_weight: float = 0.0
+		for y: int in range(maxi(0, int(foot.y) - 90), mini(image.get_height(), int(foot.y))):
+			for x: int in range(maxi(0, int(foot.x) - 40), mini(image.get_width(), int(foot.x) + 40)):
+				var pixel: Color = image.get_pixel(x, y)
+				var redness: float = maxf(0.0, pixel.r - maxf(pixel.g, pixel.b) * 1.8)
+				red_weight += redness
+				horizontal_weight += (float(x) + 0.5 - foot.x) * redness
+		_check(red_weight > 0.0 and horizontal_weight * (-1.0 if mirrored else 1.0) > 0.0,
+			"Portal aperture faces into its board along enemy travel, mirrored=%s" % mirrored)
+	board.mirror_horizontal = false
 
 
 func _check_endpoint_idle(board: PathBoard, viewport: SubViewport) -> void:
