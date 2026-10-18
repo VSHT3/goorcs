@@ -131,8 +131,8 @@ func _run() -> void:
 	_check(model.upgrade_tower(0, id, "pierce"), "Exact configured price buys Pierce")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
-	_check(screen._special_upgrade_command == "bounce" and screen.special_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased evolution disappears while its excluded sibling remains unavailable")
-	_check(screen._alternate_upgrade_command == "bigger_wood_1" and screen.alternate_upgrade.disabled, "Only the branch's next upgrade is offered, and it follows affordability")
+	_check(screen._special_upgrade_command == "bigger_wood_1" and screen.special_upgrade.disabled and not screen.alternate_upgrade.visible and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased evolution disappears; only its next upgrade is offered, following affordability")
+	_check(not model.upgrade_tower(0, id, "bounce"), "The excluded sibling branch remains unavailable")
 	screen.close_button.pressed.emit()
 	_check(screen.selected_tower_id == -1 and model.towers[0].size() == 1, "Close clears selection without selling")
 	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
@@ -255,14 +255,12 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 		planning._publish_snapshot()
 		var first_step: String = String(choices[evolution]["upgrades"][0]["id"])
 		var sibling: String = "bounce" if evolution == "pierce" else "pierce"
-		_check(screen._special_upgrade_command == sibling and screen.special_upgrade.disabled, "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
-		_check(screen._alternate_upgrade_command == first_step and not screen.alternate_upgrade.disabled, "The funded branch offers exactly its next upgrade")
+		_check(screen._special_upgrade_command == first_step and not screen.special_upgrade.disabled and not screen.alternate_upgrade.is_visible_in_tree(), "Funded Ballista offers exactly its next upgrade, never a repeat or the sibling branch")
 		frozen = planning.combat.duplicate(true)
-		screen.special_upgrade.pressed.emit()
-		for command: String in ["pierce", "bounce", "special", "boulders", "onyx_ring", "freeze_runes", "bigger_wood_2", "magic_ballista" if evolution == "pierce" else "bigger_wood_1"]:
+		for command: String in [sibling, "pierce", "bounce", "special", "boulders", "onyx_ring", "freeze_runes", "bigger_wood_2", "magic_ballista" if evolution == "pierce" else "bigger_wood_1"]:
 			planning.upgrade_tower(0, id, command)
 		_check(planning.combat == frozen and screen.selected_tower_id == id and screen.boards[0].selected_tower_id == id, "Purchased Ballista preserves the selected tower and rejects repeated purchases, the other branch, out-of-order steps, and unrelated commands even with funds")
-		screen.alternate_upgrade.pressed.emit()
+		screen.special_upgrade.pressed.emit()
 		for slot: int in range(2):
 			_check(model.towers[slot][0]["branch_upgrades"] == [first_step] and MatchCombat.tower_level(model.towers[slot][0]) == 5, "The next-step button buys exactly that branch upgrade on both solo boards")
 		planning.stop_singleplayer()
@@ -307,7 +305,8 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		planning.upgrade_tower(0, id, evolution)
 		_check(planning.combat == frozen, "A real evolution command rejects one missing prerequisite")
 		second.pressed.emit()
-		_check(MatchCombat.tower_level(tower) == 3 and screen.special_upgrade.visible and screen.alternate_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible, "Both stat purchase orders expose exactly the two Rune evolution choices at level III")
+		_check(MatchCombat.tower_level(tower) == 3 and screen.special_upgrade.visible and screen.alternate_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible, "Both stat purchase orders expose the Rune evolution choices at level III")
+		_check(screen._special_upgrade_command == "boulders" and screen._alternate_upgrade_command == "onyx_ring" and screen._extra_upgrade_buttons.has("storm_sigil") and screen._extra_upgrade_buttons["storm_sigil"].is_visible_in_tree() and screen._extra_upgrade_buttons["void_monolith"].is_visible_in_tree(), "All four Rune branches are offered side by side")
 		model.coins = [price - 1, price - 1]
 		planning._publish_snapshot()
 		_check(screen.special_upgrade.disabled and screen.alternate_upgrade.disabled, "Both choices become unavailable one Coin short")
@@ -336,7 +335,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			var evolved: Dictionary = model.towers[slot][0]
 			_check(evolved.get("evolution", "") == evolution and evolved["special_upgraded"] and MatchCombat.tower_level(evolved) == 4 and model.coins[slot] == 0, "Button command purchases the chosen evolution with exact funds on both real boards")
 		if evolution == "boulders":
-			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes", "Purchased Boulders replaces branch purchases with its reachable follow-up")
+			_check(screen.special_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes" and screen._alternate_upgrade_command == "rolling_stones", "Purchased Boulders replaces branch purchases with its follow-up and next branch upgrade")
 		else:
 			_check(screen._special_upgrade_command != evolution and screen._alternate_upgrade_command != evolution and not chosen.is_visible_in_tree() and screen.special_upgrade.disabled, "Purchased Onyx is hidden and the excluded branch cannot be bought")
 		frozen = planning.combat.duplicate(true)
@@ -349,16 +348,14 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		planning._publish_snapshot()
 		frozen = planning.combat.duplicate(true)
 		if evolution == "boulders":
-			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes" and not screen.special_upgrade.disabled, "Funded Boulders exposes only its legitimate follow-up, not a repeat or branch switch")
+			_check(screen._special_upgrade_command == "freeze_runes" and screen._alternate_upgrade_command == "rolling_stones" and not screen.special_upgrade.disabled, "Funded Boulders exposes only its legitimate continuations, not a repeat or branch switch")
 		else:
-			_check(not chosen.is_visible_in_tree() and screen.special_upgrade.disabled, "Funded Onyx exposes no enabled repeat or alternate branch purchase")
-			chosen.pressed.emit()
-			other.pressed.emit()
+			_check(not chosen.is_visible_in_tree() and screen._special_upgrade_command == "twin_rings" and not screen.special_upgrade.disabled, "Funded Onyx offers only its next upgrade, not a repeat or alternate branch")
 		for command: String in ["boulders", "onyx_ring", "special"]:
 			planning.upgrade_tower(0, id, command)
 		_check(planning.combat == frozen and screen.selected_tower_id == id and screen.boards[0].selected_tower_id == id, "Funded Rune branch attempts preserve the accepted selection and both boards")
 		if evolution == "boulders":
-			_check(screen.special_upgrade.visible and not screen.alternate_upgrade.visible, "Boulders replaces the exclusive choices with its follow-up control")
+			_check(screen.special_upgrade.visible and screen._alternate_upgrade_command == "rolling_stones", "Boulders replaces the exclusive choices with its follow-up and branch upgrade controls")
 			var followup: Dictionary = planning.combat["tower_types"]["rune_obelisk"]["evolutions"]["boulders"]["followup"]
 			var followup_price: int = int(followup["cost"])
 			model.coins = [followup_price - 1, followup_price - 1]
@@ -385,7 +382,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			screen.special_upgrade.pressed.emit()
 			for slot: int in range(2):
 				_check(model.towers[slot][0].get("freeze_upgraded", false) and MatchCombat.tower_level(model.towers[slot][0]) == 5 and model.coins[slot] == 0, "Follow-up button dispatches its real command and reaches level V on both solo boards")
-			_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up disappears without changing continuous damage stats or reviving Onyx")
+			_check(screen._special_upgrade_command == "rolling_stones" and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up disappears, leaving only the branch upgrade, without changing continuous damage stats or reviving Onyx")
 			frozen = planning.combat.duplicate(true)
 			screen.special_upgrade.pressed.emit()
 			planning.upgrade_tower(0, id, "freeze_runes")
@@ -394,9 +391,8 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			model.coins = [2000, 2000]
 			planning._publish_snapshot()
 			frozen = planning.combat.duplicate(true)
-			screen.special_upgrade.pressed.emit()
 			planning.upgrade_tower(0, id, "freeze_runes")
-			_check(planning.combat == frozen and MatchCombat.tower_level(tower) == 4 and not tower.get("freeze_upgraded", false), "Onyx never exposes or accepts the Boulders follow-up")
+			_check(screen._special_upgrade_command != "freeze_runes" and screen._alternate_upgrade_command != "freeze_runes" and planning.combat == frozen and MatchCombat.tower_level(tower) == 4 and not tower.get("freeze_upgraded", false), "Onyx never exposes or accepts the Boulders follow-up")
 		planning.stop_singleplayer()
 		# Let the audio mixer release each stopped solo fixture before starting another.
 		await create_timer(0.2).timeout

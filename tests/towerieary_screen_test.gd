@@ -229,6 +229,11 @@ func _check_role(preview: Dictionary) -> void:
 			_check_value(&"mark_income", float(config["mark_income_bonus"]) * 100.0)
 		"income_aura":
 			_check_value(&"kill_income", float(config["kill_income_bonus"]) * 100.0)
+		"crystal":
+			_check_value(&"clear_shards", float(config["clear_shards"]))
+			if int(config["periodic_shards"]) > 0:
+				_check_value(&"periodic_shards", float(config["periodic_shards"]))
+				_check_value(&"periodic_interval", float(config["periodic_interval"]))
 		_:
 			var advancement: Dictionary = stats["advancements"].get(tower["advancement"], {})
 			var weapon: String = String(advancement.get("weapon", "arrow"))
@@ -237,7 +242,7 @@ func _check_role(preview: Dictionary) -> void:
 				_check_value(&"fuel_duration", float(advancement["fuel_duration"]))
 				_check_value(&"refuel_duration", float(advancement["refuel_duration"]))
 				_check(not screen.stat_values.has(&"interval"), "Continuous flame is not represented as discrete projectile attacks")
-			elif tower["evolution"] == "boulders":
+			elif bool(stats["evolutions"].get(tower["evolution"], {}).get("continuous", false)):
 				_check_value(&"continuous_dps", float(tower["damage"]))
 				_check(not screen.stat_values.has(&"interval"), "Continuous damage is never divided by a zero attack interval")
 			else:

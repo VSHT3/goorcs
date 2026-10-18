@@ -1111,7 +1111,9 @@ static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dicti
 	var chosen_definition: Dictionary = evolutions.get(chosen, {})
 	var has_followups: bool = not chosen_definition.get("followup", {}).is_empty() or not chosen_definition.get("followups", {}).is_empty()
 	for command: String in evolutions:
-		if has_followups:
+		# Once a branch is chosen, only its own continuation is offered; the
+		# model still rejects every excluded sibling.
+		if has_followups or (not chosen.is_empty() and chosen != command):
 			continue
 		var definition: Dictionary = evolutions[command]
 		var locked: bool = not base_ready or (not chosen.is_empty() and chosen != command) or (special == "escalating_chain" and not bool(tower.get("special_upgraded", false)))
