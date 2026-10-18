@@ -1,0 +1,307 @@
+{
+  "authoring": "Original deterministic local Pillow integer geometry; articulated limbs and native-pixel material planes redrawn per frame. No image generation service or source pixels.",
+  "identity": "Heavy root-footed forest orc with hunched moss-and-bark back, shelf fungi, dangling vines and pale branching brow; self-heal draws bright green shoots into its chest.",
+  "generator": "tools/author_variety_enemies.py",
+  "generator_sha256": "0bafa9e2ec52ed5f03eb8de37e1f1afc49e1cee99acc16b798dffe7219e66895",
+  "reproduce": "python3 tools/author_variety_enemies.py",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "geometry_helpers_reused": [
+    "Pixels",
+    "segment",
+    "O",
+    "SK",
+    "FE",
+    "LE",
+    "BO"
+  ],
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
+  "design_reference": "assets/enemies/animations/grunt_still.png",
+  "design_reference_sha256": "6b58a9c65c65789b5a80eddd6bdaffa8da05391ac140cea7f9207b64ab9c3698",
+  "design_reference_status": "Creator-approved Orc is read-only; comparison only, no sampled/cutout pixels or source replacement.",
+  "camera": "Elevated three-quarter facing left; top and left material planes lit; near left limbs overlap far right limbs.",
+  "alpha": "Binary 0/255, no antialiasing, dithering, smoothing, raster rotation or scaling in authored frames.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    2880,
+    80
+  ],
+  "base_anchor_pixels": [
+    40,
+    70
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.75,
+  "still": "assets/enemies/animations/moss_orc_still.png",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "still_alpha_bounds": [
+    19,
+    8,
+    70,
+    70
+  ],
+  "sheet_sha256": "a58b07ab2fa21ce83f8a465ff69aaa6377ab61a708dc82c3cf1aa3dd486c06b3",
+  "still_sha256": "e09ba323025dbf69942d24fbd8f929867e3ba544f32610885fefa13733825ffe",
+  "sprite_frames_sha256": "2b0dec5ff391b271748325ebe3422b05a915f9cb4aee59a5ed82224a533bba0e",
+  "death": {
+    "duration_seconds": 0.8,
+    "articulation": "Recoil, knee buckle, torso impact and settled joint tableaux with separately released equipment.",
+    "last_frame": "Settled corpse; empty fallen crate for CrateOrc, dropped shield/cleaver for Scrapguard.",
+    "blood_in_sprite": false
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 8,
+      "frame_count": 12,
+      "duration_seconds": 1.5,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          19,
+          8,
+          70,
+          70
+        ],
+        [
+          19,
+          8,
+          70,
+          69
+        ],
+        [
+          19,
+          7,
+          70,
+          69
+        ],
+        [
+          19,
+          7,
+          70,
+          69
+        ],
+        [
+          19,
+          7,
+          70,
+          69
+        ],
+        [
+          19,
+          8,
+          70,
+          69
+        ],
+        [
+          19,
+          8,
+          70,
+          70
+        ],
+        [
+          19,
+          8,
+          70,
+          70
+        ],
+        [
+          19,
+          7,
+          70,
+          70
+        ],
+        [
+          19,
+          7,
+          70,
+          70
+        ],
+        [
+          19,
+          7,
+          70,
+          70
+        ],
+        [
+          19,
+          7,
+          70,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "duration_seconds": 0.8,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          19,
+          8,
+          70,
+          70
+        ],
+        [
+          19,
+          10,
+          72,
+          70
+        ],
+        [
+          17,
+          12,
+          73,
+          70
+        ],
+        [
+          15,
+          13,
+          74,
+          70
+        ],
+        [
+          14,
+          16,
+          73,
+          70
+        ],
+        [
+          13,
+          16,
+          67,
+          74
+        ],
+        [
+          8,
+          21,
+          67,
+          76
+        ],
+        [
+          3,
+          24,
+          70,
+          76
+        ],
+        [
+          3,
+          25,
+          71,
+          76
+        ],
+        [
+          3,
+          25,
+          71,
+          76
+        ],
+        [
+          4,
+          26,
+          72,
+          76
+        ],
+        [
+          4,
+          26,
+          72,
+          76
+        ]
+      ]
+    },
+    {
+      "name": "heal",
+      "fps": 21.818181818181817,
+      "frame_count": 12,
+      "duration_seconds": 0.55,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ],
+        [
+          20,
+          8,
+          70,
+          70
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/moss_orc_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/moss_orc.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"moss_orc"
+title = "MossOrc"
+description = "An ancient moss-covered orc. Regrows eight percent of its maximum health every four seconds."
+health_multiplier = 6.0
+speed_multiplier = 0.55
+base_damage = 3
+regeneration_interval = 4.0
+regeneration_fraction = 0.08
+spawn_weight = 12
+first_wave = 52
+max_per_wave = 1
+count_cap_growth = 1
+count_cap_growth_interval = 14
+max_weight_share = 0.2
+send_cost = 120
+send_income = 5
+send_first_wave = 66
+kill_bounty = 6
+reroll_drop_chance = 0.22
+reroll_drop_amount = 3
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.75
+board_anchor = Vector2(0.5, 0.875)

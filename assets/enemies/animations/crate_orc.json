@@ -1,0 +1,226 @@
+{
+  "authoring": "Original deterministic local Pillow integer geometry; articulated limbs and native-pixel material planes redrawn per frame. No image generation service or source pixels.",
+  "identity": "Stooped porter with broad flattened muzzle, rope harness and huge open packed wooden crate; two distinct Orcling faces peek above its timber rim.",
+  "generator": "tools/author_variety_enemies.py",
+  "generator_sha256": "0bafa9e2ec52ed5f03eb8de37e1f1afc49e1cee99acc16b798dffe7219e66895",
+  "reproduce": "python3 tools/author_variety_enemies.py",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "geometry_helpers_reused": [
+    "Pixels",
+    "segment",
+    "O",
+    "SK",
+    "FE",
+    "LE",
+    "BO"
+  ],
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
+  "design_reference": "assets/enemies/animations/grunt_still.png",
+  "design_reference_sha256": "6b58a9c65c65789b5a80eddd6bdaffa8da05391ac140cea7f9207b64ab9c3698",
+  "design_reference_status": "Creator-approved Orc is read-only; comparison only, no sampled/cutout pixels or source replacement.",
+  "camera": "Elevated three-quarter facing left; top and left material planes lit; near left limbs overlap far right limbs.",
+  "alpha": "Binary 0/255, no antialiasing, dithering, smoothing, raster rotation or scaling in authored frames.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    1920,
+    80
+  ],
+  "base_anchor_pixels": [
+    40,
+    70
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.62,
+  "still": "assets/enemies/animations/crate_orc_still.png",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "still_alpha_bounds": [
+    20,
+    12,
+    73,
+    70
+  ],
+  "sheet_sha256": "c38810caf31cc86968618ef69328a9db9a582c36869fc7e588cf29f4b8675b64",
+  "still_sha256": "33188d87ac698207d9db6e6b0d077380c040df2fd27981730815f76c9bd70676",
+  "sprite_frames_sha256": "e136b145816b4555bbd7bc6dffa05f2831538234f74dcb334bee7a8ba44fa2eb",
+  "death": {
+    "duration_seconds": 0.8,
+    "articulation": "Recoil, knee buckle, torso impact and settled joint tableaux with separately released equipment.",
+    "last_frame": "Settled corpse; empty fallen crate for CrateOrc, dropped shield/cleaver for Scrapguard.",
+    "blood_in_sprite": false
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 9,
+      "frame_count": 12,
+      "duration_seconds": 1.3333333333333333,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          20,
+          12,
+          73,
+          70
+        ],
+        [
+          20,
+          12,
+          73,
+          69
+        ],
+        [
+          20,
+          11,
+          73,
+          69
+        ],
+        [
+          20,
+          11,
+          73,
+          69
+        ],
+        [
+          20,
+          11,
+          73,
+          69
+        ],
+        [
+          20,
+          12,
+          73,
+          69
+        ],
+        [
+          20,
+          12,
+          73,
+          70
+        ],
+        [
+          20,
+          12,
+          73,
+          70
+        ],
+        [
+          20,
+          11,
+          73,
+          70
+        ],
+        [
+          20,
+          11,
+          73,
+          70
+        ],
+        [
+          20,
+          11,
+          73,
+          70
+        ],
+        [
+          20,
+          11,
+          73,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "duration_seconds": 0.8,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          20,
+          12,
+          73,
+          70
+        ],
+        [
+          19,
+          12,
+          73,
+          70
+        ],
+        [
+          17,
+          12,
+          73,
+          70
+        ],
+        [
+          15,
+          14,
+          75,
+          70
+        ],
+        [
+          14,
+          17,
+          76,
+          72
+        ],
+        [
+          13,
+          20,
+          76,
+          75
+        ],
+        [
+          10,
+          22,
+          77,
+          79
+        ],
+        [
+          9,
+          26,
+          77,
+          79
+        ],
+        [
+          10,
+          29,
+          77,
+          79
+        ],
+        [
+          11,
+          31,
+          77,
+          78
+        ],
+        [
+          11,
+          32,
+          76,
+          78
+        ],
+        [
+          11,
+          32,
+          75,
+          78
+        ]
+      ]
+    }
+  ]
+}

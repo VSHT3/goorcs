@@ -52,7 +52,10 @@ func _run() -> void:
 		model.build(0,Vector2i(1,1),tower.reward.id,MatchCombat.TargetMode.FURTHEST)
 		model.advance(0.001)
 		var state: Dictionary = model.snapshot()
-		_check(state["deaths"][0].size() == 1 and state["enemies"][0].is_empty(), "Real accepted kill supplies one nonliving corpse: %s" % definition.id)
+		var parent_living: bool = false
+		for survivor: Dictionary in state["enemies"][0]:
+			parent_living = parent_living or survivor["type_id"] == String(definition.id)
+		_check(state["deaths"][0].size() == 1 and not parent_living and state["enemies"][0].size() == definition.death_spawn_count, "Real accepted kill retires its parent, records one corpse, and preserves authored death children: %s" % definition.id)
 		if state["deaths"][0].is_empty(): continue
 		var accepted: Dictionary = state.duplicate(true)
 		board.apply_deaths(state,0)

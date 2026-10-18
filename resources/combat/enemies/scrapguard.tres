@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/scrapguard_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/scrapguard.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"scrapguard"
+title = "Scrapguard"
+description = "A shield-bearing orc wrapped in scavenged metal. Physical attacks deal half damage."
+health_multiplier = 2.0
+speed_multiplier = 0.8
+base_damage = 2
+physical_damage_multiplier = 0.5
+spawn_weight = 3
+first_wave = 9
+max_weight_share = 0.3
+send_cost = 35
+send_income = 3
+send_first_wave = 16
+kill_bounty = 3
+reroll_drop_chance = 0.12
+reroll_drop_amount = 1
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.65
+board_anchor = Vector2(0.5, 0.875)

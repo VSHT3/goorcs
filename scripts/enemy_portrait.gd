@@ -63,7 +63,7 @@ func replay_action() -> void:
 		return
 	_actions.clear()
 	if definition.animation_frames != null:
-		for action: StringName in [&"heal", &"attack", &"cast", &"jump_deploy", &"jump_charge", &"jump", &"jump_land", &"walk_damaged", &"walk_critical"]:
+		for action: StringName in [&"heal", &"attack", &"cast", &"jump_deploy", &"jump_charge", &"jump", &"jump_land", &"walk_enraged", &"walk_damaged", &"walk_critical"]:
 			if definition.animation_frames.has_animation(action):
 				_actions.append(action)
 	if _actions.is_empty():

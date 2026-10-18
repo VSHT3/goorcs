@@ -68,7 +68,7 @@ func _check_keyboard_and_mouse() -> void:
 	_check(viewport.gui_get_focus_owner() == screen.back_button, "Portrait precedes Back in the focus chain")
 	await _key(KEY_TAB)
 	_check(viewport.gui_get_focus_owner() == screen.enemy_buttons[0], "Tab returns to the current enemy rather than resetting selection")
-	await _click(screen.enemy_buttons[3].get_global_rect().get_center())
+	await _click_entry(3)
 	_check(screen.selected_index == 3 and viewport.gui_get_focus_owner() == screen.enemy_buttons[3], "A real mouse click keeps focus and selection synchronized")
 	await _key(KEY_DOWN)
 	_check(screen.selected_index == 4, "Keyboard continues from the mouse-selected entry")
@@ -86,7 +86,7 @@ func _check_catalog_and_pixels() -> void:
 		await _settle()
 		for index: int in range(screen.entries.size()):
 			var definition: EnemyDefinition = screen.entries[index]
-			await _click(screen.enemy_buttons[index].get_global_rect().get_center())
+			await _click_entry(index)
 			var expected: Dictionary = MatchCombat.enemy_preview(definition, rules, definition.first_wave if definition.boss else 1)
 			var values: Array[Label] = []
 			values.assign(screen.get_node("%Stats").get_children())
@@ -137,7 +137,7 @@ func _check_catalog_and_pixels() -> void:
 
 
 func _check_counts_and_error() -> void:
-	await _click(screen.enemy_buttons[0].get_global_rect().get_center())
+	await _click_entry(0)
 	var id: String = String(screen.entries[0].id)
 	var snapshot: Dictionary = {"statistics_id": "screen_match", "rules": {"sandbox_mode": false}, "enemy_totals": [{"kills": {id: 12}, "sent": {id: 7}}, {"kills": {id: 99}, "sent": {id: 99}}]}
 	_check(store.observe(snapshot, 0), "Save actual local counters while the screen is open")
@@ -259,6 +259,13 @@ func _portrait_image() -> Image:
 func _settle() -> void:
 	await process_frame
 	await process_frame
+
+
+func _click_entry(index: int) -> void:
+	var scroll := screen.enemy_list.get_parent() as ScrollContainer
+	scroll.ensure_control_visible(screen.enemy_buttons[index])
+	await _settle()
+	await _click(screen.enemy_buttons[index].get_global_rect().get_center())
 
 
 func _click(point: Vector2) -> void:

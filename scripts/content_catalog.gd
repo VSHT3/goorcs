@@ -79,8 +79,14 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' requires positive group odds." % enemy.id)
 		if not is_finite(enemy.heal_interval) or enemy.heal_interval < 0.0 or not is_finite(enemy.heal_radius) or enemy.heal_radius < 0.0 or not is_finite(enemy.heal_fraction) or enemy.heal_fraction < 0.0 or enemy.heal_fraction > 1.0 or (enemy.heal_interval > 0.0 and (enemy.heal_radius <= 0.0 or enemy.heal_fraction <= 0.0)):
 			errors.append("Enemy '%s' has invalid healing metadata." % enemy.id)
-		if not is_finite(enemy.nonphysical_damage_multiplier) or enemy.nonphysical_damage_multiplier <= 0.0 or not is_finite(enemy.fire_damage_multiplier) or enemy.fire_damage_multiplier <= 0.0 or not is_finite(enemy.lightning_damage_multiplier) or enemy.lightning_damage_multiplier <= 0.0:
+		if not is_finite(enemy.physical_damage_multiplier) or enemy.physical_damage_multiplier <= 0.0 or not is_finite(enemy.nonphysical_damage_multiplier) or enemy.nonphysical_damage_multiplier <= 0.0 or not is_finite(enemy.fire_damage_multiplier) or enemy.fire_damage_multiplier <= 0.0 or not is_finite(enemy.lightning_damage_multiplier) or enemy.lightning_damage_multiplier <= 0.0:
 			errors.append("Enemy '%s' requires finite positive incoming damage multipliers." % enemy.id)
+		if enemy.death_spawn_count < 0 or ((enemy.death_spawn_type == &"") != (enemy.death_spawn_count == 0)):
+			errors.append("Enemy '%s' requires a death child and positive count together." % enemy.id)
+		if not is_finite(enemy.enrage_health_fraction) or enemy.enrage_health_fraction < 0.0 or enemy.enrage_health_fraction > 1.0 or not is_finite(enemy.enrage_speed_multiplier) or enemy.enrage_speed_multiplier < 1.0 or (enemy.enrage_health_fraction > 0.0 and enemy.enrage_speed_multiplier <= 1.0) or (enemy.enrage_health_fraction == 0.0 and enemy.enrage_speed_multiplier != 1.0):
+			errors.append("Enemy '%s' requires an enrage threshold in (0, 1] and speed multiplier above one, or disabled defaults." % enemy.id)
+		if not is_finite(enemy.regeneration_interval) or enemy.regeneration_interval < 0.0 or not is_finite(enemy.regeneration_fraction) or enemy.regeneration_fraction < 0.0 or enemy.regeneration_fraction > 1.0 or ((enemy.regeneration_interval == 0.0) != (enemy.regeneration_fraction == 0.0)):
+			errors.append("Enemy '%s' requires positive regeneration interval and fraction together, or zero defaults." % enemy.id)
 		if not is_finite(enemy.stomp_interval) or enemy.stomp_interval < 0.0 or not is_finite(enemy.stomp_radius) or enemy.stomp_radius < 0.0 or not is_finite(enemy.stomp_health_fraction) or enemy.stomp_health_fraction < 0.0 or enemy.stomp_health_fraction > 1.0 or (enemy.stomp_interval > 0.0 and (enemy.stomp_radius <= 0.0 or enemy.stomp_health_fraction <= 0.0)):
 			errors.append("Enemy '%s' has invalid stomp metadata." % enemy.id)
 		if not is_finite(enemy.tower_attack_interval) or enemy.tower_attack_interval < 0.0 or not is_finite(enemy.tower_attack_range) or enemy.tower_attack_range < 0.0 or not is_finite(enemy.tower_attack_cast_duration) or enemy.tower_attack_cast_duration < 0.0 or not is_finite(enemy.tower_stun_duration) or enemy.tower_stun_duration < 0.0 or enemy.tower_attack_targets < 1 or (enemy.tower_attack_interval > 0.0 and (enemy.tower_attack_kind not in [&"club", &"cannon"] or (enemy.tower_attack_kind == &"club" and enemy.tower_attack_range <= 0.0) or enemy.tower_attack_cast_duration <= 0.0 or enemy.tower_stun_duration <= 0.0)) or (enemy.tower_attack_interval == 0.0 and enemy.tower_attack_kind != &""):
@@ -105,7 +111,9 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' has invalid presentation metadata." % enemy.id)
 		if enemy.animation_frames != null:
 			var required: Array[StringName] = [&"walk"]
-			if enemy.heal_interval > 0.0:
+			if enemy.enrage_health_fraction > 0.0:
+				required.append(&"walk_enraged")
+			if enemy.heal_interval > 0.0 or enemy.regeneration_interval > 0.0:
 				required.append(&"heal")
 			if enemy.summon_interval > 0.0:
 				required.append(&"cast")
@@ -117,31 +125,40 @@ func validation_errors() -> PackedStringArray:
 				if not enemy.animation_frames.has_animation(animation) or enemy.animation_frames.get_frame_count(animation) == 0 or not is_finite(enemy.animation_frames.get_animation_speed(animation)) or enemy.animation_frames.get_animation_speed(animation) <= 0.0:
 					errors.append("Enemy '%s' requires a playable '%s' animation." % [enemy.id, animation])
 	for enemy: EnemyDefinition in enemies:
-		if enemy == null or (enemy.summon_interval <= 0.0 and enemy.summon_pool.is_empty()):
-			continue
-		_validate_summons(enemy, enemy_ids, {}, errors)
+		if enemy != null:
+			_validate_children(enemy, enemy_ids, {}, {}, errors)
 	return errors
 
 
-static func _validate_summons(source: EnemyDefinition, definitions: Dictionary[StringName, EnemyDefinition], ancestors: Dictionary, errors: PackedStringArray) -> void:
+static func child_ids(source: EnemyDefinition) -> PackedStringArray:
+	var children := PackedStringArray()
+	if source.summon_type != &"":
+		children.append(String(source.summon_type))
+	for child: String in source.summon_pool:
+		if child not in children:
+			children.append(child)
+	if source.death_spawn_type != &"" and String(source.death_spawn_type) not in children:
+		children.append(String(source.death_spawn_type))
+	return children
+
+
+static func _validate_children(source: EnemyDefinition, definitions: Dictionary[StringName, EnemyDefinition], ancestors: Dictionary, visited: Dictionary, errors: PackedStringArray) -> void:
 	if ancestors.has(source.id):
-		errors.append("Enemy '%s' has a cyclic summon chain." % source.id)
+		errors.append("Enemy '%s' has a cyclic summon/death-spawn chain." % source.id)
 		return
-	if source.summon_interval <= 0.0 and source.summon_pool.is_empty():
+	if visited.has(source.id):
 		return
 	ancestors[source.id] = true
-	var children: PackedStringArray = source.summon_pool
-	if children.is_empty():
-		children = PackedStringArray([String(source.summon_type)])
-	for child_id: String in children:
+	for child_id: String in child_ids(source):
 		if not definitions.has(StringName(child_id)):
-			errors.append("Enemy '%s' requires a registered summon child '%s'." % [source.id, child_id])
+			errors.append("Enemy '%s' requires a registered summon/death-spawn child '%s'." % [source.id, child_id])
 			continue
 		var child: EnemyDefinition = definitions[StringName(child_id)]
 		if child.boss:
-			errors.append("Enemy '%s' cannot summon boss '%s'." % [source.id, child_id])
-		_validate_summons(child, definitions, ancestors, errors)
+			errors.append("Enemy '%s' cannot create boss child '%s'." % [source.id, child_id])
+		_validate_children(child, definitions, ancestors, visited, errors)
 	ancestors.erase(source.id)
+	visited[source.id] = true
 
 
 static func _valid_directional_weapon(art: TowerReward) -> bool:

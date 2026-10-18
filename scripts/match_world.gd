@@ -108,6 +108,8 @@ func set_active(value: bool) -> void:
 
 
 func set_input_blocked(value: bool) -> void:
+	if _input_blocked == value:
+		return
 	_input_blocked = value
 	_cancel_motion()
 	_cancel_strokes()

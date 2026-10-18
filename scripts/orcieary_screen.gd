@@ -121,14 +121,11 @@ func _build_catalog() -> void:
 	var availability: Dictionary[StringName, int] = {}
 	for definition: EnemyDefinition in entries:
 		availability[definition.id] = mini(definition.first_wave if definition.regular_spawn_enabled or definition.boss else 2147483647, definition.send_first_wave if definition.send_enabled and not definition.boss else 2147483647)
-	# Propagate through summon chains; unreachable cycles retain the last-place sentinel.
+	# Propagate first encounters through summon and death-child chains.
 	for pass_index: int in range(entries.size()):
 		var changed: bool = false
 		for source: EnemyDefinition in entries:
-			if source.summon_interval <= 0.0:
-				continue
-			var children: PackedStringArray = source.summon_pool if not source.summon_pool.is_empty() else PackedStringArray([String(source.summon_type)])
-			for child: String in children:
+			for child: String in ContentCatalog.child_ids(source):
 				var child_id := StringName(child)
 				if availability.has(child_id) and availability[source.id] < availability[child_id]:
 					availability[child_id] = availability[source.id]
@@ -262,9 +259,9 @@ func _availability(definition: EnemyDefinition) -> String:
 	if not definition.regular_spawn_enabled and not definition.send_enabled:
 		var sources := PackedStringArray()
 		for candidate: EnemyDefinition in catalog.enemies:
-			if candidate.summon_type == definition.id or String(definition.id) in candidate.summon_pool:
+			if String(definition.id) in ContentCatalog.child_ids(candidate):
 				sources.append(candidate.title)
-		var source: String = "Summoned by " + ", ".join(sources) if not sources.is_empty() else "Summon only"
+		var source: String = "Created by " + ", ".join(sources) if not sources.is_empty() else "Child only"
 		return source + "\nNo regular waves or paid sends."
 	var regular: String = "Regular waves %d+" % definition.first_wave if definition.regular_spawn_enabled else "No regular waves"
 	var sends: String = "Sends %d+" % definition.send_first_wave if definition.send_enabled else "No paid sends"
@@ -273,6 +270,17 @@ func _availability(definition: EnemyDefinition) -> String:
 
 func _mechanics(definition: EnemyDefinition) -> String:
 	var lines := PackedStringArray()
+	if not is_equal_approx(definition.physical_damage_multiplier, 1.0):
+		lines.append("Physical damage ×%s" % String.num(definition.physical_damage_multiplier, 2))
+	if definition.death_spawn_count > 0:
+		for child: EnemyDefinition in catalog.enemies:
+			if child.id == definition.death_spawn_type:
+				lines.append("On death: %d %s\nChildren inherit its remaining route · no children on leak" % [definition.death_spawn_count, child.title])
+				break
+	if definition.enrage_health_fraction > 0.0:
+		lines.append("At %s%% HP: permanent speed ×%s" % [String.num(definition.enrage_health_fraction * 100.0, 1), String.num(definition.enrage_speed_multiplier, 2)])
+	if definition.regeneration_interval > 0.0:
+		lines.append("Regenerates %s%% max HP every %ss\nSelf only · rounded up" % [String.num(definition.regeneration_fraction * 100.0, 1), String.num(definition.regeneration_interval, 2)])
 	if definition.heal_interval > 0.0:
 		lines.append("Heals allies %s%% every %ss\nWithin %s cells · cannot heal itself" % [String.num(definition.heal_fraction * 100.0, 1), String.num(definition.heal_interval, 2), String.num(definition.heal_radius, 2)])
 	if definition.summon_interval > 0.0:

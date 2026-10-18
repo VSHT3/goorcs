@@ -22,6 +22,7 @@ const ACCENT := Color("bad98f")
 
 var _rng := RandomNumberGenerator.new()
 var _busy: bool = false
+var _suspended: bool = false
 var _elapsed: float = 0.0
 var _last_crossing: int = 0
 var _landing_position: float = float(WINNER_INDEX)
@@ -30,10 +31,12 @@ var _revealed: bool = false
 var _winner_rank: int = 0
 var _winner_name: String = ""
 var _winner_color: Color
+var _winner_payout: String = ""
 var _previous_focus: WeakRef
 var _panel: Control
 var _heading: Label
 var _result: Label
+var _payout: Label
 var _close: Button
 var _strip: ReelStrip
 var _tick: AudioStreamPlayer
@@ -45,11 +48,14 @@ class ReelStrip extends Control:
 	const STRIDE: float = CARD_WIDTH
 	const CARD_HEIGHT: float = 184.0
 	const FONT: Font = preload("res://assets/fonts/PixelifySans.ttf")
+	const NUMBERS: Font = preload("res://assets/fonts/silkscreen/Silkscreen-Regular.ttf")
 	const MARKER := Color("e0bc77")
 
 	var rarities := PackedInt32Array()
 	var names := PackedStringArray()
 	var colors := PackedColorArray()
+	var coins := PackedStringArray()
+	var shards := PackedStringArray()
 	var shades := PackedColorArray()
 	var artwork: Texture2D
 	var artwork_bounds := Rect2()
@@ -119,10 +125,16 @@ class ReelStrip extends Control:
 			draw_rect(Rect2(card.position, Vector2(CARD_WIDTH, 4.0)), color)
 			draw_rect(Rect2(card.position + Vector2(0.0, CARD_HEIGHT - 5.0), Vector2(CARD_WIDTH, 5.0)), color)
 			if artwork != null and artwork_bounds.has_area():
-				var extent: Vector2 = (artwork_bounds.size * (96.0 / maxf(artwork_bounds.size.x, artwork_bounds.size.y))).floor()
-				var icon_rect := Rect2((card.position + Vector2((CARD_WIDTH - extent.x) * 0.5, 24.0 + (102.0 - extent.y) * 0.5)).round(), extent)
+				var reward: bool = not coins.is_empty()
+				var icon_size: float = 60.0 if reward else 96.0
+				var extent: Vector2 = (artwork_bounds.size * (icon_size / maxf(artwork_bounds.size.x, artwork_bounds.size.y))).floor()
+				var icon_rect := Rect2((card.position + Vector2((CARD_WIDTH - extent.x) * 0.5, 18.0 + (64.0 - extent.y) * 0.5 if reward else 24.0 + (102.0 - extent.y) * 0.5)).round(), extent)
 				draw_texture_rect_region(artwork, icon_rect, artwork_bounds)
-			draw_string(FONT, card.position + Vector2(6.0, 158.0), names[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 18, color)
+			var name_y: float = 104.0 if not coins.is_empty() else 158.0
+			draw_string(FONT, card.position + Vector2(6.0, name_y), names[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 18, color)
+			if not coins.is_empty():
+				draw_string(NUMBERS, card.position + Vector2(6.0, 136.0), coins[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 16, Color("f5dca5"))
+				draw_string(NUMBERS, card.position + Vector2(6.0, 160.0), shards[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 16, Color("c1eff0"))
 			if reveal > 0.0:
 				if winning:
 					var highlight: Color = color
@@ -154,6 +166,7 @@ func _ready() -> void:
 	add_child(_panel)
 	_heading = _label(24)
 	_heading.text = "Rarity"
+	_heading.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_panel.add_child(_heading)
 	_close = Button.new()
 	CloseButtonStyle.apply(_close)
@@ -169,6 +182,10 @@ func _ready() -> void:
 	_result = _label(24)
 	_result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_panel.add_child(_result)
+	_payout = _label(20)
+	_payout.add_theme_font_override("font", ReelStrip.NUMBERS)
+	_payout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_panel.add_child(_payout)
 	_tick = _audio_player(TICK)
 	_reveal = _audio_player(REVEAL)
 	resized.connect(_layout)
@@ -181,18 +198,49 @@ func _ready() -> void:
 
 func present(tower: Dictionary, artwork: Texture2D) -> void:
 	# The caller owns acceptance detection and duplicate-request locking.
+	if not _can_present():
+		return
+	_strip.coins.clear()
+	_strip.shards.clear()
+	for index: int in range(RARITIES.size()):
+		_strip.names[index] = RARITIES[index].capitalize()
+	_winner_payout = ""
+	_heading.text = "Rarity"
+	_start(String(tower.get("rarity", "common")), artwork)
+
+
+func present_reward(award: Dictionary, artwork: Texture2D = null) -> void:
+	if not _can_present():
+		return
+	_strip.coins.resize(RARITIES.size())
+	_strip.shards.resize(RARITIES.size())
+	for tier: Dictionary in award["tiers"]:
+		var rank: int = RARITIES.find(String(tier["id"]))
+		if rank < 0:
+			continue
+		_strip.names[rank] = String(tier["title"])
+		_strip.coins[rank] = "%d Coins" % int(tier["coins"])
+		_strip.shards[rank] = "%d Shards" % int(tier["shards"])
+	_winner_payout = "%d Coins · %d Shards" % [int(award["coins"]), int(award["shards"])]
+	_heading.text = String(award["boss_title"])
+	_start(String(award["rarity"]), artwork, String(award["rarity_title"]))
+
+
+func _can_present() -> bool:
 	if _busy or not is_node_ready():
-		return
+		return false
 	var parent_item := get_parent() as CanvasItem
-	if parent_item != null and not parent_item.is_visible_in_tree():
-		return
+	return parent_item == null or parent_item.is_visible_in_tree()
+
+
+func _start(rarity: String, artwork: Texture2D, winner_name: String = "") -> void:
 	var focus: Control = get_viewport().gui_get_focus_owner()
 	_previous_focus = weakref(focus) if focus != null else null
-	_winner_rank = RARITIES.find(String(tower.get("rarity", "common")))
+	_winner_rank = RARITIES.find(rarity)
 	if _winner_rank < 0:
 		_winner_rank = 2
-	_winner_name = _strip.names[_winner_rank]
-	_winner_color = MatchPlanningScreen.tower_rarity_color(tower)
+	_winner_name = _strip.names[_winner_rank] if winner_name.is_empty() else winner_name
+	_winner_color = MatchPlanningScreen.tower_rarity_color({"rarity": rarity})
 	_strip.set_artwork(artwork)
 	_strip.rarities.resize(CARD_COUNT)
 	for index: int in range(CARD_COUNT):
@@ -220,7 +268,9 @@ func present(tower: Dictionary, artwork: Texture2D) -> void:
 	_revealed = false
 	_last_crossing = floori(START_POSITION + 0.5)
 	_result.text = ""
-	_heading.text = "Rarity"
+	_payout.text = ""
+	_payout.visible = not _winner_payout.is_empty()
+	_suspended = false
 	_busy = true
 	show()
 	get_parent().move_child(self, -1)
@@ -236,9 +286,26 @@ func is_busy() -> bool:
 	return _busy
 
 
+func set_suspended(suspended: bool) -> void:
+	if not _busy or _suspended == suspended:
+		return
+	_suspended = suspended
+	set_process(not suspended)
+	set_process_input(not suspended)
+	if suspended:
+		_tick.stop()
+		_reveal.stop()
+		hide()
+	else:
+		show()
+		get_parent().move_child(self, -1)
+		_close.grab_focus()
+
+
 func cancel() -> void:
 	var was_busy: bool = _busy
 	_busy = false
+	_suspended = false
 	set_process(false)
 	set_process_input(false)
 	if _tick != null:
@@ -257,6 +324,8 @@ func cancel() -> void:
 
 
 func _process(delta: float) -> void:
+	if not _busy or _suspended:
+		return
 	_elapsed += delta
 	if not _revealed:
 		var previous_position: float = _strip.scroll_position
@@ -274,7 +343,7 @@ func _process(delta: float) -> void:
 		if _elapsed >= SPIN_SECONDS:
 			_begin_reveal()
 	else:
-		_strip.reveal = minf((_elapsed - SPIN_SECONDS) / 0.45, 1.0)
+		_strip.reveal = maxf(_strip.reveal, minf((_elapsed - SPIN_SECONDS) / 0.45, 1.0))
 		if _elapsed >= SPIN_SECONDS + REVEAL_SECONDS:
 			cancel()
 			return
@@ -313,7 +382,7 @@ func _skip_to_result() -> void:
 	queue_redraw()
 
 
-func _begin_reveal() -> void:
+func _begin_reveal(immediate: bool = false) -> void:
 	_revealed = true
 	# Start the readable hold at the actual reveal, even after a delayed frame.
 	_elapsed = SPIN_SECONDS
@@ -322,7 +391,13 @@ func _begin_reveal() -> void:
 	_reveal.volume_db = -8.0 + float(_winner_rank) * 0.35
 	_reveal.play()
 	_result.text = _winner_name
+	_payout.text = _winner_payout
 	_result.add_theme_color_override("font_color", _winner_color)
+	_strip.reveal = 1.0 if immediate else 0.0
+	_strip.queue_redraw()
+	queue_redraw()
+
+
 
 
 func _input(event: InputEvent) -> void:
@@ -359,7 +434,7 @@ func _gui_input(_event: InputEvent) -> void:
 
 func _visibility_changed() -> void:
 	# Inherited visibility changes also fire when the owning screen is hidden.
-	if _busy and not is_visible_in_tree():
+	if _busy and not _suspended and not is_visible_in_tree():
 		cancel()
 
 
@@ -370,7 +445,7 @@ func _exit_tree() -> void:
 func _layout() -> void:
 	if _panel == null:
 		return
-	_panel.size = Vector2(minf(1000.0, maxf(0.0, size.x - 64.0)), 354.0)
+	_panel.size = Vector2(minf(1000.0, maxf(0.0, size.x - 64.0)), 382.0 if not _winner_payout.is_empty() else 354.0)
 	_panel.position = ((size - _panel.size) * 0.5).floor()
 	_heading.position = Vector2(24.0, 18.0)
 	_heading.size = Vector2(maxf(0.0, _panel.size.x - 100.0), 40.0)
@@ -379,7 +454,9 @@ func _layout() -> void:
 	_strip.position = Vector2(20.0, 76.0)
 	_strip.size = Vector2(maxf(0.0, _panel.size.x - 40.0), 216.0)
 	_result.position = Vector2(24.0, 302.0)
-	_result.size = Vector2(maxf(0.0, _panel.size.x - 48.0), 36.0)
+	_result.size = Vector2(maxf(0.0, _panel.size.x - 48.0), 28.0 if not _winner_payout.is_empty() else 36.0)
+	_payout.position = Vector2(24.0, 334.0)
+	_payout.size = Vector2(maxf(0.0, _panel.size.x - 48.0), 28.0)
 	queue_redraw()
 
 

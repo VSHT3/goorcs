@@ -1,0 +1,307 @@
+{
+  "authoring": "Original deterministic local Pillow integer geometry; articulated limbs and native-pixel material planes redrawn per frame. No image generation service or source pixels.",
+  "identity": "Wiry bare-chested long-limbed orc, swept black crest, wrapped fists and ankle ties; calm upright lope becomes forward-pitched open-jawed red-eyed sprint.",
+  "generator": "tools/author_variety_enemies.py",
+  "generator_sha256": "0bafa9e2ec52ed5f03eb8de37e1f1afc49e1cee99acc16b798dffe7219e66895",
+  "reproduce": "python3 tools/author_variety_enemies.py",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "geometry_helpers_reused": [
+    "Pixels",
+    "segment",
+    "O",
+    "SK",
+    "FE",
+    "LE",
+    "BO"
+  ],
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
+  "design_reference": "assets/enemies/animations/grunt_still.png",
+  "design_reference_sha256": "6b58a9c65c65789b5a80eddd6bdaffa8da05391ac140cea7f9207b64ab9c3698",
+  "design_reference_status": "Creator-approved Orc is read-only; comparison only, no sampled/cutout pixels or source replacement.",
+  "camera": "Elevated three-quarter facing left; top and left material planes lit; near left limbs overlap far right limbs.",
+  "alpha": "Binary 0/255, no antialiasing, dithering, smoothing, raster rotation or scaling in authored frames.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    2880,
+    80
+  ],
+  "base_anchor_pixels": [
+    40,
+    70
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.62,
+  "still": "assets/enemies/animations/rage_orc_still.png",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "still_alpha_bounds": [
+    18,
+    10,
+    63,
+    70
+  ],
+  "sheet_sha256": "de8a6dec6cdf3d20a69b98532d06e4d67a1dac5a0217e6390bce0be0545a8f4b",
+  "still_sha256": "2758c3810addb6ccdf6485a3ae0be94215bfcf433f677e441859649d3234335a",
+  "sprite_frames_sha256": "a10cab976c37b2608885d99f8a98bbfe65eafb5afbba6184273d91774f718ff3",
+  "death": {
+    "duration_seconds": 0.8,
+    "articulation": "Recoil, knee buckle, torso impact and settled joint tableaux with separately released equipment.",
+    "last_frame": "Settled corpse; empty fallen crate for CrateOrc, dropped shield/cleaver for Scrapguard.",
+    "blood_in_sprite": false
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 14,
+      "frame_count": 12,
+      "duration_seconds": 0.8571428571428571,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          18,
+          10,
+          63,
+          70
+        ],
+        [
+          18,
+          10,
+          63,
+          69
+        ],
+        [
+          19,
+          9,
+          63,
+          69
+        ],
+        [
+          21,
+          9,
+          63,
+          69
+        ],
+        [
+          22,
+          9,
+          63,
+          69
+        ],
+        [
+          22,
+          10,
+          63,
+          69
+        ],
+        [
+          21,
+          10,
+          63,
+          70
+        ],
+        [
+          22,
+          10,
+          63,
+          70
+        ],
+        [
+          23,
+          9,
+          63,
+          70
+        ],
+        [
+          21,
+          9,
+          63,
+          70
+        ],
+        [
+          19,
+          9,
+          63,
+          70
+        ],
+        [
+          18,
+          9,
+          63,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "duration_seconds": 0.8,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          18,
+          10,
+          63,
+          70
+        ],
+        [
+          19,
+          12,
+          64,
+          70
+        ],
+        [
+          17,
+          15,
+          65,
+          70
+        ],
+        [
+          15,
+          17,
+          66,
+          70
+        ],
+        [
+          14,
+          19,
+          64,
+          72
+        ],
+        [
+          13,
+          21,
+          61,
+          75
+        ],
+        [
+          10,
+          28,
+          64,
+          75
+        ],
+        [
+          7,
+          37,
+          67,
+          76
+        ],
+        [
+          7,
+          38,
+          68,
+          76
+        ],
+        [
+          7,
+          40,
+          68,
+          76
+        ],
+        [
+          7,
+          41,
+          69,
+          76
+        ],
+        [
+          7,
+          42,
+          69,
+          76
+        ]
+      ]
+    },
+    {
+      "name": "walk_enraged",
+      "fps": 22,
+      "frame_count": 12,
+      "duration_seconds": 0.5454545454545454,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          5,
+          10,
+          65,
+          70
+        ],
+        [
+          5,
+          9,
+          65,
+          69
+        ],
+        [
+          6,
+          8,
+          64,
+          69
+        ],
+        [
+          8,
+          8,
+          62,
+          69
+        ],
+        [
+          9,
+          8,
+          61,
+          69
+        ],
+        [
+          11,
+          9,
+          59,
+          69
+        ],
+        [
+          11,
+          10,
+          59,
+          70
+        ],
+        [
+          11,
+          9,
+          59,
+          70
+        ],
+        [
+          10,
+          8,
+          60,
+          70
+        ],
+        [
+          8,
+          8,
+          62,
+          70
+        ],
+        [
+          6,
+          8,
+          64,
+          70
+        ],
+        [
+          5,
+          9,
+          65,
+          70
+        ]
+      ]
+    }
+  ]
+}

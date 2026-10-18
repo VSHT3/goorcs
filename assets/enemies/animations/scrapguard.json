@@ -1,0 +1,226 @@
+{
+  "authoring": "Original deterministic local Pillow integer geometry; articulated limbs and native-pixel material planes redrawn per frame. No image generation service or source pixels.",
+  "identity": "Low plated infantry, slotted scrap helm, asymmetric riveted armor and oversized patchwork slab shield; small rusted cleaver in the far hand.",
+  "generator": "tools/author_variety_enemies.py",
+  "generator_sha256": "0bafa9e2ec52ed5f03eb8de37e1f1afc49e1cee99acc16b798dffe7219e66895",
+  "reproduce": "python3 tools/author_variety_enemies.py",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "geometry_helpers_reused": [
+    "Pixels",
+    "segment",
+    "O",
+    "SK",
+    "FE",
+    "LE",
+    "BO"
+  ],
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
+  "design_reference": "assets/enemies/animations/grunt_still.png",
+  "design_reference_sha256": "6b58a9c65c65789b5a80eddd6bdaffa8da05391ac140cea7f9207b64ab9c3698",
+  "design_reference_status": "Creator-approved Orc is read-only; comparison only, no sampled/cutout pixels or source replacement.",
+  "camera": "Elevated three-quarter facing left; top and left material planes lit; near left limbs overlap far right limbs.",
+  "alpha": "Binary 0/255, no antialiasing, dithering, smoothing, raster rotation or scaling in authored frames.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    1920,
+    80
+  ],
+  "base_anchor_pixels": [
+    40,
+    70
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.65,
+  "still": "assets/enemies/animations/scrapguard_still.png",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "still_alpha_bounds": [
+    8,
+    12,
+    67,
+    70
+  ],
+  "sheet_sha256": "81b58aed4dad0fcf726b2aaee6620af2dc7e59f6d8f561d65c3503ef28482a54",
+  "still_sha256": "68f18b245ba4e298ece00a669936208f61014b17fefc30ff9b6b05d38130029a",
+  "sprite_frames_sha256": "0bc608785df53d2e2a2c39264eebf39a595acb871c81b5142b14d362a594f422",
+  "death": {
+    "duration_seconds": 0.8,
+    "articulation": "Recoil, knee buckle, torso impact and settled joint tableaux with separately released equipment.",
+    "last_frame": "Settled corpse; empty fallen crate for CrateOrc, dropped shield/cleaver for Scrapguard.",
+    "blood_in_sprite": false
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 10,
+      "frame_count": 12,
+      "duration_seconds": 1.2,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          8,
+          12,
+          67,
+          70
+        ],
+        [
+          8,
+          12,
+          67,
+          69
+        ],
+        [
+          8,
+          11,
+          67,
+          69
+        ],
+        [
+          9,
+          11,
+          67,
+          69
+        ],
+        [
+          9,
+          11,
+          67,
+          69
+        ],
+        [
+          10,
+          12,
+          67,
+          69
+        ],
+        [
+          10,
+          12,
+          67,
+          70
+        ],
+        [
+          10,
+          12,
+          67,
+          70
+        ],
+        [
+          10,
+          11,
+          67,
+          70
+        ],
+        [
+          9,
+          11,
+          67,
+          70
+        ],
+        [
+          8,
+          11,
+          67,
+          70
+        ],
+        [
+          8,
+          11,
+          67,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "duration_seconds": 0.8,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          8,
+          12,
+          67,
+          70
+        ],
+        [
+          8,
+          14,
+          66,
+          71
+        ],
+        [
+          7,
+          16,
+          66,
+          71
+        ],
+        [
+          6,
+          18,
+          66,
+          71
+        ],
+        [
+          5,
+          20,
+          66,
+          71
+        ],
+        [
+          4,
+          24,
+          66,
+          73
+        ],
+        [
+          3,
+          31,
+          66,
+          75
+        ],
+        [
+          2,
+          33,
+          67,
+          77
+        ],
+        [
+          2,
+          33,
+          68,
+          77
+        ],
+        [
+          2,
+          33,
+          68,
+          77
+        ],
+        [
+          2,
+          33,
+          69,
+          77
+        ],
+        [
+          2,
+          33,
+          69,
+          77
+        ]
+      ]
+    }
+  ]
+}

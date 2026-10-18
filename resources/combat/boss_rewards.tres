@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="BossRewardRules" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/boss_reward_rules.gd" id="1_rules"]
+[ext_resource type="Resource" path="res://resources/combat/tower_rolls.tres" id="2_rarities"]
+
+; Provisional run-only balance. Rarity weights remain owned by tower_rolls.tres.
+[resource]
+script = ExtResource("1_rules")
+rarity_rules = ExtResource("2_rarities")
+payouts = {
+"broken": Vector2i(50, 1),
+"shoddy": Vector2i(80, 2),
+"common": Vector2i(140, 4),
+"uncommon": Vector2i(240, 7),
+"rare": Vector2i(420, 12),
+"epic": Vector2i(800, 22),
+"legendary": Vector2i(1600, 40),
+"mythic": Vector2i(4000, 100)
+}

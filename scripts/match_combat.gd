@@ -62,6 +62,7 @@ var _drop_random := RandomNumberGenerator.new()
 # Magic Ballista bounce rolls never perturb waves, placement rolls or drops.
 var _magic_random := RandomNumberGenerator.new()
 var _roll_rules: TowerRollRules
+var _boss_loot: BossRewardLedger
 var _roster_configuration_valid: bool = true
 var _routes: Array[Array] = [[], []]
 var _routing_next: Array[Dictionary] = [{}, {}]
@@ -116,6 +117,12 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 	if drop_random == null:
 		_drop_random.seed = _wave_random.seed ^ 0x44524f50
 	_magic_random.seed = _wave_random.seed ^ 0x4d414749
+	var reward_random := RandomNumberGenerator.new()
+	reward_random.seed = _wave_random.seed ^ 0x424f5353
+	_boss_loot = BossRewardLedger.new(rules.boss_reward_rules, reward_random, not _sandbox_mode)
+	if not _boss_loot.error_message.is_empty():
+		push_error("Invalid boss rewards: " + _boss_loot.error_message)
+		_roster_configuration_valid = false
 	reroll_currency = [rules.starting_reroll_currency, rules.starting_reroll_currency]
 	if rules.starting_reroll_currency < 0 or rules.clear_reroll_currency < 0:
 		push_error("Reroll currency grants must be nonnegative")
@@ -187,6 +194,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"jump_charge_duration": definition.jump_charge_duration, "jump_duration": definition.jump_duration,
 			"jump_land_duration": definition.jump_land_duration,
 		}
+		_enemy_types[type_id].merge(EnemyMechanics.capture(definition))
 	var has_remainder_enemy: bool = false
 	for definition: EnemyDefinition in rules.catalog.enemies:
 		if definition.regular_spawn_enabled and not definition.boss and definition.spawn_weight == 1 and definition.first_wave == 1 and definition.max_per_wave == 0 and definition.max_weight_share == 1.0:
@@ -721,7 +729,7 @@ func _send_enemy_accepted(slot: int, type_id: StringName) -> void:
 	var cost: int = definition["send_cost"]
 	var target: int = 1 - slot
 	var count: int = _roll_group(definition, _group_random)
-	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0
+	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
 	if _pending_sends(target) == 0 and phase == Phase.WAVE:
 		_next_send_times[target] = maxf(_next_send_times[target], _elapsed)
 	for member: int in range(count):
@@ -866,7 +874,7 @@ func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dic
 	for slot: int in range(2):
 		for index: int in range(_send_heads[slot], _send_queues[slot].size()):
 			var pending: Dictionary = _enemy_types[_send_queues[slot][index]]
-			_special_stream = _special_stream or float(pending["heal_interval"]) > 0.0 or float(pending["summon_interval"]) > 0.0
+			_special_stream = _special_stream or float(pending["heal_interval"]) > 0.0 or float(pending["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(pending)
 			_boss_stream = _boss_stream or BossMechanics.has_abilities(pending)
 	var interval_multiplier: float = _spawn_interval_multiplier(wave_number)
 	var group_times: Array[float] = _generate_spawn_times(groups.size(), _rules.spawn_interval * interval_multiplier)
@@ -874,7 +882,7 @@ func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dic
 	for index: int in range(groups.size()):
 		var group: Dictionary = groups[index]
 		var definition: Dictionary = _enemy_types[group["type_id"]]
-		_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0
+		_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
 		_boss_stream = _boss_stream or BossMechanics.has_abilities(definition)
 		var spacing: float = _enemy_types[group["type_id"]]["group_interval"]
 		for member: int in range(int(group["count"])):
@@ -1120,6 +1128,7 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 				duration = minf(duration, float(enemy["cast_remaining"]))
 			elif float(definition["summon_interval"]) > 0.0 and (not _boss_stream or (float(enemy["tower_attack_remaining"]) <= 0.000000001 and BossMechanics.can_act(enemy))):
 				duration = minf(duration, float(enemy["next_summon"]) - float(enemy["age"]))
+			duration = minf(duration, EnemyMechanics.event_step(enemy, definition))
 			if float(definition["heal_interval"]) > 0.0:
 				duration = minf(duration, float(enemy["next_heal"]) - float(enemy["age"]))
 	return maxf(0.000000001, duration)
@@ -1212,6 +1221,7 @@ func _enemy_abilities(slot: int) -> void:
 		if enemy["animation"] == "heal" and float(enemy["animation_elapsed"]) >= 0.55:
 			enemy["animation"] = "walk"
 			enemy["animation_elapsed"] = 0.0
+		EnemyMechanics.advance(enemy, definition)
 		if float(definition["heal_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_heal"]):
 			enemy["next_heal"] += float(definition["heal_interval"])
 			enemy["heal_count"] += 1
@@ -1360,6 +1370,7 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 				if victim["id"] == enemy["id"] or int(victim["hp"]) <= 0 or Vector2(enemy["pos"]).distance_squared_to(victim["pos"]) > radius_squared:
 					continue
 				victim["hp"] = maxi(0, int(victim["hp"]) - maxi(1, ceili(float(victim["max_hp"]) * float(definition["stomp_health_fraction"]))))
+				EnemyMechanics.after_damage(victim, _enemy_types[victim["type_id"]])
 				if int(victim["hp"]) == 0:
 					_record_death(slot, victim)
 					_retire_enemy(int(victim["id"]))
@@ -1417,6 +1428,7 @@ func snapshot() -> Dictionary:
 		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
 		"death_generation": _death_generation,
 		"sounds": _sound_events.snapshot(_death_time),
+		"boss_rewards": [_boss_loot.awards(0), _boss_loot.awards(1)],
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
 		"wave_roster": wave_roster.duplicate(), "wave_weight": _wave_weight(maxi(1, wave)),
 		"spawn_times": spawn_times.duplicate(),
@@ -1621,7 +1633,16 @@ func _move_enemies(slot: int, delta: float) -> void:
 				enemy["slow_remaining"] = 0.0
 			enemy["speed"] = slow_speed if enemy["slowed"] else base_speed
 		else:
-			_slow_motion.erase(enemy["id"])
+			if float(_enemy_types[enemy["type_id"]]["enrage_health_fraction"]) > 0.0:
+				if not _slow_motion.has(enemy["id"]):
+					_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
+				var motion: Array = _slow_motion[enemy["id"]]
+				motion[0] = float(enemy["progress"])
+				motion[1] = delta
+				motion[2] = base_speed
+				motion[3] = base_speed
+			else:
+				_slow_motion.erase(enemy["id"])
 			enemy["progress"] += base_speed * delta
 		enemy["pos"] = _position(enemy["route"], enemy["progress"])
 		enemy["stepped"] = float(enemy["progress"]) > previous_progress + 0.000000001 and enemy["animation"] == "walk"
@@ -1667,7 +1688,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 	var definition: Dictionary = _enemy_types[type_id]
 	var route: Array[Vector2i] = _assign_route(slot) if captured_route.is_empty() else captured_route.duplicate()
 	var speed: float = _enemy_speed(type_id, wave)
-	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0
+	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
 	_boss_stream = _boss_stream or BossMechanics.has_abilities(definition)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
@@ -1696,6 +1717,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"jump_target_progress": progress,
 		"stepped": false,
 	})
+	EnemyMechanics.initialize(enemies[slot].back(), definition)
 	_enemy_spawn_times[_next_enemy_id] = spawn_time
 	_next_enemy_id += 1
 
@@ -2327,6 +2349,9 @@ func _record_death(slot: int, enemy: Dictionary) -> void:
 	})
 	_next_death_id += 1
 	_sound_events.record(int(_enemy_types[enemy["type_id"]]["death_sound"]), slot, enemy["pos"], _death_time)
+	var definition: Dictionary = _enemy_types[enemy["type_id"]]
+	for child: int in range(int(definition["death_spawn_count"])):
+		_spawn_enemy(slot, definition["death_spawn_type"], progress, _elapsed, route, enemy["id"])
 
 
 func _retire_enemy(enemy_id: int) -> void:
@@ -2364,7 +2389,7 @@ func _tower_damage_type(tower: Dictionary) -> StringName:
 
 
 func _elemental_damage_multiplier(enemy: Dictionary, damage_type: StringName) -> float:
-	var multiplier: float = float(enemy["nonphysical_damage_multiplier"]) if damage_type != &"physical" else 1.0
+	var multiplier: float = float(enemy["nonphysical_damage_multiplier"]) if damage_type != &"physical" else float(enemy["physical_damage_multiplier"])
 	if damage_type == &"fire":
 		multiplier *= float(enemy["fire_damage_multiplier"])
 	elif damage_type == &"lightning":
@@ -2434,6 +2459,7 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 	tower["damage_dealt"] += hit_damage - indirect
 	enemy["hp"] -= hit_damage
 	if hit_damage > 0:
+		EnemyMechanics.after_damage(enemy, _enemy_types[enemy["type_id"]])
 		_sound_events.record(CombatSoundEvents.Cue.HIT, slot, enemy["pos"], _death_time)
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1
@@ -2455,6 +2481,10 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 			aura["coins_generated"] += payout - marked_payout
 		if int(definition["reroll_drop_amount"]) > 0 and float(definition["reroll_drop_chance"]) > 0.0 and _drop_random.randf() < float(definition["reroll_drop_chance"]):
 			reroll_currency[slot] += int(definition["reroll_drop_amount"])
+		var reward: Dictionary = _boss_loot.claim(slot, String(enemy["type_id"]), definition, wave, _death_time)
+		if not reward.is_empty():
+			coins[slot] += int(reward["coins"])
+			reroll_currency[slot] += int(reward["shards"])
 		_add_total(slot, "kills", enemy["type_id"])
 		_record_death(slot, enemy)
 		_retire_enemy(enemy["id"])

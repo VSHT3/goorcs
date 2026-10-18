@@ -31,6 +31,41 @@ NecOrcmancers begin at one regular selection per wave; the cap grows by one ever
 
 The boss uses the same seven-second / 1.15-second ritual, but raises **two to four ordinary NecOrcmancers**, capped at six living direct children. Those NecOrcmancers retain their own stats, bounty, and SkeleOrc rituals; newborn casters start their clocks at birth and cannot cascade a cast immediately. Every generation inherits its parent's captured route/current progress, and all descendants must clear before the wave ends. Catalog validation permits acyclic summon chains and rejects self/indirect cycles. The boss pays 40 Coins when killed; SkeleOrcs retain zero normal Coin bounty.
 
+## Varied regular enemies
+
+These four roles join the existing roster progressively. All are available directly in Sandbox and fully animated in Orcieary. Their count/share caps and rewards remain provisional playtest tuning.
+
+| Enemy | Regular / Send round | HP / Speed multiplier | Weight / share | Send Coins / income | Gimmick |
+| --- | --- | --- | --- | --- | --- |
+| Scrapguard | 9 / 16 | 2 / 0.8 | 3 / 30% | 35 / +3 | Physical damage ×0.5; elemental damage stays normal. |
+| CrateOrc | 18 / 28 | 2.2 / 0.7 | 5 / 25% | 50 / +3 | A confirmed death releases exactly two individual Orclings. |
+| RageOrc | 28 / 40 | 3.5 / 0.8 | 7 / 30% | 80 / +4 | First surviving hit to ≤50% HP permanently multiplies speed by 1.6. |
+| MossOrc | 52 / 66 | 6 / 0.55 | 12 / 20% | 120 / +5 | Regenerates 8% of maximum HP every four simulation seconds. |
+
+Crate children inherit the captured parent route/current progress, start fresh at birth, keep ordinary Orcling rewards, and prevent clearance. Tower kills award the crate bounty once; collateral death releases children without awarding the player; leaks release none. Combined summon/death-child graphs reject missing references, boss children, and cycles.
+
+Rage composes with slows and casting restrictions without multiplying twice or reverting after healing. Its accepted flag selects the faster `walk_enraged` artwork; changing speed cannot rewrite earlier movement in the same tick. Moss heals only itself, rounds each heal up, caps at maximum HP, never resurrects, and uses a birth-relative simulation clock. Its green action pose marks actual healing; pause/playback affect its clock normally.
+
+## First boss kill loot
+
+Each player earns one bonus for the **first tower-owned kill of each boss type in a run**. The host rolls independently using the same authored rarity weights as tower placement, then immediately credits both currencies. Ordinary bounty/Shard drops still apply separately. Repeated encounters, leaks, collateral deaths, and Sandbox cannot claim the bonus or consume its RNG. Debug round jumps preserve claims; a new run resets them. Rewards are run-only, not lifetime progression.
+
+| Tier | Weight | Base Coins | Base Shards |
+| --- | ---: | ---: | ---: |
+| Broken | 8 | 50 | 1 |
+| Shoddy | 13 | 80 | 2 |
+| Common | 35 | 140 | 4 |
+| Uncommon | 26 | 240 | 7 |
+| Rare | 12 | 420 | 12 |
+| Epic | 4.5 | 800 | 22 |
+| Legendary | 1.3 | 1600 | 40 |
+| Mythic | 0.2 | 4000 | 100 |
+
+Multiply each base payout by `max(1, kill_round / 40)` and round upward once. Later bosses are worth more without making higher tiers less rare. `resources/combat/boss_rewards.tres` owns payouts and references the existing tower rarity resource for odds, rather than maintaining a second set.
+
+The existing sound-backed reel shows each tier's scaled payout and the accepted winning total. **Click or Enter skips spinning straight to that result**, for both boss loot and tower rerolls. It cannot alter the roll or grant again. Multiple awards queue behind the shared tower reel; pause/results defer presentation, leaving clears it, and snapshots never replay a seen award. Multiplayer continues while the local overlay is open.
+
+
 ## Late-game bosses
 
 All boss identities are barred from paid sends by the host, independently of their authored send flag. Each type reserves at most one encounter at its guaranteed debut, then rolls its own occasional later encounter; total weight/share rules still apply. Both new bosses are available directly in Sandbox and have debut-scaled Orcieary entries. Numeric balance below is provisional until real friend playtests.
@@ -88,7 +123,7 @@ Movement no longer gains a fixed 0.15 cells/second every round. `CombatRules.spe
 
 ## Presentation
 
-All ten enemies use elevated three-quarter pixel art with distinct faces/anatomy and authored walk/death animations. Chief healing and both NecOrcmancer tiers have separate action poses. The basic **Orc** uses the creator-approved 64×64 GameLab design, losslessly padded onto its existing 80×80 frame canvas; local cutout articulation preserves its face, clothing and cleaver without claiming unseen anatomy. `archive_assets/enemies/grunt/gamelab-20261018/derive_runtime.py` reproduces it, with sources, previous artwork and derivations archived beside it. `tools/author_enemy_sprites.py` preserves that Orc and reproduces the remaining six original enemy sheets/stills. `tools/author_necorcmancer_mancer.py` authors the round-40 boss; `tools/author_late_bosses.py` authors Trollorc and Orchine, including crew/king, weapons, doors, wheel/leg jump transitions and damaged phases. Fixed canvases/foot anchors and frame-zero stills remain shared. Per-enemy JSON records provenance, bounds and hashes. The Orc replacement retains gameplay stats/timing; no external generator or paid credits were used for the late bosses. Native GPU/performance and physical input feel remain unverified.
+All fourteen enemies use elevated three-quarter pixel art with distinct silhouettes and authored walk/death animations. The approved GameLab Orc and existing boss artwork remain unchanged. `tools/author_variety_enemies.py` reproducibly authors the four new 80×80 hard-alpha sheets/stills, twelve-frame walks/deaths, Rage's faster `walk_enraged`, and Moss's 0.55-second heal action. Existing generators and archived source provenance remain the owners of earlier enemies. Fixed foot anchors and frame-zero stills are shared by battlefield/guide picking and rendering; per-enemy JSON records bounds and hashes. No paid service or external generator was used for the four new enemies.
 Every enemy has an authored collapse/debris animation: the original roster uses 0.8 seconds, while the two late bosses use weightier 1.2-second, twelve-frame collapses. Living Orcs/Trollorc leave a small dark-red blood splatter; SkeleOrcs scatter into bloodless bones and Orchine breaks into bloodless debris. The host publishes short-lived, uniquely numbered confirmed deaths; clients cannot manufacture damage, rewards, or new living enemies from them. Fallen bodies/effects fade and are never selectable or targetable. Repeated snapshots cannot replay expired deaths. Playback respects simulation speed and explicit pause, but the final death can finish after wave clearance. Debug/map resets invalidate stale-coordinate effects.
 
 ## Orcieary and lifetime records

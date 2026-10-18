@@ -47,6 +47,8 @@ var _reroll_balance: Label
 var _rarity_reel: RarityReel
 var _pending_rarity_id: int = -1
 var _pending_rarity_count: int = -1
+var _queued_rarity_tower: Dictionary = {}
+var _boss_rewards := BossRewardPresenter.new()
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -287,7 +289,7 @@ func _build_currencies() -> void:
 func _reroll(kind: String) -> void:
 	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
 	var tower: Dictionary = _selected_tower()
-	if planning == null or not button.is_visible_in_tree() or button.disabled or tower.is_empty() or _rarity_reel.is_busy() or _pending_rarity_id >= 0:
+	if planning == null or not button.is_visible_in_tree() or button.disabled or tower.is_empty() or _rarity_reel.is_busy() or _pending_rarity_id >= 0 or not _queued_rarity_tower.is_empty():
 		return
 	if kind == "rarity":
 		_pending_rarity_id = selected_tower_id
@@ -306,17 +308,51 @@ func _observe_rarity_reroll() -> void:
 			continue
 		if int(tower["rarity_rerolls"]) > _pending_rarity_count:
 			_pending_rarity_id = -1
-			cancel_strokes()
-			world.set_input_blocked(true)
-			var button: TowerShopButton = shop_buttons[StringName(tower["type_id"])]
-			_rarity_reel.present(tower, button.tower_artwork)
+			_queued_rarity_tower = tower.duplicate(true)
 		return
 	_pending_rarity_id = -1
 
 
 func _rarity_reel_finished() -> void:
-	world.set_input_blocked(pause_menu.visible or debug_popup.visible or results_menu.visible)
-	_refresh()
+	world.set_input_blocked(pause_menu.visible or debug_popup.visible or results_menu.visible or _rarity_reel.is_busy())
+	_refresh.call_deferred()
+
+
+func _reset_rarity_presentation() -> void:
+	_pending_rarity_id = -1
+	_pending_rarity_count = -1
+	_queued_rarity_tower.clear()
+	_rarity_reel.cancel()
+
+
+func _clear_reel_presentations() -> void:
+	_boss_rewards.clear()
+	_reset_rarity_presentation()
+
+
+func _present_pending_reel() -> void:
+	if planning == null or not planning.active or not is_visible_in_tree():
+		return
+	var blocked: bool = pause_menu.visible or debug_popup.visible or results_menu.visible
+	_rarity_reel.set_suspended(blocked)
+	if not blocked and not _rarity_reel.is_busy():
+		if not _queued_rarity_tower.is_empty():
+			var button: TowerShopButton = shop_buttons.get(StringName(_queued_rarity_tower["type_id"]))
+			_rarity_reel.present(_queued_rarity_tower, button.tower_artwork if button != null else null)
+			if _rarity_reel.is_busy():
+				_queued_rarity_tower.clear()
+		elif _pending_rarity_id < 0 and _boss_rewards.pending_count() > 0:
+			var artwork: Texture2D
+			var boss_id: StringName = _boss_rewards.next_boss_id()
+			for definition: EnemyDefinition in planning.combat_rules.catalog.enemies:
+				if definition.id == boss_id:
+					artwork = definition.texture
+					break
+			_boss_rewards.present_next(_rarity_reel, artwork)
+	if _rarity_reel.is_busy():
+		cancel_strokes()
+		enemy_selector.get_popup().hide()
+	world.set_input_blocked(blocked or _rarity_reel.is_busy())
 
 
 func cancel_strokes() -> void:
@@ -339,6 +375,7 @@ func open_pause_menu() -> void:
 	world.set_input_blocked(true)
 	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
 	pause_menu.open_menu(not planning.singleplayer)
+	_rarity_reel.set_suspended(true)
 	sound_player.set_combat_paused(planning.singleplayer)
 	_owns_tree_pause = planning.singleplayer
 	if _owns_tree_pause:
@@ -349,11 +386,13 @@ func _resume_match() -> void:
 	_close_pause_menu()
 	if is_visible_in_tree():
 		menu_button.grab_focus()
+	_present_pending_reel()
 
 
 func _quit_match() -> void:
 	_close_pause_menu()
 	_close_results()
+	_clear_reel_presentations()
 	leave_requested.emit()
 
 
@@ -364,7 +403,7 @@ func _close_pause_menu() -> void:
 	pause_menu.close_menu()
 	sound_player.set_combat_paused(false)
 	$HUD.process_mode = Node.PROCESS_MODE_INHERIT
-	world.set_input_blocked(false)
+	world.set_input_blocked(debug_popup.visible or results_menu.visible or _rarity_reel.is_busy())
 
 
 func _exit_tree() -> void:
@@ -377,8 +416,7 @@ func _visibility_changed() -> void:
 	if not is_node_ready():
 		return
 	if not is_visible_in_tree():
-		_pending_rarity_id = -1
-		_rarity_reel.cancel()
+		_clear_reel_presentations()
 		sound_player.deactivate()
 		debug_popup.hide()
 		_close_results()
@@ -407,6 +445,7 @@ func _open_debug() -> void:
 	debug_shards.value = int(planning.combat["reroll_currency"][planning.local_slot()])
 	world.set_input_blocked(true)
 	debug_popup.popup_centered()
+	_rarity_reel.set_suspended(true)
 	debug_round.get_line_edit().grab_focus()
 	debug_round.get_line_edit().select_all()
 
@@ -420,7 +459,8 @@ func _apply_debug() -> void:
 
 
 func _debug_closed() -> void:
-	world.set_input_blocked(pause_menu.visible)
+	world.set_input_blocked(pause_menu.visible or results_menu.visible or _rarity_reel.is_busy())
+	_refresh.call_deferred()
 
 
 func _debug_window_input(event: InputEvent) -> void:
@@ -949,7 +989,7 @@ func _refresh_action(button: Button, action: Dictionary) -> void:
 func _refresh_reroll(button: Button, tower: Dictionary, kind: String, balance: int) -> void:
 	var price: int = int(tower.get("rarity_reroll_cost" if kind == "rarity" else "attribute_reroll_cost", -1))
 	button.text = "%s · %s" % ["Reroll rarity" if kind == "rarity" else "Reroll attributes", ("%d Shards" if kind == "rarity" else "%d Coins") % price if price >= 0 else "Unavailable"]
-	button.disabled = targeting_button.disabled or price < 0 or balance < price or _pending_rarity_id >= 0 or _rarity_reel.is_busy()
+	button.disabled = targeting_button.disabled or price < 0 or balance < price or _pending_rarity_id >= 0 or not _queued_rarity_tower.is_empty() or _rarity_reel.is_busy()
 	button.tooltip_text = reroll_tooltip(kind)
 	if balance < price:
 		button.tooltip_text += "\nNeed %d more %s." % [price - balance, "Shards" if kind == "rarity" else "Coins"]
@@ -1300,6 +1340,7 @@ func _refresh() -> void:
 	if not debug_button.visible:
 		debug_popup.hide()
 	if planning == null:
+		_clear_reel_presentations()
 		world.set_active(false)
 		cancel_strokes()
 		_clear_feedback()
@@ -1315,10 +1356,11 @@ func _refresh() -> void:
 		_status.text = "Planning unavailable"
 		return
 	var own_slot: int = planning.local_slot()
-	if not planning.active or not is_visible_in_tree() or int(planning.combat.get("phase", -1)) == MatchCombat.Phase.FINISHED:
-		_pending_rarity_id = -1
-		_rarity_reel.cancel()
+	if not planning.active or not is_visible_in_tree():
+		_clear_reel_presentations()
 	else:
+		if _boss_rewards.observe(planning.combat, own_slot):
+			_reset_rarity_presentation()
 		_observe_rarity_reroll()
 	for slot: int in range(boards.size()):
 		boards[slot].layout = planning.layouts[slot]
@@ -1425,6 +1467,7 @@ func _refresh() -> void:
 	elif is_visible_in_tree() and _results_run_id != String(state.get("statistics_id","")):
 		_results_run_id = state.get("statistics_id","")
 		open_results()
+	_present_pending_reel()
 
 
 func open_results() -> void:
@@ -1440,6 +1483,7 @@ func open_results() -> void:
 	world.set_input_blocked(true)
 	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
 	results_menu.open_result(planning.combat,planning.local_slot(),planning.singleplayer)
+	_rarity_reel.set_suspended(true)
 
 
 func _close_results() -> void:
@@ -1447,18 +1491,20 @@ func _close_results() -> void:
 		return
 	results_menu.hide()
 	$HUD.process_mode = Node.PROCESS_MODE_INHERIT
-	world.set_input_blocked(false)
+	world.set_input_blocked(pause_menu.visible or debug_popup.visible or _rarity_reel.is_busy())
 
 
 func _inspect_results() -> void:
 	_close_results()
 	menu_button.grab_focus()
+	_present_pending_reel()
 
 
 func _replay_results() -> void:
 	if planning == null or not planning.singleplayer or int(planning.combat.get("phase",-1)) != MatchCombat.Phase.FINISHED:
 		return
 	_close_results()
+	_clear_reel_presentations()
 	world.set_active(false)
 	planning.start_singleplayer()
 	ready_button.grab_focus()
@@ -1480,6 +1526,7 @@ func _show_feedback(message: String) -> void:
 	_feedback.show()
 	_feedback_timer.start()
 	_refresh_targeting()
+	_refresh.call_deferred()
 
 
 func _clear_feedback() -> void:
