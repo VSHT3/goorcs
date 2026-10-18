@@ -150,6 +150,13 @@ func _execute_command(command: Dictionary) -> void:
 					enemy["base_speed"] = 1.0 if index == 0 else 0.0
 					enemy["speed"] = enemy["base_speed"]
 				planning._publish_snapshot()
+		"ballista_reload":
+			if _session.is_host:
+				planning._host_combat.towers[0][0]["cooldown"] = float(command["seconds"])
+				planning._publish_snapshot()
+		"ballista_targeting":
+			if _session.is_host:
+				planning.set_targeting(0, int(planning._host_combat.towers[0][0]["id"]), int(command["mode"]))
 		"ballista_target_state":
 			if _session.is_host:
 				var model: MatchCombat = planning._host_combat
@@ -169,6 +176,9 @@ func _execute_command(command: Dictionary) -> void:
 						"absent":
 							model.enemies[0].remove_at(index)
 					break
+				if String(command["state"]) == "none":
+					model.enemies[0].clear()
+				model._update_tracking_target(0, model.towers[0][0])
 				planning._publish_snapshot()
 		"ballista_probe":
 			_ballista_probe = {"ballista_probe": int(command["id"]), "ballista_views": _observe_ballista_boards()}
@@ -295,6 +305,8 @@ func _observe_ballista_boards() -> Array:
 			"trace_origin": str(board._projectile_origin(traces[0])) if not traces.is_empty() else "",
 			"trace_aim": str(traces[0]["aim"]) if not traces.is_empty() else "",
 			"target_id": tower["target_id"],
+			"tracking_target_id": tower["tracking_target_id"],
+			"tracking_aim": str(tower["tracking_aim"]),
 			"shot": tower["shot"],
 		})
 	return views

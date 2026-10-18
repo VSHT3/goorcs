@@ -49,8 +49,10 @@ func _run() -> void:
 	var placed_id: int = screen.selected_tower_id
 	_check(screen._management.visible, "Selected tower opens fixed management overlay")
 	screen._upgrade_buttons["damage"].pressed.emit()
+	_check(not screen._upgrade_buttons["damage"].visible and screen._upgrade_buttons["speed"].visible and not screen._upgrade_buttons["speed"].disabled, "Sandbox hides the purchased stat while retaining its available sibling")
 	screen._upgrade_buttons["speed"].pressed.emit()
 	_check(screen.controller.combat.towers[0][0]["damage_upgraded"] and screen.controller.combat.towers[0][0]["speed_upgraded"], "Upgrade controls call real owner with no currency gate")
+	_check(not screen._upgrade_buttons["damage"].visible and not screen._upgrade_buttons["speed"].visible, "Sandbox removes both purchased base upgrades from inspection")
 	for direction: int in [1, -1]:
 		var expected_modes: Array = [MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.FURTHEST] if direction == 1 else [MatchCombat.TargetMode.STRONGEST, MatchCombat.TargetMode.CLOSEST, MatchCombat.TargetMode.LAST, MatchCombat.TargetMode.FURTHEST]
 		for expected: int in expected_modes:
@@ -178,7 +180,7 @@ func _check_advancement_controls() -> void:
 			await _press_cycle_button(button)
 			var accepted: Dictionary = screen.controller.state["towers"][0][0]
 			_check(accepted["advancement"] == command and accepted["advancement_path"].has(command), "Native branch control reaches the accepted advancement and history")
-			_check(screen.advancement_buttons[command].disabled, "Purchased current node is shown as owned")
+			_check(not screen.advancement_buttons[command].is_visible_in_tree(), "Purchased advancement disappears while the next eligible purchase remains available")
 		_check(not screen.secondary_targeting.is_visible_in_tree(), "Single-weapon terminal branches hide secondary and extra selectors")
 		for selector: TargetingCycle in screen.extra_targeting:
 			_check(not selector.is_visible_in_tree(), "No obsolete multi-archer selector remains on a terminal operator")

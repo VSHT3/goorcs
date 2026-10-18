@@ -62,6 +62,7 @@ func _run() -> void:
 	for index: int in range(8):
 		var aimed: Dictionary = ballista.duplicate(true)
 		aimed["tower"]["aim"] = Vector2(aimed["tower"]["cell"]) + Vector2.from_angle(-PI * 0.5 + float(index) * PI * 0.25)
+		aimed["tower"]["tracking_aim"] = aimed["tower"]["aim"]
 		portrait.configure(aimed)
 		var pose: Image = await _capture()
 		var bounds: Rect2i = pose.get_used_rect()

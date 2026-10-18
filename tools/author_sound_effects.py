@@ -165,6 +165,7 @@ FAMILIES = {
     "upgrade": (0.325, 0.25, 0.0, 1, "rising three-part material resonance, affirmative not a fanfare"),
     "reject": (0.105, 0.20, 0.0, 1, "restrained low double latch click, no buzzer or alarm"),
     "menu_click": (0.115, 0.16, 0.0, 1, "muted single woody clack with a short dull metal edge; no pitched reward or rejection"),
+    "sale": (0.310, 0.23, 0.0, 1, "three bright falling coin contacts into a muted cash drawer"),
 }
 
 
@@ -242,6 +243,12 @@ def recipe(kind: str, variant: int, duration: float, seed: int) -> Sound:
         s.modes(0.002, 0.156, 0.27, (2280, 3680, 5940), 0.027, 0.62)
         s.modes(0.037, 0.110, 0.105, (1760, 2910, 4730), 0.020, 0.57)
         s.noise(0.037, 0.016, 0.24, 2300, 7500, 0.003)
+    elif kind == "sale":
+        for at, frequency, gain in ((0.002, 3100, 0.30), (0.052, 2540, 0.25), (0.112, 1980, 0.19)):
+            s.noise(at, 0.013, gain, 1900, 8200, 0.0026)
+            s.modes(at, 0.160, gain, (frequency, frequency * 1.61, frequency * 2.60), 0.033, 0.61)
+        s.noise(0.163, 0.100, 0.26, 160, 1600, 0.017, 0.002)
+        s.modes(0.163, 0.120, 0.17, (184, 397, 811), 0.020, 0.42)
     elif kind == "upgrade":
         for at, frequency, gain in ((0.002, 610, 0.23), (0.066, 813, 0.25), (0.131, 1025, 0.26)):
             s.modes(at, 0.185, gain, (frequency, frequency * 2.72, frequency * 4.14), 0.042, 0.49)

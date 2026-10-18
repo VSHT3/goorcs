@@ -20,10 +20,11 @@ const STREAMS: Array = [
 	[preload("res://assets/audio/sfx/upgrade_01.wav")],
 	[preload("res://assets/audio/sfx/portal_01.wav"), preload("res://assets/audio/sfx/portal_02.wav")],
 	[preload("res://assets/audio/sfx/reject_01.wav")],
+	[preload("res://assets/audio/sfx/sale_01.wav")],
 ]
-const GAINS_DB: Array[float] = [-7.0, -5.0, -8.0, -7.0, -11.0, -9.0, -9.0, -8.0, -4.0, -3.0, -3.0, -8.0, -4.0]
-const GAPS_MSEC: Array[int] = [75, 100, 150, 140, 110, 170, 170, 220, 180, 65, 100, 160, 180]
-const PRIORITY: Array[int] = [30, 35, 40, 60, 10, 45, 45, 25, 100, 100, 100, 100, 100]
+const GAINS_DB: Array[float] = [-7.0, -5.0, -8.0, -7.0, -11.0, -9.0, -9.0, -8.0, -4.0, -3.0, -3.0, -8.0, -4.0, -3.0]
+const GAPS_MSEC: Array[int] = [75, 100, 150, 140, 110, 170, 170, 220, 180, 65, 100, 160, 180, 65]
+const PRIORITY: Array[int] = [30, 35, 40, 60, 10, 45, 45, 25, 100, 100, 100, 100, 100, 100]
 
 var world: MatchWorld
 var _world_players: Array[AudioStreamPlayer2D] = []
@@ -110,7 +111,7 @@ func observe(state: Dictionary, own_slot: int, active: bool, combat_paused: bool
 			_candidates[cue] = {"id": id, "gain": gain, "point": point}
 	_last_id = maxi(_last_id, latest)
 	# Prioritize urgent feedback before disposable contacts; no audio backlog.
-	for cue: int in [Cues.CRYSTAL, Cues.PURCHASE, Cues.UPGRADE, Cues.SEND, Cues.EXPLOSION, Cues.DEATH, Cues.BONES, Cues.RUNE, Cues.BALLISTA, Cues.BOW, Cues.PORTAL, Cues.HIT]:
+	for cue: int in [Cues.CRYSTAL, Cues.SALE, Cues.PURCHASE, Cues.UPGRADE, Cues.SEND, Cues.EXPLOSION, Cues.DEATH, Cues.BONES, Cues.RUNE, Cues.BALLISTA, Cues.BOW, Cues.PORTAL, Cues.HIT]:
 		var candidate: Dictionary = _candidates[cue]
 		if candidate.is_empty():
 			continue

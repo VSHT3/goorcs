@@ -2,7 +2,7 @@ class_name CombatSoundEvents
 extends RefCounted
 ## Host-owned cosmetic facts. Dropping/coalescing cues never changes combat.
 
-enum Cue { BOW, BALLISTA, RUNE, EXPLOSION, HIT, DEATH, BONES, PORTAL, CRYSTAL, PURCHASE, UPGRADE, SEND, REJECT }
+enum Cue { BOW, BALLISTA, RUNE, EXPLOSION, HIT, DEATH, BONES, PORTAL, CRYSTAL, PURCHASE, UPGRADE, SEND, REJECT, SALE }
 
 const CAPACITY: int = 128
 const LIFETIME: float = 1.2

@@ -35,7 +35,6 @@ var fourth_targeting: TargetingCycle
 var advancement_buttons: Dictionary[String, Button] = {}
 var extra_targeting: Array[TargetingCycle] = []
 var play_button: Button
-var build_another_button: Button
 var restart_button: Button
 var speed_selector: OptionButton
 var wave_button: Button
@@ -261,7 +260,6 @@ func _build_management() -> void:
 	_tower_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_tower_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	CloseButtonStyle.apply(_button(heading, "X", cancel_interaction))
-	build_another_button = _button(shell, "Build another [B]", _build_another)
 	var scroll := ScrollContainer.new()
 	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -538,8 +536,9 @@ func _tower_drag_started(_type_id: StringName) -> void:
 
 
 func _sell() -> void:
-	controller.sell(selected_tower_id)
-	cancel_interaction()
+	if _active and _management.is_visible_in_tree() and not _find(controller.state["towers"][0], selected_tower_id).is_empty():
+		controller.sell(selected_tower_id)
+		cancel_interaction()
 
 
 func _refresh() -> void:
@@ -569,7 +568,7 @@ func _refresh() -> void:
 	restart_button.disabled = not _active or not controller.can_restart()
 	speed_selector.disabled = not _active
 	speed_selector.select(SPEEDS.find(controller.speed))
-	_status.text = "%s · Alive %d" % [("Paused" if controller.paused else "Running") if running else "Editing", state["enemies"][0].size()]
+	_status.text = ("Paused" if controller.paused else "Running") if running else "Editing"
 	_status.tooltip_text = "%d path tiles · Unlimited tiles · %d × %d map" % [controller.layout.used_tiles(), controller.layout.dimensions.x, controller.layout.dimensions.y]
 	clear_button.disabled = running or controller.layout.used_tiles() == 0
 	_refresh_management(state)
@@ -590,13 +589,13 @@ func _find(items: Array, id: int) -> Dictionary:
 func _refresh_management(state: Dictionary) -> void:
 	var tower: Dictionary = _find(state["towers"][0], selected_tower_id)
 	_management.visible = not tower.is_empty()
-	var palette_button: TowerShopButton = shop_buttons.get(StringName(tower.get("type_id", "")))
-	build_another_button.disabled = not _active or tower.is_empty() or palette_button == null or not palette_button.is_visible_in_tree() or palette_button.disabled
 	if tower.is_empty():
 		selected_tower_id = -1
+		board.selected_tower_id = -1
 		return
 	var stats: Dictionary = state["tower_types"][tower["type_id"]]
 	_tower_title.text = MatchPlanningScreen.tower_display_title(tower, stats)
+	_tower_title.add_theme_color_override("font_color", MatchPlanningScreen.tower_rarity_color(tower))
 	_tower_stats.text = MatchPlanningScreen.tower_stats_text(tower, stats)
 	_roll_details.text = MatchPlanningScreen.roll_details_text(tower)
 	rarity_reroll.disabled = not _active or int(tower.get("rarity_reroll_cost", -1)) < 0
@@ -633,7 +632,7 @@ func _refresh_management(state: Dictionary) -> void:
 		if not available.has(command):
 			continue
 		var action: Dictionary = available[command]
-		button.text = "%s\n%s" % [action["title"], "Owned" if action["purchased"] else ("Locked" if action["locked"] else "Free")]
+		button.text = "%s\n%s" % [action["title"], "Locked" if action["locked"] else "Free"]
 		button.disabled = not _active or not _advancement_row.visible or action["purchased"] or action["locked"]
 		button.tooltip_text = String(action["description"]) + "\nFree in Sandbox; normal price %d Coins." % int(action["cost"])
 	var commands: Dictionary = MatchPlanningScreen.tower_upgrade_actions(tower, stats)
@@ -647,8 +646,8 @@ func _refresh_management(state: Dictionary) -> void:
 			_upgrade_buttons[command].add_theme_font_size_override("font_size", 16)
 		var details: Dictionary = commands[command]
 		var button: Button = _upgrade_buttons[command]
-		button.show()
-		button.text = "%s · %s" % [details["title"], "Purchased" if details["purchased"] else ("Locked" if details["locked"] else "Free")]
+		button.visible = not bool(details["purchased"])
+		button.text = "%s · %s" % [details["title"], "Locked" if details["locked"] else "Free"]
 		button.disabled = not _active or details["purchased"] or details["locked"]
 		button.tooltip_text = String(details["description"]) + "\nFree in Sandbox; normal prerequisites apply. Sell and rebuild to choose another permanent branch."
 
@@ -711,6 +710,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if popup.visible:
 			return
 	if not event is InputEventKey or not event.pressed or event.echo or event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
+		return
+	if event.keycode == KEY_BACKSPACE:
+		if _management.is_visible_in_tree() and not _find(controller.state["towers"][0], selected_tower_id).is_empty():
+			_sell()
+			get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_B:
 		if _build_another():

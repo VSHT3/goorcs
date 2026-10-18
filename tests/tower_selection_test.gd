@@ -76,16 +76,50 @@ func _run() -> void:
 	_check(screen.selected_tower_id == id and screen.get_node("%TowerManagement").visible, "Owned inspection opens management")
 	_check(screen.targeting_button.mode == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
 	_check(screen.boards[0].selected_tower_id == id and screen.boards[1].selected_tower_id == -1, "Range selection stays local to owned board")
+	main.planning.combat["rules"]["base_health"] = 140
+	main.planning.combat["health"] = [63, 17]
+	main.planning.changed.emit()
+	_check(screen._health_bar.max_value == 140 and screen._health_bar.value == 63, "Own health bar consumes accepted health and admitted maximum rather than local defaults or opponent health")
+	for accepted_health: int in [140, 90, 35, 7, 0, 140]:
+		main.planning.combat["health"] = [accepted_health, 140 - accepted_health]
+		main.planning.changed.emit()
+		_check(screen._health_bar.max_value == 140 and screen._health_bar.value == accepted_health, "Full, damaged, critical, depleted and restored health follow the accepted own-slot value")
+		_check(is_equal_approx(screen._health_bar.get_as_ratio(), float(accepted_health) / 140.0), "Health fill ratio uses the accepted maximum throughout damage and restoration")
+	main.planning.combat["rules"]["base_health"] = 80
+	main.planning.combat["health"] = [20, 79]
+	main.planning.changed.emit()
+	_check(screen._health_bar.max_value == 80 and screen._health_bar.value == 20 and is_equal_approx(screen._health_bar.get_as_ratio(), 0.25), "A changed accepted maximum immediately remaps the own health ratio without using opponent health")
+	main.planning.combat["rules"]["base_health"] = 0
+	main.planning.combat["health"] = [0, 79]
+	main.planning.changed.emit()
+	_check(screen._health_bar.value == 0 and screen._health_bar.get_as_ratio() == 0.0, "A zero accepted maximum renders an empty finite health display")
+	main.planning.combat["rules"]["base_health"] = 140
+	main.planning.combat["health"] = [63, 17]
+	var accepted_health_state: Dictionary = main.planning.combat.duplicate(true)
+	main.planning.changed.emit()
+	screen._refresh()
+	_check(main.planning.combat == accepted_health_state and screen._health_bar.max_value == 140 and screen._health_bar.value == 63, "Repeated health refresh neither mutates accepted health nor retains a previous maximum")
+	var rarity_colors: Array[Color] = []
+	for rarity: String in TowerRollRules.RARITIES:
+		var color: Color = MatchPlanningScreen.tower_rarity_color({"rarity": rarity})
+		_check(not rarity_colors.has(color), "Every accepted rarity has a distinct static title color")
+		rarity_colors.append(color)
 	_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible and screen.damage_upgrade.visible and screen.speed_upgrade.visible, "Evolution choices are hidden until both stat upgrades")
 	var definition: Dictionary = main.planning.combat["tower_types"]["orc_ballista"]
 	_check(model.upgrade_tower(0, id, "damage"), "First real stat upgrade succeeds")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
-	_check(not screen.special_upgrade.visible and screen.speed_upgrade.visible, "Special stays hidden until both stat upgrades are purchased")
+	_check(not screen.special_upgrade.visible and not screen.damage_upgrade.visible and screen.speed_upgrade.visible and not screen.speed_upgrade.disabled, "Purchasing one stat hides only that upgrade and preserves its unpurchased sibling")
 	_check(model.upgrade_tower(0, id, "speed"), "Second real stat upgrade succeeds")
 	model.towers[0][0]["kills"] = 7
+	model.towers[0][0]["damage_dealt"] = 12345
+	model.towers[0][0]["coins_generated"] = 456
+	model.towers[0][0]["indirect_damage"] = 789
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
+	var accepted_counters: Dictionary = model.snapshot()
+	screen._refresh()
+	_check(model.snapshot() == accepted_counters, "Repeated inspection refresh cannot reset kills or other lifetime statistics")
 	_check(screen.damage_upgrade.disabled and screen.speed_upgrade.disabled, "Purchased upgrades cannot be bought twice in management")
 	_check(screen.special_upgrade.visible and screen.alternate_upgrade.visible and not screen.damage_upgrade.visible and not screen.speed_upgrade.visible and not screen.special_upgrade.disabled and not screen.alternate_upgrade.disabled, "Both purchased Ballista stats expose two affordable evolution choices")
 	var pierce_price: int = int(definition["evolutions"]["pierce"]["cost"])
@@ -97,7 +131,7 @@ func _run() -> void:
 	_check(model.upgrade_tower(0, id, "pierce"), "Exact configured price buys Pierce")
 	main.planning.combat = model.snapshot()
 	main.planning.changed.emit()
-	_check(screen.special_upgrade.visible and screen.alternate_upgrade.visible and screen.special_upgrade.disabled and screen.alternate_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased Ballista evolution keeps both exclusive choices visible and disabled")
+	_check(screen._special_upgrade_command != "pierce" and screen._alternate_upgrade_command != "pierce" and not screen.alternate_upgrade.visible and screen.special_upgrade.disabled and MatchCombat.tower_level(model.towers[0][0]) == 4, "Purchased evolution disappears while its excluded sibling remains unavailable")
 	screen.close_button.pressed.emit()
 	_check(screen.selected_tower_id == -1 and model.towers[0].size() == 1, "Close clears selection without selling")
 	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
@@ -214,11 +248,11 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 			var evolved: Dictionary = model.towers[slot][0]
 			_check(evolved.get("evolution", "") == evolution and evolved["special_upgraded"] and MatchCombat.tower_level(evolved) == 4 and model.coins[slot] == 0, "Each native Ballista button buys its own branch with exact funds on both solo boards")
 			_check(evolved["damage"] == damage_before and is_equal_approx(float(evolved["interval"]), interval_before), "Ballista branches preserve current upgraded attack stats")
-		_check(chosen.visible and other.visible and chosen.disabled and other.disabled, "Purchased and excluded Ballista branches remain visible and unavailable")
+		_check(screen._special_upgrade_command != evolution and screen._alternate_upgrade_command != evolution, "Purchased Ballista branch is absent from remaining controls")
 		_check(screen._tower_stats.text == stats_before, "Ballista evolutions preserve ordinary attack-stat presentation")
 		model.coins = [2000, 2000]
 		planning._publish_snapshot()
-		_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
+		_check(screen.special_upgrade.disabled and not screen.alternate_upgrade.is_visible_in_tree(), "Funded Ballista still exposes no enabled repeat or alternate branch purchase")
 		frozen = planning.combat.duplicate(true)
 		chosen.pressed.emit()
 		other.pressed.emit()
@@ -298,7 +332,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		if evolution == "boulders":
 			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes", "Purchased Boulders replaces branch purchases with its reachable follow-up")
 		else:
-			_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Purchased Onyx leaves both exclusive branch purchases visibly unavailable")
+			_check(screen._special_upgrade_command != evolution and screen._alternate_upgrade_command != evolution and not chosen.is_visible_in_tree() and screen.special_upgrade.disabled, "Purchased Onyx is hidden and the excluded branch cannot be bought")
 		frozen = planning.combat.duplicate(true)
 		chosen.pressed.emit()
 		other.pressed.emit()
@@ -311,7 +345,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		if evolution == "boulders":
 			_check(screen.special_upgrade.is_visible_in_tree() and not screen.alternate_upgrade.is_visible_in_tree() and screen._special_upgrade_command == "freeze_runes" and not screen.special_upgrade.disabled, "Funded Boulders exposes only its legitimate follow-up, not a repeat or branch switch")
 		else:
-			_check(chosen.is_visible_in_tree() and other.is_visible_in_tree() and chosen.disabled and other.disabled, "Funded Onyx exposes no enabled repeat or alternate branch purchase")
+			_check(not chosen.is_visible_in_tree() and screen.special_upgrade.disabled, "Funded Onyx exposes no enabled repeat or alternate branch purchase")
 			chosen.pressed.emit()
 			other.pressed.emit()
 		for command: String in ["boulders", "onyx_ring", "special"]:
@@ -345,11 +379,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			screen.special_upgrade.pressed.emit()
 			for slot: int in range(2):
 				_check(model.towers[slot][0].get("freeze_upgraded", false) and MatchCombat.tower_level(model.towers[slot][0]) == 5 and model.coins[slot] == 0, "Follow-up button dispatches its real command and reaches level V on both solo boards")
-			_check(screen.special_upgrade.disabled and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up stays visible without changing continuous damage stats or reviving Onyx")
-			_check(screen._tower_title.text.ends_with(MatchPlanningScreen.TOWER_LEVEL_NUMERALS[4]), "Management displays the accepted fifth tower level")
-			await process_frame
-			var row: Control = screen.special_upgrade.get_parent()
-			_check(is_equal_approx(screen.special_upgrade.size.x, row.size.x), "Boulders follow-up uses the entire existing upgrade row")
+			_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up disappears without changing continuous damage stats or reviving Onyx")
 			frozen = planning.combat.duplicate(true)
 			screen.special_upgrade.pressed.emit()
 			planning.upgrade_tower(0, id, "freeze_runes")
@@ -401,7 +431,6 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 		var choices: Dictionary = planning.combat["tower_types"]["arrow_tower"]["advancements"]
 		var price: int = int(choices[branch]["cost"])
 		var chosen: Button = screen.advancement_buttons[branch]
-		_check(chosen.text.contains(str(price)), "Arrow button shows the accepted host resource price")
 		model.coins = [price - 1, price - 1]
 		planning._publish_snapshot()
 		_check(chosen.disabled, "Arrow path affordability uses the accepted exact price")
@@ -692,6 +721,8 @@ func _press_cycle_button(button: Button) -> void:
 
 func _check_send_visibility(main: Control, screen: MatchPlanningScreen) -> void:
 	var rules: CombatRules = main.combat_rules.duplicate() as CombatRules
+	# Keep the bounded terminal-visibility scenario independent of starting-health balance.
+	rules.base_health = 10
 	rules.catalog = rules.catalog.duplicate(true) as ContentCatalog
 	for enemy: EnemyDefinition in rules.catalog.enemies:
 		enemy.send_first_wave = 1

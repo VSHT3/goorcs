@@ -903,9 +903,9 @@ func _directional_weapon_rect(artwork: TowerReward, foot: Vector2) -> Rect2:
 
 func _directional_weapon_index(tower: Dictionary, released: bool = false) -> int:
 	var cell := Vector2(tower["cell"])
-	var aim: Vector2 = tower.get("aim", cell)
+	var aim: Vector2 = tower.get("aim", cell) if released else tower.get("tracking_aim", cell)
 	if not released:
-		var target_id: int = int(tower.get("target_id", -1))
+		var target_id: int = int(tower.get("tracking_target_id", -1))
 		if _enemies_by_id.has(target_id):
 			var enemy: Dictionary = _enemies_by_id[target_id]
 			var range_cells: float = float(tower.get("range", 0.0))

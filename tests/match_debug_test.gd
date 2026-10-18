@@ -234,6 +234,8 @@ func _test_growth_and_retention() -> void:
 			expected["cell"] += Vector2i(0, expansions)
 			_check(_permanent_tower(planning.combat["towers"][slot][0]) == expected, "Jump growth reindexes existing towers once without changing any permanent upgrade")
 			_check(planning.combat["towers"][slot][0]["cell"] + Vector2i(0, planning.combat["board_origin_y"]) == original_towers[slot][0]["cell"], "Existing towers remain stationary in world space")
+			_check(planning.combat["towers"][slot][0]["tracking_aim"] + Vector2(0, planning.combat["board_origin_y"]) == original_towers[slot][0]["tracking_aim"],
+				"Growth reindexes accepted tracking aim with the tower so un-aimed rests and world-space aim remain unchanged")
 			for index: int in range(original_route.size()):
 				_check(planning.layouts[slot].route[index] + Vector2i(0, planning.combat["board_origin_y"]) == original_route[index], "Every retained path cell stays stationary in world space")
 		var grown: Dictionary = planning._snapshot().duplicate(true)

@@ -64,6 +64,10 @@ func _test_accepted_gameplay() -> void:
 		model.advance(0.8)
 		var cues: Array[int] = _cues(model)
 		_check(cues.has(entry[1]) and cues.has(C.HIT) and cues.has(C.DEATH),"Actual "+String(entry[0])+" attack and lethal damage emit its own shot family, contact and death")
+		var sold_id: int = model.towers[0][0]["id"]
+		_check(model.sell_tower(0, sold_id) and _cues(model).back() == C.SALE, "Accepted sale emits its distinct cash acknowledgement")
+		before = model.snapshot()
+		_check(not model.sell_tower(0, sold_id) and model.snapshot() == before, "Rejected repeat sale emits no cash cue or accepted state change")
 	var model := MatchCombat.new(_rules())
 	model.build(0,Vector2i(1,3),&"arrow_tower",0)
 	var id: int = model.towers[0][0]["id"]
@@ -127,6 +131,21 @@ func _test_local_playback() -> void:
 	_check(not player._ui_players.any(func(voice:AudioStreamPlayer)->bool:return voice.playing) and not player._active,"Leaving stops all actual playback and retires event identity")
 	player.observe(model.snapshot(),0,true)
 	_check(player._ui_cursor==1 and player._last_id==model.snapshot()["sounds"]["last_id"],"Returning to an existing state establishes a silent baseline rather than replaying combat history")
+	var sold_id: int = model.towers[0][0]["id"]
+	_check(model.sell_tower(0, sold_id), "Playback fixture sells an actual accepted tower")
+	player.observe(model.snapshot(), 0, true)
+	_check(player._ui_cursor == 2 and player._ui_players[1].playing and player._ui_players[1].stream == GameSoundPlayer.STREAMS[C.SALE][0] and player._ui_players[1].bus == &"Sound", "Sale cash uses the distinct stream and existing user-controlled Sound bus")
+	player._next_allowed.fill(0)
+	player.observe(model.snapshot(), 0, true)
+	_check(player._ui_cursor == 2, "Repeated sale snapshot never repeats cash")
+	audio.set_sound_volume(0.0)
+	model.build(0, Vector2i(2, 3), &"arrow_tower", 0)
+	model.sell_tower(0, model.towers[0][0]["id"])
+	player.observe(model.snapshot(), 0, true)
+	_check(player._ui_cursor == 2, "Muted sale is consumed without starting cash playback")
+	audio.set_sound_volume(1.0)
+	player.observe(model.snapshot(), 0, true)
+	_check(player._ui_cursor == 2, "Unmuting never replays a muted sale")
 	player.queue_free()
 	audio.set_sound_volume(original)
 	await process_frame

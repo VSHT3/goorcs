@@ -130,6 +130,7 @@ func _fire() -> void:
 	tower["cooldown"] = 0.0
 	model._attack(0,0.01)
 	check(enemy["hp"]==94 and enemy["burning"],"Both physical arrows hit while ignition grants no instant burn tick")
+	check(tower["damage_dealt"] == 6, "Both accepted projectile hits contribute actual HP once")
 	tower["cooldown"] = 100.0
 	model.advance(0.25)
 	check(enemy["hp"]==93,"Burn integrates exactly four damage per simulation second")
@@ -142,6 +143,7 @@ func _fire() -> void:
 	var before: int = model.coins[0]
 	model.advance(0.25)
 	check(model.enemies[0].is_empty() and tower["kills"]==1 and model.coins[0]==before+3 and not model.snapshot()["deaths"][0].is_empty(),"Burn kill after source sale retains attribution, bounty and confirmed corpse once")
+	check(tower["damage_dealt"] == 9, "Burn continues lifetime accounting after source sale and clips its lethal hit to one remaining HP")
 func _bombs() -> void:
 	var model: MatchCombat = prepared("bomb_arrows")
 	var tower: Dictionary = model.towers[0][0]
@@ -150,6 +152,7 @@ func _bombs() -> void:
 	var outside: Dictionary = spawn(model,&"grunt",Vector2(0.7,4.7))
 	model._attack_arrow(0,tower,primary["id"],primary["pos"],model.snapshot()["tower_types"]["arrow_tower"]["advancements"]["bomb_arrows"])
 	check(primary["hp"]==95 and near["hp"]==98 and outside["hp"]==100,"Bomb primary gets ceil1.5 damage, other true-radius victims ceilhalf, square-corner victim escapes")
+	check(tower["damage_dealt"] == 7, "Primary and true-radius splash contribute exactly their distinct removed HP")
 func _immunity() -> void:
 	var model: MatchCombat = prepared("fire_arrows")
 	var tower: Dictionary = model.towers[0][0]
@@ -261,6 +264,7 @@ func _flamethrower() -> void:
 		check(is_equal_approx(tower["continuous_fire_time"],1.0) and tower["firing"] and is_zero_approx(tower["refuel_remaining"]) and tower["shot"]==0 and tower["secondary_shot"]==0,"Sixty firing seconds, six locked refuel seconds, then one firing second produce no discrete arrows")
 		if reference<0: reference=hp
 		check(hp==reference,"Continuous fractional fire plus sustained burn is frame-step independent through refuel")
+		check(tower["damage_dealt"] == 100000 - hp, "Flame plus burn count every removed HP once through refuel at each simulation cadence")
 	var model: MatchCombat=flame_fixture()
 	var tower: Dictionary=model.towers[0][0]
 	model.advance(59.5)
@@ -295,6 +299,21 @@ func _flamethrower() -> void:
 	model.advance(60.0)
 	for tick: int in range(122): model.advance(0.05)
 	check(tower["refuel_remaining"]==0.0 and tower["firing"],"Fractional clock steps retire the refuel flag completely so the resumed flame can render")
+	for step: float in [0.01, 2.0]:
+		model = flame_fixture()
+		tower = model.towers[0][0]
+		enemy = model.enemies[0][0]
+		check(model.build(0, Vector2i(1, 3), &"gold_mine", 0), "Marked flame fixture places its real Board")
+		var board: Dictionary = model.towers[0][1]
+		for command: String in ["damage", "speed", "bounty_board"]:
+			check(model.upgrade_tower(0, board["id"], command), "Marked flame fixture accepts its Board prerequisite")
+		model._update_bounties(0)
+		for tick: int in range(roundi(2.0 / step)):
+			model.advance(step)
+		var config: Dictionary = model.snapshot()["tower_types"]["arrow_tower"]["advancements"]["flamethrower"]
+		var bonus: float = enemy["bounty_damage_bonus"]
+		var extra: int = floori(2.0 * float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * bonus + 0.000000001) + floori(2.0 * float(config["burn_dps"]) * float(tower["damage_multiplier"]) * bonus + 0.000000001)
+		check(board["indirect_damage"] == extra and tower["damage_dealt"] + extra == 100000 - int(enemy["hp"]), "Marked flame and burn accumulate separate fractional bonus streams without duplicate attribution at %.2fs cadence" % step)
 
 func _validation() -> void:
 	var definition: TowerDefinition=(load("res://resources/combat/towers/arrow_tower.tres") as TowerDefinition).duplicate(true) as TowerDefinition
@@ -370,3 +389,4 @@ func _flame_motion_and_kills() -> void:
 		for enemy: Dictionary in model.enemies[0]: total+=int(enemy["hp"])
 		if remaining<0: remaining=total
 		check(total==remaining and tower["kills"]>=2,"Lethal continuous fractions retarget inside coarse ticks without wasting damage or inventing arrows")
+		check(tower["damage_dealt"] == 400 - total, "Lethal flame retargeting accounts exactly for living and killed enemies without overkill")

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/planning_screen.gd" id="1_planning"]
 [ext_resource type="PackedScene" path="res://scenes/match_world.tscn" id="2_world"]
@@ -18,9 +18,29 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.40, 0.46, 0.40, 1)
 content_margin_left = 12.0
-content_margin_top = 4.0
+content_margin_top = 2.0
 content_margin_right = 12.0
-content_margin_bottom = 4.0
+content_margin_bottom = 2.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_health_track"]
+bg_color = Color(0.035, 0.075, 0.12, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.18, 0.34, 0.44, 1)
+content_margin_left = 1.0
+content_margin_top = 1.0
+content_margin_right = 1.0
+content_margin_bottom = 1.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_health_background"]
+bg_color = Color(0.035, 0.075, 0.12, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_health_fill"]
+bg_color = Color(0.20, 0.60, 0.88, 1)
+border_width_top = 1
+border_color = Color(0.55, 0.87, 1, 1)
 
 [node name="PlanningScreen" type="Control"]
 layout_mode = 3
@@ -64,12 +84,12 @@ theme_override_styles/panel = SubResource("StyleBox_hud")
 [node name="Content" type="VBoxContainer" parent="HUD/Header"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 4
+theme_override_constants/separation = 2
 
 [node name="Summary" type="HBoxContainer" parent="HUD/Header/Content"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 10
 
 [node name="Status" type="Label" parent="HUD/Header/Content/Summary"]
 unique_name_in_owner = true
@@ -105,7 +125,7 @@ tooltip_text = "Choose a send type when the host catalog arrives."
 
 [node name="SendEnemy" type="Button" parent="HUD/Header/Content/Summary/SendControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(176, 34)
+custom_minimum_size = Vector2(152, 34)
 layout_mode = 2
 disabled = true
 tooltip_text = "Waiting for host enemy types and send rules."
@@ -138,6 +158,15 @@ icon_alignment = 1
 theme_override_colors/icon_normal_color = Color(0.878, 0.737, 0.467, 1)
 tooltip_text = "Autoplay"
 
+[node name="DebugButton" type="Button" parent="HUD/Header/Content/Summary"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(42, 34)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 16
+text = "#"
+
 [node name="MenuButton" type="Button" parent="HUD/Header/Content/Summary"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(42, 34)
@@ -151,6 +180,58 @@ theme_override_colors/icon_normal_color = Color(0.878, 0.737, 0.467, 1)
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 12
+
+[node name="Health" type="HBoxContainer" parent="HUD/Header/Content/Players"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_constants/separation = 9
+
+[node name="HealthIcon" type="Control" parent="HUD/Header/Content/Players/Health"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(20, 22)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="Track" type="PanelContainer" parent="HUD/Header/Content/Players/Health"]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_health_track")
+
+[node name="BaseHealth" type="ProgressBar" parent="HUD/Header/Content/Players/Health/Track"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(154, 16)
+layout_mode = 2
+mouse_filter = 1
+theme_override_styles/background = SubResource("StyleBox_health_background")
+theme_override_styles/fill = SubResource("StyleBox_health_fill")
+show_percentage = false
+
+[node name="HealthAccents" type="Control" parent="HUD/Header/Content/Players/Health/Track/BaseHealth"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="BaseHealthValue" type="Label" parent="HUD/Header/Content/Players/Health"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(48, 0)
+layout_mode = 2
+mouse_filter = 1
+theme_override_colors/font_color = Color(0.84, 0.95, 1, 1)
+theme_override_colors/font_shadow_color = Color(0.02, 0.045, 0.075, 1)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_fonts/font = ExtResource("3_numbers")
+theme_override_font_sizes/font_size = 20
+text = "0"
+horizontal_alignment = 2
 
 [node name="Host" type="HBoxContainer" parent="HUD/Header/Content/Players"]
 layout_mode = 2
@@ -168,13 +249,6 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 16
 text = "You"
-
-[node name="State" type="Label" parent="HUD/Header/Content/Players/Host/Heading"]
-layout_mode = 2
-mouse_filter = 1
-theme_override_fonts/font = ExtResource("3_numbers")
-theme_override_font_sizes/font_size = 16
-text = "HP 10/10"
 
 [node name="Budget" type="Label" parent="HUD/Header/Content/Players/Host"]
 layout_mode = 2
@@ -206,13 +280,6 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 16
 text = "Opponent"
-
-[node name="State" type="Label" parent="HUD/Header/Content/Players/Guest/Heading"]
-layout_mode = 2
-mouse_filter = 1
-theme_override_fonts/font = ExtResource("3_numbers")
-theme_override_font_sizes/font_size = 16
-text = "HP 10/10"
 
 [node name="Budget" type="Label" parent="HUD/Header/Content/Players/Guest"]
 layout_mode = 2
@@ -300,17 +367,6 @@ text = ""
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
-[node name="DebugButton" type="Button" parent="HUD/Bottom/Content/Actions"]
-unique_name_in_owner = true
-visible = false
-custom_minimum_size = Vector2(24, 22)
-layout_mode = 2
-size_flags_vertical = 4
-theme_override_fonts/font = ExtResource("3_numbers")
-theme_override_font_sizes/font_size = 16
-text = "#"
-
-
 [node name="CancelPlacement" type="Button" parent="HUD/Bottom/Content/Actions"]
 unique_name_in_owner = true
 visible = false

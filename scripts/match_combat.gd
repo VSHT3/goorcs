@@ -5,6 +5,7 @@ enum Phase { PLANNING, WAVE, FINISHED }
 enum TargetMode { FURTHEST, CLOSEST, STRONGEST, LAST = 3 }
 
 const DEATH_EVENT_LIFETIME: float = 2.0
+const NO_BONUS: Dictionary = {}
 
 var phase: Phase = Phase.PLANNING
 var wave: int = 0
@@ -66,6 +67,8 @@ var _next_tower_id: int = 1
 var _next_enemy_id: int = 1
 # Host-only fractional HP, isolated by tower and enemy and retired with either.
 var _continuous_damage: Dictionary = {}
+# Fractional vulnerability credit follows its original Board, not the current mark.
+var _continuous_bonus: Dictionary = {}
 # Spawn times cap first-tick exposure even when due events arrive mid-tick.
 var _enemy_spawn_times: Dictionary = {}
 # Only enemies slowed at tick start need a two-speed historical motion record.
@@ -177,6 +180,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"damage_upgrade_bonus": definition.damage_upgrade_bonus,
 			"speed_upgrade_multiplier": definition.speed_upgrade_multiplier,
 			"area_attack": definition.area_attack,
+			"directional_weapon": not definition.reward.directional_weapon_textures.is_empty(),
 			"attack_sound": definition.attack_sound,
 			"special_upgrade": definition.special_upgrade,
 			"special_upgrade_title": definition.special_upgrade_title,
@@ -231,7 +235,9 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 	towers[slot].append({
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
-		"kills": 0, "damage_upgraded": false, "speed_upgraded": false,
+		"tracking_target_id": -1, "tracking_aim": Vector2(cell),
+		"kills": 0, "damage_dealt": 0, "coins_generated": 0, "indirect_damage": 0,
+		"damage_upgraded": false, "speed_upgraded": false,
 		"special_upgraded": false, "freeze_upgraded": false, "evolution": "", "secondary_mode": mode,
 		"secondary_shot": 0, "secondary_aim": Vector2(cell), "secondary_target_id": -1,
 		"advancement": "", "advancement_path": [] as Array[String], "extra_archers": [] as Array[Dictionary],
@@ -253,6 +259,7 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		coins[slot] -= cost
 	_next_tower_id += 1
 	_refresh_board(slot)
+	_update_tracking_target(slot, towers[slot].back())
 	_sound_events.record(CombatSoundEvents.Cue.PURCHASE, slot, Vector2(cell), _death_time)
 
 
@@ -423,6 +430,7 @@ func set_targeting(slot: int, tower_id: int, mode: int) -> bool:
 			if tower["mode"] == mode:
 				return false
 			tower["mode"] = mode
+			_update_tracking_target(slot, tower)
 			return true
 	return false
 
@@ -578,9 +586,11 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 		if not _sandbox_mode:
 			coins[slot] += _sell_value(tower["invested"])
 		_continuous_damage.erase(tower_id)
+		_continuous_bonus.erase(tower_id)
 		_clear_tower_mark(slot, tower)
 		towers[slot].remove_at(index)
 		_refresh_board(slot)
+		_sound_events.record(CombatSoundEvents.Cue.SALE, slot, Vector2(tower["cell"]), _death_time)
 		return true
 	return false
 
@@ -623,6 +633,7 @@ func grow_for_main_round() -> void:
 		for tower: Dictionary in board:
 			tower["cell"] += Vector2i.DOWN
 			tower["aim"] += Vector2.DOWN
+			tower["tracking_aim"] += Vector2.DOWN
 			tower["secondary_aim"] += Vector2.DOWN
 			tower["chain_points"].clear()
 			for archer: Dictionary in tower["extra_archers"]:
@@ -709,6 +720,7 @@ func debug_set_round(round_number: int) -> bool:
 	_elapsed = 0.0
 	_step_start_time = 0.0
 	_continuous_damage.clear()
+	_continuous_bonus.clear()
 	_burns.clear()
 	_enemy_spawn_times.clear()
 	_slow_motion.clear()
@@ -724,6 +736,8 @@ func debug_set_round(round_number: int) -> bool:
 			tower["shot"] = 0
 			tower["secondary_shot"] = 0
 			tower["aim"] = Vector2(tower["cell"])
+			tower["tracking_target_id"] = -1
+			tower["tracking_aim"] = Vector2(tower["cell"])
 			tower["secondary_aim"] = Vector2(tower["cell"])
 			for archer: Dictionary in tower["extra_archers"]:
 				archer["shot"] = 0
@@ -944,6 +958,8 @@ func advance(delta: float) -> bool:
 			# A dead caster never resolves its due ritual.
 			_enemy_abilities(slot)
 			_apply_leaks(slot)
+			for tower: Dictionary in towers[slot]:
+				_update_tracking_target(slot, tower)
 		remaining -= step
 		if periodic and base_health[0] > 0 and base_health[1] > 0:
 			_produce_periodic(step)
@@ -979,7 +995,9 @@ func advance(delta: float) -> bool:
 			for tower: Dictionary in towers[slot]:
 				_reset_firing(tower)
 				if tower["behavior_kind"] == "economy":
-					coins[slot] += int(tower["behavior_config"]["clear_income"])
+					var produced: int = int(tower["behavior_config"]["clear_income"])
+					coins[slot] += produced
+					tower["coins_generated"] += produced
 		phase = Phase.PLANNING
 	return true
 
@@ -1032,7 +1050,9 @@ func _produce_periodic(delta: float) -> void:
 			var count: int = floori((float(tower["production_elapsed"]) + 0.000000001) / float(config["periodic_interval"]))
 			if count > 0:
 				tower["production_elapsed"] = maxf(0.0, float(tower["production_elapsed"]) - count * float(config["periodic_interval"]))
-				coins[slot] += count * int(config["periodic_income"])
+				var produced: int = count * int(config["periodic_income"])
+				coins[slot] += produced
+				tower["coins_generated"] += produced
 
 
 func _update_bounties(slot: int) -> void:
@@ -1052,13 +1072,17 @@ func _update_bounties(slot: int) -> void:
 			selected["bounty_income_bonus"] = tower["behavior_config"]["mark_income_bonus"]
 
 
-func _income_aura_bonus(slot: int, tower: Dictionary) -> float:
-	# Income auras never stack, including independently authored duplicate groups.
+func _income_aura_source(slot: int, tower: Dictionary) -> Dictionary:
+	# Strict comparison retains the oldest accepted source on equal strengths.
+	var selected: Dictionary = NO_BONUS
 	var strongest: float = 0.0
 	for source: Dictionary in towers[slot]:
 		if source["behavior_kind"] == "income_aura" and cell_in_range(source["cell"], tower["cell"], source["range"]):
-			strongest = maxf(strongest, float(source["behavior_config"]["kill_income_bonus"]))
-	return strongest
+			var bonus: float = source["behavior_config"]["kill_income_bonus"]
+			if bonus > strongest:
+				selected = source
+				strongest = bonus
+	return selected
 
 
 func _enemy_abilities(slot: int) -> void:
@@ -1457,7 +1481,8 @@ func _attack_flame(slot: int, tower: Dictionary, config: Dictionary, delta: floa
 		if not _continuous_damage.has(tower["id"]):
 			_continuous_damage[tower["id"]] = {}
 		var fractions: Dictionary = _continuous_damage[tower["id"]]
-		var rate: float = float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * (1.0 + float(enemy["bounty_damage_bonus"]))
+		var base_rate: float = float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"])
+		var rate: float = base_rate * (1.0 + float(enemy["bounty_damage_bonus"]))
 		end = minf(end, time + maxf(0.0, float(config["fuel_duration"]) - float(tower["continuous_fire_time"])))
 		var burn: Dictionary = _burns[id]
 		var own_burn: bool = float(burn["dps"]) <= float(config["burn_dps"]) * float(tower["damage_multiplier"])
@@ -1476,10 +1501,12 @@ func _attack_flame(slot: int, tower: Dictionary, config: Dictionary, delta: floa
 		if own_burn:
 			burn["end_time"] = maxf(float(burn["end_time"]), end + float(config["burn_duration"]))
 		var total: float = float(fractions.get(id, 0.0)) + rate * exposure
+		var bonus: Dictionary = _continuous_bonus_stream(tower["id"], id, float(enemy["bounty_damage_bonus"]) > 0.0)
+		_accumulate_bonus(slot, enemy, bonus, base_rate * exposure)
 		var damage: int = floori(total + 0.000000001)
 		fractions[id] = maxf(0.0, total - damage)
 		if damage > 0:
-			_hit(slot, tower, selected, damage, true)
+			_hit(slot, tower, selected, damage, true, bonus)
 		_burn_until(slot, id, end)
 		selected = _enemy_index(slot, id)
 		if selected >= 0:
@@ -1681,13 +1708,17 @@ func _burn_until(slot: int, id: int, time: float, index: int = -1) -> void:
 	var burn: Dictionary = _burns[id]
 	var exposure: float = maxf(0.0, minf(time, float(burn["end_time"])) - maxf(float(burn["last_time"]), float(_enemy_spawn_times[id])))
 	var total: float = float(burn["fraction"]) + float(burn["dps"]) * exposure * (1.0 + float(enemy["bounty_damage_bonus"]))
+	if float(enemy["bounty_damage_bonus"]) > 0.0 and not burn.has("bonus"):
+		burn["bonus"] = {}
+	var bonus: Dictionary = burn.get("bonus", NO_BONUS)
+	_accumulate_bonus(slot, enemy, bonus, float(burn["dps"]) * exposure)
 	var damage: int = floori(total + 0.000000001)
 	burn["fraction"] = maxf(0.0, total - damage)
 	burn["last_time"] = maxf(float(burn["last_time"]), time)
 	enemy["burn_remaining"] = maxf(0.0, float(burn["end_time"]) - time)
 	enemy["burning"] = float(enemy["burn_remaining"]) > 0.000000001
 	if damage > 0:
-		_hit(slot, burn["source"], index, damage, true)
+		_hit(slot, burn["source"], index, damage, true, bonus)
 	if not enemy["burning"]:
 		enemy["burn_remaining"] = 0.0
 		_burns.erase(id)
@@ -1823,13 +1854,16 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 			enemy["slowed"] = true
 			enemy["slow_remaining"] = TowerDefinition.freeze_duration(int(enemy["max_hp"]))
 			enemy["speed"] = 0.0 if enemy["animation"] == "cast" else float(enemy["base_speed"]) * TowerDefinition.FREEZE_SPEED_MULTIPLIER
-		var total: float = float(fractions.get(enemy["id"], 0.0)) + float(tower["base_damage"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * exposure * (1.0 + float(enemy["bounty_damage_bonus"]))
+		var base_damage: float = float(tower["base_damage"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * exposure
+		var total: float = float(fractions.get(enemy["id"], 0.0)) + base_damage * (1.0 + float(enemy["bounty_damage_bonus"]))
+		var bonus: Dictionary = _continuous_bonus_stream(tower_id, enemy["id"], float(enemy["bounty_damage_bonus"]) > 0.0)
+		_accumulate_bonus(slot, enemy, bonus, base_damage)
 		# Credit is already vulnerability-adjusted HP: mark changes affect only
 		# new exposure, not saved fractions. The epsilon corrects whole-HP sums.
 		var damage: int = floori(total + 0.000000001)
 		fractions[enemy["id"]] = maxf(0.0, total - damage)
 		if damage > 0:
-			_hit(slot, tower, index, damage, true)
+			_hit(slot, tower, index, damage, true, bonus)
 
 
 # Read the motion captured before attacks, not a slow refreshed by an earlier
@@ -1931,18 +1965,67 @@ func _retire_enemy(enemy_id: int) -> void:
 	_burns.erase(enemy_id)
 	for tower_id: int in _continuous_damage:
 		_continuous_damage[tower_id].erase(enemy_id)
+	for tower_id: int in _continuous_bonus:
+		_continuous_bonus[tower_id].erase(enemy_id)
 	for board: Array in towers:
 		for tower: Dictionary in board:
 			if int(tower["bounty_target_id"]) == enemy_id:
 				tower["bounty_target_id"] = -1
 
 
-func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, bounty_applied: bool = false) -> void:
+func _continuous_bonus_stream(tower_id: int, enemy_id: int, marked: bool) -> Dictionary:
+	if not marked and (not _continuous_bonus.has(tower_id) or not _continuous_bonus[tower_id].has(enemy_id)):
+		return NO_BONUS
+	if not _continuous_bonus.has(tower_id):
+		_continuous_bonus[tower_id] = {}
+	var streams: Dictionary = _continuous_bonus[tower_id]
+	if not streams.has(enemy_id):
+		streams[enemy_id] = {}
+	return streams[enemy_id]
+
+
+func _accumulate_bonus(slot: int, enemy: Dictionary, credit: Dictionary, base_damage: float) -> void:
+	var source_id: int = enemy["bounty_tower_id"]
+	var amount: float = base_damage * float(enemy["bounty_damage_bonus"])
+	if source_id < 0 or amount <= 0.0:
+		return
+	if not credit.has(source_id):
+		var source: Dictionary = _find_tower(slot, source_id)
+		if source.is_empty():
+			return
+		credit[source_id] = {"source": source, "fraction": 0.0}
+	credit[source_id]["fraction"] += amount
+
+
+func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, bounty_applied: bool = false, credit: Dictionary = {}) -> void:
 	var enemy: Dictionary = enemies[slot][enemy_index]
-	var incoming_damage: int = int(tower["damage"]) if damage < 0 else damage
+	var base_damage: int = int(tower["damage"]) if damage < 0 else damage
+	var incoming_damage: int = base_damage
 	if not bounty_applied:
-		incoming_damage = ceili(float(incoming_damage) * (1.0 + float(enemy["bounty_damage_bonus"])))
+		incoming_damage = ceili(float(base_damage) * (1.0 + float(enemy["bounty_damage_bonus"])))
 	var hit_damage: int = mini(int(enemy["hp"]), incoming_damage)
+	var indirect: int = 0
+	if bounty_applied:
+		# Quantize each source's accumulated extra HP only once, carrying sub-HP
+		# credit across ticks/mark changes. Base HP gets priority on overkill.
+		var available: int = 0
+		for source_id: int in credit:
+			available += floori(float(credit[source_id]["fraction"]) + 0.000000001)
+		var budget: int = maxi(0, hit_damage - maxi(0, incoming_damage - available))
+		for source_id: int in credit:
+			var contribution: Dictionary = credit[source_id]
+			var whole: int = floori(float(contribution["fraction"]) + 0.000000001)
+			contribution["fraction"] = maxf(0.0, float(contribution["fraction"]) - mini(budget, whole))
+			var removed: int = mini(budget, whole)
+			contribution["source"]["indirect_damage"] += removed
+			budget -= removed
+			indirect += removed
+	else:
+		var source: Dictionary = _find_tower(slot, enemy["bounty_tower_id"]) if int(enemy["bounty_tower_id"]) >= 0 else NO_BONUS
+		indirect = maxi(0, hit_damage - base_damage) if not source.is_empty() else 0
+		if indirect > 0:
+			source["indirect_damage"] += indirect
+	tower["damage_dealt"] += hit_damage - indirect
 	enemy["hp"] -= hit_damage
 	if hit_damage > 0:
 		_sound_events.record(CombatSoundEvents.Cue.HIT, slot, enemy["pos"], _death_time)
@@ -1951,7 +2034,19 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 		var definition: Dictionary = _enemy_types[enemy["type_id"]]
 		var bounty: int = int(definition["kill_bounty"])
 		var normal: int = _rules.kill_bounty if bounty < 0 else bounty
-		coins[slot] += ceili(normal * (1.0 + float(enemy["bounty_income_bonus"]) + _income_aura_bonus(slot, tower)))
+		var mark_bonus: float = enemy["bounty_income_bonus"]
+		var aura: Dictionary = _income_aura_source(slot, tower)
+		var aura_bonus: float = float(aura["behavior_config"]["kill_income_bonus"]) if not aura.is_empty() else 0.0
+		var payout: int = ceili(normal * (1.0 + mark_bonus + aura_bonus))
+		coins[slot] += payout
+		# Keep the single combined round-up: mark receives its incremental
+		# rounded share first, then the strongest aura receives the remainder.
+		var marked_payout: int = mini(payout, ceili(normal * (1.0 + mark_bonus)))
+		var mark_source: Dictionary = _find_tower(slot, enemy["bounty_tower_id"]) if int(enemy["bounty_tower_id"]) >= 0 else NO_BONUS
+		if not mark_source.is_empty():
+			mark_source["coins_generated"] += marked_payout - normal
+		if not aura.is_empty():
+			aura["coins_generated"] += payout - marked_payout
 		if int(definition["reroll_drop_amount"]) > 0 and float(definition["reroll_drop_chance"]) > 0.0 and _drop_random.randf() < float(definition["reroll_drop_chance"]):
 			reroll_currency[slot] += int(definition["reroll_drop_amount"])
 		_add_total(slot, "kills", enemy["type_id"])
@@ -1960,6 +2055,17 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 		enemies[slot].remove_at(enemy_index)
 
 
+
+
+# Live tracking is host-owned, independent of the last released shot event.
+# Resolve after damage, rituals and leaks so no retired victim is published.
+func _update_tracking_target(slot: int, tower: Dictionary) -> void:
+	if not _tower_types[tower["type_id"]]["directional_weapon"]:
+		return
+	var selected: int = _target(slot, tower, tower["range"])
+	tower["tracking_target_id"] = -1 if selected < 0 else enemies[slot][selected]["id"]
+	if selected >= 0:
+		tower["tracking_aim"] = enemies[slot][selected]["pos"]
 
 
 # Scan in place rather than allocating or sorting candidates for each tower.

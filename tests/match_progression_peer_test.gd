@@ -83,6 +83,7 @@ func _run() -> void:
 				var expected_tower: Dictionary = original_towers[slot][0].duplicate(true)
 				expected_tower["cell"] = str(Vector2i(0, expansions))
 				expected_tower["aim"] = str(Vector2(0, expansions))
+				expected_tower["tracking_aim"] = str(Vector2(0, expansions))
 				expected_tower["secondary_aim"] = str(Vector2(0, expansions))
 				expected_tower["bounce_aim"] = str(Vector2(0, expansions))
 				expected_tower["pierce_aim"] = str(Vector2(0, expansions))

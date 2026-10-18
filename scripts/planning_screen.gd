@@ -6,6 +6,21 @@ signal leave_requested
 
 const TOWER_LEVEL_NUMERALS: Array[String] = ["I", "II", "III", "IV", "V"]
 
+
+class CurrencyIcon extends Control:
+	var shard: bool = false
+
+	func _draw() -> void:
+		if shard:
+			draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(17, 8), Vector2(12, 21), Vector2(4, 15), Vector2(3, 7)]), Color("76cbd8"))
+			draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(10, 15), Vector2(4, 15), Vector2(3, 7)]), Color("c1eff0"))
+			draw_line(Vector2(10, 15), Vector2(12, 21), Color("398397"), 2)
+		else:
+			draw_circle(Vector2(10, 11), 9, Color("9d743b"))
+			draw_circle(Vector2(10, 9), 8, Color("e0bc77"))
+			draw_arc(Vector2(10, 9), 5, PI * 0.8, PI * 1.8, 8, Color("f5dca5"), 2)
+			draw_line(Vector2(10, 5), Vector2(10, 13), Color("9d743b"), 2)
+
 var planning: MatchPlanning
 var selected_tower_id: int = -1
 var selected_enemy_id: int = -1
@@ -26,7 +41,6 @@ var sound_player: GameSoundPlayer
 var _roll_details: Label
 var rarity_reroll: Button
 var attribute_reroll: Button
-var build_another_button: Button
 var _extra_upgrades: VBoxContainer
 var _extra_upgrade_buttons: Dictionary[String, Button] = {}
 var extra_targeting: Array[TargetingCycle] = []
@@ -51,6 +65,10 @@ var _reroll_balance: Label
 @onready var autoplay_button: Button = %Autoplay
 @onready var _palette: HBoxContainer = %TowerPalette
 @onready var _coins: Label = %Coins
+@onready var _health_bar: ProgressBar = %BaseHealth
+@onready var _health_value: Label = %BaseHealthValue
+@onready var _health_icon: Control = %HealthIcon
+@onready var _health_accents: Control = %HealthAccents
 @onready var _income: Label = %Income
 @onready var _cancel_placement: Button = %CancelPlacement
 @onready var _management: PanelContainer = %TowerManagement
@@ -74,7 +92,6 @@ var _reroll_balance: Label
 @onready var _feedback: Label = %Feedback
 @onready var _feedback_timer: Timer = $FeedbackTimer
 @onready var _titles: Array[Label] = [$HUD/Header/Content/Players/Host/Heading/Title, $HUD/Header/Content/Players/Guest/Heading/Title]
-@onready var _states: Array[Label] = [$HUD/Header/Content/Players/Host/Heading/State, $HUD/Header/Content/Players/Guest/Heading/State]
 @onready var _budgets: Array[Label] = [$HUD/Header/Content/Players/Host/Budget, $HUD/Header/Content/Players/Guest/Budget]
 @onready var _counts: Array[Label] = [$HUD/Header/Content/Players/Host/Count, $HUD/Header/Content/Players/Guest/Count]
 
@@ -94,6 +111,8 @@ func _ready() -> void:
 		if planning != null:
 			boards[slot].content_catalog = planning.combat_rules.catalog
 	_create_palette()
+	_build_currencies()
+	_build_health()
 	_build_tower_management()
 	_cancel_placement.pressed.connect(cancel_interaction)
 	close_button.pressed.connect(cancel_interaction)
@@ -166,11 +185,6 @@ func _build_tower_management() -> void:
 	var shell := VBoxContainer.new()
 	shell.add_theme_constant_override("separation", 8)
 	_management.add_child(shell)
-	build_another_button = Button.new()
-	build_another_button.text = "Build another [B]"
-	build_another_button.custom_minimum_size.y = 30
-	build_another_button.pressed.connect(_build_another)
-	shell.add_child(build_another_button)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	shell.add_child(scroll)
 	content.reparent(scroll, false)
@@ -206,13 +220,6 @@ func _build_tower_management() -> void:
 	content.move_child(_extra_upgrades, content.get_child_count() - 2)
 	for button: Button in [special_upgrade, alternate_upgrade]:
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_reroll_balance = Label.new()
-	_reroll_balance.name = "RerollCurrency"
-	_reroll_balance.add_theme_font_override("font", _coins.get_theme_font("font"))
-	_reroll_balance.add_theme_font_size_override("font_size", 16)
-	_reroll_balance.tooltip_text = "Run-only rarity currency. Earned from round clears and enemy drops; spent on rarity rerolls."
-	_income.get_parent().add_child(_reroll_balance)
-	_income.get_parent().move_child(_reroll_balance, _income.get_index())
 	var heading := HBoxContainer.new()
 	shell.add_child(heading)
 	shell.move_child(heading, 0)
@@ -220,6 +227,82 @@ func _build_tower_management() -> void:
 	_tower_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	close_button.reparent(heading, false)
 
+
+
+func _build_health() -> void:
+	_health_icon.draw.connect(_draw_health_emblem)
+	_health_accents.draw.connect(_draw_health_accents)
+	_health_accents.resized.connect(_health_accents.queue_redraw)
+
+
+func _draw_health_emblem() -> void:
+	_health_icon.draw_colored_polygon(PackedVector2Array([Vector2(10, 0), Vector2(18, 6), Vector2(18, 15), Vector2(10, 22), Vector2(2, 15), Vector2(2, 6)]), Color("102c43"))
+	_health_icon.draw_colored_polygon(PackedVector2Array([Vector2(10, 2), Vector2(4, 7), Vector2(10, 9)]), Color("b6efff"))
+	_health_icon.draw_colored_polygon(PackedVector2Array([Vector2(10, 2), Vector2(16, 7), Vector2(10, 9)]), Color("64cef5"))
+	_health_icon.draw_colored_polygon(PackedVector2Array([Vector2(4, 7), Vector2(10, 9), Vector2(10, 20), Vector2(4, 14)]), Color("3ba8e7"))
+	_health_icon.draw_colored_polygon(PackedVector2Array([Vector2(10, 9), Vector2(16, 7), Vector2(16, 14), Vector2(10, 20)]), Color("2776b9"))
+	_health_icon.draw_rect(Rect2(9, 9, 1, 7), Color("80daf5"))
+
+
+func _draw_health_accents() -> void:
+	var width: int = roundi(_health_accents.size.x)
+	var height: int = roundi(_health_accents.size.y)
+	var filled_width: int = roundi(float(width) * _health_bar.get_as_ratio())
+	if filled_width > 0:
+		_health_accents.draw_rect(Rect2(0, height - 1, filled_width, 1), Color("19518b"))
+
+
+func _refresh_health(accepted_health: int, accepted_maximum: int) -> void:
+	# Range needs a nonzero span; the label and tooltip retain accepted host values.
+	_health_bar.max_value = maxi(1, accepted_maximum)
+	_health_bar.value = accepted_health if accepted_maximum > 0 else 0
+	_health_value.text = str(accepted_health)
+	_health_bar.tooltip_text = "Base health: %d/%d" % [accepted_health, accepted_maximum]
+	_health_value.tooltip_text = _health_bar.tooltip_text
+	_health_accents.queue_redraw()
+
+
+func _build_currencies() -> void:
+	var summary: HBoxContainer = _coins.get_parent() as HBoxContainer
+	var currencies := HBoxContainer.new()
+	currencies.name = "Currencies"
+	currencies.add_theme_constant_override("separation", 6)
+	summary.add_child(currencies)
+	summary.move_child(currencies, _coins.get_index())
+	_reroll_balance = Label.new()
+	_reroll_balance.name = "RerollCurrency"
+	for shard: bool in [false, true]:
+		var panel := PanelContainer.new()
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color("131e1a")
+		style.border_color = Color("526b67") if shard else Color("766744")
+		style.set_border_width_all(1)
+		style.content_margin_left = 6
+		style.content_margin_right = 8
+		style.content_margin_top = 2
+		style.content_margin_bottom = 2
+		panel.add_theme_stylebox_override("panel", style)
+		panel.tooltip_text = "Shards" if shard else "Coins"
+		currencies.add_child(panel)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 5)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(row)
+		var icon := CurrencyIcon.new()
+		icon.shard = shard
+		icon.custom_minimum_size = Vector2(20, 22)
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon)
+		var value: Label = _reroll_balance if shard else _coins
+		if shard:
+			value.add_theme_font_override("font", _coins.get_theme_font("font"))
+			value.add_theme_font_size_override("font_size", 16)
+			value.add_theme_color_override("font_color", Color("b7e5e7"))
+			row.add_child(value)
+		else:
+			value.reparent(row, false)
+		value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _reroll(kind: String) -> void:
 	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
@@ -353,6 +436,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if popup.visible:
 			return
 	if not event is InputEventKey or not event.pressed or event.echo or event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
+		return
+	if event.keycode == KEY_BACKSPACE:
+		if _management.is_visible_in_tree() and not sell_button.disabled and not _selected_tower().is_empty():
+			_sell()
+			get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_B:
 		if _build_another():
@@ -534,9 +622,9 @@ func _refresh_palette() -> void:
 		if id == _placement_id and button.disabled:
 			_placement_id = &""
 			button.set_pressed_no_signal(false)
-	_coins.text = "Coins %d" % coins
+	_coins.text = str(coins)
 	var currency: Array = planning.combat.get("reroll_currency", [0, 0]) if planning != null else [0, 0]
-	_reroll_balance.text = "Shards %d" % int(currency[planning.local_slot() if planning != null else 0])
+	_reroll_balance.text = str(int(currency[planning.local_slot() if planning != null else 0]))
 	_refresh_sends()
 	_cancel_placement.visible = _placement_id != &""
 
@@ -762,14 +850,13 @@ func _selected_tower() -> Dictionary:
 func _refresh_targeting() -> void:
 	var tower: Dictionary = _selected_tower()
 	_management.visible = not tower.is_empty()
-	var palette_button: TowerShopButton = shop_buttons.get(StringName(tower.get("type_id", "")))
-	build_another_button.disabled = tower.is_empty() or not planning.can_manage_towers(planning.local_slot()) or palette_button == null or not palette_button.is_visible_in_tree() or palette_button.disabled
 	if tower.is_empty():
 		targeting_button.mode = _default_targeting
 		return
 	var types: Dictionary = planning.combat.get("tower_types", {})
 	var stats: Dictionary = types.get(String(tower["type_id"]), {})
 	_tower_title.text = tower_display_title(tower, stats)
+	_tower_title.add_theme_color_override("font_color", tower_rarity_color(tower))
 	_tower_stats.text = tower_stats_text(tower, stats)
 	_roll_details.text = roll_details_text(tower)
 	targeting_button.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
@@ -780,13 +867,11 @@ func _refresh_targeting() -> void:
 	_refresh_reroll(attribute_reroll, tower, "attributes", _own_coins())
 	var actions: Dictionary = tower_upgrade_actions(tower, stats)
 	var base_ready: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false))
-	damage_upgrade.visible = not base_ready or actions.size() == 2
-	speed_upgrade.visible = damage_upgrade.visible
 	for command: String in ["damage", "speed"]:
 		_refresh_action(damage_upgrade if command == "damage" else speed_upgrade, actions[command])
 	var choices: Array[String] = []
 	for command: String in actions:
-		if base_ready and command not in ["damage", "speed"]:
+		if base_ready and command not in ["damage", "speed"] and not bool(actions[command]["purchased"]):
 			choices.append(command)
 	_special_upgrade_command = choices[0] if not choices.is_empty() else ""
 	_alternate_upgrade_command = choices[1] if choices.size() > 1 else ""
@@ -856,9 +941,10 @@ func _refresh_targeting() -> void:
 
 func _refresh_action(button: Button, action: Dictionary) -> void:
 	var purchased: bool = bool(action["purchased"])
+	button.visible = not purchased
 	var locked: bool = bool(action["locked"])
 	var price: int = int(action["cost"])
-	button.text = "%s\n%s" % [action["title"], "Owned" if purchased else ("Locked" if locked else str(price))]
+	button.text = "%s\n%s" % [action["title"], "Locked" if locked else str(price)]
 	button.disabled = purchased or locked or targeting_button.disabled or _own_coins() < price
 	button.tooltip_text = String(action["description"])
 	if locked:
@@ -894,14 +980,25 @@ static func tower_display_title(tower: Dictionary, stats: Dictionary) -> String:
 	var advancement: Dictionary = stats.get("advancements", {}).get(tower.get("advancement", ""), {})
 	var title: String = String(advancement.get("title", followup.get("title", branch.get("title", stats.get("title", "Tower")))))
 	var level: int = MatchCombat.tower_level(tower)
-	return "%s · %s" % [title, TOWER_LEVEL_NUMERALS[level - 1] if level <= TOWER_LEVEL_NUMERALS.size() else str(level)]
+	var rarity: String = String(tower.get("rarity", ""))
+	return "%s%s · %s" % [rarity.capitalize() + " " if not rarity.is_empty() else "", title, TOWER_LEVEL_NUMERALS[level - 1] if level <= TOWER_LEVEL_NUMERALS.size() else str(level)]
+
+
+static func tower_rarity_color(tower: Dictionary) -> Color:
+	match String(tower.get("rarity", "")):
+		"broken": return Color("c69886")
+		"shoddy": return Color("bdba91")
+		"common": return Color("e4e7de")
+		"uncommon": return Color("9bd38d")
+		"rare": return Color("81b8ed")
+		"epic": return Color("c6a0e8")
+		"legendary": return Color("f1c76e")
+		"mythic": return Color("f28eab")
+		_: return Color("e0bc77")
 
 
 static func roll_details_text(tower: Dictionary) -> String:
-	var rarity: String = String(tower.get("rarity", ""))
 	var lines := PackedStringArray()
-	if not rarity.is_empty():
-		lines.append(rarity.capitalize())
 	for attribute: Dictionary in tower.get("attributes", []):
 		var effect: String = String(attribute.get("effect", ""))
 		var value: float = float(attribute.get("value", 0.0))
@@ -915,20 +1012,27 @@ static func roll_details_text(tower: Dictionary) -> String:
 			"chain_jumps":
 				title = "Chain hits"
 		lines.append("%s %s" % [amount, title])
-	if lines.size() == 1:
+	if lines.is_empty():
 		lines.append("No attributes")
 	return "\n".join(lines)
 
 
 static func tower_stats_text(tower: Dictionary, stats: Dictionary) -> String:
-	var result: String = behavior_summary(tower, stats)
-	if tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]:
-		result = "Kills %d\n%s" % [int(tower.get("kills", 0)), result]
-		var damage_buff: float = float(tower.get("support_damage_bonus", 0.0))
-		var speed_buff: float = float(tower.get("support_speed_bonus", 0.0))
-		if damage_buff > 0.0 or speed_buff > 0.0:
-			result += "\nSupport: +%.0f%% damage / +%.0f%% speed" % [damage_buff * 100.0, speed_buff * 100.0]
-	return result
+	var kind: String = String(tower.get("behavior_kind", stats.get("behavior_kind", "attack")))
+	var lines := PackedStringArray()
+	lines.append("Kills %d" % int(tower.get("kills", 0)))
+	if kind in ["attack", "chain"] or int(tower.get("damage_dealt", 0)) > 0:
+		lines.append("Damage dealt %d" % int(tower.get("damage_dealt", 0)))
+	if kind in ["economy", "bounty", "income_aura"] or int(tower.get("coins_generated", 0)) > 0:
+		lines.append("Coins generated %d" % int(tower.get("coins_generated", 0)))
+	if kind == "bounty" or int(tower.get("indirect_damage", 0)) > 0:
+		lines.append("Indirect damage %d" % int(tower.get("indirect_damage", 0)))
+	lines.append(behavior_summary(tower, stats))
+	var damage_buff: float = float(tower.get("support_damage_bonus", 0.0))
+	var speed_buff: float = float(tower.get("support_speed_bonus", 0.0))
+	if damage_buff > 0.0 or speed_buff > 0.0:
+		lines.append("Buff: +%.0f%% damage / +%.0f%% speed" % [damage_buff * 100.0, speed_buff * 100.0])
+	return "\n".join(lines)
 
 
 static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> String:
@@ -1055,9 +1159,8 @@ static func advancement_actions(tower: Dictionary, stats: Dictionary) -> Diction
 		var definition: Dictionary = advancements[command]
 		var requires: String = String(definition.get("requires", ""))
 		var purchased: bool = chosen == command or history.has(command)
-		# Before choosing, show roots. Thereafter show the accepted node and
-		# its immediate successors, never unrelated or unreachable purchases.
-		if (chosen.is_empty() and not requires.is_empty()) or (not chosen.is_empty() and command != chosen and requires != chosen):
+		# Only unpurchased roots or immediate successors remain actionable.
+		if purchased or (chosen.is_empty() and not requires.is_empty()) or (not chosen.is_empty() and requires != chosen):
 			continue
 		var title: String = String(definition.get("title", command.capitalize()))
 		if command in ["aom_speed_1", "aom_speed_2"]:
@@ -1179,9 +1282,9 @@ func _refresh() -> void:
 	var editable: bool = planning.can_edit_path(own_slot)
 	var all_towers: Array = state.get("towers", [[], []])
 	var all_enemies: Array = state.get("enemies", [[], []])
-	var health: Array = state.get("health", [10, 10])
-	var spawned: Array = state.get("spawned", [0, 0])
+	var health: Array = state.get("health", [0, 0])
 	var rules: Dictionary = state.get("rules", {})
+	_refresh_health(int(health[own_slot]), int(rules.get("base_health", 0)))
 	if _pending_tower_cell != Vector2i(-1, -1):
 		for tower: Dictionary in all_towers[own_slot]:
 			if tower["cell"] == _pending_tower_cell:
@@ -1213,23 +1316,16 @@ func _refresh() -> void:
 		board.queue_redraw()
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
 		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")
+		_titles[slot].visible = slot != own_slot
 		_titles[slot].tooltip_text = role
 		var path_state: String = "Legal route." if layout.is_ready() else \
 			("No route to base." if layout.route.is_empty() else "%d disconnected tiles." % layout.disconnected_count)
-		_states[slot].tooltip_text = "Base health. %s\n%s" % [role, path_state]
-		_states[slot].modulate = Color("d99578") if int(health[slot]) <= 0 else Color("b5e2b7")
-		_states[slot].text = "HP %d/%d" % [int(health[slot]), int(rules.get("base_health", 10))]
 		_budgets[slot].text = "Ready" if phase == MatchCombat.Phase.PLANNING and slot != own_slot and planning.ready_flags[slot] else ""
 		_budgets[slot].modulate = Color("b5e2b7")
-		_counts[slot].visible = not finished and (in_wave or slot == own_slot)
-		if in_wave:
-			_counts[slot].text = "Alive %d" % all_enemies[slot].size()
-			_counts[slot].tooltip_text = "Regular enemies spawned: %d/%d.\nWASD: pan · Scroll / pinch: zoom · Home: fit your board." % [int(spawned[slot]), int(state.get("total", 0))]
-			_counts[slot].modulate = Color("b5e2b7")
-		else:
-			_counts[slot].text = "%d/%d tiles%s" % [layout.used_tiles(), layout.budget, " · Main" if bool(state.get("main_round", false)) else ""]
-			_counts[slot].tooltip_text = "%s\nPaths change only in setup and main rounds. WASD: pan · Scroll / pinch: zoom · Home: fit your board." % path_state
-			_counts[slot].modulate = Color("b5e2b7") if layout.is_ready() else Color("e0bc77")
+		_counts[slot].visible = not finished and not in_wave and slot == own_slot
+		_counts[slot].text = "%d/%d tiles%s" % [layout.used_tiles(), layout.budget, " · Main" if bool(state.get("main_round", false)) else ""]
+		_counts[slot].tooltip_text = "%s\nPaths change only in setup and main rounds. WASD: pan · Scroll / pinch: zoom · Home: fit your board." % path_state
+		_counts[slot].modulate = Color("b5e2b7") if layout.is_ready() else Color("e0bc77")
 	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
 	ready_button.disabled = not finished and (not planning.active or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[own_slot] or not planning.layouts[own_slot].is_ready())
 	clear_button.visible = planning.active and bool(state.get("main_round", false))

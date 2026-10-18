@@ -72,13 +72,16 @@ func _run() -> void:
 	await _check_four_way_keys()
 	await _check_zoom()
 	await _check_home()
+	await _check_middle_drag()
+	await _check_middle_priority()
+	await _check_middle_cancellation()
 	await _check_input_priority()
 	await _check_transformed_clicks()
 	await _check_lifecycle()
 	fixture.queue_free()
 	await process_frame
 	if failures == 0:
-		print("PASS: root WASD and normalized diagonals, anchored bounded wheel/pinch, expanded coordinate invariance, terrain clamps, HUD/focus priority, transformed owned clicks and lifecycle reset")
+		print("PASS: root WASD and middle-mouse world grabs, anchored bounded wheel/pinch, expanded coordinate invariance, terrain clamps, HUD/focus priority, transformed owned clicks and lifecycle reset")
 	quit(1 if failures else 0)
 
 
@@ -297,6 +300,138 @@ func _check_home() -> void:
 		world.set_input_blocked(false)
 
 
+func _check_middle_drag() -> void:
+	var point: Vector2 = world.get_global_rect().get_center()
+	var delta := Vector2(42, 26)
+	var commands: Array[Vector2i] = []
+	var collect := func(cell: Vector2i, _value: Variant) -> void: commands.append(cell)
+	for board: PathBoard in world.boards:
+		board.cell_clicked.connect(collect)
+		board.edit_requested.connect(collect)
+		board.cell_click_mode = false
+	for shrink: int in [1, 2]:
+		world.stretch_shrink = shrink
+		await _settle()
+		for ratio: float in [1.5, 2.0]:
+			_center_drag_camera(initial_zoom * ratio)
+			var start: Vector2 = world.camera.position
+			var grabbed: Vector2 = _world_point(point)
+			var expected_delta: Vector2 = (_world_point(point + delta) - grabbed)
+			world.boards[0]._paint_button = MOUSE_BUTTON_LEFT
+			world.boards[0]._last_painted = Vector2i(6, 6)
+			world.zoom_at(1.1, point)
+			await _middle(point, true)
+			_check(world.boards[0]._paint_button == MOUSE_BUTTON_NONE, "Beginning a world grab cancels an existing path stroke")
+			_check(is_equal_approx(world._target_zoom, world.camera.zoom.x), "Beginning a grab cancels unfinished zoom easing")
+			await _middle_motion(point + delta)
+			_check(world.camera.position.distance_to(start - expected_delta) < 0.001, "Grab follows inverse world motion at zoom=%s viewport shrink=%d" % [ratio, shrink])
+			_check(_world_point(point + delta).distance_to(grabbed) < 0.001, "The grabbed world point follows the pointer through real viewport scaling")
+			await _middle_motion(point)
+			_check(world.camera.position.distance_to(start) < 0.001, "Reversing a grab restores the camera without drift")
+			await _middle(header.get_global_rect().get_center(), false)
+			await _middle_motion(point + delta)
+			_check(world.camera.position.distance_to(start) < 0.001, "Release over HUD ends the grab before subsequent world motion")
+			_check(not world._middle_dragging, "HUD release clears gesture ownership")
+	_check(commands.is_empty(), "Middle gestures cannot select cells, place towers, or request path edits")
+	world.stretch_shrink = 1
+	await _settle()
+	_center_drag_camera(initial_zoom * 2.0)
+	await _middle(point, true)
+	await _middle_motion(Vector2(-100000, -100000))
+	_check(world.camera.position.is_equal_approx(Vector2(world.camera_bounds.y, world.camera_vertical_bounds.y)), "Dragging toward the upper left clamps at the same right/bottom terrain bounds as WASD")
+	await _middle_motion(Vector2(100000, 100000))
+	_check(world.camera.position.is_equal_approx(Vector2(world.camera_bounds.x, world.camera_vertical_bounds.x)), "Dragging toward the lower right clamps at the same left/top terrain bounds as WASD")
+	await _middle(point, false)
+	for board: PathBoard in world.boards:
+		board.cell_clicked.disconnect(collect)
+		board.edit_requested.disconnect(collect)
+		board.cell_click_mode = true
+	await _key(KEY_HOME, true)
+	await _key(KEY_HOME, false)
+
+
+func _check_middle_priority() -> void:
+	_center_drag_camera(initial_zoom * 2.0)
+	var point: Vector2 = world.get_global_rect().get_center()
+	var position: Vector2 = world.camera.position
+	await _middle(header.get_global_rect().get_center(), true)
+	await _middle_motion(point + Vector2(30, 20))
+	await _middle(point, false)
+	_check(world.camera.position.is_equal_approx(position), "HUD-origin middle presses cannot become a world grab after crossing onto terrain")
+	management.show()
+	await _settle()
+	await _middle(management.get_global_rect().get_center(), true)
+	await _middle_motion(point)
+	await _middle(point, false)
+	_check(world.camera.position.is_equal_approx(position), "Inspector overlays block middle-drag initiation")
+	management.hide()
+	world.set_input_blocked(true)
+	await _middle(point, true)
+	await _middle_motion(point + Vector2(30, 20))
+	await _middle(point, false)
+	world.set_input_blocked(false)
+	_check(world.camera.position.is_equal_approx(position), "Modal-blocked world cannot begin a middle drag")
+	selector.show_popup()
+	await process_frame
+	await _middle(point, true)
+	await _middle_motion(point + Vector2(30, 20))
+	await _middle(point, false)
+	_check(world.camera.position.is_equal_approx(position), "An open enemy popup blocks middle-drag initiation")
+	selector.get_popup().hide()
+	editor.show()
+	editor.grab_focus()
+	await _middle(point, true)
+	await _middle_motion(point + Vector2(30, 20))
+	await _middle(point, false)
+	_check(world.camera.position.is_equal_approx(position), "Focused text entry blocks middle-drag initiation")
+	editor.release_focus()
+	editor.hide()
+
+
+func _check_middle_cancellation() -> void:
+	var point: Vector2 = world.get_global_rect().get_center()
+	for reason: String in ["focus", "window_focus", "hidden", "blocked", "inactive", "popup", "typing"]:
+		_center_drag_camera(initial_zoom * 2.0)
+		await _middle(point, true)
+		_check(world._middle_dragging, "Cancellation fixture begins a real root-event grab: %s" % reason)
+		match reason:
+			"focus": world.notification(MainLoop.NOTIFICATION_APPLICATION_FOCUS_OUT)
+			"window_focus": world.notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
+			"hidden": fixture.hide()
+			"blocked": world.set_input_blocked(true)
+			"inactive": world.set_active(false)
+			"popup": selector.show_popup()
+			"typing":
+				editor.show()
+				editor.grab_focus()
+		world._process(0.01)
+		_check(not world._middle_dragging, "Camera grab is cancelled on %s" % reason)
+		match reason:
+			"hidden": fixture.show()
+			"blocked": world.set_input_blocked(false)
+			"inactive": world.set_active(true)
+			"popup": selector.get_popup().hide()
+			"typing":
+				editor.release_focus()
+				editor.hide()
+		world.set_process(false)
+		await _settle()
+		var position: Vector2 = world.camera.position
+		await _middle_motion(point + Vector2(30, 20))
+		_check(world.camera.position.is_equal_approx(position), "Resuming after %s cannot revive a cancelled grab" % reason)
+		await _middle(point, false)
+	await _key(KEY_HOME, true)
+	await _key(KEY_HOME, false)
+
+
+func _center_drag_camera(zoom: float) -> void:
+	world.camera.zoom = Vector2.ONE * zoom
+	world._target_zoom = world.camera.zoom.x
+	world._update_camera_bounds()
+	world.camera.position = Vector2((world.camera_bounds.x + world.camera_bounds.y) * 0.5, (world.camera_vertical_bounds.x + world.camera_vertical_bounds.y) * 0.5)
+	world.camera.force_update_scroll()
+
+
 func _check_input_priority() -> void:
 	var zoom: Vector2 = world.camera.zoom
 	await _wheel(header.get_global_rect().get_center(), MOUSE_BUTTON_WHEEL_UP)
@@ -389,6 +524,26 @@ func _world_point(point: Vector2) -> Vector2:
 	var local: Vector2 = world.get_global_transform_with_canvas().affine_inverse() * point
 	var viewport: SubViewport = world.get_node("Viewport")
 	return viewport.get_canvas_transform().affine_inverse() * (local * Vector2(viewport.size) / world.size)
+
+
+func _middle(point: Vector2, pressed: bool) -> void:
+	var event := InputEventMouseButton.new()
+	event.position = point
+	event.global_position = point
+	event.button_index = MOUSE_BUTTON_MIDDLE
+	event.button_mask = MOUSE_BUTTON_MASK_MIDDLE if pressed else 0
+	event.pressed = pressed
+	root.push_input(event, true)
+	await process_frame
+
+
+func _middle_motion(point: Vector2) -> void:
+	var event := InputEventMouseMotion.new()
+	event.position = point
+	event.global_position = point
+	event.button_mask = MOUSE_BUTTON_MASK_MIDDLE
+	root.push_input(event, true)
+	await process_frame
 
 
 func _wheel(point: Vector2, button: MouseButton) -> void:

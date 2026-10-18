@@ -39,6 +39,8 @@ var _left_held: bool = false
 var _right_held: bool = false
 var _up_held: bool = false
 var _down_held: bool = false
+var _middle_dragging: bool = false
+var _drag_last_position := Vector2.ZERO
 var _hud_popups: Array[PopupMenu] = []
 var _camera_input: CameraInput
 
@@ -137,7 +139,7 @@ func pan(delta: float, direction: Vector2) -> void:
 
 
 func _process(delta: float) -> void:
-	if not is_visible_in_tree() or _movement_blocked():
+	if not is_visible_in_tree() or _movement_blocked() or (_middle_dragging and get_viewport().gui_is_dragging()):
 		_cancel_motion()
 		return
 	_update_zoom(delta)
@@ -148,8 +150,31 @@ func _handle_camera_input(event: InputEvent) -> void:
 	if not _active or not is_visible_in_tree() or _input_blocked:
 		_cancel_motion()
 		return
+	if _middle_dragging and (event is InputEventMouseMotion or event is InputEventMouseButton):
+		if _movement_blocked() or get_viewport().gui_is_dragging():
+			_cancel_motion()
+		elif event is InputEventMouseMotion:
+			_drag_camera_to((event as InputEventMouseMotion).position)
+		elif event is InputEventMouseButton:
+			var drag_button := event as InputEventMouseButton
+			if drag_button.button_index == MOUSE_BUTTON_MIDDLE and not drag_button.pressed:
+				_middle_dragging = false
+			elif drag_button.button_index == MOUSE_BUTTON_WHEEL_UP or drag_button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				# Keep cursor-anchored zoom available during a grab.
+				if drag_button.pressed:
+					var factor: float = drag_button.factor if drag_button.factor > 0.0 else 1.0
+					zoom_at(pow(WHEEL_ZOOM_STEP, factor if drag_button.button_index == MOUSE_BUTTON_WHEEL_UP else -factor), drag_button.position)
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton:
 		var mouse := event as InputEventMouseButton
+		if mouse.button_index == MOUSE_BUTTON_MIDDLE:
+			if mouse.pressed and _fit_zoom > 0.0 and _can_start_camera_gesture(mouse.position):
+				_cancel_motion()
+				_middle_dragging = true
+				_drag_last_position = mouse.position
+				get_viewport().set_input_as_handled()
+			return
 		if mouse.pressed and (mouse.button_index == MOUSE_BUTTON_WHEEL_UP or mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN):
 			var exponent: float = mouse.factor if mouse.factor > 0.0 else 1.0
 			if mouse.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -188,15 +213,34 @@ func _handle_camera_input(event: InputEvent) -> void:
 func zoom_at(factor: float, screen_position: Vector2) -> bool:
 	if not _active or not is_visible_in_tree() or factor <= 0.0 or not is_finite(factor) or _fit_zoom <= 0.0:
 		return false
-	if _movement_blocked() or get_viewport().gui_is_dragging() or _hud_at_point(get_parent(), screen_position):
+	if not _can_start_camera_gesture(screen_position):
 		return false
 	var local_position: Vector2 = get_global_transform_with_canvas().affine_inverse() * screen_position
-	if not Rect2(Vector2.ZERO, size).has_point(local_position):
-		return false
 	_zoom_anchor = local_position * Vector2(_world_viewport.size) / size
 	_target_zoom = clampf(_target_zoom * factor, _minimum_zoom(), _fit_zoom * MAX_ZOOM_RATIO)
 	_cancel_strokes()
 	return true
+
+
+func _can_start_camera_gesture(screen_position: Vector2) -> bool:
+	if _movement_blocked() or get_viewport().gui_is_dragging() or _hud_at_point(get_parent(), screen_position):
+		return false
+	var local_position: Vector2 = get_global_transform_with_canvas().affine_inverse() * screen_position
+	return Rect2(Vector2.ZERO, size).has_point(local_position)
+
+
+func _drag_camera_to(screen_position: Vector2) -> void:
+	# Root event positions must pass through the container and actual render
+	# viewport before the inverse camera canvas turns them into world motion.
+	var container_inverse: Transform2D = get_global_transform_with_canvas().affine_inverse()
+	var viewport_delta: Vector2 = (container_inverse * screen_position - container_inverse * _drag_last_position) * Vector2(_world_viewport.size) / size
+	_drag_last_position = screen_position
+	var canvas_inverse: Transform2D = _world_viewport.get_canvas_transform().affine_inverse()
+	var world_delta: Vector2 = canvas_inverse.basis_xform(viewport_delta)
+	if not camera.zoom.is_equal_approx(_bounds_zoom):
+		_update_camera_bounds()
+	camera.position = _clamped_position(camera.position - world_delta)
+	camera.force_update_scroll()
 
 
 func _update_zoom(delta: float) -> void:
@@ -273,12 +317,13 @@ func _movement_blocked() -> bool:
 func _propagate_input_event(event: InputEvent) -> bool:
 	# A native HUD drag belongs to the root viewport; forwarding its mouse
 	# events would let the embedded viewport replace the root drop target.
-	return _active and not _input_blocked and is_visible_in_tree() and not (event is InputEventMouse and get_viewport().gui_is_dragging())
+	return _active and not _input_blocked and is_visible_in_tree() and not (event is InputEventMouse and (_middle_dragging or get_viewport().gui_is_dragging()))
 
 
 func _fit_camera() -> void:
 	if not is_node_ready() or _dimensions == Vector2i.ZERO or size.x <= 0.0 or size.y <= 0.0:
 		return
+	_middle_dragging = false
 	_cancel_strokes()
 	var ratio: float = camera.zoom.x / _fit_zoom if _fit_zoom > 0.0 else 1.0
 	var initial_size := Vector2(maxi(_dimensions.x + _board_origin_y, 1), maxi(_dimensions.y + 2 * _board_origin_y, 1)) * CELL_SIZE
@@ -368,6 +413,7 @@ func _cancel_motion() -> void:
 	_right_held = false
 	_up_held = false
 	_down_held = false
+	_middle_dragging = false
 	_target_zoom = camera.zoom.x
 	_cancel_strokes()
 

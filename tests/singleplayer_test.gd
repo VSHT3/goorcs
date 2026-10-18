@@ -31,6 +31,7 @@ func _run() -> void:
 	planning.session = session
 	# Isolate mirrored lifecycle from the shipped randomized horde composition.
 	var rules: CombatRules = _classic_rules()
+	rules.base_health = 10
 	var grunt: EnemyDefinition = preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition
 	grunt.send_first_wave = 1
 	rules.catalog.enemies = [grunt]
