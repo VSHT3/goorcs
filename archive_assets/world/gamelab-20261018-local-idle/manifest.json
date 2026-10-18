@@ -1,0 +1,124 @@
+{
+  "status": "LOCAL ANIMATION CANDIDATES; approved input stills, animation review pending; NOT installed at runtime",
+  "authoring": "Deterministic local Python + Pillow pixel edits; no network, credentials, model inference, generation service, GPU, or credits used.",
+  "pillow_version": "12.3.0",
+  "script": "generate.py",
+  "script_sha256": "a05d77f469aedfa81b7fca4bd71210a550f98d00a65584d00f8cbf0b01835b12",
+  "source_provenance_snapshot": "source-generation.json",
+  "source_provenance_sha256": "8663ee1a0d3df20fbb9e09f2fd82c42b8820b18b593ee9cfc975860d7476bfa8",
+  "source_approval_note": "Creator-approved stills supplied for this task; the original provider manifest predates that approval and is preserved verbatim.",
+  "frame_size": [
+    128,
+    128
+  ],
+  "frame_count": 16,
+  "frame_duration_ms": 200,
+  "frames_per_second": 5.0,
+  "loop_duration_ms": 3200,
+  "sheet_size": [
+    2048,
+    128
+  ],
+  "sheet_layout": "Single horizontal row, left-to-right chronological 128x128 cells; no padding.",
+  "alpha_policy": "0/255 only; exact source alpha every frame; transparent RGB cleared to zero; no halo, blur, antialiasing, dilation, or shape movement.",
+  "palette_policy": "Opaque pixels in sheets/individual GIFs belong to that approved still's exact RGB palette; no dithering or new sprite colors. Comparison background/text colors are preview-only.",
+  "filtering": "No sprite resampling except exact nearest-neighbor 2x enlargement in comparison previews; intended runtime filtering remains nearest if later approved.",
+  "motion": {
+    "health_crystal": "One restrained traveling diagonal facet shimmer; no bob, scaling, silhouette change, socket/inlay motion, or pedestal edits. Nearly white highlights remain fixed.",
+    "enemy_portal": "Interior-only full-turn polar advection with periodic angular shear and radial ripple; source-palette remapping; stationary boundary taper. Stone ring, carved red runes, foundation, and silhouette never rotate or move."
+  },
+  "limitations": [
+    "Manual 16-frame/5fps pixel animation, not model-generated material or volumetric animation; nearest sampling and limited source colors produce visible pixel steps, especially at 2x preview scale.",
+    "Portal perimeter taper is intentionally restrained to protect masonry; the interior does not emit new external glow, sparks, or changing carved runes.",
+    "Crystal effect is deliberately subtle and can read weakly when reduced on the battlefield; isolated socket inlays and pale fixed facet highlights do not animate.",
+    "No Godot import, tests, build, game launch, runtime integration, or gameplay/scale review performed. Animation approval is still required."
+  ],
+  "paired_preview": "idle_comparison.gif",
+  "paired_preview_sha256": "ea560a4c05ca15f43336899839444602ce8688796a250c035bdb1620a74ebf95",
+  "assets": [
+    {
+      "name": "enemy_portal",
+      "approved_still_original_path": "/home/vsht/Pictures/Gorcs-PixelArt/endpoints-gamelab-20261018/enemy_portal.png",
+      "approved_still_original_sha256": "fb72206e4348988ac777eb48100c2f0694a84a98285698262a34d8b9f12885cd",
+      "preserved_original_copy": "enemy_portal-approved.png",
+      "cleaned_source": "enemy_portal.png",
+      "cleaned_source_sha256": "e2fe2e8fa20d18f0fd138144f24fe68ddd080fe5e360cd9e901ec670d488f5ab",
+      "opaque_source_palette_colors": 47,
+      "alpha_bounds": [
+        23,
+        3,
+        105,
+        123
+      ],
+      "effect_mask": "enemy_portal_effect_mask.png",
+      "effect_mask_pixels": 2066,
+      "sheet": "enemy_portal_idle.png",
+      "sheet_sha256": "9c0de96ff14862968002f882f46c155e1343b164feb62ff5077fd37843483021",
+      "preview": "enemy_portal_idle.gif",
+      "preview_sha256": "63cfd2c45c5f2e575ff63ad2a47de9a33e765ab065a5ce0572b8a713f38b3229",
+      "unique_frames": 16,
+      "adjacent_changed_pixels_including_loop_seam": [
+        1362,
+        1396,
+        1411,
+        1333,
+        1304,
+        1366,
+        1372,
+        1379,
+        1414,
+        1343,
+        1324,
+        1340,
+        1382,
+        1414,
+        1341,
+        1351
+      ],
+      "preservation": "Every pixel outside the saved effect mask and the complete alpha channel remain identical to the cleaned approved still. All opaque source pixels are unmodified by cleanup."
+    },
+    {
+      "name": "health_crystal",
+      "approved_still_original_path": "/home/vsht/Pictures/Gorcs-PixelArt/endpoints-gamelab-20261018/health_crystal.png",
+      "approved_still_original_sha256": "ba8947500a3cd00137d85442352437e8c90e0e1c529824b4f49c69bc1c30e662",
+      "preserved_original_copy": "health_crystal-approved.png",
+      "cleaned_source": "health_crystal.png",
+      "cleaned_source_sha256": "e115eafb930078c29ab558ead2d82e9f457bf3244ab6ad8711ea33045d2574f8",
+      "opaque_source_palette_colors": 48,
+      "alpha_bounds": [
+        29,
+        3,
+        100,
+        119
+      ],
+      "effect_mask": "health_crystal_effect_mask.png",
+      "effect_mask_pixels": 2037,
+      "sheet": "health_crystal_idle.png",
+      "sheet_sha256": "6917e3990f5c40a78327b506cd892c0403a1163122a4503d26daed7407fc2904",
+      "preview": "health_crystal_idle.gif",
+      "preview_sha256": "14bcc77afd690deaddc95a507b97c78cbc70000a599f83edbd8f3c410feb9b62",
+      "unique_frames": 16,
+      "adjacent_changed_pixels_including_loop_seam": [
+        3,
+        33,
+        81,
+        173,
+        237,
+        312,
+        331,
+        397,
+        407,
+        447,
+        452,
+        475,
+        441,
+        343,
+        203,
+        67
+      ],
+      "preservation": "Every pixel outside the saved effect mask and the complete alpha channel remain identical to the cleaned approved still. All opaque source pixels are unmodified by cleanup."
+    }
+  ],
+  "optional_existing_video": "/home/vsht/Pictures/Gorcs-PixelArt/endpoint-idles-orc-gamelab-20261018/enemy_portal-idle.mp4",
+  "optional_existing_video_action": "Untouched; remains an alternative, not an input to these candidates."
+}

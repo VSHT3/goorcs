@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Reproduce seven original, locally pixel-authored enemy designs (Pillow only).
+"""Reproduce the remaining original, locally pixel-authored enemies (Pillow only).
 
-All silhouettes, faces, material clusters and articulated poses are drawn here.
+The accepted GameLab Orc is loaded from its installed sheet for shared previews;
+this script never overwrites it. Other silhouettes and poses are authored here.
 Historical assets/enemies/*.png are references only and NEVER written or sampled.
-Run this script to export sheets, SpriteFrames, stills and exact provenance. Review
-lineups/contact sheets and a real-time animated preview are written under /tmp.
-No external generator, paid service, antialiasing, image rotation or limb masks.
+Run to export the remaining sheets, SpriteFrames, stills and exact provenance.
+Review lineups/contact sheets and animated previews are written under /tmp.
 """
 from pathlib import Path
 import hashlib
@@ -720,6 +720,8 @@ def digest(path):
 
 
 def export(kind, animations):
+    if kind == 'grunt':
+        raise ValueError('Approved Orc is owned by archive_assets/enemies/grunt/gamelab-20261018/derive_runtime.py')
     all_frames = [im for _,_,frames in animations for im in frames]
     sheet = Image.new('RGBA',(SIZE*len(all_frames),SIZE))
     for i,im in enumerate(all_frames):
@@ -773,6 +775,22 @@ def export(kind, animations):
                        for name,speed,frames in animations],
     }
     (OUT/f'{kind}.json').write_text(json.dumps(manifest,indent=2)+'\n')
+
+
+def installed_grunt():
+    """Read accepted frames without generating or overwriting the approved Orc."""
+    manifest = json.loads((OUT/'grunt.json').read_text())
+    width,height = manifest['frame_size']
+    sheet = Image.open(OUT/'grunt.png').convert('RGBA')
+    animations = []
+    offset = 0
+    for animation in manifest['animations']:
+        count = animation['frame_count']
+        frames = [sheet.crop(((offset+i)*width,0,(offset+i+1)*width,height))
+                  for i in range(count)]
+        animations.append((animation['name'],animation['fps'],frames))
+        offset += count
+    return animations
 
 
 def previews(cycles):
@@ -865,6 +883,9 @@ def gait_review(cycles):
     """Export directional evidence using the same numeric gait that draws the legs."""
     report={}
     for kind,stride in zip(KINDS,(5,5,9,4,4,3,6)):
+        if kind == 'grunt':
+            report[kind] = json.loads((OUT/'grunt.json').read_text())['gait']
+            continue
         recovery=[gait(i*math.pi/12,stride)[0] for i in range(13)]
         stance=[gait(math.pi+i*math.pi/12,stride)[0] for i in range(13)]
         knee=gait(math.pi/2,stride)[2]
@@ -890,8 +911,10 @@ def gait_review(cycles):
     for row,kind in enumerate(KINDS):
         for mirror in (False,True):
             y=32+row*216+(108 if mirror else 0)
-            label=(kind+'   ---> RIGHT / mirrored: ground foot sweeps LEFT' if mirror
-                   else kind+'   <--- LEFT / source: ground foot sweeps RIGHT')
+            source_left = kind != 'grunt'
+            faces_left = source_left != mirror
+            direction = '<--- LEFT: ground foot sweeps RIGHT' if faces_left else '---> RIGHT: ground foot sweeps LEFT'
+            label = kind+'   '+direction+(' / mirrored' if mirror else ' / source')
             draw.text((5,y+2),label,fill='#dfd4ac')
             for f,im in enumerate(cycles[kind][0][2]):
                 if mirror:
@@ -899,13 +922,16 @@ def gait_review(cycles):
                 sheet.paste(im,(f*80,y+18),im)
                 draw.text((f*80+3,y+96),f'{f:02d}',fill='#b4c49c')
     sheet.save('/tmp/gorcs-enemy-walk-direction-contact.png')
-    print('Gait authoring audit: seven left-facing stance sweeps right, recovery left; mirrored-right signs opposite.')
+    print('Gait authoring audit: six original left-facing gaits; accepted right-facing Orc uses its archived cutout rig.')
 
 
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     cycles={}
     for kind in KINDS:
+        if kind == 'grunt':
+            cycles[kind] = installed_grunt()
+            continue
         animations=[('walk',FPS[kind],[pose(kind,i) for i in range(12)])]
         if kind=='orc_chief':
             animations.append(('heal',12/.55,[pose(kind,i,'heal') for i in range(12)]))
@@ -916,7 +942,7 @@ def main():
         cycles[kind]=animations
     previews(cycles)
     gait_review(cycles)
-    print('Exported seven original 12-frame walks/deaths, .55s heal, 1.15s cast; review images/GIF in /tmp/gorcs-enemy-*.')
+    print('Exported six original walks/deaths plus actions; preserved approved Orc and included it in /tmp/gorcs-enemy-* previews.')
 
 
 if __name__=='__main__':

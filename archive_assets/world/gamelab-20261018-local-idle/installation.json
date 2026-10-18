@@ -1,0 +1,39 @@
+{
+  "status": "Creator approved both local loops and requested installation",
+  "runtime_files": [
+    "assets/world/enemy_portal.png",
+    "assets/world/enemy_portal_idle.png",
+    "assets/world/health_crystal.png",
+    "assets/world/health_crystal_idle.png"
+  ],
+  "frame_size": [
+    128,
+    128
+  ],
+  "frame_count": 16,
+  "fps": 5,
+  "runtime_height_cells": 1.05,
+  "anchors": {
+    "enemy_portal": [
+      0.5,
+      0.9609375
+    ],
+    "health_crystal": [
+      0.50390625,
+      0.9296875
+    ]
+  },
+  "authoring_credits": 0,
+  "still_generation_credits": 4,
+  "paid_portal_video": "Alternative only; not used by these local sheets. Previously charged4credits.",
+  "approval": "Both local idles approved in batch review.",
+  "verification": {
+    "main_scene_walkthrough": "Passed in6.54seconds using isolated saves, X11 Compatibility/Mesa llvmpipe, Dummy audio; native Sandbox pointer placement/upgrade, actual Orc walk and confirmed deaths, supported-width mirrored views, 128px endpoint playback and hide/resume.",
+    "captures": ".verify-logs/orc-endpoints-20261018/",
+    "native_gpu_performance": "Not verified",
+    "sound_quality": "Not verified",
+    "full_suite": "All headless checks passed in initial all-mode run (63/64 overall, death-rendering helper timed out). After correcting capture-signal ordering, standard rendered run passed12/12 including death pixels with native render loop disabled. No timeout increase, retry or assertion exemption.",
+    "all_logs": ".verify-logs/20261018T110737Z-all-0658f574/",
+    "final_rendered_logs": ".verify-logs/20261018T111453Z-rendered-7c8e786d/"
+  }
+}

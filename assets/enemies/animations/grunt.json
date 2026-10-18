@@ -1,8 +1,25 @@
 {
-  "authoring": "Original local pixel geometry; seven individually authored heads/anatomies; every pose redrawn from articulated joints. No source-image sampling or model generation.",
-  "identity": "Stocky adult veteran; projecting square jaw, broken nose, diagonal cheek scar and leather baldric.",
-  "generator": "tools/author_enemy_sprites.py",
-  "generator_sha256": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
+  "approval": "Creator approved basic Orc still: enemy looks perfect; install it.",
+  "source_origin": "GameLab generated still, creator approved; free local source-cutout animation",
+  "provider": {
+    "image_job_id": "ce3cd60b-93f1-45e3-8db5-9cd08b804a00",
+    "asset_id": 69895,
+    "project_id": 32579,
+    "image_credits_debited": 2,
+    "local_animation_credits": 0
+  },
+  "generator": "archive_assets/enemies/grunt/gamelab-20261018/derive_runtime.py",
+  "source": "archive_assets/enemies/grunt/gamelab-20261018/source/basic_orc.png",
+  "source_dimensions": [
+    64,
+    64
+  ],
+  "source_alpha_bounds": [
+    13,
+    9,
+    49,
+    56
+  ],
   "frame_size": [
     80,
     80
@@ -11,115 +28,878 @@
     1920,
     80
   ],
-  "alpha": "binary 0/255; nearest-neighbour; no antialiasing, smoothing, dithering, masks or raster-image rotation",
-  "lighting": "upper-left broad material planes; dark selective outlines and warm leather/bone shadows",
-  "camera": "elevated three-quarter view facing left; foreground left shoulder/foot overlap far right limbs",
+  "still": "assets/enemies/animations/grunt_still.png",
+  "sprite_frames": "Existing grunt.tres retained byte-for-byte: 24 80px atlas regions, 12fps walk loop and 15fps nonlooping death.",
+  "still_derivation": {
+    "operation": "lossless transparent padding only",
+    "offset": [
+      8,
+      14
+    ],
+    "source_pixels": "unchanged RGBA including RGB under alpha"
+  },
+  "alpha": "binary 0/255; nearest-neighbor inverse affine sampling; no smoothing or dithering",
   "base_anchor": [
     0.5,
     0.875
   ],
-  "source_faces_left": true,
-  "sheet_sha256": "f1791c4aabf1e1d076cf04ae83bfdde454fda3c0725ff34e8e48759ff01e6776",
-  "still": "assets/enemies/animations/grunt_still.png",
-  "still_sha256": "d2d5ea8fd3b8d0090704615783e8fea0c37e70b9c0ab118061bf1c4c607dc637",
-  "still_dimensions": [
-    80,
-    80
-  ],
-  "death": {
-    "duration_seconds": 0.8,
-    "last_frame": "settled corpse; bone pile for SkeleOrc",
-    "articulation": "individually authored recoil, knee/trip, impact and settled joint tableaux",
-    "blood_in_sprite": false,
-    "dropped_equipment": "Chief crown / NecOrcmancer skullstaff"
+  "board_height": 0.5,
+  "source_faces_left": false,
+  "camera": "approved front/right elevated three-quarter source; mirrored by shared renderer",
+  "masks_in_ownership_order": {
+    "cleaver": [
+      [
+        19,
+        39
+      ],
+      [
+        21,
+        38
+      ],
+      [
+        28,
+        44
+      ],
+      [
+        29,
+        48
+      ],
+      [
+        27,
+        51
+      ],
+      [
+        23,
+        47
+      ],
+      [
+        19,
+        43
+      ],
+      [
+        18,
+        41
+      ]
+    ],
+    "head": [
+      [
+        27,
+        8
+      ],
+      [
+        42,
+        8
+      ],
+      [
+        42,
+        22
+      ],
+      [
+        39,
+        26
+      ],
+      [
+        35,
+        28
+      ],
+      [
+        30,
+        25
+      ],
+      [
+        28,
+        22
+      ],
+      [
+        26,
+        16
+      ]
+    ],
+    "near_arm": [
+      [
+        22,
+        16
+      ],
+      [
+        25,
+        19
+      ],
+      [
+        24,
+        26
+      ],
+      [
+        21,
+        30
+      ],
+      [
+        21,
+        34
+      ],
+      [
+        23,
+        36
+      ],
+      [
+        21,
+        39
+      ],
+      [
+        16,
+        40
+      ],
+      [
+        13,
+        36
+      ],
+      [
+        12,
+        32
+      ],
+      [
+        14,
+        26
+      ],
+      [
+        16,
+        21
+      ]
+    ],
+    "far_arm": [
+      [
+        41,
+        18
+      ],
+      [
+        44,
+        21
+      ],
+      [
+        45,
+        27
+      ],
+      [
+        48,
+        30
+      ],
+      [
+        48,
+        33
+      ],
+      [
+        50,
+        35
+      ],
+      [
+        49,
+        39
+      ],
+      [
+        45,
+        39
+      ],
+      [
+        43,
+        36
+      ],
+      [
+        43,
+        33
+      ],
+      [
+        40,
+        29
+      ]
+    ],
+    "near_boot": [
+      [
+        20,
+        43
+      ],
+      [
+        26,
+        43
+      ],
+      [
+        26,
+        49
+      ],
+      [
+        25,
+        56
+      ],
+      [
+        18,
+        56
+      ],
+      [
+        18,
+        51
+      ]
+    ],
+    "far_boot": [
+      [
+        36,
+        43
+      ],
+      [
+        44,
+        43
+      ],
+      [
+        44,
+        48
+      ],
+      [
+        48,
+        50
+      ],
+      [
+        48,
+        53
+      ],
+      [
+        41,
+        53
+      ],
+      [
+        36,
+        50
+      ]
+    ],
+    "near_thigh": [
+      [
+        24,
+        35
+      ],
+      [
+        32,
+        35
+      ],
+      [
+        31,
+        39
+      ],
+      [
+        28,
+        44
+      ],
+      [
+        25,
+        46
+      ],
+      [
+        20,
+        44
+      ],
+      [
+        20,
+        40
+      ]
+    ],
+    "far_thigh": [
+      [
+        34,
+        35
+      ],
+      [
+        40,
+        35
+      ],
+      [
+        43,
+        39
+      ],
+      [
+        44,
+        44
+      ],
+      [
+        40,
+        46
+      ],
+      [
+        36,
+        44
+      ],
+      [
+        34,
+        40
+      ]
+    ]
   },
-  "historical_reference": "assets/enemies/grunt.png",
-  "historical_reference_dimensions": [
-    64,
-    64
+  "pivots": {
+    "torso": [
+      [
+        32,
+        35
+      ],
+      [
+        32,
+        24
+      ]
+    ],
+    "head": [
+      [
+        35,
+        19
+      ],
+      [
+        35,
+        10
+      ]
+    ],
+    "near_arm": [
+      [
+        21,
+        21
+      ],
+      [
+        18,
+        36
+      ]
+    ],
+    "far_arm": [
+      [
+        42,
+        22
+      ],
+      [
+        46,
+        36
+      ]
+    ],
+    "near_thigh": [
+      [
+        27,
+        36
+      ],
+      [
+        24,
+        44
+      ]
+    ],
+    "near_boot": [
+      [
+        24,
+        44
+      ],
+      [
+        22,
+        54
+      ]
+    ],
+    "far_thigh": [
+      [
+        37,
+        36
+      ],
+      [
+        40,
+        44
+      ]
+    ],
+    "far_boot": [
+      [
+        40,
+        44
+      ],
+      [
+        44,
+        51
+      ]
+    ],
+    "cleaver": [
+      [
+        22,
+        41
+      ],
+      [
+        26,
+        48
+      ]
+    ]
+  },
+  "compositing_order": [
+    "far_boot",
+    "far_thigh",
+    "far_arm",
+    "near_boot",
+    "near_thigh",
+    "torso",
+    "head",
+    "near_arm",
+    "cleaver"
   ],
-  "historical_reference_sha256": "7005092f2216a6d57556010196978f57213f5a8e98a359cad9055959bb0927ca",
-  "historical_reference_status": "Pre-existing source preserved byte-for-byte; not used as cutout or runtime frame",
-  "historical_reference_origin": "Prior accepted Klein reference edit",
-  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
+  "death_keyframes": [
+    {
+      "torso": [
+        [
+          32,
+          35
+        ],
+        [
+          32,
+          24
+        ]
+      ],
+      "head": [
+        [
+          35,
+          19
+        ],
+        [
+          35,
+          10
+        ]
+      ],
+      "near_arm": [
+        [
+          21,
+          21
+        ],
+        [
+          18,
+          36
+        ]
+      ],
+      "far_arm": [
+        [
+          42,
+          22
+        ],
+        [
+          46,
+          36
+        ]
+      ],
+      "near_thigh": [
+        [
+          27,
+          36
+        ],
+        [
+          24,
+          44
+        ]
+      ],
+      "near_boot": [
+        [
+          24,
+          44
+        ],
+        [
+          22,
+          54
+        ]
+      ],
+      "far_thigh": [
+        [
+          37,
+          36
+        ],
+        [
+          40,
+          44
+        ]
+      ],
+      "far_boot": [
+        [
+          40,
+          44
+        ],
+        [
+          44,
+          51
+        ]
+      ],
+      "cleaver": [
+        [
+          22,
+          41
+        ],
+        [
+          26,
+          48
+        ]
+      ]
+    },
+    {
+      "torso": [
+        [
+          32,
+          38
+        ],
+        [
+          34,
+          27
+        ]
+      ],
+      "head": [
+        [
+          37,
+          22
+        ],
+        [
+          38,
+          13
+        ]
+      ],
+      "near_arm": [
+        [
+          22,
+          25
+        ],
+        [
+          16,
+          35
+        ]
+      ],
+      "far_arm": [
+        [
+          43,
+          26
+        ],
+        [
+          47,
+          39
+        ]
+      ],
+      "near_thigh": [
+        [
+          27,
+          39
+        ],
+        [
+          23,
+          46
+        ]
+      ],
+      "near_boot": [
+        [
+          23,
+          46
+        ],
+        [
+          22,
+          54
+        ]
+      ],
+      "far_thigh": [
+        [
+          37,
+          39
+        ],
+        [
+          42,
+          47
+        ]
+      ],
+      "far_boot": [
+        [
+          42,
+          47
+        ],
+        [
+          46,
+          52
+        ]
+      ],
+      "cleaver": [
+        [
+          20,
+          40
+        ],
+        [
+          23,
+          47
+        ]
+      ]
+    },
+    {
+      "torso": [
+        [
+          36,
+          47
+        ],
+        [
+          30,
+          37
+        ]
+      ],
+      "head": [
+        [
+          29,
+          31
+        ],
+        [
+          24,
+          24
+        ]
+      ],
+      "near_arm": [
+        [
+          24,
+          37
+        ],
+        [
+          16,
+          46
+        ]
+      ],
+      "far_arm": [
+        [
+          37,
+          34
+        ],
+        [
+          42,
+          45
+        ]
+      ],
+      "near_thigh": [
+        [
+          31,
+          47
+        ],
+        [
+          36,
+          52
+        ]
+      ],
+      "near_boot": [
+        [
+          36,
+          52
+        ],
+        [
+          43,
+          55
+        ]
+      ],
+      "far_thigh": [
+        [
+          40,
+          45
+        ],
+        [
+          45,
+          50
+        ]
+      ],
+      "far_boot": [
+        [
+          45,
+          50
+        ],
+        [
+          51,
+          54
+        ]
+      ],
+      "cleaver": [
+        [
+          16,
+          49
+        ],
+        [
+          10,
+          52
+        ]
+      ]
+    },
+    {
+      "torso": [
+        [
+          38,
+          52
+        ],
+        [
+          27,
+          49
+        ]
+      ],
+      "head": [
+        [
+          21,
+          45
+        ],
+        [
+          13,
+          43
+        ]
+      ],
+      "near_arm": [
+        [
+          26,
+          51
+        ],
+        [
+          18,
+          55
+        ]
+      ],
+      "far_arm": [
+        [
+          30,
+          45
+        ],
+        [
+          36,
+          53
+        ]
+      ],
+      "near_thigh": [
+        [
+          35,
+          52
+        ],
+        [
+          43,
+          53
+        ]
+      ],
+      "near_boot": [
+        [
+          43,
+          53
+        ],
+        [
+          52,
+          55
+        ]
+      ],
+      "far_thigh": [
+        [
+          41,
+          49
+        ],
+        [
+          49,
+          49
+        ]
+      ],
+      "far_boot": [
+        [
+          49,
+          49
+        ],
+        [
+          55,
+          53
+        ]
+      ],
+      "cleaver": [
+        [
+          15,
+          54
+        ],
+        [
+          8,
+          54
+        ]
+      ]
+    }
+  ],
+  "sha256": {
+    "archive_assets/enemies/grunt/gamelab-20261018/source/basic_orc.png": "a322d7987a2320cc62307b0d0257372fa26149cb43175367caa209dafcb1ded5",
+    "archive_assets/enemies/grunt/gamelab-20261018/source/basic_orc-provider.png": "8ec2f9c821d45f5c407b56371c6e59dcd839015dd1c40436545287f5f040c8da",
+    "archive_assets/enemies/grunt/gamelab-20261018/source/generation.json": "0ff122c2709f50f39124b0f6c81c65123e04c5324634b3cbe3eefa60c1db5ba3",
+    "archive_assets/enemies/grunt/gamelab-20261018/derive_runtime.py": "ccbb6176f39affec55e205b3fed60166b91b0d73915494d6e8d6c6df888f3bfb",
+    "assets/enemies/animations/grunt.png": "e2b472b5d68ce13fedc7c4961d64a8d043a97deecdf34cdc6ea6963491da0478",
+    "assets/enemies/animations/grunt_still.png": "6b58a9c65c65789b5a80eddd6bdaffa8da05391ac140cea7f9207b64ab9c3698",
+    "assets/enemies/animations/grunt.tres": "7a2a5114677686f044e271307036dec101e15ea7d84d060a4bf28f921c3b881d",
+    "resources/combat/enemies/grunt.tres": "79497c96fffd7b6633f3205c25dbc13599defc0a095c12bd580a2c5bec9333ed",
+    "tools/author_enemy_sprites.py": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4"
+  },
+  "gait": {
+    "source_faces_left": false,
+    "source_direction": "right",
+    "grounded_back_sweep": "left in local space",
+    "airborne_front_recovery": "right in local space",
+    "stride_pixels": 3,
+    "lift_pixels": 2,
+    "arm_counter_swing_pixels": 1.5,
+    "method": "independent thigh/knee/boot joints; counter-swing arms with cleaver attached to hand"
+  },
   "animations": [
     {
       "name": "walk",
       "fps": 12,
-      "duration_seconds": 1.0,
       "frame_count": 12,
+      "duration_seconds": 1.0,
       "loop": true,
       "alpha_bounds": [
         [
-          16,
-          13,
-          62,
+          21,
+          23,
+          57,
           70
         ],
         [
-          16,
-          12,
-          61,
-          68
+          20,
+          23,
+          58,
+          69
         ],
         [
-          16,
-          12,
-          59,
-          68
-        ],
-        [
-          18,
-          12,
-          57,
+          20,
+          22,
+          58,
           68
         ],
         [
           19,
-          12,
+          22,
+          59,
+          68
+        ],
+        [
+          20,
+          22,
+          58,
+          68
+        ],
+        [
+          20,
+          23,
+          58,
+          69
+        ],
+        [
+          21,
+          23,
+          57,
+          70
+        ],
+        [
+          22,
+          23,
           56,
-          68
-        ],
-        [
-          19,
-          12,
-          54,
-          68
-        ],
-        [
-          19,
-          13,
-          54,
           70
         ],
         [
-          19,
-          12,
-          54,
-          70
+          22,
+          22,
+          56,
+          71
         ],
         [
-          19,
-          12,
+          23,
+          22,
           55,
+          71
+        ],
+        [
+          22,
+          22,
+          56,
           70
         ],
         [
-          18,
-          12,
-          57,
-          70
-        ],
-        [
-          16,
-          12,
-          59,
-          70
-        ],
-        [
-          16,
-          12,
-          62,
+          22,
+          22,
+          56,
           70
         ]
       ]
@@ -127,83 +907,99 @@
     {
       "name": "death",
       "fps": 15,
-      "duration_seconds": 0.8,
       "frame_count": 12,
+      "duration_seconds": 0.8,
       "loop": false,
       "alpha_bounds": [
         [
-          16,
-          13,
-          62,
-          70
-        ],
-        [
-          18,
-          13,
-          60,
-          71
-        ],
-        [
-          18,
-          14,
-          61,
-          71
-        ],
-        [
-          18,
-          16,
-          60,
-          70
-        ],
-        [
-          17,
-          22,
+          21,
+          23,
           57,
           70
         ],
         [
-          10,
-          29,
-          56,
-          71
+          21,
+          24,
+          57,
+          70
         ],
         [
-          8,
+          21,
+          25,
+          58,
+          70
+        ],
+        [
+          21,
+          26,
+          58,
+          70
+        ],
+        [
+          21,
+          30,
+          58,
+          70
+        ],
+        [
+          21,
           33,
+          60,
+          70
+        ],
+        [
+          16,
+          36,
           64,
           71
         ],
         [
-          8,
-          36,
-          67,
+          16,
+          42,
+          64,
+          71
+        ],
+        [
+          15,
+          47,
+          65,
           72
         ],
         [
-          8,
-          38,
-          69,
-          73
-        ],
-        [
-          7,
-          40,
-          70,
+          14,
+          49,
+          66,
           74
         ],
         [
-          7,
-          40,
-          70,
+          14,
+          49,
+          66,
           74
         ],
         [
-          7,
-          40,
-          70,
+          14,
+          49,
+          66,
           74
         ]
       ]
     }
+  ],
+  "previous_runtime": "previous-runtime/ preserves original sheet, still, resources, imports, manifest and authoring script byte-for-byte",
+  "previous_runtime_sha256": {
+    "previous-runtime/author_enemy_sprites.py": "19faa3d4bfe240995c374b883a2073802782a2b6024320af868bb03b496aef3a",
+    "previous-runtime/enemy-definition.tres": "5db294282ca7002c0feee8c1513e15b6825be6d3bd6b80a80cddfdae7c6957e8",
+    "previous-runtime/grunt.json": "e2012daa7a62b28e8daf3893c75dfa27bd464ba7ad01c4a0d8763ff7699118f2",
+    "previous-runtime/grunt.png": "f1791c4aabf1e1d076cf04ae83bfdde454fda3c0725ff34e8e48759ff01e6776",
+    "previous-runtime/grunt.png.import": "19cba813af177fce0c9c332d1cfb1c9a760420ae0adee9327129e9e0fc00edad",
+    "previous-runtime/grunt.tres": "7a2a5114677686f044e271307036dec101e15ea7d84d060a4bf28f921c3b881d",
+    "previous-runtime/grunt_still.png": "d2d5ea8fd3b8d0090704615783e8fea0c37e70b9c0ab118061bf1c4c607dc637",
+    "previous-runtime/grunt_still.png.import": "da06dca4d219073e3b69e4058390ddcb4ac7c46fa23b3778e7fc63a0508e2cf6"
+  },
+  "limitations": [
+    "Local cutout articulation, not provider-generated or hand-redrawn in-between anatomy.",
+    "Conservative motion cannot reveal unseen back/side surfaces; face pixels are sampled unchanged.",
+    "No Godot import, game launch, build or test was run during this asset derivation."
   ]
 }

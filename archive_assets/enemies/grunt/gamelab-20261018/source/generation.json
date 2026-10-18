@@ -1,0 +1,174 @@
+{
+  "animation_requests": {
+    "health_crystal": {
+      "project_id": 32579,
+      "source_image_job_id": "2c5c6fab-cf67-424b-821c-ea7a77ec1831",
+      "prompt": "Subtle seamless idle loop of this exact pixel-art blue health crystal. Lock the camera, framing, scale, silhouette, pedestal and iron socket completely stationary. Crystal does not rotate, bob, bend, grow, melt or change shape. Only a restrained cyan light glints slowly across the existing blue crystal facets, with a few tiny crisp pixel highlights rising within the crystal faces, brightening softly then settling to the exact starting appearance. Preserve all stone blocks and every architectural feature. Calm magical idle, not an attack or transformation. No additional objects, no camera movement, no perspective changes, no large effects. Preserve crisp pixel clusters and original colors.",
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "south",
+      "loopable": true,
+      "quality": "standard",
+      "length_seconds": 4,
+      "frame_padding": 5,
+      "frame_padding_unit": "percent"
+    },
+    "enemy_portal": {
+      "project_id": 32579,
+      "source_image_job_id": "31d6244f-1eae-4ea8-be2a-c31d2fcb0e75",
+      "prompt": "Subtle seamless idle loop of this exact pixel-art red enemy portal. Lock the camera, framing, scale, stone ring, keystone, carved runes and stepped foundation completely stationary, no bobbing or morphing. Only the red energy INSIDE the opening curls slowly clockwise around the near-black center, with gentle scarlet ripples fading into burgundy and a tiny flicker along the inner edge. Keep the opening a dark traversable hole. Finish at the exact starting swirl phase for a seamless loop. Retain every stone block, edge and crack unchanged. No opening or closing sequence, no character emerging, no projectiles, no exterior flames or dramatic flashes, no camera movement or perspective changes. Preserve crisp pixel clusters and original colors.",
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "south",
+      "loopable": true,
+      "quality": "standard",
+      "length_seconds": 4,
+      "frame_padding": 5,
+      "frame_padding_unit": "percent"
+    }
+  },
+  "orc_request": {
+    "project_id": 32579,
+    "asset_name": "Gorcs Basic Orc \u2014 reference-free enemy trial",
+    "prompt": "One BASIC ORC footsoldier enemy sprite for a medieval fantasy tower-defense game, newly designed from scratch. Native 64 x 64 pixel art, full body visible, facing south-east in an elevated three-quarter top-down orthographic view. A stocky muscular ordinary GREEN ORC with broad bare head, heavy dark brows, flat broad nose, pointed ears, square jaw and two small upward ivory tusks. Recognizable orc face, not a goblin, ogre, human or pig. Chunky arms, short strong legs, slightly hunched shoulders, simple worn dark brown leather vest and belt, dull iron belt buckle, rough muted brown trousers and heavy leather boots. Holds one modest crude iron cleaver lowered in his right hand, free left hand loosely clenched. No helmet, horns, crown, magic, giant armor, shield or oversized weapon. Neutral alert standing pose suitable as a later walking-animation source, legs clearly separated and both feet on the same ground plane. Strong readable silhouette, simple deliberate pixel clusters, dark selective outline, upper-left lighting, restrained 32-color palette with green skin distinct from brown clothes and cool iron. Styled to stand beside substantial pale-stone and dark-oak pixel-art tower buildings, but readable at only 30-45 pixels tall. One centered character with clear margins around ears, weapon and feet. No scene, ground tile, props, text, UI, cast oval shadow, antialiasing or blurry shading.",
+    "width": 64,
+    "height": 64,
+    "centered": true,
+    "isometric": false,
+    "three_quarter_top_down": true,
+    "two_d": true,
+    "subject_orientation_in_frame": "southeast",
+    "pixel_art": true,
+    "pixel_art_colors": 32,
+    "edge_cleanup": true,
+    "transparent_bg": true,
+    "quality": "high"
+  },
+  "jobs": {
+    "health_crystal": {
+      "text": "Error: Error calling tool 'video.generate': GameLabs API returned HTTP 402: Insufficient credits",
+      "details": {
+        "xdev": {
+          "tool": "mcp__gamelab_mcp_video_generate",
+          "mode": "execute",
+          "args": {
+            "project_id": 32579,
+            "source_image_job_id": "2c5c6fab-cf67-424b-821c-ea7a77ec1831",
+            "prompt": "Subtle seamless idle loop of this exact pixel-art blue health crystal. Lock the camera, framing, scale, silhouette, pedestal and iron socket completely stationary. Crystal does not rotate, bob, bend, grow, melt or change shape. Only a restrained cyan light glints slowly across the existing blue crystal facets, with a few tiny crisp pixel highlights rising within the crystal faces, brightening softly then settling to the exact starting appearance. Preserve all stone blocks and every architectural feature. Calm magical idle, not an attack or transformation. No additional objects, no camera movement, no perspective changes, no large effects. Preserve crisp pixel clusters and original colors.",
+            "width": 128,
+            "height": 128,
+            "centered": true,
+            "isometric": false,
+            "three_quarter_top_down": true,
+            "two_d": true,
+            "subject_orientation_in_frame": "south",
+            "loopable": true,
+            "quality": "standard",
+            "length_seconds": 4,
+            "frame_padding": 5,
+            "frame_padding_unit": "percent"
+          },
+          "tier": "write",
+          "inner": {
+            "serverName": "gamelab-mcp",
+            "mcpToolName": "video.generate",
+            "isError": true,
+            "rawContent": [
+              {
+                "type": "text",
+                "text": "Error calling tool 'video.generate': GameLabs API returned HTTP 402: Insufficient credits"
+              }
+            ],
+            "provider": "native",
+            "providerName": "OMP"
+          }
+        }
+      },
+      "hasError": true
+    },
+    "enemy_portal": {
+      "job_id": "2e9a8cd7-c383-4cb6-91dd-81848428a838",
+      "status": "completed",
+      "type": "video",
+      "credits_debited": 4,
+      "project_id": 32579,
+      "asset_id": 69893
+    },
+    "basic_orc": {
+      "job_id": "ce3cd60b-93f1-45e3-8db5-9cd08b804a00",
+      "status": "completed",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32579,
+      "asset_id": 69895,
+      "invalid_params": [
+        {
+          "name": "subject_orientation_in_frame",
+          "reason": "must be a compass direction: east, north, north east, northwest, south, south east, south west, west"
+        }
+      ]
+    }
+  },
+  "approval": "Creator approved basic Orc still for installation. Endpoint stills approved; paid portal animation remains an alternative. Crystal paid animation rejected HTTP402; local manual endpoint animation requested instead. No further paid generation.",
+  "statuses": {
+    "enemy_portal": {
+      "job_id": "2e9a8cd7-c383-4cb6-91dd-81848428a838",
+      "status": "processing",
+      "type": "video",
+      "prompt": "[STD_VIDEO] Subtle seamless idle loop of this exact pixel-art red enemy portal. Lock the camera, framing, scale, stone ring, keystone, carved runes and stepped foundation completely stationary, no bobbing or morphing. Only the red energy INSIDE the opening curls slowly clockwise around the near-black center, with gentle scarlet ripples fading into burgundy and a tiny flicker along the inner edge. Keep the opening a dark traversable hole. Finish at the exact starting swirl phase for a seamless loop. Retain every stone block, edge and crack unchanged. No opening or closing sequence, no character emerging, no projectiles, no exterior flames or dramatic flashes, no camera movement or perspective changes. Preserve crisp pixel clusters and original colors. [Params: centered composition. the subject must remain centered in frame and facing the current direction, and perform action in place. The subject must remain fully within the frame bounds during its movement. The camera zoom must stay the same, 3/4 top-down orthographic view, camera angled from above, 2D style, keep the subject facing: south (down) . The direction of the subject must stay the same., loopable animation - all things should be contained in the bounds of the frame.]",
+      "error": null,
+      "created_at": "2026-10-18T10:57:48",
+      "updated_at": "2026-10-18T10:57:50",
+      "is_healthy": true,
+      "next_step": "Job is being processed (just started, no progress details yet). Continue polling job.status every 30 seconds."
+    },
+    "basic_orc": {
+      "job_id": "ce3cd60b-93f1-45e3-8db5-9cd08b804a00",
+      "status": "completed",
+      "type": "image",
+      "prompt": "One BASIC ORC footsoldier enemy sprite for a medieval fantasy tower-defense game, newly designed from scratch. Native 64 x 64 pixel art, full body visible, facing south-east in an elevated three-quarter top-down orthographic view. A stocky muscular ordinary GREEN ORC with broad bare head, heavy dark brows, flat broad nose, pointed ears, square jaw and two small upward ivory tusks. Recognizable orc face, not a goblin, ogre, human or pig. Chunky arms, short strong legs, slightly hunched shoulders, simple worn dark brown leather vest and belt, dull iron belt buckle, rough muted brown trousers and heavy leather boots. Holds one modest crude iron cleaver lowered in his right hand, free left hand loosely clenched. No helmet, horns, crown, magic, giant armor, shield or oversized weapon. Neutral alert standing pose suitable as a later walking-animation source, legs clearly separated and both feet on the same ground plane. Strong readable silhouette, simple deliberate pixel clusters, dark selective outline, upper-left lighting, restrained 32-color palette with green skin distinct from brown clothes and cool iron. Styled to stand beside substantial pale-stone and dark-oak pixel-art tower buildings, but readable at only 30-45 pixels tall. One centered character with clear margins around ears, weapon and feet. No scene, ground tile, props, text, UI, cast oval shadow, antialiasing or blurry shading. [Params: size 64x64px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-18T10:57:48",
+      "updated_at": "2026-10-18T10:58:13",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "ce3cd60b-93f1-45e3-8db5-9cd08b804a00",
+          "sequence": 0,
+          "download_url": "/v1/jobs/ce3cd60b-93f1-45e3-8db5-9cd08b804a00/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "c0b2fa8b-7bb1-4dec-8d34-1758b242a039",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/c0b2fa8b-7bb1-4dec-8d34-1758b242a039/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    }
+  },
+  "local_animation_direction": "Reuse deterministic source-masked pixel animation; stationary masonry; no game verification per creator request."
+}

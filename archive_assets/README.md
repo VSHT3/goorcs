@@ -66,18 +66,29 @@ Runtime copies use `assets/towers/ballista_base.png`, `ballista_weapon_{n,ne,e,s
 
 [`runtime-proof/directions-runtime.png`](towers/ballista/gamelab-20261017/runtime-proof/directions-runtime.png) is a labelled crop grid of actual host/client main-scene captures, not a generated composite study. Full [1280×720 host combat](towers/ballista/gamelab-20261017/runtime-proof/host-1280.png) and [1000×720 guest view](towers/ballista/gamelab-20261017/runtime-proof/guest-1000.png) show the fixed HUD, top-row clearance and placement. `game-trial.json` records runtime geometry and exercised verification. No native GPU/performance, separate-network internet, new animation, or provider licensing/privacy verification is claimed.
 
-## Approved endpoint idle animations
+## Original endpoint idle animations (archived)
 
-[`world/idle/idle_comparison.gif`](world/idle/idle_comparison.gif) compares the original portal and crystal with their approved idle loops. Byte-identical PNG sheets are installed in `assets/world/` and enabled in matches and the workshop; this archive preserves the authoring inputs, reproducible exports, and previews.
+[`world/idle/idle_comparison.gif`](world/idle/idle_comparison.gif) compares the original portal and crystal with their original approved idle loops. These 96×96 sheets are historical, superseded at runtime by the approved 128×128 loops below; this archive preserves their authoring inputs, reproducible exports and previews.
 
 - Both loops contain sixteen 96×96 frames at 5 fps: a 3.2-second repeating cycle. PNG sheets store one horizontal row; separate transparent GIFs are also included.
 - The portal preserves its stone ring, runes, silhouette, and pedestal while the red aperture distorts slightly, small wisps circulate, and existing embers drift. The crystal retains its shape and stone base while facets shimmer and existing sparks twinkle.
 - Sprite exports use only their respective source palettes and binary alpha, without blur or antialiasing. Fixed original framing bounds prevent particle changes from shifting sprite scale or anchors.
-- [`world/idle/manifest.json`](world/idle/manifest.json) records source/output hashes, runtime sheet paths, timing, frame layout, anchors, and adjacent-frame changes including the loop seam. Sources remain `assets/world/enemy_portal.png` and `assets/world/health_crystal.png`, unchanged.
+- [`world/idle/manifest.json`](world/idle/manifest.json) retains historical output hashes, runtime paths, timing, anchors and frame changes. Original source PNGs are now preserved as `world/idle/enemy_portal-source.png` and `world/idle/health_crystal-source.png`; its generator reads those archived copies.
 
 Regenerate with `python3 archive_assets/world/idle/generate.py` from the project root; authoring was verified with Pillow 12.3.0. This rebuilds archived exports, not the installed runtime copies. Pillow is development-only, not a game dependency. Generation validates source-palette membership, hard alpha, fixed non-magical body pixels, unique frames, and loop boundaries.
 
 Graphical verification played the installed sheets automatically through every frame in the actual workshop and Singleplayer, both match orientations, at 1280×720 and 1000×720, including 2× combat and hide/resume/leave/reopen. Captured frames were inspected; endpoint framing and idle accepted state stayed unchanged. Native clicks still built paths, purchased towers, and started waves. Decoded transparent GIF frames match the PNG sheets exactly.
+
+## Approved endpoint replacements and local idle loops
+
+[`world/gamelab-20261018-local-idle/`](world/gamelab-20261018-local-idle/) contains the approved 128×128 blue health crystal and red enemy portal, local effect masks, reproducible Pillow generator, sixteen-frame horizontal sheets, GIF previews and source-generation/installation provenance. The creator approved both stills and then both local loops for installation. Only crystal-facet colors and portal-interior pixels move; masonry, carved runes, sockets, foundations and silhouettes remain fixed. Local animation costs no credits. The separately generated paid portal video remains an unused local alternative.
+
+Runtime uses the archived sheets and cleaned stills, unchanged. `PathBoard` selects 128×128 frames at the existing 5 fps and 1.05-cell opaque height, with anchors matching each foundation. Historical 96×96 assets and generator remain under `world/idle/`. After approval, an isolated actual-main-scene X11/Mesa walkthrough exercised both orientations, supported widths and hidden/resumed playback; captures were inspected. See [current verification](../docs/development.md#locally-authored-match-endpoint-sprites) for limits.
+
+## Approved basic Orc replacement
+
+[`enemies/grunt/gamelab-20261018/`](enemies/grunt/gamelab-20261018/) preserves the approved reference-free GameLab Orc still, provider cutout, generation metadata, original runtime assets, local articulation script, exact pixel masks/joints and walk/death previews. The source still is losslessly padded from 64×64 onto an 80×80 canvas; twelve-frame walk and death sheets retain the approved face, clothing and cleaver. Runtime reuses the existing SpriteFrames/timing and corrected source-facing metadata; gameplay stats are unchanged. The shared procedural authoring tool protects this accepted Orc rather than regenerating its former design. No additional animation credits were used. An isolated actual-main-scene walkthrough exercised live walking and confirmed deaths on mirrored, supported-width views.
+
 
 ## Approved Gold Mine still
 
@@ -89,7 +100,7 @@ The raw chroma image and provider cutout are preserved. The cleaned candidate th
 
 [`towers/gold-mine/gamelab-20261018-upgrades/`](towers/gold-mine/gamelab-20261018-upgrades/) preserves the approved Royal Mint, Bounty Board, Greater Bounty and Tribute Office batch: provider cutouts, cleaned candidates, previous runtime sprites, review sheet and exact generation requests/job IDs. All four were generated without image references, at 128×128, high quality and requested 48-color pixel processing, costing eight reported credits together. The base mine is unchanged.
 
-Runtime uses the cleaned candidate pixels directly, with binary alpha thresholded at 128 and no RGB changes. Resource-specific opaque heights and foot anchors retain 0.98-cell visible widths. The procedural authoring tool now writes only War Drums, Forge and Command Banner, never these accepted upgrades. Runtime/rendered and gameplay verification is explicitly deferred at the creator's request; only an isolated headless asset import completed before the instruction to stop checks. Approval is not a claim of in-game visual verification.
+Runtime uses the cleaned candidate pixels directly, with binary alpha thresholded at 128 and no RGB changes. Resource-specific opaque heights and foot anchors retain 0.98-cell visible widths. The procedural authoring tool now writes only War Drums, Forge and Command Banner, never these accepted upgrades. Verification was initially deferred by request; the subsequent full project check covered every branch through the shared portrait renderer. Dedicated Gold Mine gameplay/art-scale playtesting is not claimed.
 
 
 ## Approved Lightning still

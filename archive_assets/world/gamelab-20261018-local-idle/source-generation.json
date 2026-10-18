@@ -1,0 +1,139 @@
+{
+  "requests": {
+    "health_crystal": {
+      "project_id": 32579,
+      "asset_name": "Gorcs Health Crystal \u2014 upgraded endpoint still",
+      "prompt": "A heroic BLUE HEALTH CRYSTAL base objective. One large tall sharply faceted cobalt-blue crystal rises from a substantial low stepped pale-gray stone pedestal. The main crystal has a pointed asymmetrical top and broad readable geometric facets: dark deep-blue shadow faces, saturated royal-blue midtones, bright cyan edges and a few tiny pale icy highlights. Two smaller blue crystal facets or attached shards at its base reinforce a single coherent silhouette, not a cluster of many spikes. A chunky dark iron socket with a few restrained cool metal corner braces grips its lower portion. Pedestal has two clean square stone steps, carved block seams, weathered corners and a nearly horizontal front edge. Keep the crystal luminous through crisp color contrast, not effects. Monumental magical defensive heart, visually distinct from a rune tower, no copper coils, no floating rocks, no roof. One finished native 128 x 128 pixel-art environment structure sprite for Gorcs, a medieval fantasy tower-defense game. Match substantial pale-gray weathered stonework, dark readable contours, deliberate sharp pixel clusters and restrained 48-color palette of polished stone-and-timber tower sprites. Elevated three-quarter orthographic front-right camera: broad front face, narrow visible right-side depth and clearly visible top surfaces, NOT diamond isometric. Upper-left lighting. Strong silhouette readable at 70-90 pixels tall. One centered complete structure, clear margins around its tallest and widest parts. Broad stable flat front contact edge, compact square-cell footprint, no diamond ground tile. No characters, scenery, text, UI, numerals, lettering, smooth gradients, blurry bloom, large aura, detached particles or cast oval shadow. Clean solid architecture suitable for a later subtle idle animation with stationary masonry.",
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "south",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "transparent_bg": true,
+      "quality": "high"
+    },
+    "enemy_portal": {
+      "project_id": 32579,
+      "asset_name": "Gorcs Enemy Portal \u2014 upgraded endpoint still",
+      "prompt": "An ominous RED ENEMY PORTAL objective. A heavy freestanding upright oval stone ring built from broad weathered pale-gray wedge blocks rises from a squat square stepped stone foundation. The ring has substantial visible depth on its narrow right side, a distinctive chunky keystone, a few chipped corners, dark cracks and restrained deep-red carved rune accents represented as simple angular symbols, not writing. A recessed deep burgundy interior opens inside the ring, with a vivid scarlet-red curling energy swirl around a near-black center: a readable traversable gateway, not a solid red gemstone or a flat painted sign. Keep all red energy entirely inside the opening except two tiny embers near its rim. Strong readable stone arch silhouette, sturdy low feet and flat front foundation edge. No skull faces, characters, horns, spikes, giant flames or sprawling decorative wings. One finished native 128 x 128 pixel-art environment structure sprite for Gorcs, a medieval fantasy tower-defense game. Match substantial pale-gray weathered stonework, dark readable contours, deliberate sharp pixel clusters and restrained 48-color palette of polished stone-and-timber tower sprites. Elevated three-quarter orthographic front-right camera: broad front face, narrow visible right-side depth and clearly visible top surfaces, NOT diamond isometric. Upper-left lighting. Strong silhouette readable at 70-90 pixels tall. One centered complete structure, clear margins around its tallest and widest parts. Broad stable flat front contact edge, compact square-cell footprint, no diamond ground tile. No characters, scenery, text, UI, numerals, lettering, smooth gradients, blurry bloom, large aura, detached particles or cast oval shadow. Clean solid architecture suitable for a later subtle idle animation with stationary masonry.",
+      "width": 128,
+      "height": 128,
+      "centered": true,
+      "isometric": false,
+      "three_quarter_top_down": true,
+      "two_d": true,
+      "subject_orientation_in_frame": "south",
+      "pixel_art": true,
+      "pixel_art_colors": 48,
+      "edge_cleanup": true,
+      "transparent_bg": true,
+      "quality": "high"
+    }
+  },
+  "jobs": {
+    "health_crystal": {
+      "job_id": "2c5c6fab-cf67-424b-821c-ea7a77ec1831",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32579,
+      "asset_id": 69894
+    },
+    "enemy_portal": {
+      "job_id": "31d6244f-1eae-4ea8-be2a-c31d2fcb0e75",
+      "status": "queued",
+      "type": "image",
+      "credits_debited": 2,
+      "project_id": 32579,
+      "asset_id": 69893
+    }
+  },
+  "completed_statuses": {
+    "health_crystal": {
+      "job_id": "2c5c6fab-cf67-424b-821c-ea7a77ec1831",
+      "status": "completed",
+      "type": "image",
+      "prompt": "A heroic BLUE HEALTH CRYSTAL base objective. One large tall sharply faceted cobalt-blue crystal rises from a substantial low stepped pale-gray stone pedestal. The main crystal has a pointed asymmetrical top and broad readable geometric facets: dark deep-blue shadow faces, saturated royal-blue midtones, bright cyan edges and a few tiny pale icy highlights. Two smaller blue crystal facets or attached shards at its base reinforce a single coherent silhouette, not a cluster of many spikes. A chunky dark iron socket with a few restrained cool metal corner braces grips its lower portion. Pedestal has two clean square stone steps, carved block seams, weathered corners and a nearly horizontal front edge. Keep the crystal luminous through crisp color contrast, not effects. Monumental magical defensive heart, visually distinct from a rune tower, no copper coils, no floating rocks, no roof. One finished native 128 x 128 pixel-art environment structure sprite for Gorcs, a medieval fantasy tower-defense game. Match substantial pale-gray weathered stonework, dark readable contours, deliberate sharp pixel clusters and restrained 48-color palette of polished stone-and-timber tower sprites. Elevated three-quarter orthographic front-right camera: broad front face, narrow visible right-side depth and clearly visible top surfaces, NOT diamond isometric. Upper-left lighting. Strong silhouette readable at 70-90 pixels tall. One centered complete structure, clear margins around its tallest and widest parts. Broad stable flat front contact edge, compact square-cell footprint, no diamond ground tile. No characters, scenery, text, UI, numerals, lettering, smooth gradients, blurry bloom, large aura, detached particles or cast oval shadow. Clean solid architecture suitable for a later subtle idle animation with stationary masonry. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south (down), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-18T10:54:07",
+      "updated_at": "2026-10-18T10:54:30",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "2c5c6fab-cf67-424b-821c-ea7a77ec1831",
+          "sequence": 0,
+          "download_url": "/v1/jobs/2c5c6fab-cf67-424b-821c-ea7a77ec1831/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "56cc3604-6b49-4e43-9f09-602a7ce65570",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/56cc3604-6b49-4e43-9f09-602a7ce65570/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    },
+    "enemy_portal": {
+      "job_id": "31d6244f-1eae-4ea8-be2a-c31d2fcb0e75",
+      "status": "completed",
+      "type": "image",
+      "prompt": "An ominous RED ENEMY PORTAL objective. A heavy freestanding upright oval stone ring built from broad weathered pale-gray wedge blocks rises from a squat square stepped stone foundation. The ring has substantial visible depth on its narrow right side, a distinctive chunky keystone, a few chipped corners, dark cracks and restrained deep-red carved rune accents represented as simple angular symbols, not writing. A recessed deep burgundy interior opens inside the ring, with a vivid scarlet-red curling energy swirl around a near-black center: a readable traversable gateway, not a solid red gemstone or a flat painted sign. Keep all red energy entirely inside the opening except two tiny embers near its rim. Strong readable stone arch silhouette, sturdy low feet and flat front foundation edge. No skull faces, characters, horns, spikes, giant flames or sprawling decorative wings. One finished native 128 x 128 pixel-art environment structure sprite for Gorcs, a medieval fantasy tower-defense game. Match substantial pale-gray weathered stonework, dark readable contours, deliberate sharp pixel clusters and restrained 48-color palette of polished stone-and-timber tower sprites. Elevated three-quarter orthographic front-right camera: broad front face, narrow visible right-side depth and clearly visible top surfaces, NOT diamond isometric. Upper-left lighting. Strong silhouette readable at 70-90 pixels tall. One centered complete structure, clear margins around its tallest and widest parts. Broad stable flat front contact edge, compact square-cell footprint, no diamond ground tile. No characters, scenery, text, UI, numerals, lettering, smooth gradients, blurry bloom, large aura, detached particles or cast oval shadow. Clean solid architecture suitable for a later subtle idle animation with stationary masonry. [Params: size 128x128px, centered composition. , 3/4 top-down orthographic view, camera angled from above. NOT isometric, 2D style, the subject must be facing to the: south (down), render the subject on a fully transparent background with a clean alpha channel. There must be NO background, ground, sky, shadows, or reflections. Keep the subject fully visible and do not crop it]",
+      "error": null,
+      "created_at": "2026-10-18T10:54:07",
+      "updated_at": "2026-10-18T10:54:33",
+      "artifacts": [
+        {
+          "kind": "output",
+          "sequence": 0,
+          "filename": "image_000.png",
+          "content_type": "image/png"
+        }
+      ],
+      "transparent_bg_downloads": {
+        "chroma_key": {
+          "job_id": "31d6244f-1eae-4ea8-be2a-c31d2fcb0e75",
+          "sequence": 0,
+          "download_url": "/v1/jobs/31d6244f-1eae-4ea8-be2a-c31d2fcb0e75/artifacts/0"
+        },
+        "background_removed": {
+          "job_id": "e065bd94-42b8-4b03-ac09-2482157003f0",
+          "status": "completed",
+          "sequence": 0,
+          "download_url": "/v1/jobs/e065bd94-42b8-4b03-ac09-2482157003f0/artifacts/0",
+          "artifacts": [
+            {
+              "kind": "output",
+              "sequence": 0,
+              "filename": "image_000.png",
+              "content_type": "image/png"
+            }
+          ]
+        }
+      },
+      "next_step": "Both the chroma_key image (for animation/video step) and the background_removed transparent cutout are ready. Download each with job.artifact.download using its job_id and sequence."
+    }
+  },
+  "references": [],
+  "processing": "Provider cutout alpha thresholded >=128 to255, otherwise0; RGB and 128x128 canvas unchanged. Review uses nearest-neighbor enlargement.",
+  "approval": "Pending still review; no animation or runtime changes."
+}

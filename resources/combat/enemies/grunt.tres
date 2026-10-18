@@ -24,6 +24,6 @@ send_income = 2
 send_first_wave = 6
 texture = ExtResource("2_sprite")
 animation_frames = ExtResource("3_animation")
-source_faces_left = true
+source_faces_left = false
 board_height = 0.50
 board_anchor = Vector2(0.5, 0.875)

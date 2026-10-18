@@ -32,7 +32,7 @@ const ROCKET_IMPACT_DURATION: float = 0.48
 const MAX_SHOT_TRACES: int = 256
 const ENEMY_LATERAL_SPREAD: float = 0.10
 const ENEMY_CORNER_BLEND: float = 0.25
-const ENDPOINT_FRAME_SIZE: int = 96
+const ENDPOINT_FRAME_SIZE: int = 128
 const ENDPOINT_FRAME_COUNT: int = 16
 const ENDPOINT_FRAME_SECONDS: float = 0.2
 const ONYX_PULSE_DURATION: float = 0.30
@@ -1050,7 +1050,8 @@ func _draw_combat() -> void:
 		match int(item["kind"]):
 			0:
 				var texture: Texture2D = _portal_texture if item["cell"] == layout.entrance else _crystal_texture
-				draw_texture_rect(texture, _sprite_rect(texture, 1.05, Vector2(0.5, 0.97), item["foot"]), false)
+				var anchor := Vector2(0.5, 0.9609375) if item["cell"] == layout.entrance else Vector2(0.50390625, 0.9296875)
+				draw_texture_rect(texture, _sprite_rect(texture, 1.05, anchor, item["foot"]), false)
 			1:
 				_draw_tower(item["data"], item["foot"])
 			2:
