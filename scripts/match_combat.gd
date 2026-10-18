@@ -29,6 +29,7 @@ var spawn_times: Array[float] = []
 var wave_groups: Array[Dictionary] = []
 var statistics_id: String = Crypto.new().generate_random_bytes(16).hex_encode()
 var enemy_totals: Array[Dictionary] = [{"kills": {}, "sent": {}}, {"kills": {}, "sent": {}}]
+var _recap := MatchRecap.new()
 var _death_events: Array[Array] = [[], []]
 var _death_heads: Array[int] = [0, 0]
 var _death_time: float = 0.0
@@ -291,8 +292,10 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"support_damage_bonus": 0.0, "support_speed_bonus": 0.0,
 		"invested": 0 if _sandbox_mode else cost, "sell_value": 0 if _sandbox_mode else _sell_value(cost),
 	})
+	_recap.register_tower(slot, towers[slot].back())
 	if not _sandbox_mode:
 		coins[slot] -= cost
+		_recap.add(slot, "spent", "towers", cost)
 	_next_tower_id += 1
 	_refresh_board(slot)
 	_update_tracking_target(slot, towers[slot].back())
@@ -352,11 +355,13 @@ func _apply_reroll(slot: int, tower: Dictionary, kind: String, rolled: Dictionar
 	if kind == "rarity":
 		if not _sandbox_mode:
 			reroll_currency[slot] -= int(tower["rarity_reroll_cost"])
+			_recap.add(slot, "spent", "rarity_shards", int(tower["rarity_reroll_cost"]))
 		tower["rarity_rerolls"] += 1
 		tower["attribute_rerolls"] = 0
 	else:
 		if not _sandbox_mode:
 			coins[slot] -= int(tower["attribute_reroll_cost"])
+			_recap.add(slot, "spent", "attribute_rerolls", int(tower["attribute_reroll_cost"]))
 		tower["attribute_rerolls"] += 1
 	tower["rarity"] = rolled["rarity"]
 	tower["attributes"] = rolled["attributes"].duplicate(true)
@@ -582,6 +587,7 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 			return false
 	if not _sandbox_mode:
 		coins[slot] -= cost
+		_recap.add(slot, "spent", "upgrades", cost)
 		tower["invested"] += cost
 		tower["sell_value"] = _sell_value(tower["invested"])
 	if not flag.is_empty():
@@ -642,9 +648,11 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 			continue
 		if not _sandbox_mode:
 			coins[slot] += _sell_value(tower["invested"])
+			_recap.add(slot, "earned", "sale_coins", _sell_value(tower["invested"]))
 		_continuous_damage.erase(tower_id)
 		_continuous_bonus.erase(tower_id)
 		_clear_tower_mark(slot, tower)
+		_recap.sell(slot, tower_id)
 		towers[slot].remove_at(index)
 		_refresh_board(slot)
 		_sound_events.record(CombatSoundEvents.Cue.SALE, slot, Vector2(tower["cell"]), _death_time)
@@ -737,6 +745,7 @@ func _send_enemy_accepted(slot: int, type_id: StringName) -> void:
 		_send_group_ends[target].append(member == count - 1)
 	if not _sandbox_mode:
 		coins[slot] -= cost
+		_recap.add(slot, "spent", "sends", cost)
 	income[slot] += int(definition["send_income"])
 	_add_total(slot, "sent", String(type_id), count)
 	_sound_events.record(CombatSoundEvents.Cue.SEND, slot, Vector2.ZERO, _death_time)
@@ -1069,18 +1078,24 @@ func advance(delta: float) -> bool:
 			_refresh_board(slot)
 	elif _wave_cleared():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
+		_recap.rounds_cleared += 1
 		for slot: int in range(2):
 			coins[slot] += reward + income[slot]
 			reroll_currency[slot] += _rules.clear_reroll_currency
+			_recap.add(slot, "earned", "wave_coins", reward)
+			_recap.add(slot, "earned", "income_coins", income[slot])
+			_recap.add(slot, "earned", "clear_shards", _rules.clear_reroll_currency)
 			for tower: Dictionary in towers[slot]:
 				if tower["behavior_kind"] == "economy" and float(tower["stunned_remaining"]) <= 0.000000001:
 					var produced: int = int(tower["behavior_config"]["clear_income"])
 					coins[slot] += produced
 					tower["coins_generated"] += produced
+					_recap.add(slot, "earned", "production_coins", produced)
 				elif tower["behavior_kind"] == "crystal" and float(tower["stunned_remaining"]) <= 0.000000001:
 					var dug: int = int(tower["behavior_config"]["clear_shards"])
 					reroll_currency[slot] += dug
 					tower["shards_generated"] += dug
+					_recap.add(slot, "earned", "production_shards", dug)
 				_reset_firing(tower)
 				_clear_stun(tower)
 			_refresh_board(slot)
@@ -1169,9 +1184,11 @@ func _produce_periodic(slot: int, delta: float) -> void:
 			if tower["behavior_kind"] == "crystal":
 				reroll_currency[slot] += produced
 				tower["shards_generated"] += produced
+				_recap.add(slot, "earned", "production_shards", produced)
 			else:
 				coins[slot] += produced
 				tower["coins_generated"] += produced
+				_recap.add(slot, "earned", "production_coins", produced)
 
 
 func _update_bounties(slot: int) -> void:
@@ -1417,6 +1434,7 @@ func snapshot() -> Dictionary:
 	return {
 		"phase": phase, "wave": wave, "health": base_health.duplicate(),
 		"statistics_id": statistics_id, "enemy_totals": enemy_totals.duplicate(true),
+		"recap": _recap.snapshot(_death_time) if phase == Phase.FINISHED else {},
 		"wave_groups": wave_groups.duplicate(true),
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
@@ -2471,6 +2489,7 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 		var aura_bonus: float = float(aura["behavior_config"]["kill_income_bonus"]) if not aura.is_empty() else 0.0
 		var payout: int = ceili(normal * (1.0 + mark_bonus + aura_bonus))
 		coins[slot] += payout
+		_recap.add(slot, "earned", "kill_coins", payout)
 		# Keep the single combined round-up: mark receives its incremental
 		# rounded share first, then the strongest aura receives the remainder.
 		var marked_payout: int = mini(payout, ceili(normal * (1.0 + mark_bonus)))
@@ -2481,10 +2500,13 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 			aura["coins_generated"] += payout - marked_payout
 		if int(definition["reroll_drop_amount"]) > 0 and float(definition["reroll_drop_chance"]) > 0.0 and _drop_random.randf() < float(definition["reroll_drop_chance"]):
 			reroll_currency[slot] += int(definition["reroll_drop_amount"])
+			_recap.add(slot, "earned", "drop_shards", int(definition["reroll_drop_amount"]))
 		var reward: Dictionary = _boss_loot.claim(slot, String(enemy["type_id"]), definition, wave, _death_time)
 		if not reward.is_empty():
 			coins[slot] += int(reward["coins"])
 			reroll_currency[slot] += int(reward["shards"])
+			_recap.add(slot, "earned", "boss_coins", int(reward["coins"]))
+			_recap.add(slot, "earned", "boss_shards", int(reward["shards"]))
 		_add_total(slot, "kills", enemy["type_id"])
 		_record_death(slot, enemy)
 		_retire_enemy(enemy["id"])
@@ -2549,9 +2571,11 @@ func _apply_leaks(slot: int) -> void:
 	while index >= 0:
 		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1 and BossMechanics.can_act(enemies[slot][index]):
 			if not _sandbox_mode:
+				var health_before: int = base_health[slot]
 				if base_health[slot] > 0:
 					_sound_events.record(CombatSoundEvents.Cue.CRYSTAL, slot, Vector2(enemies[slot][index]["route"].back()), _death_time)
 				base_health[slot] = maxi(0, base_health[slot] - int(enemies[slot][index]["damage"]))
+				_recap.leak(slot, String(enemies[slot][index]["type_id"]), health_before - base_health[slot], base_health[slot] == 0)
 			_retire_enemy(enemies[slot][index]["id"])
 			enemies[slot].remove_at(index)
 		index -= 1

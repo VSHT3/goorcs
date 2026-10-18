@@ -87,6 +87,12 @@ The final isolated `python3 tools/verify.py all` run passed **72/73 checks**, in
 
 Publication integration preserved the incoming reel acceleration/braking, tooth/flap motion, and off-center winning-card landing alongside boss payout cards and shared skip behavior. Fresh import/save-isolation gates, all five focused enemy/reward/reel and real-peer suites, and a **4.01-second rendered reel smoke** passed after rebasing. Native Enter revealed an accepted **Common 140-Coin / 4-Shard** award and native pointer input revealed a tower reroll; the captured reward surface was inspected. This focused integration check does not supersede the full-run Discord failure above.
 
+### Scrollable match recap verification
+
+The recorded recap and post-loss read-only tower inspection passed their isolated model, UI lifecycle, and separate-process host/client checks. The full `python3 tools/verify.py all` run passed **75/76 checks**; every headless suite passed. The rendered `enemy_inspection_test.gd` printed its behavior PASS but emitted **“7 resources still in use at exit”**. This full run is not green and no diagnostic exemption was added. Logs: `.verify-logs/20261018T165111Z-all-aa390886/`.
+
+A **4.67-second actual-main-scene graphical walkthrough**, using Compatibility/OpenGL on Apple M2 with dummy audio, passed native scrolling/keyboard focus, both desktop widths, real defeat, retained sold-tower ranking, boss reward history, final Mine/Arrow inspection without mutations, Escape precedence, and fresh replay. Its captures were inspected. Native-audio runs completed the scenario but retained audio playback resources at shutdown; dummy-audio visual proof does not establish physical audio teardown. Detailed accounting rules and limits live in [match results](match-results.md#recorded-recap). Isolated saves and throwaway scripts were removed afterward.
+
 ### Six-role gameplay verification
 
 The loadout/roll/roster expansion now implements all six identities and the agreed mechanics, with final Lightning naming/additional evolution choices still undecided. [Content authoring](content-pipeline.md#six-role-schemas-and-evolution-data) owns exact role schemas, rarity profiles/pools/bounds, branch art, Shard drops, effective-stat/evolution composition, quadratic reroll pricing, and payout rounding. These are **authored provisional resources**, not creator-approved final balance. [The gameplay roadmap](../TODO.md#gameplay-roadmap--loadouts-tower-rolls-and-roster-expansion) distinguishes delivered behavior from the two remaining design/visual boundaries.

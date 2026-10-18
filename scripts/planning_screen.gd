@@ -472,7 +472,7 @@ func _debug_window_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if _rarity_reel.is_busy():
 		return
-	if not is_visible_in_tree() or pause_menu.visible or debug_popup.visible or (_placement_id == &"" and selected_enemy_id < 0):
+	if not is_visible_in_tree() or pause_menu.visible or debug_popup.visible or (_placement_id == &"" and selected_enemy_id < 0 and selected_tower_id < 0):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		cancel_interaction()
@@ -549,8 +549,6 @@ func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
 		return
 	if button != MOUSE_BUTTON_LEFT:
 		return
-	if int(planning.combat.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.FINISHED:
-		return
 	_pending_tower_cell = Vector2i(-1, -1)
 	for tower: Dictionary in boards[slot].combat_towers:
 		if tower["cell"] == cell:
@@ -560,6 +558,9 @@ func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
 			_refresh()
 			return
 	selected_tower_id = -1
+	if int(planning.combat.get("phase", -1)) == MatchCombat.Phase.FINISHED:
+		_refresh()
+		return
 	if _placement_id != &"":
 		_buy_tower(cell, _placement_id, slot)
 	else:
@@ -904,6 +905,15 @@ func _refresh_targeting() -> void:
 	targeting_button.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
 	targeting_button.mode = int(tower["mode"])
 	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
+	var terminal: bool = int(planning.combat.get("phase", -1)) == MatchCombat.Phase.FINISHED
+	rarity_reroll.visible = not terminal
+	attribute_reroll.visible = not terminal
+	sell_button.visible = not terminal
+	if terminal:
+		for control: Control in _upgrade_row.get_children():
+			control.hide()
+		_upgrade_row.hide()
+		return
 	var currency: Array = planning.combat.get("reroll_currency", [0, 0])
 	_refresh_reroll(rarity_reroll, tower, "rarity", int(currency[planning.local_slot()]))
 	_refresh_reroll(attribute_reroll, tower, "attributes", _own_coins())
@@ -1399,6 +1409,7 @@ func _refresh() -> void:
 	for slot: int in range(boards.size()):
 		var layout: PathLayout = planning.layouts[slot]
 		var board: PathBoard = boards[slot]
+		board.tower_inspection_enabled = planning.active and finished and slot == own_slot
 		board.cell_click_mode = _placement_id != &"" or not editable
 		board.input_enabled = planning.active and not finished and slot == own_slot
 		board.placement_enabled = slot == own_slot and planning.can_manage_towers(slot)
@@ -1514,7 +1525,8 @@ func handle_results_escape() -> void:
 	if results_menu.visible:
 		MenuAudio.activate(results_menu.inspect_button)
 	else:
-		MenuAudio.activate(menu_button)
+		if not cancel_interaction():
+			MenuAudio.activate(menu_button)
 
 
 func _show_feedback(message: String) -> void:

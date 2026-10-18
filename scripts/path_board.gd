@@ -104,6 +104,10 @@ var enemy_inspection_enabled: bool = false:
 	set(value):
 		enemy_inspection_enabled = value
 		_update_input_filter()
+var tower_inspection_enabled: bool = false:
+	set(value):
+		tower_inspection_enabled = value
+		_update_input_filter()
 var tower_types: Dictionary = {}
 var placement_id: StringName = &"":
 	set(value):
@@ -711,7 +715,7 @@ func _drop_data(at_position: Vector2, data: Variant) -> void:
 
 
 func _update_input_filter() -> void:
-	mouse_filter = Control.MOUSE_FILTER_STOP if input_enabled or enemy_inspection_enabled else Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP if input_enabled or enemy_inspection_enabled or tower_inspection_enabled else Control.MOUSE_FILTER_IGNORE
 
 
 func enemy_at(position: Vector2) -> int:
@@ -728,7 +732,7 @@ func enemy_at(position: Vector2) -> int:
 
 
 func _gui_input(event: InputEvent) -> void:
-	if layout == null or not (input_enabled or enemy_inspection_enabled):
+	if layout == null or not (input_enabled or enemy_inspection_enabled or tower_inspection_enabled):
 		return
 	if event is InputEventMouseButton:
 		var click := event as InputEventMouseButton

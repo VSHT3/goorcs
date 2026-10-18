@@ -21,6 +21,8 @@ func _run() -> void:
 	check(planning.selecting_loadout and not planning.active and not screen.is_visible_in_tree(),"Singleplayer presents loadout selection before the battlefield")
 	check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(),"Result fixture commits its owned starter")
 	var run_id: String = planning.combat["statistics_id"]
+	planning.build_tower(0, Vector2i(1, 1), &"arrow_tower", 0)
+	var tower_id: int = planning.combat["towers"][0][0]["id"]
 	screen.enemy_selector.get_popup().popup()
 	planning._host_combat.base_health = [0,5]
 	planning._host_combat.winner = 1
@@ -42,6 +44,18 @@ func _run() -> void:
 	check(planning.combat==frozen,"Visible defeat screen does not waive terminal command rejection")
 	screen.results_menu.inspect_button.pressed.emit()
 	check(not screen.results_menu.visible and planning.active,"View battlefield dismisses only the local overlay, not the run")
+	var board: PathBoard = screen.boards[0]
+	check(not board.input_enabled and not board.placement_enabled and board.tower_inspection_enabled, "Finished board enables inspection, never construction")
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	click.position = board.cell_center(Vector2i(1, 1))
+	board._gui_input(click)
+	check(screen.selected_tower_id == tower_id and screen._management.visible, "Readonly board input opens the selected final tower inspector")
+	check(screen.targeting_button.disabled and not screen.rarity_reroll.visible and not screen.attribute_reroll.visible and not screen.sell_button.visible and not screen._upgrade_row.visible, "Final inspector exposes stats but no available mutation actions")
+	check(planning.combat == frozen, "Inspecting a final tower changes only local presentation")
+	screen.handle_results_escape()
+	check(screen.selected_tower_id == -1 and not screen.results_menu.visible, "Escape dismisses tower selection before reopening results")
 	planning._publish_snapshot()
 	check(not screen.results_menu.visible,"Repeated terminal snapshots never reopen dismissed results or steal focus")
 	screen.ready_button.pressed.emit()
