@@ -282,15 +282,25 @@ func _focus_action() -> void:
 
 
 func _default_address() -> String:
-	var candidate: String = ""
-	for address: String in IP.get_local_addresses():
-		if address.contains(":") or address.begins_with("127.") or address.begins_with("169.254.") or address == "0.0.0.0":
-			continue
-		if candidate.is_empty():
-			candidate = address
-		if address.begins_with("192.168.") or address.begins_with("10."):
-			return address
-		var octets: PackedStringArray = address.split(".")
-		if octets.size() == 4 and octets[0] == "172" and int(octets[1]) >= 16 and int(octets[1]) <= 31:
-			return address
-	return candidate if not candidate.is_empty() else "127.0.0.1"
+	return _preferred_host_address(IP.get_local_interfaces())
+
+
+static func _preferred_host_address(interfaces: Array[Dictionary]) -> String:
+	var candidate: String = "127.0.0.1"
+	var best_rank: int = -1
+	for interface: Dictionary in interfaces:
+		var interface_name: String = String(interface.get("name", "")).to_lower()
+		var friendly: String = String(interface.get("friendly", "")).to_lower()
+		# Interface enumeration can put a non-peer VPN tunnel before Wi-Fi.
+		# Prefer LAN adapters; VPN hosting remains available through manual entry.
+		var is_lan: bool = interface_name.begins_with("en") or interface_name.begins_with("eth") or interface_name.begins_with("wl") or friendly.contains("wi-fi") or friendly.contains("ethernet")
+		for address: String in interface.get("addresses", []):
+			if not address.is_valid_ip_address() or address.contains(":") or address.begins_with("127.") or address.begins_with("169.254.") or address.get_slice(".", 0).to_int() == 0 or address.get_slice(".", 0).to_int() >= 224:
+				continue
+			var second_octet: int = address.get_slice(".", 1).to_int()
+			var is_private: bool = address.begins_with("192.168.") or address.begins_with("10.") or (address.begins_with("172.") and second_octet >= 16 and second_octet <= 31)
+			var rank: int = (2 if is_lan else 0) + (1 if is_private else 0)
+			if rank > best_rank:
+				candidate = address
+				best_rank = rank
+	return candidate

@@ -17,6 +17,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	_test_host_address_selection()
 	_suite_deadline_msec = Time.get_ticks_msec() + int(SUITE_DEADLINE_SECONDS * 1000.0)
 	_directory = OS.get_temp_dir().path_join("goorcs_session_test_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	if DirAccess.make_dir_recursive_absolute(_directory) != OK:
@@ -30,6 +31,25 @@ func _run() -> void:
 	await _test_malformed_invites(port)
 	await _test_room_lifecycle(port)
 	await _finish()
+
+
+func _test_host_address_selection() -> void:
+	var interfaces: Array[Dictionary] = [
+		{"name": "utun4", "friendly": "utun4", "addresses": ["172.16.0.2"]},
+		{"name": "lo0", "friendly": "lo0", "addresses": ["127.0.0.1"]},
+		{"name": "en0", "friendly": "en0", "addresses": ["fe80::1", "169.254.1.2", "10.37.34.238"]},
+	]
+	_check(MultiplayerLobby._preferred_host_address(interfaces) == "10.37.34.238", "LAN hosting chooses Wi-Fi instead of an earlier VPN tunnel")
+	interfaces.reverse()
+	_check(MultiplayerLobby._preferred_host_address(interfaces) == "10.37.34.238", "Adapter enumeration order cannot replace Wi-Fi with a VPN address")
+	for name: String in ["eth0", "wlp2s0", "{adapter-guid}"]:
+		interfaces = [
+			{"name": "tun0", "addresses": ["10.8.0.2"]},
+			{"name": name, "friendly": "Ethernet", "addresses": ["172.20.1.5"]},
+		]
+		_check(MultiplayerLobby._preferred_host_address(interfaces) == "172.20.1.5", "LAN adapter is preferred on supported desktop interface names: " + name)
+	_check(MultiplayerLobby._preferred_host_address([{"name": "utun4", "addresses": ["172.16.0.2"]}]) == "172.16.0.2", "VPN-only machines retain an available numeric host address")
+	_check(MultiplayerLobby._preferred_host_address([{"name": "en0", "addresses": ["::1", "0.0.0.0", "127.0.0.1", "169.254.1.2", "224.0.0.1"]}]) == "127.0.0.1", "No usable interface falls back to local-only hosting")
 
 
 func _test_malformed_invites(port: int) -> void:
