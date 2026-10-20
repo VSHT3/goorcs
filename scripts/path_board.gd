@@ -187,6 +187,8 @@ var _boss_effects: Array[Dictionary] = []
 var _enemy_blend_elapsed: float = ENEMY_BLEND_DURATION
 var _bounty_health: Dictionary[int, float] = {}
 var _bounty_hit_life: Dictionary[int, float] = {}
+var _shield_hit_counts: Dictionary[int, int] = {}
+var _shield_hit_life: Dictionary[int, float] = {}
 var _tower_art: Dictionary[String, TowerReward] = {}
 var _texture_bounds: Dictionary[Texture2D, Rect2] = {}
 var _directional_framing: Dictionary[TowerReward, Vector2] = {}
@@ -210,6 +212,10 @@ var _death_generation: int = -1
 var _last_death_id: int = 0
 var _corpse_speed: float = 1.0
 var _corpse_paused: bool = false
+var _ground_bombs: Array[Dictionary] = []
+var _bomb_explosion_traces: Array[Dictionary] = []
+var _last_bomb_explosion_id: int = 0
+var _bomb_visual_clock: float = 0.0
 var _portal_texture: AtlasTexture
 var _crystal_texture: AtlasTexture
 var _endpoint_frame: int = 0
@@ -270,13 +276,18 @@ func _advance_endpoints() -> void:
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or _has_catapult_motion or not _flight_traces.is_empty() or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or _has_catapult_motion or not _flight_traces.is_empty() or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty() or not _ground_bombs.is_empty() or not _bomb_explosion_traces.is_empty()))
 
 
 func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
 	var visual_delta: float = 0.0 if _corpse_paused else delta * _corpse_speed
+	_bomb_visual_clock += visual_delta
+	for index: int in range(_bomb_explosion_traces.size() - 1, -1, -1):
+		_bomb_explosion_traces[index]["age"] += visual_delta
+		if float(_bomb_explosion_traces[index]["age"]) >= 0.55:
+			_bomb_explosion_traces.remove_at(index)
 	if _has_idle_flames:
 		_flame_elapsed = fposmod(_flame_elapsed + visual_delta, 12.0)
 	if _has_boulders:
@@ -293,6 +304,12 @@ func _process(delta: float) -> void:
 			_bounty_hit_life.erase(id)
 		else:
 			_bounty_hit_life[id] = life
+	for id: int in _shield_hit_life.keys():
+		var life: float = _shield_hit_life[id] - visual_delta
+		if life <= 0.0:
+			_shield_hit_life.erase(id)
+		else:
+			_shield_hit_life[id] = life
 	for id: Variant in _ring_clocks.keys():
 		_ring_clocks[id] = minf(float(_ring_clocks[id]) + visual_delta, 30.0)
 	_has_catapult_motion = false
@@ -341,16 +358,23 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 		_boss_effects.clear()
 		_boss_seen_enemy.clear()
 		_boss_seen_stuns.clear()
+		_shield_hit_counts.clear()
+		_shield_hit_life.clear()
 		_enemy_lifts.clear()
 		_enemy_position_from.clear()
 		_enemy_position_to.clear()
 		_flight_traces.clear()
 		_last_flight_id = 0
+		_ground_bombs.clear()
+		_bomb_explosion_traces.clear()
+		_last_bomb_explosion_id = 0
 		_death_match_id = match_id
 		_death_generation = generation
 	_corpse_speed = maxf(0.0, speed)
 	_corpse_paused = paused
 	var clock: float = float(state.get("death_time", 0.0))
+	_bomb_visual_clock = clock
+	_capture_bombs(state, slot, clock)
 	for index: int in range(_corpse_traces.size() - 1, -1, -1):
 		var trace: Dictionary = _corpse_traces[index]
 		trace["age"] = maxf(float(trace["age"]), clock - float(trace["time"]))
@@ -564,6 +588,7 @@ func _capture_attack(tower: Dictionary, definition: Dictionary, archer_index: in
 func _blend_enemies() -> void:
 	var next_progress: Dictionary[int, Vector2] = {}
 	var next_health: Dictionary[int, float] = {}
+	var next_shield_counts: Dictionary[int, int] = {}
 	var next_lifts: Dictionary[int, Vector2] = {}
 	var next_position_from: Dictionary[int, Vector2] = {}
 	var next_position_to: Dictionary[int, Vector2] = {}
@@ -571,6 +596,10 @@ func _blend_enemies() -> void:
 	for enemy: Dictionary in combat_enemies:
 		var id: int = int(enemy["id"])
 		_enemies_by_id[id] = enemy
+		var shield_count: int = int(enemy.get("shield_hit_count", 0))
+		if shield_count > _shield_hit_counts.get(id, shield_count):
+			_shield_hit_life[id] = 0.18
+		next_shield_counts[id] = shield_count
 		var lift: float = EnemyVisuals.jump_lift(enemy)
 		var old_lift: Vector2 = _enemy_lifts.get(id, Vector2(lift, lift))
 		next_lifts[id] = Vector2(lerpf(old_lift.x, old_lift.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), lift)
@@ -595,10 +624,13 @@ func _blend_enemies() -> void:
 	_enemy_position_from = next_position_from
 	_enemy_position_to = next_position_to
 	_bounty_health = next_health
+	_shield_hit_counts = next_shield_counts
 	_enemy_blend_elapsed = 0.0
 
 
 func _enemy_position(enemy: Dictionary) -> Vector2:
+	if float(enemy.get("stunned_remaining", 0.0)) > 0.0:
+		return enemy["pos"]
 	if enemy.get("locomotion", "path") == "jump":
 		var id: int = int(enemy["id"])
 		var target: Vector2 = _enemy_position_to.get(id, enemy["pos"])
@@ -645,6 +677,8 @@ func _route_normal(route: Array, progress: float) -> Vector2:
 
 
 func _enemy_route_progress(enemy: Dictionary) -> float:
+	if float(enemy.get("stunned_remaining", 0.0)) > 0.0:
+		return float(enemy["progress"])
 	var blend: Vector2 = _enemy_progress.get(int(enemy["id"]), Vector2(enemy["progress"], enemy["progress"]))
 	return clampf(lerpf(blend.x, blend.y, _enemy_blend_elapsed / ENEMY_BLEND_DURATION), 0.0, maxf(0.0, enemy["route"].size() - 1))
 
@@ -1278,6 +1312,7 @@ func _draw_combat() -> void:
 			# Include shadows, action poses, jumping bodies, bars and dizzy stars.
 			item["visible"] = not cull_enemies or Rect2(item["bounds"]).grow(cell_size * 2.0).intersects(combat_view_rect)
 	for trace: Dictionary in _corpse_traces:
+		EnemyVisuals.draw_death_stun(self, _position_center(Vector2(trace["pos"]).round()), float(trace.get("death_stun_radius", 0.0)), float(trace["age"]), cell_size)
 		_draw_death_blood(trace, _position_center(trace["pos"]) + Vector2(0, cell_size * 0.28))
 	# Only units and corpses cast ovals; structures sit on their foundations.
 	for item: Dictionary in _draw_order:
@@ -1310,12 +1345,15 @@ func _draw_combat() -> void:
 			3:
 				_draw_enemy_death(item)
 	_draw_flights()
+	_draw_ground_bombs()
 	# Bars are an information overlay; foreground bodies must not cover them.
 	for item: Dictionary in _draw_order:
 		if int(item["kind"]) == 2 and bool(item["visible"]):
 			if int(item["data"]["id"]) == selected_enemy_id:
 				_draw_enemy_selection(item)
 			_draw_enemy_health(item)
+			var enemy: Dictionary = item["data"]
+			EnemyVisuals.draw_hit_shield(self, item["bounds"], int(enemy.get("shield_hits", 0)), int(enemy.get("shield_max_hits", 0)), cell_size, float(_shield_hit_life.get(int(enemy["id"]), 0.0)) / 0.18)
 			_draw_bounty_indicator(item)
 
 
@@ -1651,7 +1689,8 @@ func _draw_landing_dust(foot: Vector2, t: float, seed_value: int) -> void:
 func _draw_dizzy_stars(enemy: Dictionary, center: Vector2) -> void:
 	var cell_size: float = _cell_size()
 	var radius: float = maxf(2.5, cell_size * 0.05)
-	var spin: float = float(enemy.get("age", 0.0)) * 3.2 + float(int(enemy["id"]) % 5)
+	var stunned: float = float(enemy.get("stunned_remaining", 0.0))
+	var spin: float = (-stunned if stunned > 0.0 else float(enemy.get("age", 0.0))) * 3.2 + float(int(enemy["id"]) % 5)
 	for index: int in range(2):
 		var angle: float = spin + float(index) * PI
 		var point: Vector2 = center + Vector2(cos(angle) * cell_size * 0.16, sin(angle) * cell_size * 0.05)
@@ -2030,7 +2069,7 @@ func _draw_enemy(item: Dictionary) -> void:
 		var phase: int = int(float(enemy.get("age", 0.0)) * 10.0) + int(enemy["id"])
 		_draw_pixel_flame(item["foot"] + Vector2(-pixel * 3.0, -_cell_size() * artwork.board_height * 0.30), pixel, phase)
 		_draw_pixel_flame(item["foot"] + Vector2(pixel * 3.0, -_cell_size() * artwork.board_height * 0.48), pixel, phase + 2)
-	if bool(enemy.get("launched", false)):
+	if bool(enemy.get("launched", false)) or float(enemy.get("stunned_remaining", 0.0)) > 0.0:
 		_draw_dizzy_stars(enemy, item["foot"] - Vector2(0.0, _cell_size() * artwork.board_height * 0.92))
 
 
@@ -2770,3 +2809,33 @@ func _tower_stun_center(tower: Dictionary, foot: Vector2) -> Vector2:
 			var offset: Vector2 = _archer_offset(artwork, index, variant)
 			top = minf(top, rect.position.y + (pivot.y + offset.y - 15.0) * scale)
 	return Vector2(foot.x, top - cell_size * 0.07)
+
+
+func _capture_bombs(state: Dictionary, slot: int, clock: float) -> void:
+	_ground_bombs.clear()
+	for bomb: Dictionary in state.get("bombs", []):
+		if int(bomb["slot"]) == slot:
+			_ground_bombs.append(bomb)
+	for index: int in range(_bomb_explosion_traces.size() - 1, -1, -1):
+		var trace: Dictionary = _bomb_explosion_traces[index]
+		trace["age"] = maxf(float(trace["age"]), clock - float(trace["time"]))
+		if float(trace["age"]) >= 0.55:
+			_bomb_explosion_traces.remove_at(index)
+	for event: Dictionary in state.get("bomb_explosions", []):
+		if int(event["slot"]) != slot or int(event["id"]) <= _last_bomb_explosion_id:
+			continue
+		_last_bomb_explosion_id = int(event["id"])
+		var age: float = maxf(0.0, clock - float(event["time"]))
+		if age < 0.55:
+			var trace: Dictionary = event.duplicate()
+			trace["age"] = age
+			_bomb_explosion_traces.append(trace)
+
+
+func _draw_ground_bombs() -> void:
+	var cell_size: float = _cell_size()
+	for bomb: Dictionary in _ground_bombs:
+		var foot: Vector2 = _position_center(bomb["pos"]) + Vector2(0.0, cell_size * 0.28)
+		EnemyVisuals.draw_ground_bomb(self, foot, bomb, _bomb_visual_clock, cell_size)
+	for event: Dictionary in _bomb_explosion_traces:
+		EnemyVisuals.draw_death_stun(self, _position_center(event["pos"]), float(event["radius"]), float(event["age"]), cell_size)

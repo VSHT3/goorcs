@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ContentCatalog" load_steps=25 format=3]
+[gd_resource type="Resource" script_class="ContentCatalog" load_steps=27 format=3]
 
 [ext_resource type="Script" path="res://scripts/content_catalog.gd" id="1_catalog"]
 [ext_resource type="Script" path="res://scripts/tower_definition.gd" id="2_tower"]
@@ -24,9 +24,11 @@
 [ext_resource type="Resource" path="res://resources/combat/enemies/rage_orc.tres" id="22_rage"]
 [ext_resource type="Resource" path="res://resources/combat/enemies/moss_orc.tres" id="23_moss"]
 [ext_resource type="Resource" path="res://resources/combat/towers/orcapult.tres" id="24_orcapult"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/giant_skeltorc.tres" id="25_giant"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/kamikaorc.tres" id="26_kamika"]
 
 [resource]
 script = ExtResource("1_catalog")
 towers = Array[ExtResource("2_tower")]([ExtResource("4_arrow"), ExtResource("5_ballista"), ExtResource("6_rune"), ExtResource("14_lightning"), ExtResource("15_drums"), ExtResource("16_mine"), ExtResource("24_orcapult")])
-enemies = Array[ExtResource("3_enemy")]([ExtResource("7_grunt"), ExtResource("8_runner"), ExtResource("20_scrapguard"), ExtResource("9_brute"), ExtResource("10_orcling"), ExtResource("21_crate"), ExtResource("11_chief"), ExtResource("22_rage"), ExtResource("12_necro"), ExtResource("13_skeleton"), ExtResource("17_boss"), ExtResource("23_moss"), ExtResource("18_troll"), ExtResource("19_machine")])
+enemies = Array[ExtResource("3_enemy")]([ExtResource("7_grunt"), ExtResource("8_runner"), ExtResource("20_scrapguard"), ExtResource("9_brute"), ExtResource("10_orcling"), ExtResource("21_crate"), ExtResource("11_chief"), ExtResource("22_rage"), ExtResource("12_necro"), ExtResource("13_skeleton"), ExtResource("25_giant"), ExtResource("26_kamika"), ExtResource("17_boss"), ExtResource("23_moss"), ExtResource("18_troll"), ExtResource("19_machine")])
 starter_tower_id = &"arrow_tower"

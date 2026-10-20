@@ -87,7 +87,11 @@ func _check_catalog_and_pixels() -> void:
 		for index: int in range(screen.entries.size()):
 			var definition: EnemyDefinition = screen.entries[index]
 			await _click_entry(index)
-			var expected: Dictionary = MatchCombat.enemy_preview(definition, rules, definition.first_wave if definition.boss else 1)
+			var preview_wave: int = definition.first_wave if definition.boss else 1
+			for source: EnemyDefinition in catalog.enemies:
+				if source.spawn_variant == definition.id:
+					preview_wave = source.spawn_variant_first_wave
+			var expected: Dictionary = MatchCombat.enemy_preview(definition, rules, preview_wave)
 			var values: Array[Label] = []
 			values.assign(screen.get_node("%Stats").get_children())
 			_check(values[1].text.to_int() == int(expected["max_hp"]) and absf(values[3].text.to_float() - float(expected["speed"])) <= 0.0051 and values[5].text.to_int() == int(expected["base_damage"]), "Visible stats use the combat owner's HP, two-decimal speed, and base damage at the preview round")
@@ -102,7 +106,7 @@ func _check_catalog_and_pixels() -> void:
 				if not definition.regular_spawn_enabled:
 					var source_found: bool = false
 					for source: EnemyDefinition in catalog.enemies:
-						if source.summon_type == definition.id:
+						if String(definition.id) in ContentCatalog.child_ids(source) or source.spawn_variant == definition.id:
 							source_found = screen.availability_label.text.contains(source.title)
 					_check(source_found, "Summoned-only entries identify their actual catalog summoner")
 			_check(_inside(screen.portrait, Rect2(Vector2.ZERO, Vector2(viewport.size))) and _inside(screen.kills_value, Rect2(Vector2.ZERO, Vector2(viewport.size))) and _inside(screen.sent_value, Rect2(Vector2.ZERO, Vector2(viewport.size))), "Preview and counters remain visible at both supported desktop widths")

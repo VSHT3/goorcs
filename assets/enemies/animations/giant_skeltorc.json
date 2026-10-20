@@ -1,0 +1,128 @@
+{
+  "identity": "Giant Skeltorc: unchanged skeleton foreground with oversized iron sphere backpack, skull warning plate, riveted leather cradle and hooked fuse.",
+  "authoring": "Deterministic Pillow integer geometry for original bomb; existing normal skeleton sheet reused read-only as an explicit derivation.",
+  "generator": "tools/author_giant_skeltorc.py",
+  "generator_sha256": "a4f6ad31767fd3a1f1d660eba186e11b2ae8931d7e26e256b40ef41aa0ba9d85",
+  "reproduce": "python3 tools/author_giant_skeltorc.py",
+  "parents": {
+    "assets/enemies/animations/skeleorc.png": "f6682e0597424aee9b07d7f087b9aff0f1608878c6cfd6dcfed5f3ce4aaabbe0",
+    "assets/enemies/animations/skeleorc.tres": "2f05e5d13faf03707a5190afaccb6f8b319fa9fd9068f4f697014c9123a1e678",
+    "assets/enemies/animations/skeleorc.json": "0514d59dd65dd5878ed5833a6150de481904b55c21cf295342b478744efd6b07"
+  },
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "source_origin": "Existing locally authored skeleton pixels plus original local Pillow bomb geometry; no image service.",
+  "source_preservation": "Normal skeleton sheet, still, SpriteFrames and provenance never written. Only new Giant outputs.",
+  "camera": "Elevated three-quarter facing left, upper-left light, fixed foot anchor.",
+  "alpha": "Binary 0/255; no smoothing, dithering, antialiasing, raster rotation or rescaling in frames.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    960,
+    80
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.95,
+  "death": "Original bare skeleton death frames referenced directly; no attached bomb after real death.",
+  "ground_bomb": {
+    "path": "assets/enemies/animations/giant_skeltorc_bomb.png",
+    "size": [
+      40,
+      48
+    ],
+    "anchor": [
+      0.475,
+      0.9583333333333334
+    ],
+    "alpha_bounds": [
+      6,
+      2,
+      35,
+      47
+    ],
+    "sha256": "3e9206b812930ad28989b5a84e83c3991e523ba9b56ec5bd89d3a42ea7add14d"
+  },
+  "sheet_sha256": "ace501d0fc0984abc016d8c5411c70dbbe11f501ae5d2f3ba76feb7404718a9d",
+  "still_sha256": "46d7eb3d567b630cc3b416ad21cdf431d6a52b04d5e114b5f91f311c13628392",
+  "sprite_frames_sha256": "7e57cbe295cdca6f591c7bf877c2cad654fe20cc88fcca35cb8d8f774023fae4",
+  "walk_alpha_bounds": [
+    [
+      20,
+      13,
+      73,
+      70
+    ],
+    [
+      20,
+      12,
+      73,
+      68
+    ],
+    [
+      21,
+      12,
+      73,
+      68
+    ],
+    [
+      23,
+      11,
+      73,
+      68
+    ],
+    [
+      24,
+      12,
+      73,
+      68
+    ],
+    [
+      22,
+      12,
+      73,
+      68
+    ],
+    [
+      21,
+      13,
+      73,
+      70
+    ],
+    [
+      22,
+      12,
+      73,
+      70
+    ],
+    [
+      24,
+      12,
+      73,
+      70
+    ],
+    [
+      24,
+      11,
+      73,
+      70
+    ],
+    [
+      22,
+      12,
+      73,
+      70
+    ],
+    [
+      21,
+      12,
+      73,
+      70
+    ]
+  ]
+}

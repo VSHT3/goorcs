@@ -7,6 +7,18 @@ extends Resource
 @export_multiline var description: String
 @export var health_multiplier: float = 1.0
 @export var speed_multiplier: float = 1.0
+# Apply after rounding the referenced type's HP, rather than before rounding.
+@export var health_base_type: StringName = &""
+@export var health_base_multiplier: int = 1
+@export var spawn_variant: StringName = &""
+@export var spawn_variant_first_wave: int = 1
+@export_range(0.0, 1.0) var spawn_variant_chance: float = 0.0
+@export var hit_shield: int = 0
+@export var death_stun_radius: float = 0.0
+@export var death_stun_duration: float = 0.0
+@export var death_bomb_fuse: float = 0.0
+@export var death_bomb_radius: float = 0.0
+@export var death_bomb_stun_duration: float = 0.0
 @export var base_damage: int = 1
 @export var fire_immune: bool = false
 @export var ice_immune: bool = false

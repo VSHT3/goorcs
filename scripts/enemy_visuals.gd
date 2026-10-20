@@ -3,6 +3,8 @@ extends RefCounted
 ## Shared simulation-time frame selection and fixed-size sprite geometry.
 ## Rendering and hit picking resolve the same Texture2D; no local gameplay clock.
 
+const GROUND_BOMB: Texture2D = preload("res://assets/enemies/animations/giant_skeltorc_bomb.png")
+
 static var _bounds: Dictionary[Texture2D, Rect2] = {}
 static var _images: Dictionary[Texture2D, Image] = {}
 static var _slow_textures: Dictionary[Texture2D, Texture2D] = {}
@@ -177,3 +179,60 @@ static func draw_action_effect(surface: CanvasItem, foot: Vector2, radius: float
 			surface.draw_rect(Rect2(center - Vector2(pixel * 1.5, pixel * 0.5), Vector2(pixel * 3.0, pixel)), color)
 		else:
 			surface.draw_rect(Rect2(center, Vector2.ONE * pixel * 1.5), color)
+
+
+static func draw_hit_shield(surface: CanvasItem, bounds: Rect2, hits: int, maximum: int, cell_size: float, hit_flash: float = 0.0) -> void:
+	if maximum <= 0:
+		return
+	var pixel: float = maxf(1.0, floorf(cell_size * 0.025))
+	if hits > 0:
+		var columns: int = ceili(float(maximum) / 2.0)
+		var width: float = float(columns * 3 - 1) * pixel
+		var origin := Vector2(bounds.get_center().x - width * 0.5, bounds.position.y - pixel * 7.0 - 4.0).floor()
+		for index: int in range(maximum):
+			var point: Vector2 = origin + Vector2(float(index % columns) * 3.0, floorf(float(index) / float(columns)) * 3.0) * pixel
+			surface.draw_rect(Rect2(point - Vector2.ONE * pixel, Vector2.ONE * pixel * 4.0), Color("172120"))
+			var color := Color("ead58c") if index < hits else Color("4b5652")
+			surface.draw_rect(Rect2(point, Vector2.ONE * pixel * 2.0), color.lerp(Color.WHITE, clampf(hit_flash, 0.0, 1.0)))
+	if hit_flash > 0.0:
+		var flash := Color(1.0, 0.87, 0.54, clampf(hit_flash, 0.0, 1.0))
+		var center: Vector2 = bounds.get_center()
+		for side: float in [-1.0, 1.0]:
+			var point: Vector2 = center + Vector2(side * (bounds.size.x * 0.5 + pixel * 2.0), -pixel)
+			surface.draw_line(point, point + Vector2(side * pixel * 3.0, -pixel * 3.0), flash, pixel * 2.0)
+
+
+static func draw_death_stun(surface: CanvasItem, center: Vector2, radius: float, elapsed: float, cell_size: float) -> void:
+	# Accepted death facts only; tower stars separately reflect accepted stun state.
+	if radius <= 0.0 or elapsed < 0.0 or elapsed >= 0.55:
+		return
+	var phase: float = elapsed / 0.55
+	var pixel: float = maxf(1.0, floorf(cell_size * 0.025))
+	var spread: float = radius * cell_size * (0.15 + phase * 0.85)
+	var color := Color(0.96, 0.73, 0.36, 1.0 - phase)
+	surface.draw_rect(Rect2(center - Vector2.ONE * spread, Vector2.ONE * spread * 2.0), color, false, pixel * 2.0)
+	for index: int in range(8):
+		var angle: float = float(index) * TAU / 8.0
+		var direction := Vector2(cos(angle), sin(angle))
+		var point: Vector2 = center + direction * spread
+		surface.draw_rect(Rect2(point.floor(), Vector2(pixel * 3.0, pixel * 2.0)), color)
+
+
+static func draw_ground_bomb(surface: CanvasItem, foot: Vector2, bomb: Dictionary, clock: float, cell_size: float) -> void:
+	var elapsed: float = maxf(0.0, clock - float(bomb["time"]))
+	var drop: float = clampf(elapsed / 0.28, 0.0, 1.0)
+	var scale: float = cell_size * 0.62 / 46.0
+	var lift: float = (1.0 - drop) * (1.0 - drop) * cell_size * 0.6
+	var origin: Vector2 = foot - Vector2(19.0, 46.0) * scale - Vector2(0.0, lift)
+	surface.draw_set_transform(foot, 0.0, Vector2(1.0, 0.3))
+	surface.draw_circle(Vector2.ZERO, cell_size * 0.19, Color(0.03, 0.05, 0.04, 0.45))
+	surface.draw_set_transform(Vector2.ZERO)
+	surface.draw_texture_rect(GROUND_BOMB, Rect2(origin, GROUND_BOMB.get_size() * scale), false)
+	# The fuse is cosmetic; only a separate accepted explosion event draws a blast.
+	var remaining: float = maxf(0.0, float(bomb["fuse_remaining"]))
+	var cadence: float = 12.0 if remaining < float(bomb["fuse_duration"]) * 0.35 else 7.0
+	var spark: Vector2 = (origin + Vector2(31.0, 2.0) * scale).floor()
+	var pixel: float = maxf(1.0, floorf(cell_size * 0.025))
+	var bright: bool = int(clock * cadence) % 2 == 0
+	surface.draw_rect(Rect2(spark - Vector2.ONE * pixel, Vector2.ONE * pixel * 3.0), Color("e9a34b") if bright else Color("bd6a3e"))
+	surface.draw_rect(Rect2(spark, Vector2.ONE * pixel), Color("fff1b1"))

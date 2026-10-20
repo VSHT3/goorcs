@@ -25,6 +25,7 @@ RENDERED_TESTS = {
     "enemy_inspection_test.gd",
     "horde_presentation_test.gd",
     "late_boss_presentation_test.gd",
+    "late_enemy_presentation_test.gd",
     "menu_wordmark_test.gd",
     "orcieary_screen_test.gd",
     "path_board_test.gd",

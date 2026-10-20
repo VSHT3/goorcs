@@ -50,6 +50,8 @@ func _run() -> void:
 		model.sandbox_spawn(0,definition.id,1)
 		model.advance(0.5)
 		model.build(0,Vector2i(1,1),tower.reward.id,MatchCombat.TargetMode.FURTHEST)
+		for contact: int in range(definition.hit_shield):
+			model._hit(0, model.towers[0][0], 0, 1000)
 		model.advance(0.001)
 		var state: Dictionary = model.snapshot()
 		var parent_living: bool = false
@@ -84,6 +86,12 @@ func _run() -> void:
 		_check(board.enemy_at(foot) == -1 and board.combat_enemies.is_empty(), "Rendered dead body is never a live selectable enemy")
 		board._process(2.0)
 		var expired: Image = await _capture()
+		if definition.death_bomb_fuse > 0.0:
+			_check(expired.get_data() != ground.get_data() and board._corpse_traces.is_empty(), "Bare Giant bones expire while its accepted lit ground bomb remains visible")
+			model.advance(definition.death_bomb_fuse)
+			board.apply_deaths(model.snapshot(), 0)
+			board._process(2.0)
+			expired = await _capture()
 		_check(expired.get_data() == ground.get_data(), "Corpse, shadow and splatter all clean up without another host snapshot")
 		board.apply_deaths(state,0)
 		_check(board._corpse_traces.is_empty(), "Republishing expired event IDs cannot resurrect visual corpses")

@@ -1,0 +1,223 @@
+{
+  "identity": "KamikaOrc: lean goggled powder runner, red tied hood, crossed rope harness, oversized iron-hooped red keg, powder diamond and hooked glowing fuse.",
+  "authoring": "Original deterministic local Pillow integer geometry; no image generation service or sampled source pixels.",
+  "generator": "tools/author_kamikaorc.py",
+  "generator_sha256": "34f0c18f105ceace4edd452f13932dc34a3cf0e63804c6fe7c055f18b7428c80",
+  "reproduce": "python3 tools/author_kamikaorc.py",
+  "geometry_helpers": {
+    "tools/author_enemy_sprites.py": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+    "tools/author_variety_enemies.py": "0bafa9e2ec52ed5f03eb8de37e1f1afc49e1cee99acc16b798dffe7219e66895"
+  },
+  "reused_primitives": [
+    "Pixels",
+    "segment",
+    "O",
+    "SK",
+    "FE",
+    "LE",
+    "BO",
+    "death_tableau"
+  ],
+  "design_reference": "assets/enemies/animations/grunt_still.png",
+  "design_reference_sha256": "6b58a9c65c65789b5a80eddd6bdaffa8da05391ac140cea7f9207b64ab9c3698",
+  "design_reference_status": "Approved Orc is read-only; palette/style comparison only, no sampled pixels or replacement.",
+  "source_origin": "Locally authored Pillow pixel clusters; NOT PixelLab-generated",
+  "camera": "Elevated three-quarter facing left, top-left lighting, fixed foot anchor; articulated near/far limbs.",
+  "alpha": "Binary 0/255; no antialiasing, dithering, raster rotation or scaling in frames.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    1920,
+    80
+  ],
+  "base_anchor_pixels": [
+    40,
+    70
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.6,
+  "still": "assets/enemies/animations/kamikaorc_still.png",
+  "still_alpha_bounds": [
+    19,
+    12,
+    69,
+    70
+  ],
+  "sheet_sha256": "acfbe95e2b41aedca46c46cd041f216cfd4d4b3a6d05cde6004a2264ac399e01",
+  "still_sha256": "06152add63af7b7fea5a82654dbeb281225806512120b5af200f6adbbfd3cacb",
+  "sprite_frames_sha256": "ab86ae43f6034cb2139d899764f3854f1c1c05003473c9962d2614826b7c6c34",
+  "death": {
+    "duration_seconds": 0.8,
+    "articulation": "Recoil, buckled knees, turned torso, settled corpse and darkened fuse. No baked blast or blood."
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 12,
+      "frame_count": 12,
+      "loop": true,
+      "duration_seconds": 1.0,
+      "alpha_bounds": [
+        [
+          19,
+          12,
+          69,
+          70
+        ],
+        [
+          19,
+          12,
+          69,
+          69
+        ],
+        [
+          19,
+          11,
+          69,
+          69
+        ],
+        [
+          19,
+          11,
+          69,
+          69
+        ],
+        [
+          19,
+          12,
+          69,
+          69
+        ],
+        [
+          19,
+          13,
+          69,
+          69
+        ],
+        [
+          19,
+          12,
+          69,
+          70
+        ],
+        [
+          19,
+          12,
+          69,
+          70
+        ],
+        [
+          19,
+          11,
+          69,
+          70
+        ],
+        [
+          19,
+          11,
+          69,
+          70
+        ],
+        [
+          19,
+          12,
+          69,
+          70
+        ],
+        [
+          19,
+          13,
+          69,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "loop": false,
+      "duration_seconds": 0.8,
+      "alpha_bounds": [
+        [
+          19,
+          12,
+          69,
+          70
+        ],
+        [
+          20,
+          16,
+          69,
+          70
+        ],
+        [
+          18,
+          18,
+          71,
+          70
+        ],
+        [
+          16,
+          20,
+          74,
+          70
+        ],
+        [
+          15,
+          22,
+          70,
+          70
+        ],
+        [
+          14,
+          20,
+          68,
+          71
+        ],
+        [
+          9,
+          20,
+          70,
+          74
+        ],
+        [
+          8,
+          25,
+          70,
+          76
+        ],
+        [
+          9,
+          26,
+          70,
+          76
+        ],
+        [
+          9,
+          27,
+          70,
+          76
+        ],
+        [
+          9,
+          28,
+          70,
+          76
+        ],
+        [
+          9,
+          28,
+          70,
+          76
+        ]
+      ]
+    }
+  ]
+}

@@ -123,7 +123,7 @@ func _build_catalog() -> void:
 	var availability: Dictionary[StringName, int] = {}
 	for definition: EnemyDefinition in entries:
 		availability[definition.id] = mini(definition.first_wave if definition.regular_spawn_enabled or definition.boss else 2147483647, definition.send_first_wave if definition.send_enabled else 2147483647)
-	# Propagate first encounters through summon and death-child chains.
+	# Propagate first encounters through summons, death children and gated variants.
 	for pass_index: int in range(entries.size()):
 		var changed: bool = false
 		for source: EnemyDefinition in entries:
@@ -131,6 +131,11 @@ func _build_catalog() -> void:
 				var child_id := StringName(child)
 				if availability.has(child_id) and availability[source.id] < availability[child_id]:
 					availability[child_id] = availability[source.id]
+					changed = true
+			if source.spawn_variant != &"" and availability.has(source.spawn_variant):
+				var first_variant: int = maxi(availability[source.id], source.spawn_variant_first_wave)
+				if first_variant < availability[source.spawn_variant]:
+					availability[source.spawn_variant] = first_variant
 					changed = true
 		if not changed:
 			break
@@ -248,6 +253,9 @@ func _select(index: int) -> void:
 	else:
 		portrait.stop_preview()
 	var preview_wave: int = definition.first_wave if definition.boss else 1
+	var variant_source: EnemyDefinition = _variant_source(definition)
+	if variant_source != null:
+		preview_wave = variant_source.spawn_variant_first_wave
 	var preview: Dictionary = MatchCombat.enemy_preview(definition, rules, preview_wave)
 	_stat_values[&"health"].text = "%d HP" % int(preview["max_hp"])
 	_stat_values[&"speed"].text = "%.2f cells/s" % float(preview["speed"])
@@ -268,6 +276,10 @@ func _select(index: int) -> void:
 		if not mechanics_label.text.is_empty():
 			mechanics_label.text += "\n"
 		mechanics_label.text += "Immune: " + " · ".join(immunities)
+	if definition.fire_immune:
+		mechanics_label.text += "\nNo burning · ignores Flamethrowers"
+	if definition.ice_immune:
+		mechanics_label.text += "\nNo slowing"
 	mechanics_label.visible = not mechanics_label.text.is_empty()
 	scaling_label.text = "Wave %d · HP ×%s · Speed ×%s" % [preview_wave, String.num(definition.health_multiplier, 2), String.num(definition.speed_multiplier, 2)]
 	_details_scroll.scroll_vertical = 0
@@ -282,6 +294,9 @@ func _availability(definition: EnemyDefinition) -> String:
 	if definition.boss:
 		var sends: String = "Sends %d+" % definition.send_first_wave if definition.send_enabled else "No paid sends"
 		return "Boss round %d · %s" % [definition.first_wave, sends]
+	var variant_source: EnemyDefinition = _variant_source(definition)
+	if variant_source != null:
+		return "%s births %d+ · %s%% chance\nNo regular waves or paid sends." % [variant_source.title, variant_source.spawn_variant_first_wave, String.num(variant_source.spawn_variant_chance * 100.0, 2)]
 	if not definition.regular_spawn_enabled and not definition.send_enabled:
 		var sources := PackedStringArray()
 		for candidate: EnemyDefinition in catalog.enemies:
@@ -296,6 +311,22 @@ func _availability(definition: EnemyDefinition) -> String:
 
 func _mechanics(definition: EnemyDefinition) -> String:
 	var lines := PackedStringArray()
+	if definition.hit_shield > 0:
+		lines.append("Shield: first %d hits · no overflow\nBlocks ignition and freezing\nContinuous attacks: one charge per attack interval" % definition.hit_shield)
+	if definition.death_stun_radius > 0.0 and definition.death_stun_duration > 0.0:
+		lines.append("On death: %ss tower stun · within %s tile (incl. diagonals)\nNo stun on leaks · attacks, support and income stop" % [String.num(definition.death_stun_duration, 1), String.num(definition.death_stun_radius, 1)])
+	if definition.death_bomb_radius > 0.0 and definition.death_bomb_stun_duration > 0.0:
+		lines.append("On death: drops a bomb · %ss fuse\nBlast: %ss enemy + tower stun · within %s tiles (incl. diagonals)\nNo damage or extra Coins · no bomb on leaks" % [String.num(definition.death_bomb_fuse, 1), String.num(definition.death_bomb_stun_duration, 1), String.num(definition.death_bomb_radius, 1)])
+	if definition.spawn_variant != &"":
+		for variant: EnemyDefinition in catalog.enemies:
+			if variant.id == definition.spawn_variant:
+				lines.append("Round %d+: each birth has a fixed %s%% chance of %s" % [definition.spawn_variant_first_wave, String.num(definition.spawn_variant_chance * 100.0, 2), variant.title])
+				break
+	if definition.health_base_type != &"":
+		for source: EnemyDefinition in catalog.enemies:
+			if source.id == definition.health_base_type:
+				lines.append("%s× %s HP · %s%% slower\nSame round · same immunities" % [String.num(definition.health_base_multiplier, 0), source.title, String.num((1.0 - definition.speed_multiplier / source.speed_multiplier) * 100.0, 0)])
+				break
 	if not is_equal_approx(definition.physical_damage_multiplier, 1.0):
 		lines.append("Physical damage ×%s" % String.num(definition.physical_damage_multiplier, 2))
 	if definition.death_spawn_count > 0:
@@ -374,3 +405,10 @@ func _refresh_counts() -> void:
 	error_label.text = failure
 	error_label.visible = not failure.is_empty()
 	_refresh_focus_chain()
+
+
+func _variant_source(definition: EnemyDefinition) -> EnemyDefinition:
+	for source: EnemyDefinition in catalog.enemies:
+		if source.spawn_variant == definition.id:
+			return source
+	return null

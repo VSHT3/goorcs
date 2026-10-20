@@ -56,7 +56,7 @@ Eight Archers adds a second deck with four independently aiming archers per stor
 
 Damage still uses the existing combat owner; projectile flight/impact animation cannot delay or apply another hit. Each trace preserves its original weapon, release origin, and destination after aim or advancement changes. Deduplication, bounded histories, retirement/generation cleanup, pause, and simulation playback apply to all weapons.
 
-`EnemyDefinition.fire_immune` and `ice_immune` are captured by the host. SkeleOrcs enable both: physical arrows, bottle/grenade/rocket splash, and Rune damage still work, but ignition/burn, the entire Flamethrower, and Freeze slow do not. Orcieary lists these immunities; rendering uses accepted instance flags rather than client resource calculations.
+`EnemyDefinition.fire_immune` and `ice_immune` are captured by the host. Skeltorcs and Giant Skeltorcs enable both: physical arrows, bottle/grenade/rocket splash, and Rune damage still work, but ignition/burn, the entire Flamethrower, and Freeze slow do not. Orcieary lists these immunities; rendering uses accepted instance flags rather than client resource calculations. KamikaOrc shields absorb whole damaging contacts and attached ignition/freeze; continuous attacks consume charges by accepted attack interval, with no frame-rate-dependent depletion or hidden fractional damage debt.
 
 ## Verification
 
@@ -68,4 +68,4 @@ After the final stat/chrome/blast polish, the four focused suites and an isolate
 
 ### Earlier verification
 
-The original three advancements passed **45/45** integrated checks, including real peers, native-size projectiles, paid Four Archers, Sandbox controls at both supported widths, and displayed SkeleOrc immunities. A later shared-target cutover passed **51/51**, including real peers, sound, targeting, burn/immunity, and rig rendering. It changed scarce-enemy fallback without changing the original prices/status stacking. Those historical checks do not establish final late-game balance, artwork approval, long-run performance, or separate-network reachability for this expansion.
+The original three advancements passed **45/45** integrated checks, including real peers, native-size projectiles, paid Four Archers, Sandbox controls at both supported widths, and displayed Skeltorc immunities. A later shared-target cutover passed **51/51**, including real peers, sound, targeting, burn/immunity, and rig rendering. It changed scarce-enemy fallback without changing the original prices/status stacking. Those historical checks do not establish final late-game balance, artwork approval, long-run performance, or separate-network reachability for this expansion.

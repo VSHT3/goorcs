@@ -8,6 +8,17 @@ const EPSILON: float = 0.000000001
 static func capture(definition: EnemyDefinition) -> Dictionary:
 	return {
 		"physical_damage_multiplier": definition.physical_damage_multiplier,
+		"health_base_type": String(definition.health_base_type),
+		"health_base_multiplier": definition.health_base_multiplier,
+		"spawn_variant": String(definition.spawn_variant),
+		"spawn_variant_first_wave": definition.spawn_variant_first_wave,
+		"spawn_variant_chance": definition.spawn_variant_chance,
+		"hit_shield": definition.hit_shield,
+		"death_stun_radius": definition.death_stun_radius,
+		"death_stun_duration": definition.death_stun_duration,
+		"death_bomb_fuse": definition.death_bomb_fuse,
+		"death_bomb_radius": definition.death_bomb_radius,
+		"death_bomb_stun_duration": definition.death_bomb_stun_duration,
 		"death_spawn_type": String(definition.death_spawn_type),
 		"death_spawn_count": definition.death_spawn_count,
 		"enrage_health_fraction": definition.enrage_health_fraction,
@@ -19,10 +30,25 @@ static func capture(definition: EnemyDefinition) -> Dictionary:
 
 static func initialize(enemy: Dictionary, definition: Dictionary) -> void:
 	enemy["physical_damage_multiplier"] = float(definition["physical_damage_multiplier"])
+	enemy["shield_hits"] = int(definition["hit_shield"])
+	enemy["shield_max_hits"] = int(definition["hit_shield"])
+	enemy["shield_hit_count"] = 0
+	enemy["stunned_remaining"] = 0.0
+	enemy["stun_count"] = 0
+	enemy["stun_source"] = ""
+	enemy["stun_position"] = enemy.get("pos", Vector2.ZERO)
 	enemy["enraged"] = false
 	enemy["regeneration_count"] = 0
 	enemy["next_regeneration"] = float(definition["regeneration_interval"])
 
+
+
+static func absorb_hit(enemy: Dictionary, positive_damage: float) -> bool:
+	if positive_damage <= 0.0 or int(enemy["shield_hits"]) <= 0:
+		return false
+	enemy["shield_hits"] = int(enemy["shield_hits"]) - 1
+	enemy["shield_hit_count"] = int(enemy["shield_hit_count"]) + 1
+	return true
 
 static func after_damage(enemy: Dictionary, definition: Dictionary) -> void:
 	if int(enemy["hp"]) <= 0 or bool(enemy["enraged"]) or float(definition["enrage_health_fraction"]) <= 0.0:
@@ -32,6 +58,8 @@ static func after_damage(enemy: Dictionary, definition: Dictionary) -> void:
 	enemy["enraged"] = true
 	enemy["base_speed"] = float(enemy["base_speed"]) * float(definition["enrage_speed_multiplier"])
 	BossMechanics.prepare(enemy)
+	if float(enemy["stunned_remaining"]) > EPSILON:
+		enemy["speed"] = 0.0
 
 
 static func has_abilities(definition: Dictionary) -> bool:

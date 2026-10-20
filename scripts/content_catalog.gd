@@ -65,6 +65,14 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' has invalid combat, economy, or wave values." % enemy.id)
 		if enemy.send_first_wave < 1 or enemy.kill_bounty < -1 or not is_finite(enemy.group_interval) or enemy.group_interval <= 0.0:
 			errors.append("Enemy '%s' has invalid send, bounty, or group timing metadata." % enemy.id)
+		if enemy.health_base_multiplier < 1 or (enemy.health_base_type == &"" and enemy.health_base_multiplier != 1):
+			errors.append("Enemy '%s' requires a registered HP base with a positive integer multiplier, or empty/one defaults." % enemy.id)
+		if enemy.spawn_variant_first_wave < 1 or not is_finite(enemy.spawn_variant_chance) or enemy.spawn_variant_chance < 0.0 or enemy.spawn_variant_chance > 1.0 or ((enemy.spawn_variant == &"") != (enemy.spawn_variant_chance == 0.0)):
+			errors.append("Enemy '%s' requires a spawn variant with finite positive odds up to one, or disabled defaults." % enemy.id)
+		if enemy.hit_shield < 0 or not is_finite(enemy.death_stun_radius) or enemy.death_stun_radius < 0.0 or not is_finite(enemy.death_stun_duration) or enemy.death_stun_duration < 0.0 or ((enemy.death_stun_radius == 0.0) != (enemy.death_stun_duration == 0.0)):
+			errors.append("Enemy '%s' requires a nonnegative hit shield and positive death-stun radius/duration together, or zero defaults." % enemy.id)
+		if not is_finite(enemy.death_bomb_fuse) or enemy.death_bomb_fuse < 0.0 or not is_finite(enemy.death_bomb_radius) or enemy.death_bomb_radius < 0.0 or not is_finite(enemy.death_bomb_stun_duration) or enemy.death_bomb_stun_duration < 0.0 or ((enemy.death_bomb_fuse == 0.0) != (enemy.death_bomb_radius == 0.0)) or ((enemy.death_bomb_fuse == 0.0) != (enemy.death_bomb_stun_duration == 0.0)):
+			errors.append("Enemy '%s' requires positive death-bomb fuse/radius/stun together, or zero defaults." % enemy.id)
 		if enemy.boss and (enemy.group_weights.size() != 1 or not is_finite(enemy.boss_spawn_chance) or enemy.boss_spawn_chance < 0.0 or not is_finite(enemy.boss_spawn_chance_growth) or enemy.boss_spawn_chance_growth < 0.0 or not is_finite(enemy.boss_spawn_chance_cap) or enemy.boss_spawn_chance_cap < enemy.boss_spawn_chance or enemy.boss_spawn_chance_cap > 1.0):
 			errors.append("Enemy '%s' requires a single-member boss and finite encounter odds between zero and one with nonnegative growth." % enemy.id)
 		# Either zero permits authored enemies with no effective reroll payout.
@@ -127,6 +135,7 @@ func validation_errors() -> PackedStringArray:
 	for enemy: EnemyDefinition in enemies:
 		if enemy != null:
 			_validate_children(enemy, enemy_ids, {}, {}, errors)
+			_validate_health_base(enemy, enemy_ids, {}, errors)
 	return errors
 
 
@@ -144,14 +153,17 @@ static func child_ids(source: EnemyDefinition) -> PackedStringArray:
 
 static func _validate_children(source: EnemyDefinition, definitions: Dictionary[StringName, EnemyDefinition], ancestors: Dictionary, visited: Dictionary, errors: PackedStringArray) -> void:
 	if ancestors.has(source.id):
-		errors.append("Enemy '%s' has a cyclic summon/death-spawn chain." % source.id)
+		errors.append("Enemy '%s' has a cyclic summon/death-spawn/variant chain." % source.id)
 		return
 	if visited.has(source.id):
 		return
 	ancestors[source.id] = true
-	for child_id: String in child_ids(source):
+	var children: PackedStringArray = child_ids(source)
+	if source.spawn_variant != &"" and String(source.spawn_variant) not in children:
+		children.append(String(source.spawn_variant))
+	for child_id: String in children:
 		if not definitions.has(StringName(child_id)):
-			errors.append("Enemy '%s' requires a registered summon/death-spawn child '%s'." % [source.id, child_id])
+			errors.append("Enemy '%s' requires a registered summon/death-spawn/variant child '%s'." % [source.id, child_id])
 			continue
 		var child: EnemyDefinition = definitions[StringName(child_id)]
 		if child.boss:
@@ -159,6 +171,20 @@ static func _validate_children(source: EnemyDefinition, definitions: Dictionary[
 		_validate_children(child, definitions, ancestors, visited, errors)
 	ancestors.erase(source.id)
 	visited[source.id] = true
+
+
+static func _validate_health_base(source: EnemyDefinition, definitions: Dictionary[StringName, EnemyDefinition], ancestors: Dictionary, errors: PackedStringArray) -> void:
+	if source.health_base_type == &"":
+		return
+	if ancestors.has(source.id):
+		errors.append("Enemy '%s' has a cyclic HP-base chain." % source.id)
+		return
+	if not definitions.has(source.health_base_type):
+		errors.append("Enemy '%s' requires a registered HP base '%s'." % [source.id, source.health_base_type])
+		return
+	ancestors[source.id] = true
+	_validate_health_base(definitions[source.health_base_type], definitions, ancestors, errors)
+	ancestors.erase(source.id)
 
 
 static func _valid_directional_weapon(art: TowerReward) -> bool:

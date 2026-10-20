@@ -27,6 +27,9 @@ var towers: Array[Array] = [[], []]
 var enemies: Array[Array] = [[], []]
 # Enemies thrown by an Orcapult, airborne until they land on the target board.
 var flights: Array[Dictionary] = []
+var bombs: Array[Dictionary] = []
+var _bomb_explosions: Array[Dictionary] = []
+var _next_bomb_id: int = 1
 var _next_flight_id: int = 1
 # One host-generated ordered regular stream, replayed independently on both boards.
 var wave_roster: Array[String] = []
@@ -67,6 +70,13 @@ var _roll_random := RandomNumberGenerator.new()
 var _drop_random := RandomNumberGenerator.new()
 # Magic Ballista bounce rolls never perturb waves, placement rolls or drops.
 var _magic_random := RandomNumberGenerator.new()
+# Birth mutations never consume composition, timing, send, loot or combat rolls.
+var _variant_random := RandomNumberGenerator.new()
+# Per-source accepted exposure, not fractional HP or render-frame contacts.
+var _shield_exposure: Dictionary = {}
+var _stun_refresh_times: Dictionary = {}
+var _death_rates: Array[float] = []
+var _death_fractions: Array[float] = []
 var _roll_rules: TowerRollRules
 var _boss_loot: BossRewardLedger
 var _roster_configuration_valid: bool = true
@@ -129,6 +139,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 	if drop_random == null:
 		_drop_random.seed = _wave_random.seed ^ 0x44524f50
 	_magic_random.seed = _wave_random.seed ^ 0x4d414749
+	_variant_random.seed = _wave_random.seed ^ 0x56415249
 	var reward_random := RandomNumberGenerator.new()
 	reward_random.seed = _wave_random.seed ^ 0x424f5353
 	_boss_loot = BossRewardLedger.new(rules.boss_reward_rules, reward_random, not _sandbox_mode)
@@ -665,6 +676,9 @@ func sell_tower(slot: int, tower_id: int) -> bool:
 			_recap.add(slot, "earned", "sale_coins", _sell_value(tower["invested"]))
 		_continuous_damage.erase(tower_id)
 		_continuous_bonus.erase(tower_id)
+		_stun_refresh_times.erase(tower_id)
+		for enemy_id: int in _shield_exposure:
+			_shield_exposure[enemy_id].erase(tower_id)
 		_clear_tower_mark(slot, tower)
 		_recap.sell(slot, tower_id)
 		towers[slot].remove_at(index)
@@ -752,6 +766,7 @@ func _send_enemy_accepted(slot: int, type_id: StringName) -> void:
 	var target: int = 1 - slot
 	var count: int = _roll_group(definition, _group_random)
 	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
+	_boss_stream = _boss_stream or _requires_combat_events(definition)
 	if _pending_sends(target) == 0 and phase == Phase.WAVE:
 		_next_send_times[target] = maxf(_next_send_times[target], _elapsed)
 	for member: int in range(count):
@@ -787,6 +802,7 @@ func debug_set_round(round_number: int) -> bool:
 	enemies = [[], []]
 	_target_grid_valid = [false, false]
 	flights.clear()
+	bombs.clear()
 	_reset_death_events()
 	wave_roster.clear()
 	wave_groups.clear()
@@ -807,6 +823,7 @@ func debug_set_round(round_number: int) -> bool:
 	_continuous_damage.clear()
 	_continuous_bonus.clear()
 	_burns.clear()
+	_shield_exposure.clear()
 	_enemy_spawn_times.clear()
 	_slow_motion.clear()
 	for board: Array in towers:
@@ -900,7 +917,7 @@ func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dic
 		for index: int in range(_send_heads[slot], _send_queues[slot].size()):
 			var pending: Dictionary = _enemy_types[_send_queues[slot][index]]
 			_special_stream = _special_stream or float(pending["heal_interval"]) > 0.0 or float(pending["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(pending)
-			_boss_stream = _boss_stream or BossMechanics.has_abilities(pending)
+			_boss_stream = _boss_stream or _requires_combat_events(pending, wave_number)
 	var interval_multiplier: float = _spawn_interval_multiplier(wave_number)
 	var group_times: Array[float] = _generate_spawn_times(groups.size(), _rules.spawn_interval * interval_multiplier)
 	var offset: float = 0.0
@@ -908,7 +925,7 @@ func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dic
 		var group: Dictionary = groups[index]
 		var definition: Dictionary = _enemy_types[group["type_id"]]
 		_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
-		_boss_stream = _boss_stream or BossMechanics.has_abilities(definition)
+		_boss_stream = _boss_stream or _requires_combat_events(definition, wave_number)
 		var spacing: float = _enemy_types[group["type_id"]]["group_interval"]
 		for member: int in range(int(group["count"])):
 			wave_roster.append(group["type_id"])
@@ -1066,9 +1083,14 @@ func advance(delta: float) -> bool:
 			for tower: Dictionary in towers[slot]:
 				_update_tracking_target(slot, tower)
 		_land_flights()
+		if base_health[0] > 0 and base_health[1] > 0:
+			_advance_bombs()
 		remaining -= step
 		if (periodic or _boss_stream) and (base_health[0] == 0 or base_health[1] == 0 or _wave_cleared()):
 			break
+	for index: int in range(_bomb_explosions.size() - 1, -1, -1):
+		if _death_time - float(_bomb_explosions[index]["time"]) >= DEATH_EVENT_LIFETIME - 0.000000001:
+			_bomb_explosions.remove_at(index)
 	for slot: int in range(2):
 		var events: Array = _death_events[slot]
 		var first: int = _death_heads[slot]
@@ -1094,6 +1116,13 @@ func advance(delta: float) -> bool:
 				tower["production_elapsed"] = 0.0
 			_refresh_board(slot)
 		flights.clear()
+		bombs.clear()
+		_bomb_explosions.clear()
+		for board: Array in enemies:
+			for enemy: Dictionary in board:
+				enemy["stunned_remaining"] = 0.0
+				enemy["stun_source"] = ""
+				BossMechanics.prepare(enemy)
 	elif _wave_cleared():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
 		_recap.rounds_cleared += 1
@@ -1123,6 +1152,8 @@ func advance(delta: float) -> bool:
 
 func _next_event_step(maximum: float, periodic: bool = false) -> float:
 	var duration: float = maximum
+	for bomb: Dictionary in bombs:
+		duration = minf(duration, float(bomb["fuse_remaining"]))
 	for flight: Dictionary in flights:
 		duration = minf(duration, float(flight["land_time"]) - _elapsed)
 	for slot: int in range(2):
@@ -1142,6 +1173,13 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 					duration = minf(duration, float(tower["behavior_config"]["periodic_interval"]) - float(tower["production_elapsed"]))
 		for enemy: Dictionary in enemies[slot]:
 			var definition: Dictionary = _enemy_types[enemy["type_id"]]
+			if int(enemy["shield_max_hits"]) > 0 or float(definition["death_stun_duration"]) > 0.0 or float(definition["death_bomb_fuse"]) > 0.0:
+				duration = minf(duration, _shield_event_step(slot, enemy, duration))
+			if float(definition["death_stun_duration"]) > 0.0 or float(definition["death_bomb_fuse"]) > 0.0:
+				duration = minf(duration, _death_stun_event_step(slot, enemy, duration))
+			if float(enemy["stunned_remaining"]) > 0.000000001:
+				duration = minf(duration, float(enemy["stunned_remaining"]))
+				continue
 			if _boss_stream:
 				if float(enemy["slow_remaining"]) > 0.000000001:
 					duration = minf(duration, float(enemy["slow_remaining"]))
@@ -1198,8 +1236,175 @@ func _next_attack_entry(slot: int, enemy: Dictionary, definition: Dictionary, ma
 	return duration
 
 
+func _requires_combat_events(definition: Dictionary, wave_number: int = 0) -> bool:
+	if BossMechanics.has_abilities(definition) or int(definition["hit_shield"]) > 0 or float(definition["death_stun_duration"]) > 0.0 or float(definition["death_bomb_fuse"]) > 0.0:
+		return true
+	var variant: String = definition["spawn_variant"]
+	var birth_wave: int = wave if wave_number == 0 else wave_number
+	return not variant.is_empty() and birth_wave >= int(definition["spawn_variant_first_wave"]) and _requires_combat_events(_enemy_types[variant], birth_wave)
+
+
+func _shield_event_step(slot: int, enemy: Dictionary, maximum: float) -> float:
+	var duration: float = maximum
+	if int(enemy["shield_hits"]) <= 0 and not _shield_exposure.has(int(enemy["id"])) and float(_enemy_types[enemy["type_id"]]["death_stun_duration"]) <= 0.0 and float(_enemy_types[enemy["type_id"]]["death_bomb_fuse"]) <= 0.0:
+		return duration
+	var speed: float = enemy["speed"]
+	if speed > 0.0:
+		var boundary: float = floorf(float(enemy["progress"]) + 0.5 + 0.000000001) + 0.5 + 0.00000001
+		duration = minf(duration, maxf(0.000000001, (boundary - float(enemy["progress"])) / speed))
+	var streams: Dictionary = _shield_exposure.get(int(enemy["id"]), NO_BONUS)
+	for tower: Dictionary in towers[slot]:
+		if float(tower["stunned_remaining"]) > 0.000000001:
+			continue
+		var definition: Dictionary = _tower_types[tower["type_id"]]
+		var flame: bool = definition["advancements"].get(tower["advancement"], {}).get("weapon", "") == "flamethrower"
+		var rune: bool = definition["area_attack"] and definition["evolutions"].get(tower["evolution"], {}).get("continuous", false)
+		if not flame and not rune:
+			continue
+		if not cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), tower["range"]):
+			continue
+		var protected: float = float(streams.get(int(tower["id"]), 0.0))
+		if protected > 0.000000001:
+			duration = minf(duration, protected)
+		elif int(enemy["shield_hits"]) > 0:
+			duration = minf(duration, _shield_contact_interval(tower))
+	return duration
+
+
+func _shield_contact_interval(tower: Dictionary) -> float:
+	var interval: float = tower["interval"]
+	if interval > 0.0:
+		return interval
+	# Continuous Rune evolutions intentionally publish interval=0: their DPS
+	# still inherits the base attack cadence and accepted speed modifiers.
+	return float(_tower_types[tower["type_id"]]["interval"]) / float(tower["speed_multiplier"])
+
+
+# One accepted positive-exposure interval is one contact. Its entire exposure
+# is absorbed, including the tenth contact; no HP fraction or mark credit accrues.
+func _shield_continuous_exposure(enemy: Dictionary, source_id: int, exposure: float, interval: float, positive_rate: float) -> float:
+	if exposure <= 0.0 or positive_rate <= 0.0:
+		return 0.0
+	var id: int = enemy["id"]
+	if int(enemy["shield_hits"]) <= 0 and not _shield_exposure.has(id):
+		return exposure
+	if not _shield_exposure.has(id):
+		_shield_exposure[id] = {}
+	var streams: Dictionary = _shield_exposure[id]
+	var protected: float = float(streams.get(source_id, 0.0))
+	var remaining: float = exposure
+	while remaining > 0.000000001:
+		if protected <= 0.000000001:
+			if not EnemyMechanics.absorb_hit(enemy, positive_rate):
+				break
+			protected = maxf(0.000000001, interval)
+		var absorbed: float = minf(remaining, protected)
+		protected = maxf(0.0, protected - absorbed)
+		remaining = maxf(0.0, remaining - absorbed)
+	if protected > 0.000000001:
+		streams[source_id] = protected
+	else:
+		streams.erase(source_id)
+	if streams.is_empty():
+		_shield_exposure.erase(id)
+	return remaining
+
+
 func _wave_cleared() -> bool:
-	return _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and _pending_sends(0) == 0 and _pending_sends(1) == 0 and enemies[0].is_empty() and enemies[1].is_empty() and flights.is_empty()
+	return _spawned[0] == wave_roster.size() and _spawned[1] == wave_roster.size() and _pending_sends(0) == 0 and _pending_sends(1) == 0 and enemies[0].is_empty() and enemies[1].is_empty() and flights.is_empty() and bombs.is_empty()
+
+
+func _advance_bombs() -> void:
+	for index: int in range(bombs.size() - 1, -1, -1):
+		var bomb: Dictionary = bombs[index]
+		bomb["fuse_remaining"] = maxf(0.0, float(bomb["fuse_duration"]) - (_death_time - float(bomb["time"])))
+		if float(bomb["fuse_remaining"]) > 0.000000001:
+			continue
+		bombs.remove_at(index)
+		var slot: int = bomb["slot"]
+		var origin := Vector2i(Vector2(bomb["pos"]).round())
+		var duration: float = bomb["stun_duration"]
+		for tower: Dictionary in towers[slot]:
+			if cell_in_range(origin, tower["cell"], float(bomb["radius"])):
+				_stun_tower(slot, tower, duration, "giant_skeltorc_bomb", bomb["pos"])
+		for enemy: Dictionary in enemies[slot]:
+			if int(enemy["hp"]) <= 0 or not cell_in_range(origin, Vector2i(Vector2(enemy["pos"]).round()), float(bomb["radius"])):
+				continue
+			enemy["stunned_remaining"] = maxf(float(enemy["stunned_remaining"]), duration)
+			enemy["stun_count"] += 1
+			enemy["stun_source"] = "giant_skeltorc_bomb"
+			enemy["stun_position"] = bomb["pos"]
+			enemy["speed"] = 0.0
+		_refresh_board(slot)
+		_update_bounties(slot)
+		_bomb_explosions.append({
+			"id": bomb["id"], "slot": slot, "pos": bomb["pos"],
+			"radius": bomb["radius"], "stun_duration": duration, "time": _death_time,
+		})
+
+
+func _death_stun_event_step(slot: int, enemy: Dictionary, maximum: float) -> float:
+	if int(enemy["shield_hits"]) > 0:
+		return maximum
+	_death_rates.clear()
+	_death_fractions.clear()
+	var id: int = enemy["id"]
+	var streams: Dictionary = _shield_exposure.get(id, NO_BONUS)
+	var burn_rate: float = 0.0
+	var burn_fraction: float = 0.0
+	var duration: float = maximum
+	if _burns.has(id):
+		var burn: Dictionary = _burns[id]
+		burn_rate = float(burn["dps"]) * _damage_multiplier(enemy, &"fire")
+		burn_fraction = float(burn["fraction"])
+		duration = minf(duration, maxf(0.000000001, float(burn["end_time"]) - _elapsed))
+	for tower: Dictionary in towers[slot]:
+		if float(tower["stunned_remaining"]) > 0.000000001 or float(streams.get(int(tower["id"]), 0.0)) > 0.000000001:
+			continue
+		if not cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), tower["range"]):
+			continue
+		var definition: Dictionary = _tower_types[tower["type_id"]]
+		var config: Dictionary = definition["advancements"].get(tower["advancement"], {})
+		var rate: float = 0.0
+		if config.get("weapon", "") == "flamethrower":
+			if bool(enemy["fire_immune"]):
+				continue
+			if float(tower["refuel_remaining"]) > 0.000000001:
+				duration = minf(duration, float(tower["refuel_remaining"]))
+				continue
+			var selected: int = _target(slot, tower, tower["range"], -1, -1, -1, -1, -1.0, true)
+			if selected < 0 or int(enemies[slot][selected]["id"]) != id:
+				continue
+			duration = minf(duration, maxf(0.000000001, float(config["fuel_duration"]) - float(tower["continuous_fire_time"])))
+			rate = float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * _damage_multiplier(enemy, &"fire")
+			burn_rate = maxf(burn_rate, float(config["burn_dps"]) * float(tower["damage_multiplier"]) * _damage_multiplier(enemy, &"fire"))
+		elif definition["area_attack"] and definition["evolutions"].get(tower["evolution"], {}).get("continuous", false):
+			rate = (float(tower["base_damage"]) * float(tower["speed_multiplier"]) + float(enemy["max_hp"]) * float(tower.get("max_hp_drain", 0.0))) * float(tower["damage_multiplier"]) * _damage_multiplier(enemy, _tower_damage_type(tower))
+		if rate > 0.0:
+			var fractions: Dictionary = _continuous_damage.get(int(tower["id"]), NO_BONUS)
+			_death_rates.append(rate)
+			_death_fractions.append(float(fractions.get(id, 0.0)))
+	if burn_rate > 0.0:
+		_death_rates.append(burn_rate)
+		_death_fractions.append(burn_fraction)
+	if _continuous_lethal_damage(duration) < int(enemy["hp"]):
+		return duration
+	var low: float = 0.0
+	var high: float = duration
+	for iteration: int in range(40):
+		var middle: float = (low + high) * 0.5
+		if _continuous_lethal_damage(middle) >= int(enemy["hp"]):
+			high = middle
+		else:
+			low = middle
+	return maxf(0.000000001, high)
+
+
+func _continuous_lethal_damage(duration: float) -> int:
+	var damage: int = 0
+	for index: int in range(_death_rates.size()):
+		damage += floori(_death_fractions[index] + _death_rates[index] * duration + 0.000000001)
+	return damage
 
 
 func _has_periodic_production() -> bool:
@@ -1277,7 +1482,7 @@ func _enemy_abilities(slot: int) -> void:
 	active.clear()
 	active.append_array(enemies[slot])
 	for enemy: Dictionary in active:
-		if int(enemy["hp"]) <= 0 or (float(enemy["progress"]) >= enemy["route"].size() - 1 and BossMechanics.can_act(enemy)):
+		if int(enemy["hp"]) <= 0 or float(enemy["stunned_remaining"]) > 0.000000001 or (float(enemy["progress"]) >= enemy["route"].size() - 1 and BossMechanics.can_act(enemy)):
 			continue
 		var definition: Dictionary = _enemy_types[enemy["type_id"]]
 		if BossMechanics.has_abilities(definition):
@@ -1350,7 +1555,7 @@ func _summon_type(definition: Dictionary) -> String:
 
 func _prepare_boss_motion(slot: int) -> void:
 	for enemy: Dictionary in enemies[slot]:
-		if BossMechanics.has_abilities(_enemy_types[enemy["type_id"]]):
+		if float(enemy["stunned_remaining"]) <= 0.000000001 and BossMechanics.has_abilities(_enemy_types[enemy["type_id"]]):
 			BossMechanics.prepare(enemy)
 
 
@@ -1412,13 +1617,7 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 			var target: Dictionary = _find_tower(slot, target_id)
 			if target.is_empty():
 				continue
-			target["stunned_remaining"] = maxf(float(target["stunned_remaining"]), float(definition["tower_stun_duration"]))
-			target["stun_count"] += 1
-			target["stun_source"] = kind
-			target["stun_position"] = enemy["pos"]
-			_reset_firing(target)
-			_clear_tower_mark(slot, target)
-			_sound_events.record(CombatSoundEvents.Cue.TOWER_STUN, slot, Vector2(target["cell"]), _death_time)
+			_stun_tower(slot, target, float(definition["tower_stun_duration"]), kind, enemy["pos"])
 		_refresh_board(slot)
 		_update_bounties(slot)
 		enemy["animation"] = "walk"
@@ -1435,6 +1634,8 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 			for index: int in range(enemies[slot].size() - 1, -1, -1):
 				var victim: Dictionary = enemies[slot][index]
 				if victim["id"] == enemy["id"] or int(victim["hp"]) <= 0 or Vector2(enemy["pos"]).distance_squared_to(victim["pos"]) > radius_squared:
+					continue
+				if EnemyMechanics.absorb_hit(victim, maxi(1, ceili(float(victim["max_hp"]) * float(definition["stomp_health_fraction"])))):
 					continue
 				victim["hp"] = maxi(0, int(victim["hp"]) - maxi(1, ceili(float(victim["max_hp"]) * float(definition["stomp_health_fraction"]))))
 				EnemyMechanics.after_damage(victim, _enemy_types[victim["type_id"]])
@@ -1492,6 +1693,7 @@ func snapshot(include_metadata: bool = true) -> Dictionary:
 		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"flights": flights.duplicate(true), "flight_duration": FLIGHT_DURATION,
+		"bombs": bombs.duplicate(true), "bomb_explosions": _bomb_explosions.duplicate(true),
 		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
 		"death_generation": _death_generation,
 		"sounds": _sound_events.snapshot(_death_time),
@@ -1533,8 +1735,14 @@ func _enemy_types_snapshot() -> Dictionary:
 
 
 static func enemy_preview(definition: EnemyDefinition, rules: CombatRules, wave_number: int = 1) -> Dictionary:
+	var health: int = maxi(1, ceili(float(rules.enemy_health + maxi(0, wave_number - 1) * rules.health_growth) * definition.health_multiplier))
+	if definition.health_base_type != &"" and rules.catalog != null:
+		for base: EnemyDefinition in rules.catalog.enemies:
+			if base.id == definition.health_base_type:
+				health = int(enemy_preview(base, rules, wave_number)["max_hp"]) * definition.health_base_multiplier
+				break
 	return {
-		"max_hp": maxi(1, ceili(float(rules.enemy_health + maxi(0, wave_number - 1) * rules.health_growth) * definition.health_multiplier)),
+		"max_hp": health,
 		"speed": rules.enemy_speed_at_wave(wave_number) * definition.speed_multiplier,
 		"base_damage": definition.base_damage,
 		"fire_immune": definition.fire_immune, "ice_immune": definition.ice_immune,
@@ -1544,10 +1752,15 @@ static func enemy_preview(definition: EnemyDefinition, rules: CombatRules, wave_
 		"boss": definition.boss, "send_enabled": definition.send_enabled,
 		"jump_interval": definition.jump_interval,
 		"burning": false, "burn_remaining": 0.0,
+		"shield_hits": definition.hit_shield, "shield_max_hits": definition.hit_shield, "shield_hit_count": 0,
+		"stunned_remaining": 0.0, "stun_count": 0, "stun_source": "",
 	}
 
 
 func _enemy_health(type_id: String, wave_number: int) -> int:
+	var definition: Dictionary = _enemy_types[type_id]
+	if not String(definition["health_base_type"]).is_empty():
+		return _enemy_health(String(definition["health_base_type"]), wave_number) * int(definition["health_base_multiplier"])
 	var baseline: int = _wave_health(wave_number)
 	return maxi(1, ceili(float(baseline) * float(_enemy_types[type_id]["health_multiplier"])))
 
@@ -1659,6 +1872,23 @@ func _valid_mode(mode: int) -> bool:
 func _move_enemies(slot: int, delta: float) -> void:
 	_target_grid_valid[slot] = false
 	for enemy: Dictionary in enemies[slot]:
+		if float(enemy["stunned_remaining"]) > 0.000000001:
+			if not _slow_motion.has(enemy["id"]):
+				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
+			var stationary: Array = _slow_motion[enemy["id"]]
+			stationary[0] = float(enemy["progress"])
+			stationary[1] = delta
+			stationary[2] = 0.0
+			stationary[3] = 0.0
+			enemy["stunned_remaining"] = maxf(0.0, float(enemy["stunned_remaining"]) - delta)
+			enemy["slow_remaining"] = maxf(0.0, float(enemy["slow_remaining"]) - delta)
+			enemy["slowed"] = float(enemy["slow_remaining"]) > 0.000000001
+			enemy["speed"] = 0.0
+			if float(enemy["stunned_remaining"]) <= 0.000000001:
+				enemy["stunned_remaining"] = 0.0
+				enemy["stun_source"] = ""
+				BossMechanics.prepare(enemy)
+			continue
 		enemy["age"] += delta
 		enemy["animation_elapsed"] += delta
 		var previous_progress: float = enemy["progress"]
@@ -1758,13 +1988,17 @@ func _spawn_send(slot: int) -> void:
 
 
 func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float, captured_route: Array[Vector2i] = [], summoner_id: int = -1) -> void:
+	var birth: Dictionary = _enemy_types[type_id]
+	if wave >= int(birth["spawn_variant_first_wave"]) and float(birth["spawn_variant_chance"]) > 0.0:
+		if _variant_random.randf() < float(birth["spawn_variant_chance"]):
+			type_id = String(birth["spawn_variant"])
 	_target_grid_valid[slot] = false
 	var hp: int = _enemy_health(type_id, wave)
 	var definition: Dictionary = _enemy_types[type_id]
 	var route: Array[Vector2i] = _assign_route(slot) if captured_route.is_empty() else captured_route.duplicate()
 	var speed: float = _enemy_speed(type_id, wave)
 	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
-	_boss_stream = _boss_stream or BossMechanics.has_abilities(definition)
+	_boss_stream = _boss_stream or _requires_combat_events(definition)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
 		"type_id": type_id, "base_speed": speed, "speed": speed,
@@ -1814,19 +2048,38 @@ func _reset_firing(tower: Dictionary) -> void:
 func _clear_stun(tower: Dictionary) -> void:
 	tower["stunned_remaining"] = 0.0
 	tower["stun_source"] = ""
+	_stun_refresh_times.erase(int(tower["id"]))
 
 
 func _advance_stuns(slot: int, delta: float) -> void:
 	var expired: bool = false
 	for tower: Dictionary in towers[slot]:
 		var previous: float = tower["stunned_remaining"]
-		tower["stunned_remaining"] = maxf(0.0, previous - delta)
+		var age: float = minf(delta, maxf(0.0, _elapsed - float(_stun_refresh_times.get(int(tower["id"]), _elapsed - delta))))
+		tower["stunned_remaining"] = maxf(0.0, previous - age)
+		if previous > 0.000000001:
+			_stun_refresh_times[int(tower["id"])] = _elapsed
 		if previous > 0.000000001 and float(tower["stunned_remaining"]) <= 0.000000001:
 			_clear_stun(tower)
 			expired = true
 	if expired:
 		_refresh_board(slot)
 		_update_bounties(slot)
+
+
+func _stun_tower(slot: int, tower: Dictionary, duration: float, source: String, position: Vector2) -> void:
+	# An impact occurs now; the subsequent timer pass must not age it by the
+	# time preceding that impact in this simulation step.
+	var last_update: float = float(_stun_refresh_times.get(int(tower["id"]), _step_start_time))
+	var existing: float = maxf(0.0, float(tower["stunned_remaining"]) - maxf(0.0, _elapsed - last_update))
+	tower["stunned_remaining"] = maxf(existing, duration)
+	_stun_refresh_times[int(tower["id"])] = _elapsed
+	tower["stun_count"] += 1
+	tower["stun_source"] = source
+	tower["stun_position"] = position
+	_reset_firing(tower)
+	_clear_tower_mark(slot, tower)
+	_sound_events.record(CombatSoundEvents.Cue.TOWER_STUN, slot, Vector2(tower["cell"]), _death_time)
 
 
 func _attack_minigun(slot: int, tower: Dictionary, delta: float) -> void:
@@ -1892,13 +2145,28 @@ func _attack_flame(slot: int, tower: Dictionary, config: Dictionary, delta: floa
 		selected = _enemy_index(slot, id)
 		if selected < 0:
 			continue
-		_ignite(enemy, tower, config, time)
 		if not _continuous_damage.has(tower["id"]):
 			_continuous_damage[tower["id"]] = {}
 		var fractions: Dictionary = _continuous_damage[tower["id"]]
 		var base_rate: float = float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * _elemental_damage_multiplier(enemy, &"fire")
 		var rate: float = base_rate * (1.0 + float(enemy["bounty_damage_bonus"]))
 		end = minf(end, time + maxf(0.0, float(config["fuel_duration"]) - float(tower["continuous_fire_time"])))
+		var shield_streams: Dictionary = _shield_exposure.get(id, NO_BONUS)
+		if int(enemy["shield_hits"]) > 0 or float(shield_streams.get(int(tower["id"]), 0.0)) > 0.000000001:
+			var span: float = end - time
+			var unshielded: float = _shield_continuous_exposure(enemy, tower["id"], span, _shield_contact_interval(tower), base_rate)
+			var absorbed: float = span - unshielded
+			if absorbed > 0.000000001:
+				tower["target_id"] = id
+				tower["aim"] = _position(enemy["route"], _historical_progress(enemy, time + absorbed))
+				tower["firing"] = true
+				tower["continuous_fire_time"] += absorbed
+				time += absorbed
+				if float(tower["continuous_fire_time"]) >= float(config["fuel_duration"]) - 0.000000001:
+					tower["refuel_remaining"] = float(config["refuel_duration"])
+					_reset_firing(tower)
+				continue
+		_ignite(enemy, tower, config, time)
 		var burn: Dictionary = _burns[id]
 		var own_burn: bool = float(burn["dps"]) <= float(config["burn_dps"]) * float(tower["damage_multiplier"])
 		if not own_burn:
@@ -1921,7 +2189,7 @@ func _attack_flame(slot: int, tower: Dictionary, config: Dictionary, delta: floa
 		var damage: int = floori(total + 0.000000001)
 		fractions[id] = maxf(0.0, total - damage)
 		if damage > 0:
-			_hit(slot, tower, selected, damage, true, &"", bonus)
+			_hit(slot, tower, selected, damage, true, &"", bonus, true)
 		_burn_until(slot, id, end)
 		selected = _enemy_index(slot, id)
 		if selected >= 0:
@@ -2065,8 +2333,8 @@ func _attack_arrow(slot: int, tower: Dictionary, target_id: int, impact: Vector2
 	var primary: int = _enemy_index(slot, target_id)
 	if primary >= 0:
 		var damage: int = ceili(float(tower["damage"]) * float(config.get("primary_multiplier", 1.0)))
-		_hit(slot, tower, primary, damage, false, damage_type)
-		if config.has("burn_dps"):
+		var accepted: bool = _hit(slot, tower, primary, damage, false, damage_type)
+		if accepted and config.has("burn_dps"):
 			primary = _enemy_index(slot, target_id)
 			if primary >= 0:
 				_ignite(enemies[slot][primary], tower, config)
@@ -2077,8 +2345,8 @@ func _attack_arrow(slot: int, tower: Dictionary, target_id: int, impact: Vector2
 		for index: int in range(enemies[slot].size() - 1, -1, -1):
 			var enemy: Dictionary = enemies[slot][index]
 			if int(enemy["id"]) != target_id and int(enemy["hp"]) > 0 and impact.distance_squared_to(enemy["pos"]) <= radius_squared:
-				_hit(slot, tower, index, damage, false, damage_type)
-				if config.has("burn_dps"):
+				var accepted: bool = _hit(slot, tower, index, damage, false, damage_type)
+				if accepted and config.has("burn_dps"):
 					var survivor: int = _enemy_index(slot, int(enemy["id"]))
 					if survivor >= 0:
 						_ignite(enemies[slot][survivor], tower, config)
@@ -2092,7 +2360,7 @@ func _enemy_index(slot: int, enemy_id: int) -> int:
 
 
 func _ignite(enemy: Dictionary, tower: Dictionary, config: Dictionary, time: float = -1.0) -> void:
-	if bool(enemy["fire_immune"]):
+	if bool(enemy["fire_immune"]) or int(enemy["shield_hits"]) > 0:
 		return
 	var id: int = enemy["id"]
 	var dps: float = float(config["burn_dps"]) * float(tower["damage_multiplier"])
@@ -2128,7 +2396,9 @@ func _burn_until(slot: int, id: int, time: float, index: int = -1) -> void:
 	var enemy: Dictionary = enemies[slot][index]
 	var burn: Dictionary = _burns[id]
 	var exposure: float = maxf(0.0, minf(time, float(burn["end_time"])) - maxf(float(burn["last_time"]), float(_enemy_spawn_times[id])))
-	var base_damage: float = float(burn["dps"]) * exposure * _elemental_damage_multiplier(enemy, &"fire")
+	var rate: float = float(burn["dps"]) * _elemental_damage_multiplier(enemy, &"fire")
+	exposure = _shield_continuous_exposure(enemy, -int(burn["source"]["id"]), exposure, _shield_contact_interval(burn["source"]), rate)
+	var base_damage: float = rate * exposure
 	var total: float = float(burn["fraction"]) + base_damage * (1.0 + float(enemy["bounty_damage_bonus"]))
 	if float(enemy["bounty_damage_bonus"]) > 0.0 and not burn.has("bonus"):
 		burn["bonus"] = {}
@@ -2140,7 +2410,7 @@ func _burn_until(slot: int, id: int, time: float, index: int = -1) -> void:
 	enemy["burn_remaining"] = maxf(0.0, float(burn["end_time"]) - time)
 	enemy["burning"] = float(enemy["burn_remaining"]) > 0.000000001
 	if damage > 0:
-		_hit(slot, burn["source"], index, damage, true, &"", bonus)
+		_hit(slot, burn["source"], index, damage, true, &"", bonus, true)
 	if not enemy["burning"]:
 		enemy["burn_remaining"] = 0.0
 		_burns.erase(id)
@@ -2340,6 +2610,8 @@ func _launch(slot: int, tower: Dictionary, enemy: Dictionary) -> void:
 	enemy["burn_remaining"] = 0.0
 	enemy["slowed"] = false
 	enemy["slow_remaining"] = 0.0
+	enemy["stunned_remaining"] = 0.0
+	enemy["stun_source"] = ""
 	enemy["bounty_tower_id"] = -1
 	enemy["bounty_damage_bonus"] = 0.0
 	enemy["bounty_income_bonus"] = 0.0
@@ -2438,13 +2710,19 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 		var exposure: float = _continuous_exposure(tower["cell"], range_cells, enemy, minf(delta, _elapsed - float(_enemy_spawn_times[enemy["id"]])))
 		if exposure <= 0.0:
 			continue
+		# Void Monolith also drains a fraction of maximum HP per exposed second.
+		var per_second: float = float(tower["base_damage"]) * float(tower["speed_multiplier"]) + float(enemy["max_hp"]) * float(tower.get("max_hp_drain", 0.0))
+		var rate: float = per_second * float(tower["damage_multiplier"]) * _elemental_damage_multiplier(enemy, _tower_damage_type(tower))
+		exposure = _shield_continuous_exposure(enemy, tower_id, exposure, _shield_contact_interval(tower), rate)
+		if exposure <= 0.0:
+			continue
 		if bool(tower["freeze_upgraded"]) and not bool(enemy["ice_immune"]):
 			enemy["slowed"] = true
 			enemy["slow_remaining"] = TowerDefinition.freeze_duration(int(enemy["max_hp"]))
 			BossMechanics.prepare(enemy)
-		# Void Monolith also drains a fraction of maximum HP per exposed second.
-		var per_second: float = float(tower["base_damage"]) * float(tower["speed_multiplier"]) + float(enemy["max_hp"]) * float(tower.get("max_hp_drain", 0.0))
-		var base_damage: float = per_second * float(tower["damage_multiplier"]) * exposure * _elemental_damage_multiplier(enemy, _tower_damage_type(tower))
+			if float(enemy["stunned_remaining"]) > 0.000000001:
+				enemy["speed"] = 0.0
+		var base_damage: float = rate * exposure
 		var total: float = float(fractions.get(enemy["id"], 0.0)) + base_damage * (1.0 + float(enemy["bounty_damage_bonus"]))
 		var bonus: Dictionary = _continuous_bonus_stream(tower_id, enemy["id"], float(enemy["bounty_damage_bonus"]) > 0.0)
 		_accumulate_bonus(slot, enemy, bonus, base_damage)
@@ -2453,7 +2731,7 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 		var damage: int = floori(total + 0.000000001)
 		fractions[enemy["id"]] = maxf(0.0, total - damage)
 		if damage > 0:
-			_hit(slot, tower, index, damage, true, &"", bonus)
+			_hit(slot, tower, index, damage, true, &"", bonus, true)
 
 
 # Read the motion captured before attacks, not a slow refreshed by an earlier
@@ -2508,8 +2786,10 @@ func _death_snapshot(slot: int) -> Array[Dictionary]:
 
 func _reset_death_events() -> void:
 	_sound_events.reset()
-	if _death_heads[0] < _death_events[0].size() or _death_heads[1] < _death_events[1].size():
-		_death_generation += 1
+	# Reset is a presentation-generation boundary even after the last corpse
+	# expired: an accepted bomb/explosion may still be visible on a peer.
+	_death_generation += 1
+	_bomb_explosions.clear()
 	_death_heads = [0, 0]
 	_death_events = [[], []]
 
@@ -2537,10 +2817,27 @@ func _record_death(slot: int, enemy: Dictionary) -> void:
 		"id": _next_death_id, "enemy_id": enemy["id"], "type_id": enemy["type_id"],
 		"pos": enemy["pos"], "faces_left": faces_left, "time": _death_time,
 		"hp": enemy["hp"], "max_hp": enemy["max_hp"],
+		"death_stun_radius": _enemy_types[enemy["type_id"]]["death_stun_radius"],
 	})
 	_next_death_id += 1
 	_sound_events.record(int(_enemy_types[enemy["type_id"]]["death_sound"]), slot, enemy["pos"], _death_time)
 	var definition: Dictionary = _enemy_types[enemy["type_id"]]
+	if float(definition["death_bomb_fuse"]) > 0.0:
+		bombs.append({
+			"id": _next_bomb_id, "slot": slot, "pos": Vector2(Vector2(enemy["pos"]).round()),
+			"time": _death_time, "fuse_duration": definition["death_bomb_fuse"],
+			"fuse_remaining": definition["death_bomb_fuse"], "radius": definition["death_bomb_radius"],
+			"stun_duration": definition["death_bomb_stun_duration"],
+		})
+		_next_bomb_id += 1
+		_boss_stream = true
+	if float(definition["death_stun_duration"]) > 0.0:
+		var origin := Vector2i(Vector2(enemy["pos"]).round())
+		for tower: Dictionary in towers[slot]:
+			if cell_in_range(origin, tower["cell"], float(definition["death_stun_radius"])):
+				_stun_tower(slot, tower, float(definition["death_stun_duration"]), "kamikaorc", enemy["pos"])
+		_refresh_board(slot)
+		_update_bounties(slot)
 	for child: int in range(int(definition["death_spawn_count"])):
 		_spawn_enemy(slot, definition["death_spawn_type"], progress, _elapsed, route, enemy["id"])
 
@@ -2551,6 +2848,7 @@ func _retire_enemy(enemy_id: int) -> void:
 	_enemy_spawn_times.erase(enemy_id)
 	_slow_motion.erase(enemy_id)
 	_burns.erase(enemy_id)
+	_shield_exposure.erase(enemy_id)
 	for tower_id: int in _continuous_damage:
 		_continuous_damage[tower_id].erase(enemy_id)
 	for tower_id: int in _continuous_bonus:
@@ -2618,15 +2916,19 @@ func _accumulate_bonus(slot: int, enemy: Dictionary, credit: Dictionary, base_da
 	credit[source_id]["fraction"] += amount
 
 
-func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, bounty_applied: bool = false, damage_type: StringName = &"", credit: Dictionary = NO_BONUS) -> void:
+func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, bounty_applied: bool = false, damage_type: StringName = &"", credit: Dictionary = NO_BONUS, shield_checked: bool = false) -> bool:
 	var enemy: Dictionary = enemies[slot][enemy_index]
-	var base_damage: int = int(tower["damage"]) if damage < 0 else damage
+	var base_damage: int = int(tower["damage"]) if damage == -1 else damage
 	var incoming_damage: int = base_damage
 	if not bounty_applied:
 		var resolved_type: StringName = _tower_damage_type(tower) if damage_type == &"" else damage_type
 		incoming_damage = ceili(float(base_damage) * _damage_multiplier(enemy, resolved_type) - 0.000000001)
 		# Only the mark's incremental HP is indirect, not elemental vulnerability.
 		base_damage = ceili(float(base_damage) * _elemental_damage_multiplier(enemy, resolved_type) - 0.000000001)
+	if incoming_damage <= 0:
+		return false
+	if not shield_checked and EnemyMechanics.absorb_hit(enemy, incoming_damage):
+		return false
 	var hit_damage: int = mini(int(enemy["hp"]), incoming_damage)
 	var indirect: int = 0
 	if bounty_applied:
@@ -2686,6 +2988,7 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 		_record_death(slot, enemy)
 		_retire_enemy(enemy["id"])
 		enemies[slot].remove_at(enemy_index)
+	return true
 
 
 
@@ -2771,7 +3074,7 @@ func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, e
 func _apply_leaks(slot: int) -> void:
 	var index: int = enemies[slot].size() - 1
 	while index >= 0:
-		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1 and BossMechanics.can_act(enemies[slot][index]):
+		if enemies[slot][index]["progress"] >= enemies[slot][index]["route"].size() - 1 and float(enemies[slot][index]["stunned_remaining"]) <= 0.000000001 and BossMechanics.can_act(enemies[slot][index]):
 			if not _sandbox_mode:
 				var health_before: int = base_health[slot]
 				if base_health[slot] > 0:

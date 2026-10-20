@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/kamikaorc_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/kamikaorc.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"kamikaorc"
+title = "KamikaOrc"
+elite = true
+description = "A reckless powder carrier: fragile beneath a ten-hit shield."
+health_multiplier = 0.35
+speed_multiplier = 1.1
+base_damage = 2
+hit_shield = 10
+death_stun_radius = 1.0
+death_stun_duration = 3.0
+spawn_weight = 8
+first_wave = 80
+max_per_wave = 2
+count_cap_growth = 1
+count_cap_growth_interval = 20
+max_weight_share = 0.12
+send_cost = 250
+send_income = 8
+send_first_wave = 100
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.6
+board_anchor = Vector2(0.5, 0.875)

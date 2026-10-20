@@ -143,3 +143,7 @@ func _draw() -> void:
 		var duration: float = maxf(0.001, EnemyVisuals.animation_duration(definition, &"jump"))
 		origin.y -= sin(clampf(preview_elapsed / duration, 0.0, 1.0) * PI) * jump_room * scale
 	draw_texture_rect(texture, Rect2(origin, texture.get_size() * scale), false)
+	if preview_animation != &"death" and definition.hit_shield > 0:
+		var visible: Rect2 = EnemyVisuals.opaque_bounds(texture)
+		visible = Rect2(origin + visible.position * scale, visible.size * scale)
+		EnemyVisuals.draw_hit_shield(self, visible, definition.hit_shield, definition.hit_shield, minf(available.x, available.y) * 0.65)

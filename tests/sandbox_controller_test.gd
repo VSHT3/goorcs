@@ -125,7 +125,7 @@ func _replay_sandbox(summoning_wave: bool = false) -> SandboxController:
 				definition.summon_max = 1
 				definition.summon_limit = 1
 				enemies.append(definition)
-			elif definition.id == &"skeleorc":
+			elif definition.id in [&"skeleorc", &"giant_skeltorc"]:
 				enemies.append(definition)
 		owned_catalog.enemies = enemies
 		rules.wave_weight = 6
