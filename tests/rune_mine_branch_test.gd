@@ -18,10 +18,11 @@ func _init() -> void:
 	_test_validation()
 	_test_rune_chains()
 	_test_void_drain()
+	_test_void_limits()
 	_test_crystal_mine()
 	_test_finale_variants()
 	if failures == 0:
-		print("PASS: ordered Rune branch chains and new Storm/Void branches, Void max-HP drain, Shard-producing Crystal Mine, and step-aware finale artwork")
+		print("PASS: ordered Rune branch chains and new Storm/Void branches, Void max-HP drain with tendril, budget, buff and stun limits, Shard-producing Crystal Mine, and step-aware finale artwork")
 	quit(1 if failures else 0)
 
 
@@ -119,8 +120,77 @@ func _test_void_drain() -> void:
 	enemy["speed"] = 0.0
 	combat.advance(1.0)
 	var dealt: int = 10000 - int(enemy["hp"])
-	var expected: float = (float(tower["base_damage"]) * float(tower["speed_multiplier"]) + 10000.0 * 0.06) * float(tower["damage_multiplier"]) * combat._elemental_damage_multiplier(enemy, &"magic")
+	var expected: float = (float(tower["base_damage"]) * float(tower["speed_multiplier"]) * float(tower["damage_multiplier"]) + 10000.0 * 0.06) * combat._elemental_damage_multiplier(enemy, &"magic")
 	_check(absf(float(dealt) - expected) <= 1.0, "One exposed second deals base damage plus the max-HP drain: dealt=%d expected=%.1f" % [dealt, expected])
+
+
+# A route kept far from its exit so parked enemies never leak mid-test.
+func _void_board(void_cells: Array, enemy_count: int, drums: bool = false) -> MatchCombat:
+	var combat := MatchCombat.new(_rules())
+	for cell: Vector2i in void_cells:
+		combat.build(0, cell, &"rune_obelisk", MatchCombat.TargetMode.FURTHEST)
+		var tower: Dictionary = combat.towers[0].back()
+		for command: String in ["damage", "speed", "void_monolith", "gravity_well", "event_horizon", "singularity"]:
+			_check(combat.upgrade_tower(0, tower["id"], command), "Void accepts %s" % command)
+	if drums:
+		combat.build(0, Vector2i(0, 0), &"war_drums", MatchCombat.TargetMode.FURTHEST)
+		var drum: Dictionary = combat.towers[0].back()
+		for command: String in ["damage", "speed", "forge", "tempered_steel", "master_smith", "dragonfire_forge"]:
+			combat.upgrade_tower(0, drum["id"], command)
+	var route: Array = [Vector2i(5, 2), Vector2i(4, 2), Vector2i(3, 2), Vector2i(2, 2), Vector2i(1, 2), Vector2i(0, 2)]
+	var next: Dictionary = {}
+	for index: int in range(route.size()):
+		next[route[index]] = [route[index + 1]] if index + 1 < route.size() else []
+	var routing: Array[Dictionary] = [{"route": route, "next": next}, {"route": route, "next": next}]
+	_check(combat.sandbox_start(routing, 1, [] as Array[String]), "The Void sandbox round starts")
+	_check(combat.sandbox_spawn(0, &"grunt", enemy_count), "Void targets spawn")
+	for enemy: Dictionary in combat.enemies[0]:
+		# Cell (1, 2) is inside every test Void's 1.5-cell reach.
+		enemy["progress"] = 4.0
+		enemy["pos"] = combat._position(route, 4.0)
+		enemy["hp"] = 10000
+		enemy["max_hp"] = 10000
+		enemy["base_speed"] = 0.0
+		enemy["speed"] = 0.0
+	return combat
+
+
+func _test_void_limits() -> void:
+	var combat := _void_board([Vector2i(0, 1)], 7)
+	var tower: Dictionary = combat.towers[0][0]
+	_check(int(tower["void_tendrils"]) == 5 and is_equal_approx(float(tower["max_hp_drain_limit"]), 0.5), "Singularity has five tendrils and a 50% drain budget")
+	combat.advance(1.0)
+	var hit: int = 0
+	for enemy: Dictionary in combat.enemies[0]:
+		hit += int(int(enemy["hp"]) < 10000)
+	_check(hit == 5 and tower["drain_targets"].size() == 5 and combat.snapshot()["towers"][0][0]["drain_targets"].size() == 5, "Five tendrils drain five of seven enemies: %d" % hit)
+	var enemy: Dictionary = combat.enemies[0][0]
+	var flat: float = float(tower["base_damage"]) * float(tower["speed_multiplier"]) * float(tower["damage_multiplier"]) * combat._elemental_damage_multiplier(enemy, &"magic")
+	combat.advance(20.0)
+	_check(is_equal_approx(float(enemy["void_drained"]), 5000.0), "The maximum-HP drain stops at half the enemy's maximum HP: %.1f" % float(enemy["void_drained"]))
+	_check(absf(float(10000 - int(enemy["hp"])) - (5000.0 + flat * 21.0)) <= 2.0, "Flat drain continues after the budget is spent: hp=%d" % enemy["hp"])
+
+	var pair := _void_board([Vector2i(0, 1), Vector2i(1, 1)], 1)
+	pair.advance(20.0)
+	_check(is_equal_approx(float(pair.enemies[0][0]["void_drained"]), 5000.0), "Two Voids share one drain budget per enemy")
+
+	var buffed := _void_board([Vector2i(0, 1)], 1, true)
+	var void_tower: Dictionary = buffed.towers[0][0]
+	_check(float(void_tower["damage_multiplier"]) > 1.5, "The Forge buffs the Void")
+	var target: Dictionary = buffed.enemies[0][0]
+	var magic: float = buffed._elemental_damage_multiplier(target, &"magic")
+	buffed.advance(1.0)
+	var buffed_flat: float = float(void_tower["base_damage"]) * float(void_tower["speed_multiplier"]) * float(void_tower["damage_multiplier"]) * magic
+	_check(absf(float(10000 - int(target["hp"])) - (buffed_flat + 600.0 * magic)) <= 1.0 and is_equal_approx(float(target["void_drained"]), 600.0 * magic), "Buffs raise the flat damage but never the maximum-HP drain: dealt=%d" % (10000 - int(target["hp"])))
+
+	var stunned := _void_board([Vector2i(0, 1)], 3)
+	stunned.advance(0.5)
+	var stunned_tower: Dictionary = stunned.towers[0][0]
+	_check(stunned_tower["drain_targets"].size() == 3, "Tendrils reach every enemy within the limit")
+	stunned._stun_tower(0, stunned_tower, 3.0, "test", Vector2(0, 1))
+	var before: int = stunned.enemies[0][0]["hp"]
+	stunned.advance(1.0)
+	_check(int(stunned.enemies[0][0]["hp"]) == before and stunned_tower["drain_targets"].is_empty(), "A stunned Void drains nothing and drops its tendrils")
 
 
 func _test_crystal_mine() -> void:

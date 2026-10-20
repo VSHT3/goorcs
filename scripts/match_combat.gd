@@ -308,7 +308,8 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"pierce_active": false, "pierce_aim": Vector2(cell),
 		"bounce_points": [] as Array[Vector2], "split_paths": [] as Array[Array], "branch_upgrades": [] as Array[String],
 		"branch_pierce": 0, "bolt_scale": 1.0, "bolt_reach": 0.0, "magic_bounce": {}, "magic_split": 1,
-		"orbit_bonus": 0, "max_hp_drain": 0.0, "shards_generated": 0, "thrown": 0,
+		"orbit_bonus": 0, "max_hp_drain": 0.0, "max_hp_drain_limit": 0.0, "void_tendrils": 0, "drain_targets": [] as Array[int],
+		"shards_generated": 0, "thrown": 0,
 		"damage": definition["damage"], "interval": definition["interval"],
 		"range": definition["range"], "base_damage": definition["damage"], "base_interval": definition["interval"],
 		"behavior_kind": definition["behavior_kind"], "behavior_config": definition["behavior_config"].duplicate(true),
@@ -419,6 +420,7 @@ func _refresh_board(slot: int) -> void:
 		var orbit_bonus: int = 0
 		var extra_range: float = 0.0
 		var max_hp_drain: float = float(branch.get("max_hp_damage", 0.0))
+		var tendrils: int = int(branch.get("tendrils", 0))
 		var interval_scale: float = 1.0
 		for step: Dictionary in branch.get("upgrades", []):
 			if not tower.get("branch_upgrades", []).has(step["id"]):
@@ -432,6 +434,7 @@ func _refresh_board(slot: int) -> void:
 			orbit_bonus += int(step.get("orbit_bonus", 0))
 			extra_range += float(step.get("range_bonus", 0.0))
 			max_hp_drain += float(step.get("max_hp_damage", 0.0))
+			tendrils += int(step.get("tendril_bonus", 0))
 			interval_scale *= float(step.get("periodic_interval_multiplier", 1.0))
 			var added: Dictionary = step.get("behavior_add", {})
 			for key: String in added:
@@ -459,6 +462,8 @@ func _refresh_board(slot: int) -> void:
 		tower["magic_bounce"] = magic_bounce
 		tower["orbit_bonus"] = orbit_bonus
 		tower["max_hp_drain"] = max_hp_drain
+		tower["max_hp_drain_limit"] = float(branch.get("max_hp_damage_limit", 0.0))
+		tower["void_tendrils"] = tendrils
 		var base_range: float = float(config.get("range_cells", definition["range"])) + extra_range
 		var range_bonus: float = float(modifiers.get("range", 0.0))
 		# Rolled range scales the circular reach proportionally; drawbacks never
@@ -1454,7 +1459,8 @@ func _death_stun_event_step(slot: int, enemy: Dictionary, maximum: float) -> flo
 			rate = float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * _damage_multiplier(enemy, &"fire")
 			burn_rate = maxf(burn_rate, float(config["burn_dps"]) * float(tower["damage_multiplier"]) * _damage_multiplier(enemy, &"fire"))
 		elif definition["area_attack"] and definition["evolutions"].get(tower["evolution"], {}).get("continuous", false):
-			rate = (float(tower["base_damage"]) * float(tower["speed_multiplier"]) + float(enemy["max_hp"]) * float(tower.get("max_hp_drain", 0.0))) * float(tower["damage_multiplier"]) * _damage_multiplier(enemy, _tower_damage_type(tower))
+			# Ignoring the tendril limit can only overestimate, which shortens the step.
+			rate = (float(tower["base_damage"]) * float(tower["speed_multiplier"]) * float(tower["damage_multiplier"]) + _drain_per_second(tower, enemy)) * _damage_multiplier(enemy, _tower_damage_type(tower))
 		if rate > 0.0:
 			var fractions: Dictionary = _continuous_damage.get(int(tower["id"]), NO_BONUS)
 			_death_rates.append(rate)
@@ -2075,7 +2081,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
 	_boss_stream = _boss_stream or _requires_combat_events(definition)
 	enemies[slot].append({
-		"id": _next_enemy_id, "hp": hp, "max_hp": hp,
+		"id": _next_enemy_id, "hp": hp, "max_hp": hp, "void_drained": 0.0,
 		"type_id": type_id, "base_speed": speed, "speed": speed,
 		"slowed": false, "slow_remaining": 0.0,
 		"fire_immune": _enemy_types[type_id]["fire_immune"], "ice_immune": _enemy_types[type_id]["ice_immune"],
@@ -2117,6 +2123,7 @@ func _position(route: Array, progress: float) -> Vector2:
 func _reset_firing(tower: Dictionary) -> void:
 	tower["firing"] = false
 	tower["continuous_fire_time"] = 0.0
+	tower["drain_targets"].clear()
 	# A committed refuel survives target loss and wave transitions.
 
 
@@ -2319,6 +2326,7 @@ func _flame_motion_boundary(slot: int, time: float, finish: float) -> float:
 func _attack(slot: int, delta: float) -> void:
 	for tower: Dictionary in towers[slot]:
 		if float(tower["stunned_remaining"]) > 0.000000001:
+			tower["drain_targets"].clear()
 			continue
 		var definition: Dictionary = _tower_types[tower["type_id"]]
 		if tower["behavior_kind"] == "catapult":
@@ -2776,19 +2784,38 @@ func _attack_pulses(slot: int, tower: Dictionary, range_cells: float, delta: flo
 
 
 func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta: float) -> void:
+	# Zero-length boss-stream passes integrate nothing and keep the tendrils.
+	if delta <= 0.0:
+		return
 	var tower_id: int = tower["id"]
 	if not _continuous_damage.has(tower_id):
 		_continuous_damage[tower_id] = {}
 	var fractions: Dictionary = _continuous_damage[tower_id]
-	for index: int in range(enemies[slot].size() - 1, -1, -1):
+	var exposed: Array[int] = []
+	var exposures: Dictionary = {}
+	for index: int in range(enemies[slot].size()):
+		var exposure: float = _continuous_exposure(tower["cell"], range_cells, enemies[slot][index], minf(delta, _elapsed - float(_enemy_spawn_times[enemies[slot][index]["id"]])))
+		if exposure > 0.0:
+			exposed.append(index)
+			exposures[index] = exposure
+	# A Void Monolith drains only as many enemies as it has tendrils, chosen by its target mode.
+	var tendrils: int = int(tower["void_tendrils"])
+	if tendrils > 0 and exposed.size() > tendrils:
+		exposed.sort_custom(func(a: int, b: int) -> bool: return _drain_ranks_before(tower, enemies[slot][a], enemies[slot][b]))
+		exposed.resize(tendrils)
+	tower["drain_targets"].clear()
+	for index: int in exposed:
+		tower["drain_targets"].append(int(enemies[slot][index]["id"]))
+	# Descending indices stay valid when a lethal hit removes an enemy.
+	exposed.sort()
+	exposed.reverse()
+	for index: int in exposed:
 		var enemy: Dictionary = enemies[slot][index]
-		var exposure: float = _continuous_exposure(tower["cell"], range_cells, enemy, minf(delta, _elapsed - float(_enemy_spawn_times[enemy["id"]])))
-		if exposure <= 0.0:
-			continue
-		# Void Monolith also drains a fraction of maximum HP per exposed second.
-		var per_second: float = float(tower["base_damage"]) * float(tower["speed_multiplier"]) + float(enemy["max_hp"]) * float(tower.get("max_hp_drain", 0.0))
-		var rate: float = per_second * float(tower["damage_multiplier"]) * _elemental_damage_multiplier(enemy, _tower_damage_type(tower))
-		exposure = _shield_continuous_exposure(enemy, tower_id, exposure, _shield_contact_interval(tower), rate)
+		var exposure: float = exposures[index]
+		var elemental: float = _elemental_damage_multiplier(enemy, _tower_damage_type(tower))
+		var flat_rate: float = float(tower["base_damage"]) * float(tower["speed_multiplier"]) * float(tower["damage_multiplier"]) * elemental
+		var drain_rate: float = _drain_per_second(tower, enemy) * elemental
+		exposure = _shield_continuous_exposure(enemy, tower_id, exposure, _shield_contact_interval(tower), flat_rate + drain_rate)
 		if exposure <= 0.0:
 			continue
 		if bool(tower["freeze_upgraded"]) and not bool(enemy["ice_immune"]):
@@ -2797,7 +2824,9 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 			BossMechanics.prepare(enemy)
 			if float(enemy["stunned_remaining"]) > 0.000000001:
 				enemy["speed"] = 0.0
-		var base_damage: float = rate * exposure
+		var drained: float = minf(drain_rate * exposure, _drain_budget(tower, enemy))
+		enemy["void_drained"] = float(enemy.get("void_drained", 0.0)) + drained
+		var base_damage: float = flat_rate * exposure + drained
 		var total: float = float(fractions.get(enemy["id"], 0.0)) + base_damage * (1.0 + float(enemy["bounty_damage_bonus"]))
 		var bonus: Dictionary = _continuous_bonus_stream(tower_id, enemy["id"], float(enemy["bounty_damage_bonus"]) > 0.0)
 		_accumulate_bonus(slot, enemy, bonus, base_damage)
@@ -2807,6 +2836,35 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 		fractions[enemy["id"]] = maxf(0.0, total - damage)
 		if damage > 0:
 			_hit(slot, tower, index, damage, true, &"", bonus, true)
+
+
+# Void maximum-HP drain ignores damage and speed buffs, and every Void on the
+# board shares one per-enemy budget: max_hp_damage_limit of that enemy's max HP.
+func _drain_budget(tower: Dictionary, enemy: Dictionary) -> float:
+	return maxf(0.0, float(enemy["max_hp"]) * float(tower["max_hp_drain_limit"]) - float(enemy.get("void_drained", 0.0)))
+
+
+func _drain_per_second(tower: Dictionary, enemy: Dictionary) -> float:
+	if _drain_budget(tower, enemy) <= 0.000000001:
+		return 0.0
+	return float(enemy["max_hp"]) * float(tower["max_hp_drain"])
+
+
+static func _drain_ranks_before(tower: Dictionary, first: Dictionary, second: Dictionary) -> bool:
+	var scores: Array[float] = []
+	for enemy: Dictionary in [first, second]:
+		match int(tower["mode"]):
+			TargetMode.CLOSEST:
+				scores.append(-Vector2(tower["cell"]).distance_squared_to(enemy["pos"]))
+			TargetMode.STRONGEST:
+				scores.append(float(enemy["hp"]))
+			TargetMode.LAST:
+				scores.append(-float(enemy["progress"]))
+			_:
+				scores.append(float(enemy["progress"]))
+	if scores[0] != scores[1]:
+		return scores[0] > scores[1]
+	return int(first["id"]) < int(second["id"])
 
 
 # Read the motion captured before attacks, not a slow refreshed by an earlier

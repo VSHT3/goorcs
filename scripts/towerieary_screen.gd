@@ -454,6 +454,8 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 	elif bool(stats.get("area_attack", false)):
 		if float(tower.get("max_hp_drain", 0.0)) > 0.0:
 			_add_stat(_stats, &"max_hp_drain", "Maximum-HP drain", "%s%% / s" % _number(float(tower["max_hp_drain"]) * 100.0))
+			_add_stat(_stats, &"max_hp_drain_limit", "Drain limit", "%s%% of each enemy's max HP" % _number(float(tower["max_hp_drain_limit"]) * 100.0))
+			_add_stat(_stats, &"void_tendrils", "Tendrils", "%d enemies at once" % int(tower["void_tendrils"]))
 		if bool(tower.get("freeze_upgraded", false)):
 			_add_stat(_stats, &"freeze_hp_scale", "Thaw HP scale", "%s HP" % _number(TowerDefinition.FREEZE_HP_SCALE))
 			_add_stat(_stats, &"freeze_slow", "Movement reduction", "%s%%" % _number((1.0 - TowerDefinition.FREEZE_SPEED_MULTIPLIER) * 100.0))

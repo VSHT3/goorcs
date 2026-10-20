@@ -1983,12 +1983,12 @@ func _draw_tower_underlay(tower: Dictionary, foot: Vector2) -> void:
 
 
 func _draw_void_drain(tower: Dictionary, foot: Vector2) -> void:
-	# Cosmetic tendrils to enemies currently inside the drained neighborhood.
+	# One tendril per enemy the combat owner drained last step; none while stunned.
 	var origin: Vector2 = foot + Vector2(0, -_cell_size() * 0.5)
-	var range_cells: float = float(tower.get("range", 1.0))
+	var targets: Array = tower.get("drain_targets", [])
 	var drawn: int = 0
 	for enemy: Dictionary in combat_enemies:
-		if drawn >= 8 or float(enemy.get("hp", 0)) <= 0.0 or not MatchCombat.cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), range_cells):
+		if not targets.has(int(enemy["id"])) or float(enemy.get("hp", 0)) <= 0.0:
 			continue
 		var target: Vector2 = _position_center(_enemy_position(enemy)) + Vector2(0, _cell_size() * 0.05)
 		var bend := Vector2(-(target - origin).y, (target - origin).x).normalized() * _cell_size() * 0.12 * sin(_boulder_phase * 3.0 + drawn)

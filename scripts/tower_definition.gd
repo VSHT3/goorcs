@@ -150,6 +150,13 @@ static func valid_evolutions(definition: TowerDefinition) -> bool:
 			return false
 		if config.has("max_hp_damage") and (branch != "void_monolith" or not _nonnegative_number(config["max_hp_damage"])):
 			return false
+		# The Void always names its tendril count and its per-enemy drain budget.
+		if (branch == "void_monolith") != config.has("tendrils") or (branch == "void_monolith") != config.has("max_hp_damage_limit"):
+			return false
+		if config.has("tendrils") and (not config["tendrils"] is int or int(config["tendrils"]) <= 0):
+			return false
+		if config.has("max_hp_damage_limit") and (not _positive_number(config["max_hp_damage_limit"]) or float(config["max_hp_damage_limit"]) > 1.0):
+			return false
 		if config.has("description") and not config["description"] is String:
 			return false
 		if config.has("upgrades") and not valid_branch_upgrades(String(branch), config["upgrades"]):
@@ -181,7 +188,7 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
 			return false
 		for field: Variant in config:
-			if field not in ["id", "title", "cost", "description", "damage_multiplier", "pierce", "attack_rate_multiplier", "bolt_scale", "bolt_reach", "damage_type", "magic_bounce", "magic_split", "orbit_bonus", "range_bonus", "max_hp_damage", "behavior_add", "periodic_interval_multiplier"]:
+			if field not in ["id", "title", "cost", "description", "damage_multiplier", "pierce", "attack_rate_multiplier", "bolt_scale", "bolt_reach", "damage_type", "magic_bounce", "magic_split", "orbit_bonus", "range_bonus", "max_hp_damage", "tendril_bonus", "behavior_add", "periodic_interval_multiplier"]:
 				return false
 		for field: String in ["damage_multiplier", "attack_rate_multiplier"]:
 			if config.has(field) and not _positive_number(config[field]):
@@ -197,6 +204,8 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		if config.has("description") and not config["description"] is String:
 			return false
 		if config.has("max_hp_damage") and (branch != "void_monolith" or not _nonnegative_number(config["max_hp_damage"])):
+			return false
+		if config.has("tendril_bonus") and (branch != "void_monolith" or not config["tendril_bonus"] is int or int(config["tendril_bonus"]) <= 0):
 			return false
 		if config.has("periodic_interval_multiplier") and (branch != "crystal_mine" or not _positive_number(config["periodic_interval_multiplier"])):
 			return false

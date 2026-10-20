@@ -1167,7 +1167,8 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 			else:
 				result = "Damage %d · %.2f attacks/s\nEvery %.2fs" % [damage, 1.0 / interval, interval]
 			if float(state.get("max_hp_drain", 0.0)) > 0.0:
-				result += "\n+%s%% max HP / s drain" % String.num(float(state["max_hp_drain"]) * 100.0, 1)
+				result += "\n+%s%% max HP / s drain, up to %s%% per enemy" % [String.num(float(state["max_hp_drain"]) * 100.0, 1), String.num(float(state.get("max_hp_drain_limit", 0.0)) * 100.0, 1)]
+				result += "\n%d tendrils" % int(state.get("void_tendrils", 0))
 			if kind == "chain":
 				result += "\n%d chain hits · %.2f jump reach\n+%.0f%% damage / successive hit" % [int(config.get("hit_count", 1)), float(config.get("jump_distance", 0.0)), float(config.get("successive_hit_bonus", 0.0)) * 100.0]
 	var advancement: Dictionary = fallback.get("advancements", {}).get(state.get("advancement", ""), {})

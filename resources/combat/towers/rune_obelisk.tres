@@ -61,8 +61,10 @@ evolutions = {
 "continuous": true,
 "damage_type": &"magic",
 "max_hp_damage": 0.015,
-"description": "Void shards drain nearby enemies: continuous MAGIC damage plus 1.5% of their maximum HP per second. Built for bosses.",
-"upgrades": [{"id": "gravity_well", "title": "Gravity Well", "cost": 400, "damage_multiplier": 1.4, "orbit_bonus": 2, "description": "Gravity drags two more shards into orbit: +40% damage."}, {"id": "event_horizon", "title": "Event Horizon", "cost": 650, "max_hp_damage": 0.015, "orbit_bonus": 1, "description": "Drain rises to 3% of maximum HP per second."}, {"id": "singularity", "title": "Singularity", "cost": 1800, "damage_multiplier": 2.0, "max_hp_damage": 0.03, "orbit_bonus": 3, "description": "Endgame. A singularity: double damage and a 6% maximum-HP drain per second."}]
+"max_hp_damage_limit": 0.5,
+"tendrils": 3,
+"description": "Three void tendrils drain nearby enemies: continuous MAGIC damage plus 1.5% of their maximum HP per second. The maximum-HP drain stops after taking half an enemy's maximum HP. Built for bosses.",
+"upgrades": [{"id": "gravity_well", "title": "Gravity Well", "cost": 400, "damage_multiplier": 1.4, "orbit_bonus": 2, "tendril_bonus": 1, "description": "Gravity drags two more shards into orbit: +40% damage and a fourth tendril."}, {"id": "event_horizon", "title": "Event Horizon", "cost": 650, "max_hp_damage": 0.015, "orbit_bonus": 1, "description": "Drain rises to 3% of maximum HP per second."}, {"id": "singularity", "title": "Singularity", "cost": 1800, "damage_multiplier": 2.0, "max_hp_damage": 0.03, "orbit_bonus": 3, "tendril_bonus": 1, "description": "Endgame. A singularity: double damage, a fifth tendril and a 6% maximum-HP drain per second."}]
 }
 }
 },
