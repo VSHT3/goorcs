@@ -38,7 +38,7 @@ evolutions = {
 ; After Mother Lode, one exclusive late path: base durability or a compounding
 ; Shard multiplier (a late-game Coin sink).
 "capstones": {
-"heart_of_the_mountain": [{"id": "heart_of_the_mountain", "title": "Heart of the Mountain", "cost": 1500, "base_max_health": 5, "base_regen": 5, "description": "+5 base max HP, restored at once; regenerates 5 base HP each cleared round."}],
+"heart_of_the_mountain": [{"id": "heart_of_the_mountain", "title": "Heart of the Mountain", "cost": 2000, "base_max_health_per_round": 5, "base_max_health_limit": 1000, "base_regen": 5, "description": "Each cleared round: +5 base max HP, up to 1000, and 5 base HP regenerated."}],
 "mother": [{"id": "mother_i", "title": "Mother I", "cost": 1000, "output_multiplier": 1.1, "description": "+10% Shard output."}, {"id": "mother_ii", "title": "Mother II", "cost": 2000, "output_multiplier": 1.1, "description": "+10% Shard output, compounding."}, {"id": "mother_iii", "title": "Mother III", "cost": 3000, "output_multiplier": 1.1, "description": "+10% Shard output, compounding."}]
 }
 },

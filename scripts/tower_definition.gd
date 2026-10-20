@@ -258,11 +258,17 @@ static func valid_capstones(upgrades: Array, capstones: Variant) -> bool:
 			if config.has("description") and not config["description"] is String:
 				return false
 			var effects: int = 0
+			# Per-round max HP growth always names the max HP it stops at.
+			if config.has("base_max_health_per_round") != config.has("base_max_health_limit"):
+				return false
 			for field: Variant in config:
 				match field:
 					"id", "title", "cost", "description":
 						pass
-					"base_max_health", "base_regen":
+					"base_max_health_limit":
+						if not config[field] is int or int(config[field]) <= 0:
+							return false
+					"base_max_health_per_round", "base_regen":
 						if not config[field] is int or int(config[field]) <= 0:
 							return false
 						effects += 1

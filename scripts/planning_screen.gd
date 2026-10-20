@@ -1146,8 +1146,10 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 				result += "\n%d Shards / %.2fs combat" % [int(config["periodic_shards"]), float(config.get("periodic_interval", 0.0))]
 			if float(state.get("output_multiplier", 1.0)) > 1.0:
 				result += "\nShard output ×%s" % String.num(float(state["output_multiplier"]), 3)
-			if int(state.get("base_max_health_bonus", 0)) > 0 or int(state.get("base_regen", 0)) > 0:
-				result += "\n+%d base max HP · +%d HP / round clear" % [int(state.get("base_max_health_bonus", 0)), int(state.get("base_regen", 0))]
+			if int(state.get("base_max_health_per_round", 0)) > 0 or int(state.get("base_regen", 0)) > 0:
+				result += "\n+%d base max HP & %d HP regen / round clear" % [int(state.get("base_max_health_per_round", 0)), int(state.get("base_regen", 0))]
+				if int(state.get("base_max_health_per_round", 0)) > 0:
+					result += "\nGrown +%d base max HP · cap %d" % [int(state.get("base_max_health_bonus", 0)), int(state.get("base_max_health_limit", 0))]
 		"bounty":
 			result = "Auto mark: highest max HP\n+%.1f%% damage taken\n+%.1f%% normal kill Coins\nOne persistent, exclusive target" % [float(config.get("mark_damage_bonus", 0.0)) * 100.0, float(config.get("mark_income_bonus", 0.0)) * 100.0]
 		"catapult":

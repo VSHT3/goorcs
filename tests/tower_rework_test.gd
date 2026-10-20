@@ -19,7 +19,7 @@ func _init() -> void:
 	_test_crits()
 	_test_capstones()
 	if failures == 0:
-		print("PASS: circular reach and proportional range rolls, Storm-only Rune range, War Drums damage/speed/range/crit branches, isolated crit rolls and Crystal Mine capstone fork with base HP/regen and compounding Shards")
+		print("PASS: circular reach and proportional range rolls, Storm-only Rune range, War Drums damage/speed/range/crit branches, isolated crit rolls and Crystal Mine capstone fork with per-round base max HP growth capped at 1000, regen and compounding Shards")
 	quit(1 if failures else 0)
 
 
@@ -150,7 +150,7 @@ func _test_capstones() -> void:
 	_check(not combat.upgrade_tower(0, heart["id"], "mother_ii"), "Mother II requires Mother I")
 	var coins: int = combat.coins[0]
 	_check(combat.upgrade_tower(0, heart["id"], "heart_of_the_mountain"), "Heart of the Mountain follows Mother Lode")
-	_check(coins - combat.coins[0] == 1500 and combat.base_health[0] == 105 and combat.base_max_health[0] == 105 and combat.snapshot()["max_health"][0] == 105, "Heart adds 5 max base HP, filled at once")
+	_check(coins - combat.coins[0] == 2000 and combat.base_health[0] == 100 and combat.base_max_health[0] == 100, "Heart costs 2000 and grows nothing before a round clear")
 	_check(not combat.upgrade_tower(0, heart["id"], "mother_i"), "The capstone paths are exclusive")
 	var early := _built(combat, Vector2i(3, 1), &"gold_mine", ["damage", "speed", "crystal_mine", "deeper_veins"])
 	_check(not combat.upgrade_tower(0, early["id"], "heart_of_the_mountain"), "Capstones wait for Mother Lode")
@@ -162,24 +162,40 @@ func _test_capstones() -> void:
 	_check(coins - combat.coins[0] == 6000 and is_equal_approx(float(mother["output_multiplier"]), 1.331), "Mother I-III cost 1K/2K/3K and compound +10% each")
 	_check(int(mother["behavior_config"]["clear_shards"]) == ceili(lode_clear * 1.331 - 0.000000001), "Shard output is multiplied by 1.331: %d from %d" % [mother["behavior_config"]["clear_shards"], lode_clear])
 	_check(MatchCombat.tower_level(mother) == MatchCombat.tower_level(heart) + 2, "Each capstone step adds a level")
+	combat.base_health[0] = 90
+	_clear_round(combat)
+	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.base_max_health[0] == 105 and combat.base_health[0] == 95 and combat.snapshot()["max_health"][0] == 105 and int(heart["base_max_health_bonus"]) == 5, "A cleared round grows base max HP by 5 and regenerates 5")
+	_check(combat.base_max_health[1] == 100, "The Heart only grows its own board")
+	_clear_round(combat)
+	_check(combat.base_max_health[0] == 110 and combat.base_health[0] == 100, "Max HP keeps growing every cleared round")
+	var summary: String = MatchPlanningScreen.behavior_summary(heart)
+	_check(summary.contains("+5 base max HP & 5 HP regen / round clear") and summary.contains("Grown +10 base max HP · cap 1000") and not MatchPlanningScreen.behavior_summary(mother).contains("base max HP"), "The HUD summary shows the Heart's growth: %s" % summary)
+	_clear_round(combat, heart)
+	_check(combat.base_max_health[0] == 110 and combat.base_health[0] == 100, "A stunned Heart neither grows nor regenerates")
+	var second := _built(combat, Vector2i(7, 1), &"gold_mine", ["damage", "speed"] + CRYSTAL + ["heart_of_the_mountain"])
+	heart["base_max_health_bonus"] = 893
+	combat._refresh_board(0)
+	combat.base_health[0] = 993
+	_clear_round(combat)
+	_check(combat.base_max_health[0] == 1000 and combat.base_health[0] == 1000 and int(heart["base_max_health_bonus"]) == 898 and int(second["base_max_health_bonus"]) == 2, "Two Hearts share the 1000 max HP limit: %d" % combat.base_max_health[0])
+	_clear_round(combat)
+	_check(combat.base_max_health[0] == 1000 and combat.base_health[0] == 1000, "Growth and regen stop at 1000 max HP")
+	_check(combat.sell_tower(0, heart["id"]) and combat.base_max_health[0] == 102 and combat.base_health[0] == 102, "Selling a Heart removes the max HP it grew and caps current HP")
+	_check(combat.sell_tower(0, second["id"]) and combat.base_max_health[0] == 100 and combat.base_health[0] == 100, "Selling the last Heart restores the starting maximum")
+
+
+func _clear_round(combat: MatchCombat, stunned: Dictionary = {}) -> void:
 	var route: Array = [Vector2i(9, 0), Vector2i(8, 0), Vector2i(7, 0)]
 	var next: Dictionary = {route[0]: [route[1]], route[1]: [route[2]], route[2]: []}
 	var routing: Array[Dictionary] = [{"route": route, "next": next}, {"route": route, "next": next}]
-	combat.base_health[0] = 90
-	_check(combat.start_wave(routing), "A regen wave starts")
+	_check(combat.start_wave(routing), "A Heart round starts")
 	for slot: int in range(2):
 		combat.enemies[slot].clear()
 	combat.wave_roster.clear()
 	combat.spawn_times.clear()
 	combat._spawned = [0, 0]
+	if not stunned.is_empty():
+		# Wave start clears stuns, so the stun lands during the round.
+		stunned["stunned_remaining"] = 1.0
 	combat.advance(1.0 / 60.0)
-	_check(combat.phase == MatchCombat.Phase.PLANNING and combat.base_health[0] == 95, "Heart regenerates 5 base HP per cleared round")
-	combat.base_health[0] = 104
-	_check(combat.start_wave(routing), "A capped regen wave starts")
-	combat.wave_roster.clear()
-	combat.spawn_times.clear()
-	combat._spawned = [0, 0]
-	combat.advance(1.0 / 60.0)
-	_check(combat.base_health[0] == 105, "Regen never exceeds the maximum")
-	_check(combat.sell_tower(0, heart["id"]) and combat.base_max_health[0] == 100 and combat.base_health[0] == 100, "Selling the Heart removes its max HP and caps current HP")
-
+	_check(combat.phase == MatchCombat.Phase.PLANNING, "The empty Heart round clears")

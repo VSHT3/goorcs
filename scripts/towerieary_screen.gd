@@ -413,8 +413,9 @@ func _populate_role_stats(tower: Dictionary, stats: Dictionary) -> void:
 			_add_stat(_stats, &"clear_shards", "Round-clear Shards", "%d Shards" % int(config["clear_shards"]))
 			if float(tower.get("output_multiplier", 1.0)) > 1.0:
 				_add_stat(_stats, &"output_multiplier", "Shard output", "×%s" % String.num(float(tower["output_multiplier"]), 3))
-			if int(tower.get("base_max_health_bonus", 0)) > 0:
-				_add_stat(_stats, &"base_max_health", "Base max HP", "+%d" % int(tower["base_max_health_bonus"]))
+			if int(tower.get("base_max_health_per_round", 0)) > 0:
+				_add_stat(_stats, &"base_max_health", "Base max HP", "+%d / round clear, up to %d" % [int(tower["base_max_health_per_round"]), int(tower["base_max_health_limit"])])
+			if int(tower.get("base_regen", 0)) > 0:
 				_add_stat(_stats, &"base_regen", "Base regen", "+%d HP / round clear" % int(tower["base_regen"]))
 			if int(config["periodic_shards"]) > 0:
 				_add_stat(_stats, &"periodic_shards", "Periodic Shards", "%d Shards" % int(config["periodic_shards"]))

@@ -14,7 +14,7 @@ const NO_BONUS: Dictionary = {}
 var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
-# Starting health plus every Heart of the Mountain bonus on that board.
+# Starting health plus the max HP every Heart of the Mountain on that board has grown.
 var base_max_health: Array[int] = []
 var coins: Array[int] = []
 var reroll_currency: Array[int] = [0, 0]
@@ -318,7 +318,8 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"rarity_rerolls": 0, "attribute_rerolls": 0,
 		"rarity_reroll_cost": -1, "attribute_reroll_cost": -1,
 		"support_damage_bonus": 0.0, "support_speed_bonus": 0.0, "support_range_bonus": 0.0, "crit_chance": 0.0, "crits": 0,
-		"capstone": "", "base_max_health_bonus": 0, "base_regen": 0, "output_multiplier": 1.0,
+		"capstone": "", "base_max_health_bonus": 0, "base_max_health_per_round": 0, "base_max_health_limit": 0,
+		"base_regen": 0, "output_multiplier": 1.0,
 		"invested": 0 if _sandbox_mode else cost, "sell_value": 0 if _sandbox_mode else _sell_value(cost),
 	})
 	_recap.register_tower(slot, towers[slot].back())
@@ -436,15 +437,18 @@ func _refresh_board(slot: int) -> void:
 			for key: String in added:
 				behavior[key] = behavior.get(key, 0) + added[key]
 		var output_multiplier: float = 1.0
-		var max_health_bonus: int = 0
+		var max_health_per_round: int = 0
+		var max_health_limit: int = 0
 		var regen: int = 0
 		for step: Dictionary in branch.get("capstones", {}).get(tower.get("capstone", ""), []):
 			if tower["branch_upgrades"].has(step["id"]):
 				output_multiplier *= float(step.get("output_multiplier", 1.0))
-				max_health_bonus += int(step.get("base_max_health", 0))
+				max_health_per_round += int(step.get("base_max_health_per_round", 0))
+				max_health_limit = maxi(max_health_limit, int(step.get("base_max_health_limit", 0)))
 				regen += int(step.get("base_regen", 0))
 		tower["output_multiplier"] = output_multiplier
-		tower["base_max_health_bonus"] = max_health_bonus
+		tower["base_max_health_per_round"] = max_health_per_round
+		tower["base_max_health_limit"] = max_health_limit
 		tower["base_regen"] = regen
 		if kind == "crystal":
 			behavior["periodic_interval"] = float(behavior["periodic_interval"]) * interval_scale
@@ -701,9 +705,6 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 	elif not capstone_path.is_empty():
 		tower["branch_upgrades"].append(upgrade)
 		tower["capstone"] = capstone_path
-		# The new maximum arrives filled; selling later only lowers the cap.
-		if base_health[slot] > 0:
-			base_health[slot] += int(config.get("base_max_health", 0))
 	elif branch_step:
 		tower["branch_upgrades"].append(upgrade)
 		# Compound on the evolved base, like Arrow attack-rate advancements.
@@ -1211,7 +1212,12 @@ func advance(delta: float) -> bool:
 					reroll_currency[slot] += dug
 					tower["shards_generated"] += dug
 					_recap.add(slot, "earned", "production_shards", dug)
-					base_health[slot] = mini(base_max_health[slot], base_health[slot] + int(tower.get("base_regen", 0)))
+					# Heart growth stays on the mine, so selling it takes the grown max HP away.
+					var growth: int = mini(int(tower["base_max_health_per_round"]), int(tower["base_max_health_limit"]) - base_max_health[slot])
+					if growth > 0:
+						tower["base_max_health_bonus"] += growth
+						base_max_health[slot] += growth
+					base_health[slot] = mini(base_max_health[slot], base_health[slot] + int(tower["base_regen"]))
 				_reset_firing(tower)
 				_clear_stun(tower)
 			_refresh_board(slot)
