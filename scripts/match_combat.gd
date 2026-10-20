@@ -802,7 +802,6 @@ func debug_set_round(round_number: int) -> bool:
 	enemies = [[], []]
 	_target_grid_valid = [false, false]
 	flights.clear()
-	bombs.clear()
 	_reset_death_events()
 	wave_roster.clear()
 	wave_groups.clear()
@@ -2787,8 +2786,11 @@ func _death_snapshot(slot: int) -> Array[Dictionary]:
 func _reset_death_events() -> void:
 	_sound_events.reset()
 	# Reset is a presentation-generation boundary even after the last corpse
-	# expired: an accepted bomb/explosion may still be visible on a peer.
-	_death_generation += 1
+	# expired while an accepted bomb/explosion may still be visible on a peer.
+	# With nothing visible, repeating a reset stays idempotent.
+	if _death_heads[0] < _death_events[0].size() or _death_heads[1] < _death_events[1].size() or not bombs.is_empty() or not _bomb_explosions.is_empty():
+		_death_generation += 1
+	bombs.clear()
 	_bomb_explosions.clear()
 	_death_heads = [0, 0]
 	_death_events = [[], []]
