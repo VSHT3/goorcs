@@ -249,25 +249,122 @@ func _test_three_bosses() -> void:
 
 
 func _test_send_atomicity() -> void:
-	for malicious: bool in [false, true]:
+	for id: StringName in [MANCER, TROLL, MACHINE]:
 		var rules := _rules(false)
-		if malicious:
-			for id: StringName in [TROLL, MACHINE]:
-				var boss: EnemyDefinition = _enemy(rules, id)
-				boss.send_enabled = true
-				boss.send_first_wave = 1
-		for round_number: int in [1, 59, 60, 99, 100, 500]:
-			var combat := _combat(rules)
-			combat.debug_set_round(round_number)
-			for active: bool in [false, true]:
+		var definition: EnemyDefinition = _enemy(rules, id)
+		var unlock: int = definition.send_first_wave
+		var cost: int = definition.send_cost
+		var penalty: int = -definition.send_income
+		_check(rules.catalog.validation_errors().is_empty() and penalty > 0, "Boss signed income penalties pass resource admission")
+		for active: bool in [false, true]:
+			var locked := _combat(rules)
+			locked.debug_set_round(unlock - 1)
+			locked.income = [penalty, penalty]
+			if active:
+				locked.start_wave(_routing(_layout()))
+			_check(not locked.snapshot()["enemy_types"][String(id)]["send_available"], "Boss remains locked immediately before its paid-send debut")
+			_assert_send_rejected(locked, id)
+			for balances: Vector2i in [Vector2i(cost - 1, penalty), Vector2i(cost, penalty - 1), Vector2i(cost - 1, penalty - 1)]:
+				var rejected := _combat(rules)
+				rejected.debug_set_round(unlock)
+				rejected.coins = [balances.x, balances.x]
+				rejected.income = [balances.y, balances.y]
 				if active:
-					combat.start_wave(_routing(_layout()))
-				var frozen: Dictionary = combat.snapshot()
-				var streams: Array[int] = [combat._random.state, combat._wave_random.state, combat._timing_random.state, combat._group_random.state, combat._roll_random.state, combat._drop_random.state]
-				for id: StringName in [TROLL, MACHINE]:
-					_check(not frozen["enemy_types"][String(id)]["send_available"], "Accepted send consumers never offer a boss even with malicious local send flags")
-					_check(not combat.send_enemy(0, id) and not combat.send_enemy(1, id) and not combat.send_enemy_mirrored(0, id), "Host rejects both boss sends and mirrored commands")
-				_check(combat.snapshot() == frozen and streams == [combat._random.state, combat._wave_random.state, combat._timing_random.state, combat._group_random.state, combat._roll_random.state, combat._drop_random.state], "Rejected boss commands mutate no balances, queues, totals or gameplay RNG stream")
+					rejected.start_wave(_routing(_layout()))
+				_check(rejected.snapshot()["enemy_types"][String(id)]["send_available"], "Unlocked boss remains offered even when unaffordable")
+				_assert_send_rejected(rejected, id)
+			var accepted := _combat(rules)
+			accepted.debug_set_round(unlock)
+			accepted.coins = [cost, cost]
+			accepted.income = [penalty, penalty]
+			if active:
+				accepted.start_wave(_routing(_layout()))
+			var before: Dictionary = accepted.snapshot()
+			_check(accepted.send_enemy(0, id), "Exact Coins and recurring income fund a boss at its unlock in planning or combat")
+			_check(accepted.coins == [0, cost] and accepted.income == [0, penalty], "Accepted boss charges exact price and full signed loss once, only to sender")
+			var after: Dictionary = accepted.snapshot()
+			_check(int(after["enemy_totals"][0]["sent"].get(String(id), 0)) == 1 and after["enemy_totals"][1]["sent"] == before["enemy_totals"][1]["sent"], "One paid boss order counts exactly one individual")
+			var delivered: int = 0
+			for enemy: Dictionary in accepted.enemies[1]:
+				if enemy["type_id"] == String(id):
+					delivered += 1
+			var previous: int = 0
+			for enemy: Dictionary in before["enemies"][1]:
+				if enemy["type_id"] == String(id):
+					previous += 1
+			_check(accepted.queued_sends[1] + delivered - previous == 1, "Boss order enters existing FIFO exactly once without consuming a regular-wave cap")
+			var frozen: Dictionary = accepted.snapshot()
+			var streams: Array[int] = _send_streams(accepted)
+			_check(not accepted.send_enemy(0, id) and not accepted.send_enemy_mirrored(0, id), "Spent sender cannot buy another boss or partially buy a mirror")
+			_check(accepted.snapshot() == frozen and _send_streams(accepted) == streams, "Exhausted sender rejects without any transaction effects")
+		var mirrored := _combat(rules)
+		mirrored.debug_set_round(unlock)
+		mirrored.coins = [cost, cost]
+		mirrored.income = [penalty, penalty - 1]
+		_assert_mirror_rejected(mirrored, id)
+		mirrored.income = [penalty, penalty]
+		mirrored.coins[1] = cost - 1
+		_assert_mirror_rejected(mirrored, id)
+		mirrored.coins[1] = cost
+		_check(mirrored.send_enemy_mirrored(0, id) and mirrored.coins == [0, 0] and mirrored.income == [0, 0] and mirrored.queued_sends == [1, 1], "Mirror validates both balances first, then purchases exactly one boss per board")
+		for slot: int in range(2):
+			_check(mirrored.snapshot()["enemy_totals"][slot]["sent"].get(String(id), 0) == 1, "Mirrored accepted totals count one boss for each sender")
+		var repeated := _combat(rules)
+		repeated.debug_set_round(unlock + 200)
+		repeated.coins = [cost * 3, cost]
+		repeated.income = [penalty * 3 + 7, penalty]
+		for order: int in range(3):
+			_check(repeated.send_enemy(0, id), "Funded late-game bosses have no added send cap or cooldown")
+		_check(repeated.coins[0] == 0 and repeated.income[0] == 7 and repeated.queued_sends[1] == 3, "Repeated orders pay each full penalty and preserve residual income")
+		_check(repeated.start_wave(_routing(_layout())), "Queued boss orders start through the real regular-wave path")
+		repeated.advance(repeated._active_send_spawn_interval * 2.0 + 0.001)
+		var bosses: int = 0
+		for enemy: Dictionary in repeated.enemies[1]:
+			if enemy["type_id"] == String(id):
+				bosses += 1
+		_check(bosses == 3 + repeated.wave_roster.count(String(id)) and repeated.queued_sends[1] == 0, "Paced FIFO delivers every paid boss alongside, not instead of, ordinary encounters")
+		var captured := _combat(rules)
+		captured.debug_set_round(unlock)
+		captured.coins = [cost, cost]
+		captured.income = [penalty, penalty]
+		definition.send_cost = 1
+		definition.send_income = 999
+		definition.send_first_wave = 1
+		_check(captured.send_enemy(0, id) and captured.coins[0] == 0 and captured.income[0] == 0, "Admitted host send terms are captured, not mutable local resource values")
+		var payout_rules := _rules(false)
+		payout_rules.wave_weight = 1
+		payout_rules.wave_weight_growth = 0
+		payout_rules.enemy_speed = 10000.0
+		var payout := _combat(payout_rules)
+		payout.debug_set_round(unlock)
+		payout.coins = [cost, cost]
+		payout.income = [penalty + 7, 0]
+		_check(payout.send_enemy(0, id) and payout.coins[0] == 0 and payout.income[0] == 7, "Income loss is permanent recurring income, not another immediate Coin charge")
+		_check(payout.start_wave(_routing(_layout())), "Post-penalty payout fixture starts actual paid-send combat")
+		payout.advance(1.0)
+		var reward: int = payout_rules.wave_reward + unlock * payout_rules.wave_reward_growth
+		_check(payout.phase == MatchCombat.Phase.PLANNING and payout.income[0] == 7 and payout.coins[0] == reward + 7, "Both-board clear pays only remaining recurring income without refunding the boss penalty")
+
+
+func _send_streams(combat: MatchCombat) -> Array[int]:
+	var streams: Array[int] = [combat._random.state, combat._wave_random.state, combat._timing_random.state, combat._group_random.state, combat._roll_random.state, combat._drop_random.state, combat._magic_random.state]
+	if combat._boss_loot._random != null:
+		streams.append(combat._boss_loot._random.state)
+	return streams
+
+
+func _assert_send_rejected(combat: MatchCombat, id: StringName) -> void:
+	var frozen: Dictionary = combat.snapshot()
+	var streams: Array[int] = _send_streams(combat)
+	_check(not combat.send_enemy(0, id) and not combat.send_enemy(1, id) and not combat.send_enemy_mirrored(0, id), "Locked or insufficient Coins/income boss orders reject for either sender and mirror")
+	_check(combat.snapshot() == frozen and _send_streams(combat) == streams, "Rejected boss orders preserve balances, income, FIFO, totals, effects and every gameplay RNG")
+
+
+func _assert_mirror_rejected(combat: MatchCombat, id: StringName) -> void:
+	var frozen: Dictionary = combat.snapshot()
+	var streams: Array[int] = _send_streams(combat)
+	_check(not combat.send_enemy_mirrored(0, id) and not combat.send_enemy_mirrored(1, id), "Either insufficient mirrored balance rejects both transaction orientations")
+	_check(combat.snapshot() == frozen and _send_streams(combat) == streams, "Mirror rejection cannot spend or roll on its otherwise-funded side")
 
 
 func _test_damage_types() -> void:

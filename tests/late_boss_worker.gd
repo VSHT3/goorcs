@@ -31,6 +31,10 @@ func _planning_rules() -> CombatRules:
 	rules.spawn_interval_reduction_per_wave = 0.0
 	rules.main_round_interval = 1000
 	for definition: EnemyDefinition in rules.catalog.enemies:
+		if _lane == "guest" and definition.boss:
+			definition.send_cost = 1
+			definition.send_income = 100
+			definition.send_first_wave = 1
 		if _lane == "guest" and definition.id in [&"troll", &"orc_war_machine"]:
 			definition.health_multiplier = 0.1
 			definition.speed_multiplier = 100.0
@@ -78,6 +82,12 @@ func _execute_command(command: Dictionary) -> void:
 				for index: int in range(streams.size()):
 					streams[index].seed = seed_value + index * 97
 				planning.debug_set_values(round_number, 100000, int(planning.combat["reroll_currency"][planning.local_slot()]))
+		"send_economy_fixture":
+			if _lane == "host":
+				for slot: int in range(2):
+					planning._host_combat.coins[slot] = int(command["coins"][slot])
+					planning._host_combat.income[slot] = int(command["income"][slot])
+				planning._publish_snapshot()
 		"typed_damage_fixture":
 			if _lane == "host":
 				var combat: MatchCombat = planning._host_combat

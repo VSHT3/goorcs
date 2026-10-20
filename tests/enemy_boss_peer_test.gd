@@ -4,7 +4,7 @@ const BOSS := "necorcmancer_mancer"
 
 
 func _run() -> void:
-	success_message = "PASS: separate host/client admit round40 boss, accepted HP/speed and inherited summons despite divergent local resources; unsendable commands stay atomic"
+	success_message = "PASS: separate host/client admit round40 boss, accepted HP/speed and inherited summons despite divergent local resources; locked and unfunded sends stay atomic"
 	planning_worker_path = "res://tests/enemy_boss_worker.gd"
 	_suite_deadline_msec = Time.get_ticks_msec() + 90000
 	_directory = OS.get_temp_dir().path_join("gorcs_enemy_boss_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
@@ -83,7 +83,7 @@ func _run() -> void:
 func _reject_both(frozen: Dictionary) -> void:
 	for lane: String in ["host", "guest"]:
 		await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": BOSS})
-	_check(await _agree("Rejected boss commands replicate no changes") == frozen, "Host and remote boss sends cannot spend coins, grant income, enqueue enemies or change totals")
+	_check(await _agree("Rejected boss commands replicate no changes") == frozen, "Locked or unfunded host and remote boss sends cannot change Coins, income, FIFO or totals")
 
 
 func _bosses(state: Dictionary, slot: int) -> Array[Dictionary]:

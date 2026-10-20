@@ -4,6 +4,8 @@ extends Node
 signal changed
 signal feedback(message: String)
 
+const SNAPSHOT_CODEC = preload("res://scripts/combat_snapshot_codec.gd")
+
 var session: MultiplayerSession
 var collection_store: CollectionStore
 var combat_rules: CombatRules = preload("res://resources/combat/prototype.tres")
@@ -36,6 +38,22 @@ var _synced_guest_id: int = 0
 var _pending_snapshot_peer: int = 0
 var _host_combat: MatchCombat
 var _combat_publish_elapsed: float = 0.0
+# Reliable control revisions fence phase/layout/transaction changes. Combat has
+# its own reliable channel with one frame in flight and only the newest unsent
+# frame retained, so a slow guest cannot build a playback/command backlog.
+var _snapshot_revision: int = 0
+var _snapshot_sequence: int = 0
+var _accepted_revision: int = 0
+var _accepted_sequence: int = 0
+var _pending_combat_packet := PackedByteArray()
+var _pending_combat_revision: int = 0
+var _pending_combat_sequence: int = 0
+var _combat_flush_queued: bool = false
+var _combat_in_flight: int = 0
+var _queued_combat_frame: Dictionary = {}
+var _queued_combat_revision: int = 0
+var _queued_combat_sequence: int = 0
+var _combat_baseline: Dictionary = {}
 # Private authority state: never send both decks in one peer snapshot.
 var _host_loadouts: Array[Array] = [[], []]
 var _host_loadout_committed: Array[bool] = [false, false]
@@ -412,6 +430,14 @@ func _reset_match() -> void:
 	_expansion_count = 0
 	combat = _combat_snapshot()
 	_combat_publish_elapsed = 0.0
+	_accepted_revision = 0
+	_accepted_sequence = 0
+	_pending_combat_packet.clear()
+	_pending_combat_revision = 0
+	_pending_combat_sequence = 0
+	_combat_in_flight = 0
+	_queued_combat_frame = {}
+	_combat_baseline = {}
 	set_physics_process(false)
 
 
@@ -433,7 +459,7 @@ func _sync_guest(guest_id: int) -> void:
 	if not _can_accept(guest_id):
 		return
 	_synced_guest_id = guest_id
-	_receive_snapshot.rpc_id(guest_id, _snapshot(1))
+	_publish_snapshot()
 
 
 @rpc("any_peer", "call_remote", "reliable")
@@ -677,8 +703,8 @@ func _try_start_wave() -> bool:
 	return true
 
 
-func _combat_snapshot() -> Dictionary:
-	var snapshot: Dictionary = _host_combat.snapshot()
+func _combat_snapshot(include_metadata: bool = true) -> Dictionary:
+	var snapshot: Dictionary = _host_combat.snapshot(include_metadata)
 	snapshot["speed_votes"] = _host_speed_votes.duplicate()
 	snapshot["autoplay_votes"] = _host_autoplay_votes.duplicate()
 	snapshot["speed_multiplier"] = _speed_multiplier()
@@ -732,35 +758,130 @@ func _snapshot(recipient_slot: int = 0) -> Dictionary:
 
 
 func _publish_snapshot() -> void:
+	_snapshot_revision += 1
+	_snapshot_sequence += 1
+	_queued_combat_frame = {}
 	var snapshot: Dictionary = _snapshot()
+	_combat_baseline = snapshot["combat"]
 	_mirror_snapshot(snapshot)
-	changed.emit()
 	if _synced_guest_id != 0 and _can_accept(_synced_guest_id):
-		_receive_snapshot.rpc_id(_synced_guest_id, _snapshot(1))
-
+		# Only the recipient's deck is ever encoded. Publish before changed:
+		# local listeners can synchronously submit another accepted command.
+		var remote: Dictionary = snapshot.duplicate()
+		remote["chosen_tower_ids"] = _host_loadouts[1].duplicate()
+		remote["loadout_committed"] = _host_loadout_committed[1]
+		remote["opponent_committed"] = _host_loadout_committed[0]
+		_receive_snapshot.rpc_id(_synced_guest_id, SNAPSHOT_CODEC.encode_snapshot(remote), _snapshot_revision, _snapshot_sequence)
+	changed.emit()
 
 
 func _publish_combat() -> void:
-	combat = _combat_snapshot()
-	changed.emit()
+	var frame: Dictionary = _combat_snapshot(false)
+	var next: Dictionary = combat.duplicate()
+	next.merge(frame, true)
+	combat = next
+	_snapshot_sequence += 1
 	if _synced_guest_id != 0 and _can_accept(_synced_guest_id):
-		_receive_combat.rpc_id(_synced_guest_id, combat)
-
-
-@rpc("authority", "call_remote", "reliable")
-func _receive_combat(snapshot: Dictionary) -> void:
-	if session.is_host or session.state != MultiplayerSession.State.CONNECTED or multiplayer.get_remote_sender_id() != 1:
-		return
-	combat = snapshot
+		_queued_combat_frame = frame
+		_queued_combat_revision = _snapshot_revision
+		_queued_combat_sequence = _snapshot_sequence
+		_send_latest_combat()
 	changed.emit()
 
-@rpc("authority", "call_remote", "reliable")
-func _receive_snapshot(snapshot: Dictionary) -> void:
+
+func _send_latest_combat() -> void:
+	if _combat_in_flight != 0 or _queued_combat_frame.is_empty() or _synced_guest_id == 0 or not _can_accept(_synced_guest_id):
+		return
+	var packet: PackedByteArray = SNAPSHOT_CODEC.encode_combat(_queued_combat_frame, _combat_baseline)
+	var revision: int = _queued_combat_revision
+	var sequence: int = _queued_combat_sequence
+	_queued_combat_frame = {}
+	_combat_in_flight = sequence
+	_send_combat_packet(_synced_guest_id, packet, revision, sequence)
+
+
+func _send_combat_packet(peer_id: int, packet: PackedByteArray, revision: int, sequence: int) -> void:
+	_receive_combat.rpc_id(peer_id, packet, revision, sequence)
+
+
+@rpc("authority", "call_remote", "reliable", 1)
+func _receive_combat(packet: PackedByteArray, revision: int, sequence: int) -> void:
 	if session.is_host or session.state != MultiplayerSession.State.CONNECTED or multiplayer.get_remote_sender_id() != 1:
 		return
+	_queue_combat_frame(packet, revision, sequence)
+
+
+@rpc("any_peer", "call_remote", "reliable", 1)
+func _acknowledge_combat(sequence: int) -> void:
+	if session.is_host and multiplayer.get_remote_sender_id() == _synced_guest_id and sequence == _combat_in_flight:
+		_combat_in_flight = 0
+		_send_latest_combat()
+
+
+func _ack_combat_frame(sequence: int) -> void:
+	if sequence > 0 and session != null and not session.is_host and session.state == MultiplayerSession.State.CONNECTED:
+		_acknowledge_combat.rpc_id(1, sequence)
+
+
+func _queue_combat_frame(packet: PackedByteArray, revision: int, sequence: int) -> void:
+	if revision < _accepted_revision or sequence <= _accepted_sequence or sequence <= _pending_combat_sequence:
+		_ack_combat_frame(sequence)
+		return
+	_pending_combat_packet = packet
+	_pending_combat_revision = revision
+	_pending_combat_sequence = sequence
+	_schedule_combat_flush()
+
+
+func _schedule_combat_flush() -> void:
+	if not _combat_flush_queued and not _pending_combat_packet.is_empty():
+		_combat_flush_queued = true
+		_flush_combat_frame.call_deferred()
+
+
+func _flush_combat_frame() -> void:
+	_combat_flush_queued = false
+	# A frame can outrun its reliable baseline on the independent channel.
+	# Keep only the newest one until that baseline has actually arrived.
+	if _pending_combat_packet.is_empty() or _pending_combat_revision != _accepted_revision:
+		return
+	var frame: Dictionary = SNAPSHOT_CODEC.decode_combat(_pending_combat_packet, _combat_baseline)
+	_accepted_sequence = _pending_combat_sequence
+	_pending_combat_packet.clear()
+	_pending_combat_sequence = 0
+	_ack_combat_frame(_accepted_sequence)
+	if frame.is_empty():
+		return
+	var next: Dictionary = combat.duplicate()
+	next.merge(frame, true)
+	combat = next
+	changed.emit()
+
+
+@rpc("authority", "call_remote", "reliable")
+func _receive_snapshot(packet: PackedByteArray, revision: int, sequence: int) -> void:
+	if session.is_host or session.state != MultiplayerSession.State.CONNECTED or multiplayer.get_remote_sender_id() != 1:
+		return
+	_accept_snapshot_frame(packet, revision, sequence)
+
+
+func _accept_snapshot_frame(packet: PackedByteArray, revision: int, sequence: int) -> void:
+	if revision < _accepted_revision or sequence <= _accepted_sequence:
+		return
+	var snapshot: Dictionary = SNAPSHOT_CODEC.decode_snapshot(packet)
+	if snapshot.is_empty():
+		return
+	_accepted_revision = revision
+	_accepted_sequence = sequence
 	_active_peer_id = 1
+	if _pending_combat_revision < revision or _pending_combat_sequence <= sequence:
+		_ack_combat_frame(_pending_combat_sequence)
+		_pending_combat_packet.clear()
+		_pending_combat_sequence = 0
+	_combat_baseline = snapshot["combat"]
 	_mirror_snapshot(snapshot)
 	changed.emit()
+	_schedule_combat_flush()
 
 
 func _mirror_snapshot(snapshot: Dictionary) -> void:

@@ -23,6 +23,7 @@ extends Resource
 @export var count_cap_growth_interval: int = 1
 @export_range(0.0, 1.0) var max_weight_share: float = 1.0
 @export var send_cost: int = 20
+# Signed recurring income change per paid order; boss sends may spend income.
 @export var send_income: int = 2
 @export var send_first_wave: int = 1
 @export var regular_spawn_enabled: bool = true

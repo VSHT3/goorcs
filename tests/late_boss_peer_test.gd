@@ -165,6 +165,7 @@ func _run() -> void:
 			_check(_of_type(accepted, type_id, slot).size() == 1, "Both peer boards retain a live simultaneous " + type_id)
 	await _assert_client_frozen(accepted, "simultaneous three-boss state")
 	await _reject_boss_sends(accepted)
+	await _test_paid_boss_sends()
 	await _finish()
 
 
@@ -224,10 +225,50 @@ func _reject_boss_sends(frozen: Dictionary) -> void:
 	var runtime: Dictionary = _debug_runtime()
 	for lane: String in ["host", "guest"]:
 		for type_id: String in ["necorcmancer_mancer", "troll", "orc_war_machine"]:
-			_check(not frozen["enemy_types"][type_id]["send_available"], "Real accepted normal send consumer hides bosses")
 			await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": type_id})
-	_check(_debug_runtime() == runtime, "Rejected boss sends consume no authoritative RNG or simulation time on either peer")
-	_check(await _agree("Boss sends reject on both real peers") == frozen, "Network boss sends cannot change resources, queues, statistics or simulation")
+	_check(_debug_runtime() == runtime, "Locked or income-unfunded boss orders consume no authoritative RNG or simulation time")
+	_check(await _agree("Unaffordable boss sends reject on both real peers") == frozen, "Local guest send settings cannot bypass host unlock, Coins or recurring-income requirements")
+
+
+func _test_paid_boss_sends() -> void:
+	for type_id: String in ["necorcmancer_mancer", "troll", "orc_war_machine"]:
+		var state: Dictionary = await _agree("Accepted boss send terms agree")
+		var terms: Dictionary = state["enemy_types"][type_id]
+		var unlock: int = int(terms["send_first_wave"])
+		var cost: int = int(terms["send_cost"])
+		var penalty: int = -int(terms["send_income"])
+		await _command("host", {"action": "round_fixture", "round": unlock - 1})
+		await _command("host", {"action": "send_economy_fixture", "coins": [cost, cost], "income": [penalty, penalty]})
+		state = await _agree("Both peers receive fully funded pre-unlock boss state")
+		_check(not state["enemy_types"][type_id]["send_available"], "Host unlock overrides guest's round-one local boss send gate")
+		await _reject_paid_order(type_id, state)
+		await _command("host", {"action": "round_fixture", "round": unlock})
+		for balances: Array in [[cost - 1, penalty], [cost, penalty - 1]]:
+			await _command("host", {"action": "send_economy_fixture", "coins": [balances[0], balances[0]], "income": [balances[1], balances[1]]})
+			state = await _agree("Host publishes an unlocked but unfunded boss")
+			_check(state["enemy_types"][type_id]["send_available"], "Affordability never removes an unlocked boss from the selector")
+			await _reject_paid_order(type_id, state)
+		await _command("host", {"action": "send_economy_fixture", "coins": [cost, cost], "income": [penalty, penalty]})
+		var before: Dictionary = await _agree("Exact boss price and penalty are available")
+		for lane: String in ["host", "guest"]:
+			await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": type_id})
+		state = await _agree("Real host and guest commands purchase a boss at its unlock")
+		_check(_matches(state, {"coins": [0, 0], "income": [0, 0], "send_queues": [[type_id], [type_id]]}), "Both send paths charge captured host Coins/income exactly once and queue one boss")
+		for slot: int in range(2):
+			_check(int(state["enemy_totals"][slot]["sent"].get(type_id, 0)) == int(before["enemy_totals"][slot]["sent"].get(type_id, 0)) + 1, "Each authenticated sender receives exactly one accepted boss send count")
+		await _reject_paid_order(type_id, state)
+		await _both_ready()
+		await _command("host", {"action": "step", "delta": 0.001})
+		state = await _agree("Paid bosses deliver through the actual combat FIFO")
+		for slot: int in range(2):
+			_check(_of_type(state, type_id, slot).size() == 1 + state["wave_roster"].count(type_id) and int(state["queued_sends"][slot]) == 0, "Each board receives the paid boss in addition to any regular encounter")
+
+
+func _reject_paid_order(type_id: String, frozen: Dictionary) -> void:
+	var runtime: Dictionary = _debug_runtime()
+	for lane: String in ["host", "guest"]:
+		await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": type_id})
+	_check(await _agree("Rejected paid-boss commands leave accepted state unchanged") == frozen and _debug_runtime() == runtime, "Rejected peer orders preserve balances, queues, totals and host random streams")
 
 
 func _of_type(state: Dictionary, type_id: String, slot: int = 0) -> Array[Dictionary]:

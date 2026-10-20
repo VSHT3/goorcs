@@ -16,6 +16,7 @@ func _run() -> void:
 	_test_invalid_rules()
 	_test_weights_and_scaling()
 	_test_host_kills()
+	_test_paid_boss_kills()
 	_test_unowned_deaths()
 	if failures == 0:
 		print("PASS: boss rewards capture authored odds/payouts, isolate randomness, retain detached once-per-type histories, and credit only real host-owned kills")
@@ -204,6 +205,45 @@ func _test_host_kills() -> void:
 	var fresh := _host()
 	_kill(fresh, 0, BOSSES[0])
 	_check(fresh.snapshot()["boss_rewards"][0].size() == 1, "New host model resets boss claims")
+
+
+func _test_paid_boss_kills() -> void:
+	for type_id: String in BOSSES:
+		var rules := CombatRules.new()
+		rules.boss_reward_rules = SHIPPED
+		rules.roll_rules = null
+		rules.starting_coins = 200000
+		rules.enemy_speed = 0.0
+		rules.speed_growth_fraction = 0.0
+		rules.wave_weight = 1
+		rules.wave_weight_growth = 0
+		rules.spawn_interval = 0.0
+		rules.spawn_jitter_ratio = 0.0
+		var combat := MatchCombat.new(rules, _rng(1), _rng(2))
+		var terms: Dictionary = combat.snapshot()["enemy_types"][type_id]
+		combat.debug_set_round(int(terms["send_first_wave"]))
+		combat.income[0] = -int(terms["send_income"]) * 2
+		_check(combat.build(1, Vector2i(1, 1), &"arrow_tower", MatchCombat.TargetMode.FURTHEST), "Paid-boss reward fixture admits an actual defending killer")
+		_check(combat.send_enemy(0, StringName(type_id)) and combat.start_wave(_routing()), "Boss reward candidate is a legitimately purchased FIFO send")
+		for kill_number: int in range(2):
+			if kill_number == 1:
+				_check(combat.send_enemy(0, StringName(type_id)), "A second fully paid boss can use the same ordinary FIFO")
+			combat.advance(rules.send_spawn_interval + 0.001)
+			var index: int = -1
+			for candidate: int in range(combat.enemies[1].size()):
+				if combat.enemies[1][candidate]["type_id"] == type_id:
+					index = candidate
+					break
+			_check(index >= 0, "Actual paid boss delivers without a regular boss reservation")
+			if index < 0:
+				continue
+			var before: int = combat.coins[1]
+			combat._hit(1, combat.towers[1][0], index, 100000000)
+			var rewards: Array = combat.snapshot()["boss_rewards"][1]
+			_check(rewards.size() == 1 and combat.snapshot()["boss_rewards"][0].is_empty(), "First real paid-boss kill rewards defender once; repeats never reward sender or duplicate claim")
+			if not rewards.is_empty():
+				var bonus: int = int(rewards[0]["coins"]) if kill_number == 0 else 0
+				_check(combat.coins[1] - before == int(terms["kill_bounty"]) + bonus, "Paid boss preserves ordinary bounty and existing first-kill bonus rules")
 
 
 func _test_unowned_deaths() -> void:

@@ -93,6 +93,12 @@ var _speed_cache_wave: int = -1
 var _current_wave_speed: float = 0.0
 var _next_wave_speed: float = 0.0
 var _ability_pass: Array[Array] = [[], []]
+# Host-only acceleration of current-position targeting; historical attack
+# sampling still scans the accepted motion history. Buckets reuse their arrays.
+var _target_grid: Array[Dictionary] = [{}, {}]
+var _target_grid_valid: Array[bool] = [false, false]
+var _target_grid_counts: Array[int] = [-1, -1]
+var _target_candidates: Array[Array] = [[], []]
 
 
 func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random: RandomNumberGenerator = null, timing_random: RandomNumberGenerator = null, roll_random: RandomNumberGenerator = null, drop_random: RandomNumberGenerator = null) -> void:
@@ -722,7 +728,7 @@ func _can_send_enemy(slot: int, type_id: StringName) -> bool:
 		return false
 	var definition: Dictionary = _enemy_types[String(type_id)]
 	var delivery_wave: int = wave + 1 if phase == Phase.PLANNING else wave
-	return not definition["boss"] and definition["send_enabled"] and delivery_wave >= int(definition["send_first_wave"]) and (_sandbox_mode or coins[slot] >= int(definition["send_cost"]))
+	return definition["send_enabled"] and delivery_wave >= int(definition["send_first_wave"]) and (_sandbox_mode or coins[slot] >= int(definition["send_cost"])) and income[slot] >= -int(definition["send_income"])
 
 
 func send_enemy(slot: int, type_id: StringName) -> bool:
@@ -779,6 +785,7 @@ func debug_set_round(round_number: int) -> bool:
 	winner = -1
 	coin_flip = false
 	enemies = [[], []]
+	_target_grid_valid = [false, false]
 	flights.clear()
 	_reset_death_events()
 	wave_roster.clear()
@@ -1140,10 +1147,7 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 					duration = minf(duration, float(enemy["slow_remaining"]))
 				duration = minf(duration, BossMechanics.event_step(enemy, definition))
 				if float(enemy["speed"]) > 0.0:
-					# Enter the new rounded cell, rather than stopping on the
-					# direction-dependent half-cell rounding tie.
-					var boundary: float = minf(float(enemy["route"].size() - 1), floorf(float(enemy["progress"]) + 0.5 + 0.000000001) + 0.5 + 0.00000001)
-					duration = minf(duration, maxf(0.000000001, (boundary - float(enemy["progress"])) / float(enemy["speed"])))
+					duration = minf(duration, _next_attack_entry(slot, enemy, definition, duration))
 				if float(enemy["tower_attack_remaining"]) > 0.000000001:
 					duration = minf(duration, float(enemy["tower_attack_remaining"]))
 				elif float(definition["tower_attack_interval"]) > 0.0 and float(enemy["cast_remaining"]) <= 0.000000001 and BossMechanics.can_act(enemy):
@@ -1160,6 +1164,38 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 			if float(definition["heal_interval"]) > 0.0:
 				duration = minf(duration, float(enemy["next_heal"]) - float(enemy["age"]))
 	return maxf(0.000000001, duration)
+
+
+# Ordinary enemies only need a substep when a ready weapon can acquire them.
+# Splitting on every mob's every cell while a boss exists makes a horde impose
+# O(enemies) full-board simulation passes per second, including empty attacks.
+func _next_attack_entry(slot: int, enemy: Dictionary, definition: Dictionary, maximum: float) -> float:
+	var progress: float = enemy["progress"]
+	var speed: float = enemy["speed"]
+	var route: Array = enemy["route"]
+	var last: int = route.size() - 1
+	var duration: float = minf(maximum, maxf(0.000000001, (float(last) - progress) / speed))
+	var next_index: int = floori(progress + 0.5 + 0.000000001) + 1
+	while next_index <= last:
+		# Move past direction-dependent half-cell rounding ties.
+		var boundary: float = minf(float(last), float(next_index) - 0.5 + 0.00000001)
+		var until_entry: float = maxf(0.000000001, (boundary - progress) / speed)
+		if until_entry >= duration:
+			break
+		if definition["boss"]:
+			return until_entry
+		for tower: Dictionary in towers[slot]:
+			if float(tower["stunned_remaining"]) > 0.000000001 or float(tower["cooldown"]) > 0.000000001 or tower["behavior_kind"] not in ["attack", "chain"]:
+				continue
+			var type: Dictionary = _tower_types[tower["type_id"]]
+			var weapon: String = type["advancements"].get(tower["advancement"], {}).get("weapon", "arrow")
+			# Continuous attacks already integrate entry/exposure historically.
+			if weapon == "flamethrower" or (type["area_attack"] and type["evolutions"].get(tower["evolution"], {}).get("continuous", false)):
+				continue
+			if cell_in_range(tower["cell"], route[next_index], tower["range"]):
+				return until_entry
+		next_index += 1
+	return duration
 
 
 func _wave_cleared() -> bool:
@@ -1363,6 +1399,7 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 			"jump":
 				enemy["progress"] = enemy["jump_target_progress"]
 				enemy["pos"] = enemy["jump_to"]
+				_target_grid_valid[slot] = false
 				_jump_phase(enemy, "jump_land", definition["jump_land_duration"])
 			"jump_land":
 				_jump_phase(enemy, "wheels", 0.0)
@@ -1443,18 +1480,16 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 	enemy["speed"] = 0.0
 
 
-func snapshot() -> Dictionary:
-	return {
+func snapshot(include_metadata: bool = true) -> Dictionary:
+	var result: Dictionary = {
 		"phase": phase, "wave": wave, "health": base_health.duplicate(),
 		"statistics_id": statistics_id, "enemy_totals": enemy_totals.duplicate(true),
 		"recap": _recap.snapshot(_death_time) if phase == Phase.FINISHED else {},
-		"wave_groups": wave_groups.duplicate(true),
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
 		"reroll_currency": reroll_currency.duplicate(),
 		"income": income.duplicate(), "queued_sends": queued_sends,
 		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
-		"enemy_types": _enemy_types_snapshot(),
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"flights": flights.duplicate(true), "flight_duration": FLIGHT_DURATION,
 		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
@@ -1462,10 +1497,16 @@ func snapshot() -> Dictionary:
 		"sounds": _sound_events.snapshot(_death_time),
 		"boss_rewards": [_boss_loot.awards(0), _boss_loot.awards(1)],
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
-		"wave_roster": wave_roster.duplicate(), "wave_weight": _wave_weight(maxi(1, wave)),
-		"spawn_times": spawn_times.duplicate(),
-		"tower_types": _tower_types.duplicate(true),
-		"rules": {
+		"wave_weight": _wave_weight(maxi(1, wave)),
+	}
+	if not include_metadata:
+		return result
+	result["wave_groups"] = wave_groups.duplicate(true)
+	result["enemy_types"] = _enemy_types_snapshot()
+	result["wave_roster"] = wave_roster.duplicate()
+	result["spawn_times"] = spawn_times.duplicate()
+	result["tower_types"] = _tower_types.duplicate(true)
+	result["rules"] = {
 			"enemy_speed": _wave_speed(wave), "enemy_health": _wave_health(wave),
 			"sandbox_mode": _sandbox_mode,
 			"roll_rules_enabled": _roll_rules != null,
@@ -1477,8 +1518,8 @@ func snapshot() -> Dictionary:
 			"main_round_interval": _rules.main_round_interval,
 			"ready_window_seconds": _rules.ready_window_seconds,
 			"tiles_per_expansion": _rules.tiles_per_expansion,
-		},
 	}
+	return result
 
 
 func _enemy_types_snapshot() -> Dictionary:
@@ -1487,7 +1528,7 @@ func _enemy_types_snapshot() -> Dictionary:
 	for type_id: String in result:
 		result[type_id]["health"] = _enemy_health(type_id, preview_wave)
 		result[type_id]["speed"] = _enemy_speed(type_id, preview_wave)
-		result[type_id]["send_available"] = not bool(result[type_id]["boss"]) and bool(result[type_id]["send_enabled"]) and preview_wave >= int(result[type_id]["send_first_wave"])
+		result[type_id]["send_available"] = bool(result[type_id]["send_enabled"]) and preview_wave >= int(result[type_id]["send_first_wave"])
 	return result
 
 
@@ -1500,7 +1541,7 @@ static func enemy_preview(definition: EnemyDefinition, rules: CombatRules, wave_
 		"nonphysical_damage_multiplier": definition.nonphysical_damage_multiplier,
 		"fire_damage_multiplier": definition.fire_damage_multiplier,
 		"lightning_damage_multiplier": definition.lightning_damage_multiplier,
-		"boss": definition.boss, "send_enabled": definition.send_enabled and not definition.boss,
+		"boss": definition.boss, "send_enabled": definition.send_enabled,
 		"jump_interval": definition.jump_interval,
 		"burning": false, "burn_remaining": 0.0,
 	}
@@ -1616,6 +1657,7 @@ func _valid_mode(mode: int) -> bool:
 
 
 func _move_enemies(slot: int, delta: float) -> void:
+	_target_grid_valid[slot] = false
 	for enemy: Dictionary in enemies[slot]:
 		enemy["age"] += delta
 		enemy["animation_elapsed"] += delta
@@ -1716,6 +1758,7 @@ func _spawn_send(slot: int) -> void:
 
 
 func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float, captured_route: Array[Vector2i] = [], summoner_id: int = -1) -> void:
+	_target_grid_valid[slot] = false
 	var hp: int = _enemy_health(type_id, wave)
 	var definition: Dictionary = _enemy_types[type_id]
 	var route: Array[Vector2i] = _assign_route(slot) if captured_route.is_empty() else captured_route.duplicate()
@@ -2337,6 +2380,7 @@ func _land_flights() -> void:
 		enemy["jump_target_progress"] = enemy["progress"]
 		_enemy_spawn_times[enemy["id"]] = float(flight["land_time"])
 		enemies[target].append(enemy)
+		_target_grid_valid[target] = false
 		_sound_events.record(CombatSoundEvents.Cue.CLUB_IMPACT, target, flight["to"], _death_time)
 
 
@@ -2502,6 +2546,8 @@ func _record_death(slot: int, enemy: Dictionary) -> void:
 
 
 func _retire_enemy(enemy_id: int) -> void:
+	_target_grid_valid[0] = false
+	_target_grid_valid[1] = false
 	_enemy_spawn_times.erase(enemy_id)
 	_slow_motion.erase(enemy_id)
 	_burns.erase(enemy_id)
@@ -2655,14 +2701,41 @@ func _update_tracking_target(slot: int, tower: Dictionary) -> void:
 		tower["tracking_aim"] = enemies[slot][selected]["pos"]
 
 
-# Scan in place rather than allocating or sorting candidates for each tower.
+func _current_target_candidates(slot: int, origin: Vector2i, range_cells: float) -> Array:
+	if not _target_grid_valid[slot] or _target_grid_counts[slot] != enemies[slot].size():
+		var grid: Dictionary = _target_grid[slot]
+		for cell: Vector2i in grid:
+			grid[cell].clear()
+		for enemy: Dictionary in enemies[slot]:
+			var cell := Vector2i(Vector2(enemy["pos"]).round())
+			if not grid.has(cell):
+				grid[cell] = []
+			grid[cell].append(enemy)
+		_target_grid_counts[slot] = enemies[slot].size()
+		_target_grid_valid[slot] = true
+	var candidates: Array = _target_candidates[slot]
+	candidates.clear()
+	var reach: int = floori(range_cells)
+	for y: int in range(origin.y - reach, origin.y + reach + 1):
+		for x: int in range(origin.x - reach, origin.x + reach + 1):
+			var cell := Vector2i(x, y)
+			if _target_grid[slot].has(cell):
+				candidates.append_array(_target_grid[slot][cell])
+	return candidates
+
+
+# Range buckets do not change scoring/ties or the host's captured motion rules.
 func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, excluded_id: int = -1, excluded_second: int = -1, excluded_third: int = -1, time: float = -1.0, fire_only: bool = false, extra: Array = [], extra_count: int = 0) -> int:
 	var best: int = -1
 	var best_score: float = -INF
 	var best_id: int = 0
 	var center: Vector2 = Vector2(tower["cell"])
-	for index: int in range(enemies[slot].size()):
-		var enemy: Dictionary = enemies[slot][index]
+	var reach: int = floori(range_cells)
+	var use_grid: bool = time < 0.0 and (reach * 2 + 1) * (reach * 2 + 1) < enemies[slot].size()
+	var candidates: Array = _current_target_candidates(slot, tower["cell"], range_cells) if use_grid else enemies[slot]
+	var policy: int = int(tower["mode"]) if mode < 0 else mode
+	for index: int in range(candidates.size()):
+		var enemy: Dictionary = candidates[index]
 		if int(enemy["hp"]) <= 0 or int(enemy["id"]) == excluded_id or int(enemy["id"]) == excluded_second or int(enemy["id"]) == excluded_third or (fire_only and bool(enemy["fire_immune"])):
 			continue
 		var excluded: bool = false
@@ -2678,7 +2751,7 @@ func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, e
 			continue
 		var target_progress: float = progress
 		var score: float
-		match int(tower["mode"]) if mode < 0 else mode:
+		match policy:
 			TargetMode.CLOSEST:
 				score = -center.distance_squared_to(position)
 			TargetMode.STRONGEST:
@@ -2692,7 +2765,7 @@ func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, e
 			best = index
 			best_score = score
 			best_id = id
-	return best
+	return _enemy_index(slot, best_id) if use_grid and best >= 0 else best
 
 
 func _apply_leaks(slot: int) -> void:

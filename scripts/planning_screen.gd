@@ -709,8 +709,8 @@ func _refresh_sends() -> void:
 	var gain: int = int(stats.get("send_income", 0))
 	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured and bool(stats.get("send_available", false))
 	enemy_selector.disabled = planning == null or not planning.active or finished or types.is_empty()
-	send_button.disabled = not available or _own_coins() < cost
-	send_button.text = "Send · %d/+%d" % [cost, gain] if configured else "Send unavailable"
+	send_button.disabled = not available or _own_coins() < cost or int(income[own_slot]) < -gain
+	send_button.text = "Send · %d/%+d" % [cost, gain] if configured else "Send unavailable"
 	if finished:
 		send_button.text = "Match finished"
 	var recurring: int = int(income[own_slot])
@@ -736,8 +736,11 @@ func _refresh_sends() -> void:
 		delivery = "Match finished." if finished else ("Ready: planning actions are committed until the round starts." if planning != null and planning.active else "Waiting for match.")
 		if configured and not bool(stats.get("send_available", false)) and not finished:
 			delivery = "Available from round %d." % int(stats.get("send_first_wave", 1))
-	elif _own_coins() < cost:
-		delivery += "\nNeed %d more Coins." % (cost - _own_coins())
+	else:
+		if _own_coins() < cost:
+			delivery += "\nNeed %d more Coins." % (cost - _own_coins())
+		if int(income[own_slot]) < -gain:
+			delivery += "\nNeed %d more recurring income." % (-gain - int(income[own_slot]))
 	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
 	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nOrder cooldown: %.3f simulation seconds after its final member." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules["send_spawn_interval"])]
 	enemy_selector.tooltip_text = send_button.tooltip_text
@@ -779,7 +782,7 @@ func _refresh_enemy_selector(types: Dictionary) -> void:
 
 
 func _enemy_send_description(stats: Dictionary) -> String:
-	return "%s: %d Coins; +%d recurring Coins per both-board clear." % [String(stats.get("title", _selected_enemy_type)), int(stats.get("send_cost", 0)), int(stats.get("send_income", 0))]
+	return "%s: %d Coins; %+d recurring Coins per both-board clear." % [String(stats.get("title", _selected_enemy_type)), int(stats.get("send_cost", 0)), int(stats.get("send_income", 0))]
 
 
 func _queue_composition(queue: Array, types: Dictionary) -> String:
@@ -1397,7 +1400,6 @@ func _refresh() -> void:
 	var in_wave: bool = phase == MatchCombat.Phase.WAVE
 	var editable: bool = planning.can_edit_path(own_slot)
 	var all_towers: Array = state.get("towers", [[], []])
-	var all_enemies: Array = state.get("enemies", [[], []])
 	var health: Array = state.get("health", [0, 0])
 	var rules: Dictionary = state.get("rules", {})
 	_refresh_health(int(health[own_slot]), int(rules.get("base_health", 0)))
@@ -1426,11 +1428,7 @@ func _refresh() -> void:
 		board.selected_enemy_id = selected_enemy_id if slot == selected_enemy_slot else -1
 		board.placement_id = _placement_id if slot == own_slot else &""
 		board.selected_tower_id = selected_tower_id if slot == own_slot else -1
-		board.tower_types = state.get("tower_types", {})
-		board.combat_towers = all_towers[slot]
-		board.combat_enemies = all_enemies[slot]
-		board.apply_deaths(state, slot, float(state.get("speed_multiplier", 1.0)))
-		board.queue_redraw()
+		board.apply_combat(state, slot, float(state.get("speed_multiplier", 1.0)))
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
 		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")
 		_titles[slot].visible = slot != own_slot

@@ -61,7 +61,7 @@ func validation_errors() -> PackedStringArray:
 		if enemy.id == &"" or enemy_ids.has(enemy.id):
 			errors.append("Enemy catalog contains an empty or duplicate ID '%s'." % enemy.id)
 		enemy_ids[enemy.id] = enemy
-		if enemy.title.is_empty() or not is_finite(enemy.health_multiplier) or enemy.health_multiplier <= 0.0 or not is_finite(enemy.speed_multiplier) or enemy.speed_multiplier <= 0.0 or enemy.send_cost <= 0 or enemy.send_income < 0 or enemy.base_damage <= 0 or enemy.spawn_weight <= 0 or enemy.first_wave < 1 or enemy.max_per_wave < 0 or enemy.count_cap_growth < 0 or enemy.count_cap_growth_interval < 1 or not is_finite(enemy.max_weight_share) or enemy.max_weight_share < 0.0 or enemy.max_weight_share > 1.0:
+		if enemy.title.is_empty() or not is_finite(enemy.health_multiplier) or enemy.health_multiplier <= 0.0 or not is_finite(enemy.speed_multiplier) or enemy.speed_multiplier <= 0.0 or enemy.send_cost <= 0 or (enemy.send_income < 0 and not enemy.boss) or enemy.base_damage <= 0 or enemy.spawn_weight <= 0 or enemy.first_wave < 1 or enemy.max_per_wave < 0 or enemy.count_cap_growth < 0 or enemy.count_cap_growth_interval < 1 or not is_finite(enemy.max_weight_share) or enemy.max_weight_share < 0.0 or enemy.max_weight_share > 1.0:
 			errors.append("Enemy '%s' has invalid combat, economy, or wave values." % enemy.id)
 		if enemy.send_first_wave < 1 or enemy.kill_bounty < -1 or not is_finite(enemy.group_interval) or enemy.group_interval <= 0.0:
 			errors.append("Enemy '%s' has invalid send, bounty, or group timing metadata." % enemy.id)

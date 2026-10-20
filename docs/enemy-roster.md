@@ -18,12 +18,14 @@ Health and movement use the existing wave-scaled baseline in `CombatRules`: each
 | Brute | 2.5 | 0.65 | 3 | 12 | 22 | 5 | 35% | 40 / +4 |
 | Orc Chief | 6 | 0.5 | 5 | 22 | 34 | 12 | 25% | 100 / +5 |
 | NecOrcmancer | 5 | 0.5 | 3 | 34 | 46 | 15 | 25% | 140 / +6 |
-| NecOrcmancer Mancer | 30 | 0.3 | 8 | 40, then occasional | Never | 40 | 50% | — |
-| Trollorc | 180 | 0.09 | 10 | 60, then occasional | Never | 60 | 65% | — |
-| Orc king war orchine | 450 | 0.07 | 10 | 100, then occasional | Never | 100 | 75% | — |
+| NecOrcmancer Mancer | 30 | 0.3 | 8 | 40, then occasional | 60 | 40 | 50% | 7,500 / −100 |
+| Trollorc | 180 | 0.09 | 10 | 60, then occasional | 80 | 60 | 65% | 20,000 / −300 |
+| Orc king war orchine | 450 | 0.07 | 10 | 100, then occasional | 120 | 100 | 75% | 50,000 / −1,000 |
 | SkeleOrc | 0.5 | 1.05 | 1 | Summoned only | Not purchasable | Not in regular roster | — | — |
 
 The first five rounds allow only Orcling sends. Each later send unlock trails the next regular threat tier; the final NecOrcmancer send unlock is deliberately delayed until round 46, as chosen by the creator. UI previews and command validation use the same accepted gate. Earlier-round debug jumps relock later sends. SkeleOrcs remain available directly in sandbox.
+
+Boss orders pay both the listed Coin price and the full recurring-income penalty immediately and atomically. A sender with too little of either cannot order; income never becomes negative or gets silently clamped. The loss persists through later clears until ordinary sends rebuild income. Mirrored Singleplayer validates both balances before spending or rolling. Each order queues exactly one boss through the existing paced opponent FIFO; regular encounter count/share limits do not cap paid orders. Planning/Ready/terminal restrictions remain unchanged, and a first actual paid-boss kill remains eligible for the existing first-kill loot. All send tuning is provisional.
 
 Orclings roll two/three/four members with 60/30/10 weights. Members arrive 0.065 simulation seconds apart; the next ordinary event waits its full normal cooldown after the last member. One paid order charges once, awards income once, and records the actual individual members sent. Rejection rolls nothing and spends nothing. Both boards receive the same host-generated regular groups/timetable. Individual Orclings award one Coin, limiting the horde's bounty advantage.
 
@@ -31,7 +33,7 @@ Chiefs begin at one regular selection per wave; the cap grows by one every ten w
 
 NecOrcmancers begin at one regular selection per wave; the cap grows by one every twelve waves after introduction. Every seven simulation seconds the caster stops for a 1.15-second staff-raising ritual, then raises two to four SkeleOrcs, limited to six living children per caster. Children inherit the caster's captured route and current progress instead of returning to the portal. A dead/leaked caster cannot finish its ritual. Living children still have to clear before the wave ends. SkeleOrcs have no kill bounty, preventing summon farming. Freeze slows movement, not the simulation ability clock; casting is stationary even while a slow expires. Two-times playback accelerates all of these simulation clocks consistently.
 
-**NecOrcmancer Mancer** (`necorcmancer_mancer`) is a separate boss, never a paid send. One is guaranteed on round 40: its 40 weight is reserved before ordinary selections from that round's 84-weight budget. Later waves roll once for an encounter, starting at 5% on round 41 and gaining 0.5 percentage points per round, capped at 25% from round 81 onward. At most one of this type appears per wave, still respecting budget/share limits; it may coexist with both other boss types later. These encounter odds and combat values are provisional tuning.
+**NecOrcmancer Mancer** (`necorcmancer_mancer`) is a separate boss with a late-game paid send. One regular encounter is guaranteed on round 40: its 40 weight is reserved before ordinary selections from that round's 84-weight budget. Later waves roll once for an encounter, starting at 5% on round 41 and gaining 0.5 percentage points per round, capped at 25% from round 81 onward. At most one regular encounter of this type appears per wave, still respecting budget/share limits; it may coexist with both other boss types and additional paid orders later. These encounter odds and combat values are provisional tuning.
 
 The boss uses the same seven-second / 1.15-second ritual, but raises **two to four ordinary NecOrcmancers**, capped at six living direct children. Those NecOrcmancers retain their own stats, bounty, and SkeleOrc rituals; newborn casters start their clocks at birth and cannot cascade a cast immediately. Every generation inherits its parent's captured route/current progress, and all descendants must clear before the wave ends. Catalog validation permits acyclic summon chains and rejects self/indirect cycles. The boss pays 40 Coins when killed; SkeleOrcs retain zero normal Coin bounty.
 
@@ -72,7 +74,7 @@ The existing sound-backed reel shows each tier's scaled payout and the accepted 
 
 ## Late-game bosses
 
-All boss identities are barred from paid sends by the host, independently of their authored send flag. Each type reserves at most one encounter at its guaranteed debut, then rolls its own occasional later encounter; total weight/share rules still apply. Both new bosses are available directly in Sandbox and have debut-scaled Orcieary entries. Numeric balance below is provisional until real friend playtests.
+All three bosses have late-game paid sends with high Coin prices and recurring-income penalties, listed above. Regular encounters still reserve at most one of each type at its guaranteed debut, then roll occasional later encounters under the normal weight/share rules; paid orders use the independent send FIFO instead. Bosses remain available directly in Sandbox and have debut-scaled Orcieary entries. Numeric balance is provisional until real friend playtests.
 
 | Mechanic | Trollorc | Orc king war orchine |
 | --- | ---: | ---: |
@@ -134,7 +136,7 @@ Every enemy has an authored collapse/debris animation: the original roster uses 
 
 Open **Orcieary** from the main menu or press **B** there. Entries are ordered by earliest regular/send availability, with summoned-only types inheriting their summoner's earliest availability; ties use send/regular availability and stable IDs. The canonical content catalog is not reordered. Each entry shows encounter/send availability, description, portrait, base stats/scaling, mechanics, and lifetime killed/sent counts. Click the portrait, or focus it and press Enter/Space, to play its walk cycle or special action once and return to rest. Repeat activation restarts playback; selection changes clear it, and hidden previews do not run. Arrows navigate entries; Tab/Shift-Tab move between list, portrait, and Back; Escape returns.
 
-Boss entries show their actual debut-round stats, weight, later encounter odds, and no paid-send price/income. Other entries retain their wave-one baseline. Long identities/mechanics use the existing focus-following, chrome-free scrolling at both supported desktop widths. Machine portrait playback demonstrates attacks, troop doors, legs, charged jumps, and damaged/critical poses using the battlefield's frame owner.
+Boss entries show their actual debut-round stats, weight, later encounter odds, paid-send unlock, Coin price and signed recurring-income loss. Other entries retain their wave-one baseline. Long identities/mechanics use the existing focus-following, chrome-free scrolling at both supported desktop widths. Machine portrait playback demonstrates attacks, troop doors, legs, charged jumps, and damaged/critical poses using the battlefield's frame owner.
 
 
 `EnemyStatisticsStore` atomically saves `user://enemy_statistics.json`. Accepted cumulative per-side totals carry a unique model/match ID. Durable high-water marks make repeated, stale, reconnected, or restarted observations idempotent; the owned slot is bound for each ID, avoiding mirrored-solo/opponent duplication. Actual tower kills count; leaks/rejected sends do not. Sent groups count individuals. Sandbox never records progression. Invalid saves are not silently replaced; failures are shown in Orcieary and retried only from cumulative accepted state without granting phantom counts. This is a trusted local save, not account-backed anti-cheat.

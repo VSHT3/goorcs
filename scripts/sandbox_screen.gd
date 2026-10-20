@@ -547,10 +547,7 @@ func _refresh() -> void:
 	board.placement_id = placement_id
 	board.selected_tower_id = selected_tower_id
 	board.selected_enemy_id = selected_enemy_id
-	board.tower_types = state["tower_types"]
-	board.combat_towers = state["towers"][0]
-	board.combat_enemies = state["enemies"][0]
-	board.apply_deaths(state, 0, controller.speed, controller.paused and running)
+	board.apply_combat(state, 0, controller.speed, controller.paused and running)
 	sound_player.observe(state, 0, _active and is_visible_in_tree(), controller.paused and running)
 	board.queue_redraw()
 	for type_id: StringName in shop_buttons:

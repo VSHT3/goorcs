@@ -122,7 +122,7 @@ func _build_catalog() -> void:
 	entries.assign(catalog.enemies)
 	var availability: Dictionary[StringName, int] = {}
 	for definition: EnemyDefinition in entries:
-		availability[definition.id] = mini(definition.first_wave if definition.regular_spawn_enabled or definition.boss else 2147483647, definition.send_first_wave if definition.send_enabled and not definition.boss else 2147483647)
+		availability[definition.id] = mini(definition.first_wave if definition.regular_spawn_enabled or definition.boss else 2147483647, definition.send_first_wave if definition.send_enabled else 2147483647)
 	# Propagate first encounters through summon and death-child chains.
 	for pass_index: int in range(entries.size()):
 		var changed: bool = false
@@ -254,8 +254,8 @@ func _select(index: int) -> void:
 	_stat_values[&"damage"].text = str(int(preview["base_damage"]))
 	var bounty: int = rules.kill_bounty if definition.kill_bounty < 0 else definition.kill_bounty
 	_stat_values[&"bounty"].text = "%d %s" % [bounty, "Coin" if bounty == 1 else "Coins"]
-	_stat_values[&"cost"].text = "%d %s" % [definition.send_cost, "Coin" if definition.send_cost == 1 else "Coins"] if definition.send_enabled and not definition.boss else "—"
-	_stat_values[&"income"].text = "+%d / clear" % definition.send_income if definition.send_enabled and not definition.boss else "—"
+	_stat_values[&"cost"].text = "%d %s" % [definition.send_cost, "Coin" if definition.send_cost == 1 else "Coins"] if definition.send_enabled else "—"
+	_stat_values[&"income"].text = "%+d / clear" % definition.send_income if definition.send_enabled else "—"
 	mechanics_label.text = _mechanics(definition)
 	if definition.boss:
 		mechanics_label.text = "Later waves %s%%–%s%% · Weight %d\n" % [String.num(definition.boss_spawn_chance * 100.0, 1), String.num(definition.boss_spawn_chance_cap * 100.0, 1), definition.spawn_weight] + mechanics_label.text
@@ -280,7 +280,8 @@ func _category(definition: EnemyDefinition) -> int:
 
 func _availability(definition: EnemyDefinition) -> String:
 	if definition.boss:
-		return "Boss round %d · No paid sends" % definition.first_wave
+		var sends: String = "Sends %d+" % definition.send_first_wave if definition.send_enabled else "No paid sends"
+		return "Boss round %d · %s" % [definition.first_wave, sends]
 	if not definition.regular_spawn_enabled and not definition.send_enabled:
 		var sources := PackedStringArray()
 		for candidate: EnemyDefinition in catalog.enemies:

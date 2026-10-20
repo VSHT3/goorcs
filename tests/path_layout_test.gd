@@ -22,15 +22,22 @@ func _check(condition: bool, description: String) -> void:
 
 func _test_budget_and_endpoints() -> void:
 	var layout := PathLayout.new(Vector2i(4, 2), 2, Vector2i(0, 0), Vector2i(3, 0))
+	var revision: int = layout.revision
 	_check(not layout.place(layout.entrance) and not layout.erase(layout.base), "Endpoints cannot be edited")
 	_check(not layout.place(Vector2i(-1, 0)) and not layout.place(Vector2i(4, 0)), "Out-of-board placement is rejected")
+	_check(layout.revision == revision, "Rejected edits preserve retained-terrain revision")
 	_check(layout.place(Vector2i(1, 0)) and layout.place(Vector2i(2, 0)), "Budget permits both connecting tiles")
+	_check(layout.revision > revision, "Accepted placement invalidates retained terrain")
+	revision = layout.revision
 	_check(layout.is_ready() and layout.route.size() == 4, "Endpoints are traversable without spending budget")
 	_check(not layout.place(Vector2i(1, 0)), "Duplicate placement does not spend a tile")
 	_check(not layout.place(Vector2i(0, 1)) and layout.used_tiles() == 2, "Over-budget action leaves layout unchanged")
+	_check(layout.revision == revision, "Duplicate and over-budget placements cannot invalidate retained terrain")
 	_check(layout.erase(Vector2i(1, 0)) and not layout.is_ready(), "Deleting a bridge invalidates the route")
 	_check(layout.place(Vector2i(1, 0)) and layout.is_ready(), "Removal refunds the tile budget")
+	revision = layout.revision
 	layout.clear()
+	_check(layout.revision > revision, "Clear invalidates retained terrain on the same layout instance")
 	_check(layout.used_tiles() == 0 and layout.route.is_empty() and layout.has_path(layout.base), "Clear removes path tiles but preserves endpoints")
 
 
@@ -87,7 +94,9 @@ func _test_main_round_growth() -> void:
 	var original_route: Array[Vector2i] = layout.route.duplicate()
 	for event: int in range(1, 4):
 		var previous_width: int = layout.dimensions.x
+		var revision: int = layout.revision
 		layout.grow_for_main_round(6)
+		_check(layout.revision > revision, "Growth invalidates retained terrain along with dimensions and endpoints")
 		_check(layout.dimensions == Vector2i(14 + event, 9 + event * 2) and layout.budget == 30 + event * 6, "Each expansion adds one outer column, two rows and its explicit tile allowance")
 		_check(layout.entrance == Vector2i(0, 4 + event) and layout.base == Vector2i(13, 4 + event), "Growth never shifts logical entrance/base x coordinates or adds a portal-side column")
 		_check(layout.used_tiles() == 12 and layout.is_ready() and layout.route.size() == original_route.size(), "Expansion preserves placed tiles, connectivity and route length")

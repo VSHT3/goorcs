@@ -48,6 +48,7 @@ func _run() -> void:
 	board.combat_enemies = [_enemy(2, 0.1, Vector2(0.1, 1), route)]
 	_check(board._enemy_position(board.combat_enemies[0]).is_equal_approx(Vector2(0.1, 1)), "A new enemy never inherits another enemy's interpolation")
 	board.combat_enemies = []
+	await _check_snapshot_ingestion(board, viewport, route)
 	board.command_mode = true
 	var connected_layout: PathLayout = board.layout
 	for mirrored: bool in [false, true]:
@@ -86,6 +87,78 @@ func _run() -> void:
 	if failures == 0:
 		print("PASS: board motion, path junctions, legal owned drops, contextual clicks, tile ranges, attacks and mixed mirrored enemy sprites")
 	quit(1 if failures else 0)
+
+
+func _check_snapshot_ingestion(board: PathBoard, viewport: SubViewport, route: Array) -> void:
+	var tower: Dictionary = _tower(401, Vector2i(2, 2), "rune_obelisk")
+	var state: Dictionary = {
+		"statistics_id": "renderer_ingestion", "death_generation": 1, "death_time": 0.0,
+		"deaths": [[], []], "towers": [[tower], []],
+		"enemies": [[_enemy(402, 0.0, Vector2(0, 1), route)], []],
+		"tower_types": {"rune_obelisk": {"range": 1.0, "area_attack": true, "interval": 0.7}},
+	}
+	board.apply_combat(state, 0)
+	board.set_process(false)
+	board._update_draw_order()
+	var accepted: Dictionary = state.duplicate(true)
+	state = state.duplicate(true)
+	state["towers"][0][0]["shot"] = 1
+	state["enemies"][0][0]["progress"] = 1.8
+	state["enemies"][0][0]["pos"] = Vector2(1.8, 1)
+	state["enemies"][0][0]["hp"] = 6
+	state["enemies"][0][0]["age"] = 0.21
+	state["enemies"][0][0]["animation_elapsed"] = 0.21
+	board.apply_combat(state, 0)
+	board.set_process(false)
+	_check(board._shot_traces.size() == 1 and board._shot_traces[0]["hits"] == [Vector2(1.8, 1)],
+		"Atomic ingestion captures area-hit visuals from the same accepted enemy snapshot")
+	var traces: int = board._shot_traces.size()
+	board.apply_combat(state.duplicate(true), 0)
+	board.set_process(false)
+	_check(board._shot_traces.size() == traces, "Repeated atomic snapshots never replay accepted attacks")
+	_check(accepted["enemies"][0][0]["progress"] == 0.0 and state["enemies"][0][0]["progress"] == 1.8,
+		"Snapshot ingestion leaves both old and fresh accepted state untouched")
+	for mirrored: bool in [false, true]:
+		board.mirror_horizontal = mirrored
+		for step: int in range(4):
+			board._process(0.025)
+			board._update_draw_order()
+			for item: Dictionary in board._draw_order:
+				if int(item["kind"]) != 2:
+					continue
+				var enemy: Dictionary = item["data"]
+				_check(item["bounds"] == board._enemy_sprite_bounds(enemy, item["foot"], item["progress"]),
+					"Cached body/overlay bounds follow the same interpolated route and facing, mirrored=%s" % mirrored)
+				_check(item["frame"] == EnemyVisuals.enemy_texture(board._enemy_art[enemy["type_id"]], enemy),
+					"New accepted animation time refreshes the cached enemy frame")
+	board.combat_towers = []
+	board._process(5.0)
+	board.mirror_horizontal = false
+	board.combat_view_rect = Rect2()
+	var visible: Image = await _board_image(board, viewport)
+	board.combat_view_rect = Rect2(Vector2.ZERO, board.size)
+	var bounded: Image = await _board_image(board, viewport)
+	_check(visible.get_data() == bounded.get_data(), "Viewport culling preserves every visible enemy/effect pixel")
+	board.combat_view_rect = Rect2(Vector2(100000, 100000), board.size)
+	var culled: Image = await _board_image(board, viewport)
+	_check(visible.get_data() != culled.get_data(), "Entirely offscreen enemy bodies and overlays skip draw submission")
+	var picked: bool = false
+	for item: Dictionary in board._draw_order:
+		if int(item["kind"]) != 2:
+			continue
+		var bounds: Rect2 = item["bounds"]
+		for y: int in range(ceili(bounds.position.y), floori(bounds.end.y)):
+			for x: int in range(ceili(bounds.position.x), floori(bounds.end.x)):
+				if board.enemy_at(Vector2(x, y)) == 402:
+					picked = true
+					break
+			if picked:
+				break
+	_check(picked, "Render culling never removes accepted enemies from alpha picking")
+	board.combat_view_rect = Rect2()
+	var returned: Image = await _board_image(board, viewport)
+	_check(visible.get_data() == returned.get_data(), "Scouting back restores enemy visuals without another snapshot")
+	board.combat_enemies = []
 
 
 func _check_portal_facing(board: PathBoard, viewport: SubViewport) -> void:

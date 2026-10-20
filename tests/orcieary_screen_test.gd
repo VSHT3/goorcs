@@ -96,6 +96,7 @@ func _check_catalog_and_pixels() -> void:
 				_check(screen.availability_label.text.contains(str(definition.first_wave)), "Availability exposes the definition's real regular-wave unlock")
 			if definition.send_enabled:
 				_check(screen.availability_label.text.contains(str(definition.send_first_wave)), "Availability exposes the separate paid-send unlock")
+				_check(values[9].text.to_int() == definition.send_cost and values[11].text.to_int() == definition.send_income, "Guide exposes actual paid-send price and signed recurring income, including boss losses")
 			else:
 				_check(values[9].text == "—" and values[11].text == "—", "Summoned-only enemies do not advertise a paid price or income")
 				if not definition.regular_spawn_enabled:

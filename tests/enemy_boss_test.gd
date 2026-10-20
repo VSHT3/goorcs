@@ -41,12 +41,11 @@ func _sandbox(roster: Array[String], length: int = 100) -> MatchCombat:
 func _init() -> void:
 	_test_boss_rosters()
 	_test_chance_boundaries()
-	_test_boss_send_atomicity()
 	_test_live_ramp_and_cast()
 	_test_summon_graph()
 	_test_boss_death_and_leak()
 	if failures == 0:
-		print("PASS: reserved boss encounters, configurable chance ramp, atomic unsendability and live HP/cast/death/leak state")
+		print("PASS: reserved boss encounters, configurable chance ramp and live HP/cast/death/leak state")
 	quit(1 if failures > 0 else 0)
 
 
@@ -131,20 +130,6 @@ func _test_chance_boundaries() -> void:
 		rules.wave_weight = budget
 		rules.wave_weight_growth = 0
 		_check(_boss_count(_wave(rules, 40, 2)) == (1 if budget == 80 else 0), "Boss cannot bypass remaining weight or its half-budget share")
-
-
-func _test_boss_send_atomicity() -> void:
-	for round_number: int in [1, 39, 40, 46, 100, 1000]:
-		var combat := MatchCombat.new(_boss_rules(), null, _rng())
-		combat.debug_set_round(round_number)
-		for active: bool in [false, true]:
-			if active:
-				combat.start_wave(_routes(1000))
-			var frozen: Dictionary = combat.snapshot()
-			var wave_state: int = combat._wave_random.state
-			var group_state: int = combat._group_random.state
-			_check(not combat.send_enemy(0, BOSS) and not combat.send_enemy(1, BOSS) and not combat.send_enemy_mirrored(0, BOSS), "Boss sends always reject in planning and combat")
-			_check(combat.snapshot() == frozen and combat._wave_random.state == wave_state and combat._group_random.state == group_state, "Rejected boss sends preserve balances, income, queues, totals and both gameplay RNG streams")
 
 
 func _test_live_ramp_and_cast() -> void:

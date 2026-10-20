@@ -89,7 +89,7 @@ var combat_towers: Array = []:
 		combat_towers = value
 		_capture_shots()
 		_capture_stuns()
-		_rebuild_draw_order()
+		_draw_order_dirty = true
 		_sync_combat_animation()
 		queue_redraw()
 var combat_enemies: Array = []:
@@ -98,7 +98,7 @@ var combat_enemies: Array = []:
 		combat_enemies = value
 		_blend_enemies()
 		_capture_boss_actions()
-		_rebuild_draw_order()
+		_draw_order_dirty = true
 		_sync_combat_animation()
 		queue_redraw()
 var selected_tower_id: int = -1
@@ -106,6 +106,11 @@ var selected_enemy_id: int = -1:
 	set(value):
 		selected_enemy_id = value
 		queue_redraw()
+var combat_view_rect := Rect2():
+	set(value):
+		if combat_view_rect != value:
+			combat_view_rect = value
+			queue_redraw()
 var enemy_inspection_enabled: bool = false:
 	set(value):
 		enemy_inspection_enabled = value
@@ -137,6 +142,7 @@ var content_catalog: ContentCatalog = preload("res://resources/content_catalog.t
 				for animation: StringName in definition.animation_frames.get_animation_names():
 					for frame: int in range(definition.animation_frames.get_frame_count(animation)):
 						_cache_texture_bounds(definition.animation_frames.get_frame_texture(animation, frame))
+		_draw_order_dirty = true
 		queue_redraw()
 var placement_enabled: bool = true:
 	set(value):
@@ -186,6 +192,12 @@ var _texture_bounds: Dictionary[Texture2D, Rect2] = {}
 var _directional_framing: Dictionary[TowerReward, Vector2] = {}
 var _directional_canvas_sizes: Dictionary[TowerReward, Vector2] = {}
 var _draw_order: Array[Dictionary] = []
+var _draw_order_dirty: bool = true
+var _draw_items: Dictionary[Vector2i, Dictionary] = {}
+var _endpoint_draw_items: Array[Dictionary] = [
+	{"kind": 0, "entrance": true, "cell": Vector2i.ZERO, "foot": Vector2.ZERO},
+	{"kind": 0, "entrance": false, "cell": Vector2i.ZERO, "foot": Vector2.ZERO},
+]
 var _drag_placement_id: StringName = &""
 var _drag_clip: Control
 var _drag_ghost: PathBoard
@@ -207,6 +219,8 @@ var _ground_mask := PackedByteArray()
 var _ground_rect := Rect2()
 var _ground_dimensions := Vector2i.ZERO
 var _ground_style: int = -1
+var _ground_layout: PathLayout
+var _ground_revision: int = -1
 
 
 func _ready() -> void:
@@ -222,7 +236,7 @@ func _ready() -> void:
 	add_child(_endpoint_timer)
 	visibility_changed.connect(_sync_endpoint_animation)
 	_sync_endpoint_animation()
-	_rebuild_draw_order()
+	_draw_order_dirty = true
 	_ground_canvas = Node2D.new()
 	_ground_canvas.show_behind_parent = true
 	_ground_canvas.draw.connect(_draw_ground)
@@ -305,9 +319,18 @@ func _process(delta: float) -> void:
 				_corpse_traces.remove_at(index)
 				expired = true
 	if expired:
-		_rebuild_draw_order()
+		_draw_order_dirty = true
 	queue_redraw()
 	_sync_combat_animation()
+
+## Ingest one accepted board atomically, resetting presentation generations before
+## capturing fresh enemies/attacks. Independent setters also remain usable by guides.
+func apply_combat(state: Dictionary, slot: int, speed: float = 1.0, paused: bool = false) -> void:
+	tower_types = state.get("tower_types", {})
+	apply_deaths(state, slot, speed, paused)
+	combat_enemies = state.get("enemies", [[], []])[slot]
+	combat_towers = state.get("towers", [[], []])[slot]
+
 
 func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool = false) -> void:
 	var match_id: String = state.get("statistics_id", "")
@@ -347,7 +370,7 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 			var trace: Dictionary = event.duplicate()
 			trace["age"] = age
 			_corpse_traces.append(trace)
-	_rebuild_draw_order()
+	_draw_order_dirty = true
 	_sync_combat_animation()
 	queue_redraw()
 
@@ -752,7 +775,7 @@ func enemy_at(position: Vector2) -> int:
 		if int(item["kind"]) != 2:
 			continue
 		var enemy: Dictionary = item["data"]
-		if _enemy_contains_point(enemy, item["foot"], item["progress"], position):
+		if Rect2(item["bounds"]).has_point(position) and _sprite_contains_point(item["frame"], item["sprite_rect"], item["flip"], position):
 			return int(enemy["id"])
 	return -1
 
@@ -862,6 +885,10 @@ func _update_ground() -> void:
 	var rect := Rect2(_board_origin(), Vector2(layout.dimensions) * _cell_size())
 	var style: int = int(mirror_horizontal)
 	var dirty: bool = rect != _ground_rect or style != _ground_style or layout.dimensions != _ground_dimensions
+	if not dirty and _ground_layout == layout and _ground_revision == layout.revision:
+		return
+	_ground_layout = layout
+	_ground_revision = layout.revision
 	if layout.dimensions != _ground_dimensions:
 		_ground_mask.resize(layout.dimensions.x * layout.dimensions.y)
 	for y: int in range(layout.dimensions.y):
@@ -966,8 +993,9 @@ func _draw_ranges() -> void:
 
 func _draw_tile_range(tower_cell: Vector2i, tower_range: float) -> void:
 	var cell_size: float = _cell_size()
-	for y: int in range(layout.dimensions.y):
-		for x: int in range(layout.dimensions.x):
+	var radius: int = floori(tower_range)
+	for y: int in range(maxi(0, tower_cell.y - radius), mini(layout.dimensions.y, tower_cell.y + radius + 1)):
+		for x: int in range(maxi(0, tower_cell.x - radius), mini(layout.dimensions.x, tower_cell.x + radius + 1)):
 			var cell := Vector2i(x, y)
 			if MatchCombat.cell_in_range(tower_cell, cell, tower_range):
 				var rect := Rect2(cell_center(cell) - Vector2.ONE * (cell_size * 0.5 - 2.0),
@@ -1141,15 +1169,36 @@ func visual_headroom() -> float:
 
 
 func _rebuild_draw_order() -> void:
+	# Setters/deaths only invalidate; build once at the next draw or pick.
+	# Surviving IDs retain their wrappers instead of allocating three full sets
+	# of dictionaries for every accepted snapshot.
 	_draw_order.clear()
-	_draw_order.append({"kind": 0, "entrance": true, "cell": Vector2i.ZERO, "foot": Vector2.ZERO})
-	_draw_order.append({"kind": 0, "entrance": false, "cell": Vector2i.ZERO, "foot": Vector2.ZERO})
+	_draw_order.append_array(_endpoint_draw_items)
+	var next_items: Dictionary[Vector2i, Dictionary] = {}
 	for tower: Dictionary in combat_towers:
-		_draw_order.append({"kind": 1, "data": tower, "foot": Vector2.ZERO})
+		_append_draw_item(1, tower, next_items)
 	for enemy: Dictionary in combat_enemies:
-		_draw_order.append({"kind": 2, "data": enemy, "foot": Vector2.ZERO, "progress": 0.0})
+		_append_draw_item(2, enemy, next_items)
 	for trace: Dictionary in _corpse_traces:
-		_draw_order.append({"kind": 3, "data": trace, "foot": Vector2.ZERO})
+		_append_draw_item(3, trace, next_items)
+	_draw_items = next_items
+	_draw_order_dirty = false
+
+
+func _append_draw_item(kind: int, data: Dictionary, next_items: Dictionary[Vector2i, Dictionary]) -> void:
+	var key := Vector2i(kind, int(data["id"]))
+	var item: Dictionary
+	if _draw_items.has(key):
+		item = _draw_items[key]
+	else:
+		item = {"kind": kind, "foot": Vector2.INF, "progress": 0.0}
+	item["data"] = data
+	if kind == 2:
+		# Animation time is authoritative snapshot state, not a local frame clock.
+		item["frame"] = EnemyVisuals.enemy_texture(_enemy_art[data["type_id"]], data)
+		item["geometry_dirty"] = true
+	next_items[key] = item
+	_draw_order.append(item)
 
 
 func _depth_before(a: Dictionary, b: Dictionary) -> bool:
@@ -1167,34 +1216,72 @@ func _depth_before(a: Dictionary, b: Dictionary) -> bool:
 
 
 func _update_draw_order() -> void:
+	var moved: bool = _draw_order_dirty
+	if _draw_order_dirty:
+		_rebuild_draw_order()
 	var cell_size: float = _cell_size()
 	for item: Dictionary in _draw_order:
 		var center: Vector2
-		match int(item["kind"]):
+		var progress: float = 0.0
+		var kind: int = int(item["kind"])
+		match kind:
 			0:
 				item["cell"] = layout.entrance if bool(item["entrance"]) else layout.base
 				center = cell_center(item["cell"])
 			1:
-				center = cell_center(item["data"]["cell"])
+				center = _tower_foot(item["data"]["cell"])
 			2:
 				var enemy: Dictionary = item["data"]
-				var progress: float = _enemy_route_progress(enemy)
-				item["progress"] = progress
+				progress = _enemy_route_progress(enemy)
 				center = _position_center(_enemy_visual_position(enemy))
 			3:
 				center = _position_center(item["data"]["pos"])
-		item["foot"] = _tower_foot(item["data"]["cell"]) if int(item["kind"]) == 1 else center + Vector2(0, cell_size * 0.28)
-	_draw_order.sort_custom(_depth_before)
+		var foot: Vector2 = center if kind == 1 else center + Vector2(0, cell_size * 0.28)
+		var geometry_changed: bool = foot != item["foot"]
+		moved = moved or geometry_changed
+		if kind == 2:
+			# One geometry resolution feeds the body, overlays and alpha picking.
+			# Mirror/size changes can alter facing/framing even at stationary feet.
+			if geometry_changed or bool(item.get("geometry_dirty", false)) or progress != item["progress"] or item.get("mirrored") != mirror_horizontal or item.get("cell_size") != cell_size or item.get("blend_elapsed") != _enemy_blend_elapsed:
+				_update_enemy_geometry(item, foot, progress, cell_size)
+			item["progress"] = progress
+		item["foot"] = foot
+	if moved:
+		_draw_order.sort_custom(_depth_before)
+
+
+func _update_enemy_geometry(item: Dictionary, foot: Vector2, progress: float, cell_size: float) -> void:
+	var enemy: Dictionary = item["data"]
+	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
+	var frame: Texture2D = item["frame"]
+	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
+	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, cell_size * artwork.board_height, _enemy_render_foot(enemy, foot), flip)
+	var bounds: Rect2 = EnemyVisuals.opaque_bounds(frame)
+	if flip:
+		bounds.position.x = frame.get_width() - bounds.end.x
+	var scale: Vector2 = rect.size / frame.get_size()
+	item["bounds"] = Rect2(rect.position + bounds.position * scale, bounds.size * scale)
+	item["sprite_rect"] = rect
+	item["flip"] = flip
+	item["mirrored"] = mirror_horizontal
+	item["cell_size"] = cell_size
+	item["blend_elapsed"] = _enemy_blend_elapsed
+	item["geometry_dirty"] = false
 
 
 func _draw_combat() -> void:
 	_update_draw_order()
 	var cell_size: float = _cell_size()
+	var cull_enemies: bool = combat_view_rect.has_area()
+	for item: Dictionary in _draw_order:
+		if int(item["kind"]) == 2:
+			# Include shadows, action poses, jumping bodies, bars and dizzy stars.
+			item["visible"] = not cull_enemies or Rect2(item["bounds"]).grow(cell_size * 2.0).intersects(combat_view_rect)
 	for trace: Dictionary in _corpse_traces:
 		_draw_death_blood(trace, _position_center(trace["pos"]) + Vector2(0, cell_size * 0.28))
 	# Only units and corpses cast ovals; structures sit on their foundations.
 	for item: Dictionary in _draw_order:
-		if int(item["kind"]) < 2:
+		if int(item["kind"]) < 2 or (int(item["kind"]) == 2 and not bool(item["visible"])):
 			continue
 		var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
 		var width: float = cell_size * artwork.board_height * 0.26
@@ -1217,13 +1304,15 @@ func _draw_combat() -> void:
 			1:
 				_draw_tower(item["data"], item["foot"])
 			2:
+				if not bool(item["visible"]):
+					continue
 				_draw_enemy(item)
 			3:
 				_draw_enemy_death(item)
 	_draw_flights()
 	# Bars are an information overlay; foreground bodies must not cover them.
 	for item: Dictionary in _draw_order:
-		if int(item["kind"]) == 2:
+		if int(item["kind"]) == 2 and bool(item["visible"]):
 			if int(item["data"]["id"]) == selected_enemy_id:
 				_draw_enemy_selection(item)
 			_draw_enemy_health(item)
@@ -1298,7 +1387,7 @@ func _draw_bounty_indicator(item: Dictionary) -> void:
 	var enemy: Dictionary = item["data"]
 	if int(enemy.get("bounty_tower_id", -1)) < 0:
 		return
-	var bounds: Rect2 = _enemy_sprite_bounds(enemy, item["foot"], item["progress"])
+	var bounds: Rect2 = item["bounds"]
 	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
 	# A gold coin with a red warrant ribbon remains distinct from selection/bar.
 	var center: Vector2 = Vector2(bounds.position.x - pixel * 3.0, bounds.position.y + pixel * 2.0).floor()
@@ -1921,9 +2010,9 @@ func _draw_enemy_death(item: Dictionary) -> void:
 func _draw_enemy(item: Dictionary) -> void:
 	var enemy: Dictionary = item["data"]
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
-	var flip: bool = _enemy_faces_left(enemy["route"], item["progress"]) != artwork.source_faces_left
-	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
-	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, item["foot"]), flip)
+	var flip: bool = item["flip"]
+	var frame: Texture2D = item["frame"]
+	var rect: Rect2 = item["sprite_rect"]
 	var animation: StringName = StringName(enemy.get("animation", "walk"))
 	if animation == &"heal" or (animation == &"cast" and artwork.summon_pool.is_empty()):
 		EnemyVisuals.draw_action_effect(self, item["foot"], _cell_size() * 0.38, animation, float(enemy.get("animation_elapsed", 0.0)))
@@ -1959,6 +2048,10 @@ func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, po
 	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
 	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
 	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, foot), flip)
+	return _sprite_contains_point(frame, rect, flip, position)
+
+
+func _sprite_contains_point(frame: Texture2D, rect: Rect2, flip: bool, position: Vector2) -> bool:
 	var uv: Vector2 = (position - rect.position) / rect.size
 	if flip:
 		uv.x = 1.0 - uv.x
@@ -1969,7 +2062,7 @@ func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, po
 
 
 func _draw_enemy_selection(item: Dictionary) -> void:
-	var rect: Rect2 = _enemy_sprite_bounds(item["data"], item["foot"], item["progress"]).grow(3.0)
+	var rect: Rect2 = Rect2(item["bounds"]).grow(3.0)
 	var color := Color("e0bc77")
 	var corner: float = minf(7.0, rect.size.x * 0.25)
 	for point: Vector2 in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
@@ -1982,7 +2075,7 @@ func _draw_enemy_health(item: Dictionary) -> void:
 	var enemy: Dictionary = item["data"]
 	if float(enemy["hp"]) >= float(enemy["max_hp"]):
 		return
-	var bounds: Rect2 = _enemy_sprite_bounds(enemy, item["foot"], item["progress"])
+	var bounds: Rect2 = item["bounds"]
 	var boss: bool = _enemy_art[enemy["type_id"]].boss
 	var bar_size := Vector2(clampf(bounds.size.x * 0.85, _cell_size() * (0.55 if boss else 0.22), _cell_size() * (0.95 if boss else 0.38)),
 		maxf(2.0, _cell_size() * (0.055 if boss else 0.04)))
@@ -2024,8 +2117,10 @@ func _draw_attacks() -> void:
 					index += 1
 				continue
 			# Both discrete Rune attacks communicate the actual neighborhood footprint.
-			for y: int in range(layout.dimensions.y):
-				for x: int in range(layout.dimensions.x):
+			var radius: int = floori(float(trace["range"]))
+			var origin: Vector2i = trace["cell"]
+			for y: int in range(maxi(0, origin.y - radius), mini(layout.dimensions.y, origin.y + radius + 1)):
+				for x: int in range(maxi(0, origin.x - radius), mini(layout.dimensions.x, origin.x + radius + 1)):
 					var cell := Vector2i(x, y)
 					if not MatchCombat.cell_in_range(trace["cell"], cell, float(trace["range"])):
 						continue

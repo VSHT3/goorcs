@@ -107,6 +107,9 @@ func _check_camera_and_input(own_slot: int) -> void:
 	_check((host_left.x + host_right.x) * 0.5 < (guest_left.x + guest_right.x) * 0.5, "Host occupies the left world and guest occupies the right world")
 	for corner: Vector2i in [Vector2i.ZERO, Vector2i(dimensions.x - 1, 0), Vector2i(0, dimensions.y - 1), dimensions - Vector2i.ONE]:
 		_check(world.get_global_rect().has_point(world.cell_screen_position(own_slot, corner)), "Startup fits every owned board corner into gameplay, slot=%d cell=%s" % [own_slot, corner])
+	var initial_view: Rect2 = world.boards[own_slot].combat_view_rect
+	_check(initial_view.has_point(world.boards[own_slot].cell_center(TOWER_CELL)),
+		"Camera culling includes the owned battlefield in board-local coordinates")
 	var accepted: Dictionary = main.planning._snapshot().duplicate(true)
 	var presentation: Dictionary = main.planning.combat.duplicate(true)
 	var direction: float = 1.0 if own_slot == 0 else -1.0
@@ -119,6 +122,9 @@ func _check_camera_and_input(own_slot: int) -> void:
 	_check((second - first) * direction > 0.0 and (destination - second) * direction > 0.0, "Successive pan steps keep moving rather than switching boards, slot=%d" % own_slot)
 	world.pan(100.0, Vector2(direction, 0.0))
 	_check(is_equal_approx(world.camera.position.x, destination), "Pan clamps at the far world extent, slot=%d" % own_slot)
+	_check(world.boards[own_slot].combat_view_rect != initial_view
+		and world.boards[opponent].combat_view_rect.has_point(world.boards[opponent].cell_center(TOWER_CELL)),
+		"Scouting refreshes both mirrored board draw regions before another snapshot")
 	world.pan(1.0, Vector2(direction, 0.0))
 	_check(is_equal_approx(world.camera.position.x, destination), "Holding pan beyond an extent cannot escape the world")
 	world.pan(0.025, Vector2(-direction, 0.0))

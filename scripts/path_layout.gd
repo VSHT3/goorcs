@@ -10,6 +10,8 @@ var base: Vector2i
 var budget: int
 var route: Array[Vector2i] = []
 var disconnected_count: int = 0
+# Monotonic invalidation token for retained terrain consumers.
+var revision: int = 0
 var _tiles: Dictionary[Vector2i, bool] = {}
 
 
@@ -104,6 +106,7 @@ func capture_routing() -> Dictionary:
 
 
 func _recalculate() -> void:
+	revision += 1
 	route.clear()
 	var frontier: Array[Vector2i] = [entrance]
 	var parents: Dictionary[Vector2i, Vector2i] = {entrance: entrance}

@@ -138,14 +138,18 @@ func pan(delta: float, direction: Vector2) -> void:
 	_cancel_strokes()
 	camera.position = next_position
 	camera.force_update_scroll()
+	_update_board_views()
 
 
 func _process(delta: float) -> void:
 	if not is_visible_in_tree() or _movement_blocked() or (_middle_dragging and get_viewport().gui_is_dragging()):
-		_cancel_motion()
+		if _left_held or _right_held or _up_held or _down_held or _middle_dragging or camera.zoom.x != _target_zoom:
+			_cancel_motion()
 		return
 	_update_zoom(delta)
-	pan(delta, Vector2(float(_right_held) - float(_left_held), float(_down_held) - float(_up_held)))
+	var direction := Vector2(float(_right_held) - float(_left_held), float(_down_held) - float(_up_held))
+	if direction != Vector2.ZERO:
+		pan(delta, direction)
 
 
 func _handle_camera_input(event: InputEvent) -> void:
@@ -243,6 +247,7 @@ func _drag_camera_to(screen_position: Vector2) -> void:
 		_update_camera_bounds()
 	camera.position = _clamped_position(camera.position - world_delta)
 	camera.force_update_scroll()
+	_update_board_views()
 
 
 func _update_zoom(delta: float) -> void:
@@ -363,6 +368,15 @@ func _configure_terrain() -> void:
 	var terrain_start := Vector2(camera_bounds.x - half_view.x, camera_vertical_bounds.x - half_view.y) - Vector2.ONE * CELL_SIZE
 	var terrain_end := Vector2(camera_bounds.y + half_view.x, camera_vertical_bounds.y + half_view.y) + Vector2.ONE * CELL_SIZE
 	_terrain.configure(Vector2(_dimensions) * CELL_SIZE, BOARD_GAP, Rect2(terrain_start, terrain_end - terrain_start), boards[0].position.x)
+	_update_board_views()
+
+
+func _update_board_views() -> void:
+	# Camera bounds are local presentation only. Keep enemy draw culling separate
+	# from board visibility/input so scouting and accepted effects still advance.
+	var view: Rect2 = _world_viewport.get_canvas_transform().affine_inverse() * Rect2(Vector2.ZERO, Vector2(_world_viewport.size))
+	for board: PathBoard in boards:
+		board.combat_view_rect = board.get_global_transform().affine_inverse() * view
 
 
 func _expanded_fit_zoom() -> float:
@@ -398,6 +412,7 @@ func _reset_camera() -> void:
 		(board_size.y - headroom) * 0.5 + (HUD_BOTTOM - HUD_TOP) * 0.5 / camera.zoom.y)
 	camera.position = _clamped_position(camera.position)
 	camera.force_update_scroll()
+	_update_board_views()
 
 
 func _cancel_strokes() -> void:
