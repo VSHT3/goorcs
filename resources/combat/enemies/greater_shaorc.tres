@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/greater_shaorc_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/greater_shaorc.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"greater_shaorc"
+title = "Greater ShaOrc"
+elite = true
+description = "An elder shaman whose raised staff wards the horde around it: every non-boss orc nearby becomes immune to all damage until the ward fades or the Greater ShaOrc dies."
+health_multiplier = 7.0
+speed_multiplier = 0.5
+base_damage = 3
+spawn_weight = 30
+first_wave = 60
+max_per_wave = 1
+count_cap_growth = 1
+count_cap_growth_interval = 20
+max_weight_share = 0.3
+send_cost = 400
+send_income = 8
+send_first_wave = 72
+kill_bounty = 15
+reroll_drop_chance = 0.3
+reroll_drop_amount = 4
+ward_interval = 12.0
+ward_duration = 10.0
+ward_radius = 3.5
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.66
+board_anchor = Vector2(0.5, 0.875)

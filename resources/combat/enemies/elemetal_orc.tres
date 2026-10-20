@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/elemetal_orc_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/elemetal_orc.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"elemetal_orc"
+title = "EleMetal Orc"
+description = "An orc sealed in heavy full-body iron plate. Immune to Physical damage, but the iron conducts: Lightning deals 50% more."
+health_multiplier = 1.6
+speed_multiplier = 0.75
+base_damage = 2
+lightning_damage_multiplier = 1.5
+immune_elements = PackedStringArray("physical")
+spawn_weight = 3
+first_wave = 20
+max_per_wave = 1
+count_cap_growth = 1
+count_cap_growth_interval = 30
+max_weight_share = 0.15
+send_cost = 40
+send_income = 3
+send_first_wave = 26
+kill_bounty = 5
+reroll_drop_chance = 0.06
+reroll_drop_amount = 1
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.56
+board_anchor = Vector2(0.5, 0.875)

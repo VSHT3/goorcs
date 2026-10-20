@@ -156,12 +156,39 @@ static func burning_texture(texture: Texture2D) -> Texture2D:
 
 
 static func effect_color(animation: StringName) -> Color:
+	if animation == &"ward":
+		return WARD_COLOR
 	return Color("9cda9a") if animation == &"heal" else Color("ac97cf")
+
+
+const WARD_COLOR := Color("bff4ff")
+
+
+# Greater ShaOrc ward: full damage immunity, deliberately unlike the gold hit-shield
+# pips. A faint spectral hexagon hugs the body and flickers in its last two seconds.
+static func draw_ward(surface: CanvasItem, bounds: Rect2, cell_size: float, remaining: float, time: float) -> void:
+	if remaining <= 0.0:
+		return
+	if remaining < 2.0 and int(time * 8.0) % 2 == 1:
+		return
+	var pixel: float = maxf(1.0, floorf(cell_size * 0.02))
+	var center: Vector2 = bounds.get_center()
+	var half := Vector2(bounds.size.x * 0.5 + pixel * 3.0, bounds.size.y * 0.5 + pixel * 2.0)
+	var points := PackedVector2Array()
+	for index: int in range(6):
+		var angle: float = float(index) * TAU / 6.0 + PI / 6.0
+		points.append((center + Vector2(cos(angle) * half.x, sin(angle) * half.y)).floor())
+	var pulse: float = 0.5 + 0.5 * sin(time * 3.0)
+	surface.draw_colored_polygon(points, Color(WARD_COLOR, 0.07 + 0.05 * pulse))
+	points.append(points[0])
+	surface.draw_polyline(points, Color(WARD_COLOR, 0.45 + 0.25 * pulse), pixel)
+	var top: Vector2 = points[4]
+	surface.draw_rect(Rect2(top - Vector2.ONE * pixel, Vector2.ONE * pixel * 2.0), Color(1.0, 1.0, 1.0, 0.6 + 0.3 * pulse))
 
 
 static func draw_action_effect(surface: CanvasItem, foot: Vector2, radius: float, animation: StringName, elapsed: float) -> void:
 	# A brief ground pulse and upward motes identify actual host actions, not auras.
-	var duration: float = 0.55 if animation == &"heal" else 1.15
+	var duration: float = 0.55 if animation in [&"heal", &"ward"] else 1.15
 	if elapsed < 0.0 or elapsed >= duration:
 		return
 	var phase: float = elapsed / duration

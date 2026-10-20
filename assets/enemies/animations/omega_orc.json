@@ -1,0 +1,203 @@
+{
+  "authoring": "Shared articulated orc rig re-dressed per element: exact palette swap plus element geometry in the rig head/body joint space. No image service or sampled art.",
+  "identity": "Obsidian-skinned armoured hulk with white-gold trim and blazing eyes; fire, ice, lightning and magic orbs orbit it.",
+  "generator": "tools/author_elemental_orcs.py",
+  "generator_sha256": "e9e3ae2a6b9af979ae8d93f987ac9d629e4a707a70352f5e4c9e0cec72e5a3b0",
+  "reproduce": "python3 tools/author_elemental_orcs.py",
+  "rig": "brute",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "camera": "Elevated three-quarter facing left; top and left material planes lit.",
+  "alpha": "Binary 0/255, no antialiasing, dithering, smoothing, raster rotation or scaling.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    1920,
+    80
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.74,
+  "still": "assets/enemies/animations/omega_orc_still.png",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "sheet_sha256": "b43707f2a059fcd75090efffaa4fc668fb7a2d27762d6b8a97b34205aecc993d",
+  "still_sha256": "45f067647d7fc142046aa915c053f1a054e332ec3a6c3d7564a5217a80f11cfd",
+  "sprite_frames_sha256": "201e192aba424b54a808be1080b5d6ef8c5a60b31b44daff0d10990d3cb895ce",
+  "death": {
+    "duration_seconds": 0.8,
+    "blood_in_sprite": false,
+    "last_frame": "Settled corpse; Omega orbs scatter and fade over the first half."
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 9,
+      "frame_count": 12,
+      "duration_seconds": 1.3333333333333333,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          6,
+          10,
+          72,
+          70
+        ],
+        [
+          6,
+          9,
+          71,
+          68
+        ],
+        [
+          6,
+          9,
+          69,
+          68
+        ],
+        [
+          8,
+          9,
+          71,
+          68
+        ],
+        [
+          8,
+          9,
+          68,
+          68
+        ],
+        [
+          7,
+          9,
+          67,
+          68
+        ],
+        [
+          7,
+          10,
+          71,
+          70
+        ],
+        [
+          7,
+          9,
+          67,
+          70
+        ],
+        [
+          8,
+          9,
+          67,
+          70
+        ],
+        [
+          8,
+          9,
+          71,
+          70
+        ],
+        [
+          7,
+          9,
+          69,
+          70
+        ],
+        [
+          7,
+          9,
+          71,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "duration_seconds": 0.8,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          6,
+          10,
+          72,
+          70
+        ],
+        [
+          8,
+          9,
+          73,
+          71
+        ],
+        [
+          2,
+          10,
+          79,
+          72
+        ],
+        [
+          12,
+          12,
+          65,
+          72
+        ],
+        [
+          9,
+          13,
+          71,
+          73
+        ],
+        [
+          6,
+          8,
+          74,
+          73
+        ],
+        [
+          4,
+          19,
+          67,
+          73
+        ],
+        [
+          3,
+          22,
+          69,
+          73
+        ],
+        [
+          4,
+          25,
+          72,
+          74
+        ],
+        [
+          4,
+          28,
+          73,
+          74
+        ],
+        [
+          4,
+          28,
+          73,
+          74
+        ],
+        [
+          4,
+          28,
+          73,
+          74
+        ]
+      ]
+    }
+  ]
+}

@@ -19,6 +19,8 @@ const CATAPULT_KEYS: Array[String] = ["lift", "throw_count", "slam_radius", "lan
 const SUPPORT_BRANCHES: Array[String] = ["forge", "command_banner", "lookout_horn", "bloodlust_totem"]
 const SUPPORT_KEYS: Array[String] = ["damage_bonus", "attack_speed_bonus", "range_aura", "crit_chance"]
 const CRIT_MULTIPLIER: float = 2.0
+# Every damage type belongs to one element; explosive blasts count as Fire.
+const ELEMENTS: Array[StringName] = [&"physical", &"fire", &"ice", &"lightning", &"magic"]
 const MAX_CRIT_CHANCE: float = 0.75
 
 @export var reward: TowerReward
@@ -473,6 +475,10 @@ static func _positive_effect(effect: Dictionary, key: String) -> bool:
 
 static func _positive_number(value: Variant) -> bool:
 	return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) > 0.0
+
+
+static func element_of(damage_type: StringName) -> StringName:
+	return &"fire" if damage_type == &"explosive" else damage_type
 
 
 static func _nonnegative_number(value: Variant) -> bool:

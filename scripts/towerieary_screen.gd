@@ -291,6 +291,8 @@ func _refresh_preview() -> void:
 	if not steps.is_empty():
 		_add_stat(_costs, &"stage_cost", "Selected upgrade cost", "%d Coins" % int(steps.back()["cost"]))
 	_add_stat(_stats, &"range", "Range", "%s cells" % _number(float(tower["range"])))
+	if not String(tower.get("element", "")).is_empty():
+		_add_stat(_stats, &"element", "Element", MatchPlanningScreen.element_title(String(tower["element"])))
 	_populate_role_stats(tower, stats)
 	stage_graph.select_stage(selected_stage_id)
 	_refresh_focus_chain()

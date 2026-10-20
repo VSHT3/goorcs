@@ -26,6 +26,8 @@ extends Resource
 @export var nonphysical_damage_multiplier: float = 1.0
 @export var fire_damage_multiplier: float = 1.0
 @export var lightning_damage_multiplier: float = 1.0
+# Elements (TowerDefinition.ELEMENTS) that deal no damage; towers skip it as a target.
+@export var immune_elements: PackedStringArray = PackedStringArray()
 @export var spawn_weight: int = 1
 @export var first_wave: int = 1
 # Zero means unlimited. Share caps this type's total weight, not its head count.
@@ -61,6 +63,17 @@ extends Resource
 @export var heal_interval: float = 0.0
 @export var heal_radius: float = 0.0
 @export var heal_fraction: float = 0.0
+# Each heal also refills the caster's hit shield (ShaOrc).
+@export var heal_restores_shield: bool = false
+# OrcShakra: each other living caster of this type within the radius quickens
+# heals by shakra_max_bonus * (1 - 0.5^n) for n neighbours: 20/30/35/37.5% of a 40% cap.
+@export var shakra_radius: float = 0.0
+@export var shakra_max_bonus: float = 0.0
+# Greater ShaOrc: every interval, other non-boss, non-warding enemies within the
+# radius become immune to all damage for the duration, or until the caster leaves.
+@export var ward_interval: float = 0.0
+@export var ward_duration: float = 0.0
+@export var ward_radius: float = 0.0
 @export var summon_interval: float = 0.0
 @export var summon_cast_duration: float = 0.0
 @export var summon_type: StringName

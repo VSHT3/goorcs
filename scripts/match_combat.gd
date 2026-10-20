@@ -181,6 +181,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"title": definition.title, "health_multiplier": definition.health_multiplier,
 			"description": definition.description,
 			"fire_immune": definition.fire_immune, "ice_immune": definition.ice_immune,
+			"immune_elements": _element_set(definition.immune_elements),
 			"nonphysical_damage_multiplier": definition.nonphysical_damage_multiplier,
 			"fire_damage_multiplier": definition.fire_damage_multiplier,
 			"lightning_damage_multiplier": definition.lightning_damage_multiplier,
@@ -204,6 +205,9 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"reroll_drop_amount": definition.reroll_drop_amount,
 			"heal_interval": definition.heal_interval, "heal_radius": definition.heal_radius,
 			"heal_fraction": definition.heal_fraction,
+			"heal_restores_shield": definition.heal_restores_shield,
+			"shakra_radius": definition.shakra_radius, "shakra_max_bonus": definition.shakra_max_bonus,
+			"ward_interval": definition.ward_interval, "ward_duration": definition.ward_duration, "ward_radius": definition.ward_radius,
 			"summon_interval": definition.summon_interval,
 			"summon_cast_duration": definition.summon_cast_duration,
 			"summon_type": String(definition.summon_type),
@@ -512,6 +516,7 @@ func _refresh_board(slot: int) -> void:
 				behavior["successive_hit_bonus"] += float(definition["special_upgrade_config"].get("successive_hit_bonus", 0.0))
 		tower["rarity_reroll_cost"] = -1 if _roll_rules == null else (0 if _sandbox_mode else _roll_rules.rarity_reroll_cost(tower["rarity_rerolls"]))
 		tower["attribute_reroll_cost"] = -1 if _roll_rules == null else (0 if _sandbox_mode else _roll_rules.attribute_reroll_cost(tower["attribute_rerolls"]))
+		tower["element"] = String(TowerDefinition.element_of(_tower_damage_type(tower))) if kind in ["attack", "chain", "catapult"] else ""
 	_refresh_max_health(slot)
 	for tower: Dictionary in towers[slot]:
 		# Keep bonuses as 64-bit floats; Vector2 components narrow them to 32-bit.
@@ -840,7 +845,7 @@ func _send_enemy_accepted(slot: int, type_id: StringName) -> void:
 	var cost: int = definition["send_cost"]
 	var target: int = 1 - slot
 	var count: int = _roll_group(definition, _group_random)
-	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
+	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["ward_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
 	_boss_stream = _boss_stream or _requires_combat_events(definition)
 	if _pending_sends(target) == 0 and phase == Phase.WAVE:
 		_next_send_times[target] = maxf(_next_send_times[target], _elapsed)
@@ -990,7 +995,7 @@ func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dic
 	for slot: int in range(2):
 		for index: int in range(_send_heads[slot], _send_queues[slot].size()):
 			var pending: Dictionary = _enemy_types[_send_queues[slot][index]]
-			_special_stream = _special_stream or float(pending["heal_interval"]) > 0.0 or float(pending["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(pending)
+			_special_stream = _special_stream or float(pending["heal_interval"]) > 0.0 or float(pending["ward_interval"]) > 0.0 or float(pending["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(pending)
 			_boss_stream = _boss_stream or _requires_combat_events(pending, wave_number)
 	var interval_multiplier: float = _spawn_interval_multiplier(wave_number)
 	var group_times: Array[float] = _generate_spawn_times(groups.size(), _rules.spawn_interval * interval_multiplier)
@@ -998,7 +1003,7 @@ func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dic
 	for index: int in range(groups.size()):
 		var group: Dictionary = groups[index]
 		var definition: Dictionary = _enemy_types[group["type_id"]]
-		_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
+		_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["ward_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
 		_boss_stream = _boss_stream or _requires_combat_events(definition, wave_number)
 		var spacing: float = _enemy_types[group["type_id"]]["group_interval"]
 		for member: int in range(int(group["count"])):
@@ -1280,8 +1285,63 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 				duration = minf(duration, float(enemy["next_summon"]) - float(enemy["age"]))
 			duration = minf(duration, EnemyMechanics.event_step(enemy, definition))
 			if float(definition["heal_interval"]) > 0.0:
-				duration = minf(duration, float(enemy["next_heal"]) - float(enemy["age"]))
+				duration = minf(duration, _heal_wait(slot, enemy, definition))
+			if float(definition["ward_interval"]) > 0.0:
+				duration = minf(duration, maxf(0.000000001, float(enemy["next_ward"]) - float(enemy["age"])))
+			if float(enemy.get("ward_until", 0.0)) > _elapsed:
+				duration = minf(duration, float(enemy["ward_until"]) - _elapsed)
 	return maxf(0.000000001, duration)
+
+
+func _cast_ward(slot: int, caster: Dictionary, definition: Dictionary) -> void:
+	caster["next_ward"] += float(definition["ward_interval"])
+	caster["ward_count"] += 1
+	caster["animation"] = "heal"
+	caster["animation_elapsed"] = 0.0
+	var radius_squared: float = float(definition["ward_radius"]) * float(definition["ward_radius"])
+	for ally: Dictionary in enemies[slot]:
+		var type: Dictionary = _enemy_types[ally["type_id"]]
+		if ally["id"] == caster["id"] or int(ally["hp"]) <= 0 or type["boss"] or float(type["ward_interval"]) > 0.0:
+			continue
+		if Vector2(caster["pos"]).distance_squared_to(ally["pos"]) <= radius_squared:
+			ally["ward_until"] = _elapsed + float(definition["ward_duration"])
+			ally["ward_source"] = caster["id"]
+			ally["warded"] = true
+
+
+# OrcShakra casters charge heals faster near their own kind; others keep a fixed schedule.
+func _heal_due(slot: int, enemy: Dictionary, definition: Dictionary) -> bool:
+	if float(definition["shakra_radius"]) <= 0.0:
+		if float(enemy["age"]) + 0.000000001 < float(enemy["next_heal"]):
+			return false
+		enemy["next_heal"] += float(definition["heal_interval"])
+		return true
+	var rate: float = 1.0 + _shakra_bonus(slot, enemy, definition)
+	enemy["heal_charge"] = float(enemy["heal_charge"]) + (float(enemy["age"]) - float(enemy["heal_clock"])) * rate
+	enemy["heal_clock"] = enemy["age"]
+	if float(enemy["heal_charge"]) + 0.000000001 < float(definition["heal_interval"]):
+		return false
+	enemy["heal_charge"] = float(enemy["heal_charge"]) - float(definition["heal_interval"])
+	return true
+
+
+func _heal_wait(slot: int, enemy: Dictionary, definition: Dictionary) -> float:
+	if float(definition["shakra_radius"]) <= 0.0:
+		return float(enemy["next_heal"]) - float(enemy["age"])
+	var rate: float = 1.0 + _shakra_bonus(slot, enemy, definition)
+	var charged: float = float(enemy["heal_charge"]) + (float(enemy["age"]) - float(enemy["heal_clock"])) * rate
+	return maxf(0.000000001, (float(definition["heal_interval"]) - charged) / rate)
+
+
+func _shakra_bonus(slot: int, enemy: Dictionary, definition: Dictionary) -> float:
+	var radius_squared: float = float(definition["shakra_radius"]) * float(definition["shakra_radius"])
+	var neighbours: int = 0
+	for other: Dictionary in enemies[slot]:
+		if other["id"] != enemy["id"] and other["type_id"] == enemy["type_id"] and int(other["hp"]) > 0 and Vector2(enemy["pos"]).distance_squared_to(other["pos"]) <= radius_squared:
+			neighbours += 1
+	var bonus: float = float(definition["shakra_max_bonus"]) * (1.0 - pow(0.5, neighbours))
+	enemy["shakra_bonus"] = bonus
+	return bonus
 
 
 # Ordinary enemies only need a substep when a ready weapon can acquire them.
@@ -1563,9 +1623,14 @@ func _enemy_abilities(slot: int) -> void:
 	active.clear()
 	active.append_array(enemies[slot])
 	for enemy: Dictionary in active:
+		enemy["ward_remaining"] = maxf(0.0, float(enemy.get("ward_until", 0.0)) - _elapsed)
+		enemy["warded"] = float(enemy["ward_remaining"]) > 0.000000001
+	for enemy: Dictionary in active:
 		if int(enemy["hp"]) <= 0 or float(enemy["stunned_remaining"]) > 0.000000001 or (float(enemy["progress"]) >= enemy["route"].size() - 1 and BossMechanics.can_act(enemy)):
 			continue
 		var definition: Dictionary = _enemy_types[enemy["type_id"]]
+		if float(definition["ward_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_ward"]):
+			_cast_ward(slot, enemy, definition)
 		if BossMechanics.has_abilities(definition):
 			_boss_abilities(slot, enemy, definition)
 			if int(enemy["hp"]) <= 0 or float(enemy["progress"]) >= enemy["route"].size() - 1:
@@ -1574,9 +1639,10 @@ func _enemy_abilities(slot: int) -> void:
 			enemy["animation"] = "walk"
 			enemy["animation_elapsed"] = 0.0
 		EnemyMechanics.advance(enemy, definition)
-		if float(definition["heal_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_heal"]):
-			enemy["next_heal"] += float(definition["heal_interval"])
+		if float(definition["heal_interval"]) > 0.0 and _heal_due(slot, enemy, definition):
 			enemy["heal_count"] += 1
+			if definition["heal_restores_shield"]:
+				enemy["shield_hits"] = enemy["shield_max_hits"]
 			enemy["animation"] = "heal"
 			enemy["animation_elapsed"] = 0.0
 			var radius_squared: float = float(definition["heal_radius"]) * float(definition["heal_radius"])
@@ -2078,7 +2144,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 	var definition: Dictionary = _enemy_types[type_id]
 	var route: Array[Vector2i] = _assign_route(slot) if captured_route.is_empty() else captured_route.duplicate()
 	var speed: float = _enemy_speed(type_id, wave)
-	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
+	_special_stream = _special_stream or float(definition["heal_interval"]) > 0.0 or float(definition["ward_interval"]) > 0.0 or float(definition["summon_interval"]) > 0.0 or EnemyMechanics.has_abilities(definition)
 	_boss_stream = _boss_stream or _requires_combat_events(definition)
 	enemies[slot].append({
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp, "void_drained": 0.0,
@@ -2096,6 +2162,9 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"age": maxf(0.0, _elapsed - spawn_time), "cast_remaining": 0.0,
 		"heal_count": 0, "summon_count": 0, "summoner_id": summoner_id,
 		"next_heal": _enemy_types[type_id]["heal_interval"],
+		"heal_charge": 0.0, "heal_clock": maxf(0.0, _elapsed - spawn_time), "shakra_bonus": 0.0,
+		"next_ward": _enemy_types[type_id]["ward_interval"], "ward_count": 0,
+		"ward_until": 0.0, "ward_source": -1, "warded": false,
 		"next_summon": _enemy_types[type_id]["summon_interval"],
 		"tower_attack_count": 0, "tower_attack_target_ids": [] as Array[int], "tower_attack_aims": [] as Array[Vector2],
 		"tower_attack_remaining": 0.0, "next_tower_attack": _enemy_types[type_id]["tower_attack_interval"],
@@ -2577,6 +2646,7 @@ func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_in
 # Returns the first redirected victim's ID, or -1.
 func _redirect(slot: int, tower: Dictionary, position: Vector2, current_id: int, hit_ids: Dictionary, bounces: int, magic: Dictionary, points: Array, time: float, avoid: Dictionary, primary: bool) -> int:
 	var chance: float = float(magic.get("chance", 0.0))
+	var damage_type: StringName = _tower_damage_type(tower)
 	var first_id: int = -1
 	var jump: int = 0
 	while jump < bounces or (not magic.is_empty() and chance > 0.000000001 and _magic_random.randf() < chance):
@@ -2587,11 +2657,11 @@ func _redirect(slot: int, tower: Dictionary, position: Vector2, current_id: int,
 		if jump == 1 and not avoid.is_empty():
 			var excluded: Dictionary = hit_ids.duplicate()
 			excluded.merge(avoid)
-			selected = _nearest_unhit(slot, position, excluded, INF, time)
+			selected = _nearest_unhit(slot, position, excluded, INF, time, damage_type)
 		if selected < 0:
-			selected = _nearest_unhit(slot, position, hit_ids, INF, time)
+			selected = _nearest_unhit(slot, position, hit_ids, INF, time, damage_type)
 		if selected < 0 and not magic.is_empty():
-			selected = _nearest_unhit(slot, position, {current_id: true}, INF, time)
+			selected = _nearest_unhit(slot, position, {current_id: true}, INF, time, damage_type)
 		if selected < 0 or jump > MAX_BOUNCE_POINTS:
 			break
 		position = enemies[slot][selected]["pos"] if time < 0.0 else _position(enemies[slot][selected]["route"], _historical_progress(enemies[slot][selected], time))
@@ -2621,7 +2691,7 @@ func _attack_chain(slot: int, tower: Dictionary, primary_index: int) -> void:
 		hit_ids[int(enemy["id"])] = true
 		points.append(position)
 		_hit(slot, tower, selected, ceili(float(tower["damage"]) * (1.0 + contact * float(config["successive_hit_bonus"]))))
-		selected = _nearest_unhit(slot, position, hit_ids, float(config["jump_distance"]))
+		selected = _nearest_unhit(slot, position, hit_ids, float(config["jump_distance"]), -1.0, _tower_damage_type(tower))
 
 
 # Orcapult: grab the nearest throwable enemies in range, slam the bucket into
@@ -2739,13 +2809,16 @@ func _land_flights() -> void:
 		_sound_events.record(CombatSoundEvents.Cue.CLUB_IMPACT, target, flight["to"], _death_time)
 
 
-func _nearest_unhit(slot: int, origin: Vector2, excluded: Dictionary, radius: float = INF, time: float = -1.0) -> int:
+# Bounces and chain jumps never land on an enemy immune to their element.
+func _nearest_unhit(slot: int, origin: Vector2, excluded: Dictionary, radius: float = INF, time: float = -1.0, damage_type: StringName = &"") -> int:
 	var best: int = -1
 	var distance: float = radius * radius
 	var best_id: int = 0
 	for index: int in range(enemies[slot].size()):
 		var enemy: Dictionary = enemies[slot][index]
 		if int(enemy["hp"]) <= 0 or excluded.has(int(enemy["id"])) or (time >= 0.0 and float(_enemy_spawn_times[enemy["id"]]) > time + 0.000000001):
+			continue
+		if damage_type != &"" and _immune(enemy, damage_type):
 			continue
 		var sampled: Vector2 = enemy["pos"] if time < 0.0 else _position(enemy["route"], _historical_progress(enemy, time))
 		var candidate: float = origin.distance_squared_to(sampled)
@@ -2793,7 +2866,10 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 	var fractions: Dictionary = _continuous_damage[tower_id]
 	var exposed: Array[int] = []
 	var exposures: Dictionary = {}
+	var damage_type: StringName = _tower_damage_type(tower)
 	for index: int in range(enemies[slot].size()):
+		if _immune(enemies[slot][index], damage_type):
+			continue
 		var exposure: float = _continuous_exposure(tower["cell"], range_cells, enemies[slot][index], minf(delta, _elapsed - float(_enemy_spawn_times[enemies[slot][index]["id"]])))
 		if exposure > 0.0:
 			exposed.append(index)
@@ -2985,6 +3061,13 @@ func _retire_enemy(enemy_id: int) -> void:
 	_slow_motion.erase(enemy_id)
 	_burns.erase(enemy_id)
 	_shield_exposure.erase(enemy_id)
+	# A Greater ShaOrc's wards end the moment it dies, leaks or is thrown away.
+	for board: Array in enemies:
+		for other: Dictionary in board:
+			if int(other.get("ward_source", -1)) == enemy_id:
+				other["ward_until"] = 0.0
+				other["ward_source"] = -1
+				other["warded"] = false
 	for tower_id: int in _continuous_damage:
 		_continuous_damage[tower_id].erase(enemy_id)
 	for tower_id: int in _continuous_bonus:
@@ -3016,12 +3099,29 @@ func _tower_damage_type(tower: Dictionary) -> StringName:
 
 
 func _elemental_damage_multiplier(enemy: Dictionary, damage_type: StringName) -> float:
+	if _immune(enemy, damage_type):
+		return 0.0
 	var multiplier: float = float(enemy["nonphysical_damage_multiplier"]) if damage_type != &"physical" else float(enemy["physical_damage_multiplier"])
 	if damage_type == &"fire":
 		multiplier *= float(enemy["fire_damage_multiplier"])
 	elif damage_type == &"lightning":
 		multiplier *= float(enemy["lightning_damage_multiplier"])
 	return multiplier
+
+
+# A set (keys only), like the catalog dictionaries, rather than an identity list.
+static func _element_set(elements: PackedStringArray) -> Dictionary:
+	var result: Dictionary = {}
+	for element: String in elements:
+		result[element] = true
+	return result
+
+
+func _immune(enemy: Dictionary, damage_type: StringName) -> bool:
+	if float(enemy.get("ward_until", 0.0)) > _elapsed + 0.000000001:
+		return true
+	var type: Dictionary = _enemy_types.get(String(enemy.get("type_id", "")), NO_BONUS)
+	return not type.is_empty() and type["immune_elements"].has(String(TowerDefinition.element_of(damage_type)))
 
 
 func _damage_multiplier(enemy: Dictionary, damage_type: StringName) -> float:
@@ -3179,9 +3279,13 @@ func _target(slot: int, tower: Dictionary, range_cells: float, mode: int = -1, e
 	var use_grid: bool = time < 0.0 and (reach * 2 + 1) * (reach * 2 + 1) < enemies[slot].size()
 	var candidates: Array = _current_target_candidates(slot, tower["cell"], range_cells) if use_grid else enemies[slot]
 	var policy: int = int(tower["mode"]) if mode < 0 else mode
+	# Never waste a shot on an enemy immune to this tower's element.
+	var damage_type: StringName = _tower_damage_type(tower) if tower.get("behavior_kind", "") in ["attack", "chain"] else &""
 	for index: int in range(candidates.size()):
 		var enemy: Dictionary = candidates[index]
 		if int(enemy["hp"]) <= 0 or int(enemy["id"]) == excluded_id or int(enemy["id"]) == excluded_second or int(enemy["id"]) == excluded_third or (fire_only and bool(enemy["fire_immune"])):
+			continue
+		if damage_type != &"" and _immune(enemy, damage_type):
 			continue
 		var excluded: bool = false
 		for earlier: int in range(extra_count):

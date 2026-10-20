@@ -1186,7 +1186,13 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 			result += "\n%s splash · %s cells" % [String.num(ceilf(damage * float(advancement["splash_multiplier"])), 0), String.num(float(advancement.get("splash_radius", 0.0)), 2)]
 		if advancement.has("burn_dps"):
 			result += "\n%s burn/s · %ss" % [String.num(float(advancement["burn_dps"]) * float(state.get("damage_multiplier", 1.0)), 1), String.num(float(advancement.get("burn_duration", 0.0)), 1)]
+	if not String(state.get("element", "")).is_empty():
+		result += "\n%s element" % element_title(String(state["element"]))
 	return result + "\nRange %.2f cells" % range_cells
+
+
+static func element_title(element: String) -> String:
+	return element.capitalize()
 
 
 static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dictionary:

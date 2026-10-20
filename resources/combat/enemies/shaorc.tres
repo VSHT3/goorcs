@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/shaorc_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/shaorc.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"shaorc"
+title = "ShaOrc"
+description = "A hunched orc shaman. Raising its staff heals nearby orcs and restores its own one-hit shield; nearby ShaOrcs raise its OrcShakra and cast faster."
+health_multiplier = 2.0
+speed_multiplier = 0.6
+hit_shield = 1
+spawn_weight = 5
+first_wave = 24
+max_per_wave = 2
+count_cap_growth = 1
+count_cap_growth_interval = 10
+max_weight_share = 0.25
+send_cost = 60
+send_income = 3
+send_first_wave = 32
+kill_bounty = 5
+reroll_drop_chance = 0.1
+reroll_drop_amount = 1
+heal_interval = 6.0
+heal_radius = 2.0
+heal_fraction = 0.15
+shakra_radius = 3.0
+shakra_max_bonus = 0.4
+heal_restores_shield = true
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.56
+board_anchor = Vector2(0.5, 0.875)

@@ -268,9 +268,12 @@ func _select(index: int) -> void:
 	if definition.boss:
 		mechanics_label.text = "Later waves %s%%–%s%% · Weight %d\n" % [String.num(definition.boss_spawn_chance * 100.0, 1), String.num(definition.boss_spawn_chance_cap * 100.0, 1), definition.spawn_weight] + mechanics_label.text
 	var immunities := PackedStringArray()
-	if definition.fire_immune:
+	for element: StringName in TowerDefinition.ELEMENTS:
+		if definition.immune_elements.has(String(element)):
+			immunities.append("%s damage" % MatchPlanningScreen.element_title(String(element)))
+	if definition.fire_immune and not definition.immune_elements.has("fire"):
 		immunities.append("Fire")
-	if definition.ice_immune:
+	if definition.ice_immune and not definition.immune_elements.has("ice"):
 		immunities.append("Ice")
 	if not immunities.is_empty():
 		if not mechanics_label.text.is_empty():
@@ -280,6 +283,8 @@ func _select(index: int) -> void:
 		mechanics_label.text += "\nNo burning · ignores Flamethrowers"
 	if definition.ice_immune:
 		mechanics_label.text += "\nNo slowing"
+	if not definition.immune_elements.is_empty():
+		mechanics_label.text += "\nTowers of an immune element ignore it as a target"
 	mechanics_label.visible = not mechanics_label.text.is_empty()
 	scaling_label.text = "Wave %d · HP ×%s · Speed ×%s" % [preview_wave, String.num(definition.health_multiplier, 2), String.num(definition.speed_multiplier, 2)]
 	_details_scroll.scroll_vertical = 0
@@ -340,6 +345,18 @@ func _mechanics(definition: EnemyDefinition) -> String:
 		lines.append("Regenerates %s%% max HP every %ss\nSelf only · rounded up" % [String.num(definition.regeneration_fraction * 100.0, 1), String.num(definition.regeneration_interval, 2)])
 	if definition.heal_interval > 0.0:
 		lines.append("Heals allies %s%% every %ss\nWithin %s cells · cannot heal itself" % [String.num(definition.heal_fraction * 100.0, 1), String.num(definition.heal_interval, 2), String.num(definition.heal_radius, 2)])
+	if definition.heal_restores_shield:
+		lines.append("Each heal restores its %d-hit shield" % definition.hit_shield)
+	if definition.shakra_radius > 0.0:
+		var steps := PackedStringArray()
+		for neighbours: int in range(1, 5):
+			steps.append("+%s%%" % String.num(definition.shakra_max_bonus * (1.0 - pow(0.5, neighbours)) * 100.0, 1))
+		lines.append("OrcShakra: each other %s within %s tiles casts it faster
+%s with 1–4 nearby · never above +%s%%" % [definition.title, String.num(definition.shakra_radius, 1), " · ".join(steps), String.num(definition.shakra_max_bonus * 100.0, 1)])
+	if definition.ward_interval > 0.0:
+		lines.append("Every %ss raises its staff: other non-boss orcs within %s tiles
+are immune to all damage for %ss · towers ignore them
+Wards end the moment it dies · never wards itself or another warder" % [String.num(definition.ward_interval, 1), String.num(definition.ward_radius, 1), String.num(definition.ward_duration, 1)])
 	if definition.summon_interval > 0.0:
 		lines.append("Summons %d–%d every %ss · %ss cast\nAt most %d living summons" % [definition.summon_min, definition.summon_max, String.num(definition.summon_interval, 2), String.num(definition.summon_cast_duration, 2), definition.summon_limit])
 		if not definition.summon_pool.is_empty():

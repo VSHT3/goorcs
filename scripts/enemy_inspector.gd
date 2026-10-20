@@ -34,6 +34,11 @@ func refresh(enemy: Dictionary, type_stats: Dictionary) -> void:
 
 	_title.text = String(type_stats["title"])
 	_description.text = String(type_stats["description"]).strip_edges()
+	var immune := PackedStringArray()
+	for element: Variant in type_stats.get("immune_elements", {}):
+		immune.append(MatchPlanningScreen.element_title(String(element)))
+	if not immune.is_empty():
+		_description.text += ("\n" if not _description.text.is_empty() else "") + "Immune: " + " · ".join(immune)
 	_description.visible = not _description.text.is_empty()
 	health_bar.max_value = float(enemy["max_hp"])
 	health_bar.value = float(enemy["hp"])

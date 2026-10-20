@@ -2053,7 +2053,9 @@ func _draw_enemy(item: Dictionary) -> void:
 	var frame: Texture2D = item["frame"]
 	var rect: Rect2 = item["sprite_rect"]
 	var animation: StringName = StringName(enemy.get("animation", "walk"))
-	if animation == &"heal" or (animation == &"cast" and artwork.summon_pool.is_empty()):
+	if animation == &"heal" and artwork.ward_interval > 0.0:
+		EnemyVisuals.draw_action_effect(self, item["foot"], _cell_size() * artwork.ward_radius, &"ward", float(enemy.get("animation_elapsed", 0.0)))
+	elif animation == &"heal" or (animation == &"cast" and artwork.summon_pool.is_empty()):
 		EnemyVisuals.draw_action_effect(self, item["foot"], _cell_size() * 0.38, animation, float(enemy.get("animation_elapsed", 0.0)))
 	if flip:
 		rect.size.x = -rect.size.x
@@ -2069,6 +2071,8 @@ func _draw_enemy(item: Dictionary) -> void:
 		var phase: int = int(float(enemy.get("age", 0.0)) * 10.0) + int(enemy["id"])
 		_draw_pixel_flame(item["foot"] + Vector2(-pixel * 3.0, -_cell_size() * artwork.board_height * 0.30), pixel, phase)
 		_draw_pixel_flame(item["foot"] + Vector2(pixel * 3.0, -_cell_size() * artwork.board_height * 0.48), pixel, phase + 2)
+	if bool(enemy.get("warded", false)):
+		EnemyVisuals.draw_ward(self, item["bounds"], _cell_size(), float(enemy.get("ward_remaining", 0.0)), float(enemy.get("age", 0.0)))
 	if bool(enemy.get("launched", false)) or float(enemy.get("stunned_remaining", 0.0)) > 0.0:
 		_draw_dizzy_stars(enemy, item["foot"] - Vector2(0.0, _cell_size() * artwork.board_height * 0.92))
 

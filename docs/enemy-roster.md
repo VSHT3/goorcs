@@ -65,6 +65,34 @@ Crate children inherit the captured parent route/current progress, start fresh a
 
 Rage composes with slows and casting restrictions without multiplying twice or reverting after healing. Its accepted flag selects the faster `walk_enraged` artwork; changing speed cannot rewrite earlier movement in the same tick. Moss heals only itself, rounds each heal up, caps at maximum HP, never resurrects, and uses a birth-relative simulation clock. Its green action pose marks actual healing; pause/playback affect its clock normally.
 
+## Elements and Elemental Orcs
+
+Every tower attack belongs to one of five elements: **Physical** (Arrow, Ballista, Boulders, Orcapult slam), **Fire** (Molotov, Flamethrower, and explosive grenade/rocket splash), **Ice** (Freeze Runes), **Lightning** (Lightning tower, Storm Sigil) and **Magic** (Rune pulses, Onyx Ring, Void Monolith, Magic Ballista). The HUD and Towerieary name each attacking tower's current element. New towers pick one of these five rather than adding a new element.
+
+An enemy listed as immune to an element takes no damage from it. Single-target towers skip it, and chain jumps, bounces and Void tendrils never land on it, so they keep working on what they can hurt. Area pulses and splash still pass over it harmlessly. The Orcapult can still throw it.
+
+| Enemy | Regular / Send round | HP / Speed multiplier | Weight / cap | Send Coins / income | Gimmick |
+| --- | --- | --- | --- | --- | --- |
+| Ember Orc | 10 / 16 | 1.3 / 1.0 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Fire (including explosions); never burns. |
+| Frost Orc | 13 / 19 | 1.4 / 0.9 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Ice; never slowed. |
+| Storm Orc | 15 / 21 | 1.2 / 1.15 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Lightning. |
+| Arcane Orc | 17 / 23 | 1.3 / 1.0 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Magic. |
+| EleMetal Orc | 20 / 26 | 1.6 / 0.75 | 3 / 1 (+1 per 30 rounds) | 40 / +3 | Heavy full-body iron plate: immune to Physical, takes 50% more Lightning. |
+| Omega Elemental Orc (elite) | 38 / 48 | 4 / 0.7 | 12 / 1 (+1 per 20 rounds) | 90 / +5 | Immune to Fire, Ice, Lightning and Magic; only Physical hurts it. |
+
+Together the Elemental Orcs make up about a fifth of a mid-game wave and a quarter late on: enough to punish a single-element defence without replacing the horde.
+
+## ShaOrcs
+
+| Enemy | Regular / Send round | HP / Speed multiplier | Weight / cap | Send Coins / income | Gimmick |
+| --- | --- | --- | --- | --- | --- |
+| ShaOrc | 24 / 32 | 2 / 0.6 | 5 / 2 (+1 per 10 rounds) | 60 / +3 | Every 6 s raises its staff: heals other orcs within 2 cells for 15% of their maximum HP and restores its own one-hit shield. |
+| Greater ShaOrc (elite) | 60 / 72 | 7 / 0.5 | 30 / 1 (+1 per 20 rounds) | 400 / +8 | Every 12 s wards every other non-boss orc within 3.5 cells: immune to all damage for 10 s. |
+
+**OrcShakra.** Each other living ShaOrc within 3 cells charges a ShaOrc's cast faster, with diminishing returns: +20%, +30%, +35%, +37.5% for one to four neighbours, approaching +40% (`shakra_max_bonus * (1 - 0.5^n)`). The charge is integrated on the simulation clock, so a ShaOrc that walks into a group speeds up from that moment.
+
+**Wards.** Warded orcs show a faint pale-cyan hexagon (unlike the gold hit-shield pips) that flickers in its last two seconds; towers ignore them. A Greater ShaOrc never wards itself or another Greater ShaOrc, and every ward it cast ends the moment it dies, leaks or is thrown off the board, so killing it is the answer.
+
 ## First boss kill loot
 
 Each player earns one bonus for the **first tower-owned kill of each boss type in a run**. The host rolls independently using the same authored rarity weights as tower placement, then immediately credits both currencies. Ordinary bounty/Shard drops still apply separately. Repeated encounters, leaks, collateral deaths, and Sandbox cannot claim the bonus or consume its RNG. Debug round jumps preserve claims; a new run resets them. Rewards are run-only, not lifetime progression.

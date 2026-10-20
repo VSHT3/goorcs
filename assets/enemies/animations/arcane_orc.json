@@ -1,0 +1,203 @@
+{
+  "authoring": "Shared articulated orc rig re-dressed per element: exact palette swap plus element geometry in the rig head/body joint space. No image service or sampled art.",
+  "identity": "Violet orc in deep robes, glowing cyan runes pulsing across its chest and two rune motes circling its head.",
+  "generator": "tools/author_elemental_orcs.py",
+  "generator_sha256": "e9e3ae2a6b9af979ae8d93f987ac9d629e4a707a70352f5e4c9e0cec72e5a3b0",
+  "reproduce": "python3 tools/author_elemental_orcs.py",
+  "rig": "grunt",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "camera": "Elevated three-quarter facing left; top and left material planes lit.",
+  "alpha": "Binary 0/255, no antialiasing, dithering, smoothing, raster rotation or scaling.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    1920,
+    80
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.52,
+  "still": "assets/enemies/animations/arcane_orc_still.png",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "sheet_sha256": "130bc44a0d5f83ef02298b39a323cad8748a0f59321fed6888d483468a32e173",
+  "still_sha256": "23e4bd48fbf28eee8fd93920a934a392d12afb84010016f812e47a3a796a4f8b",
+  "sprite_frames_sha256": "76fb056f413df4e0785673b493e67578afad5b15df2dcfad2c477b74d56f119c",
+  "death": {
+    "duration_seconds": 0.8,
+    "blood_in_sprite": false,
+    "last_frame": "Settled corpse; Omega orbs scatter and fade over the first half."
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 12,
+      "frame_count": 12,
+      "duration_seconds": 1.0,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          16,
+          12,
+          62,
+          70
+        ],
+        [
+          16,
+          10,
+          61,
+          68
+        ],
+        [
+          16,
+          8,
+          59,
+          68
+        ],
+        [
+          18,
+          8,
+          57,
+          68
+        ],
+        [
+          19,
+          8,
+          56,
+          68
+        ],
+        [
+          19,
+          10,
+          54,
+          68
+        ],
+        [
+          19,
+          12,
+          54,
+          70
+        ],
+        [
+          19,
+          10,
+          54,
+          70
+        ],
+        [
+          19,
+          8,
+          55,
+          70
+        ],
+        [
+          18,
+          8,
+          57,
+          70
+        ],
+        [
+          16,
+          8,
+          59,
+          70
+        ],
+        [
+          16,
+          9,
+          62,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "duration_seconds": 0.8,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          16,
+          13,
+          62,
+          70
+        ],
+        [
+          18,
+          13,
+          60,
+          71
+        ],
+        [
+          18,
+          14,
+          61,
+          71
+        ],
+        [
+          18,
+          16,
+          60,
+          70
+        ],
+        [
+          17,
+          22,
+          57,
+          70
+        ],
+        [
+          10,
+          29,
+          56,
+          71
+        ],
+        [
+          8,
+          33,
+          64,
+          71
+        ],
+        [
+          8,
+          36,
+          67,
+          72
+        ],
+        [
+          8,
+          38,
+          69,
+          73
+        ],
+        [
+          7,
+          40,
+          70,
+          74
+        ],
+        [
+          7,
+          40,
+          70,
+          74
+        ],
+        [
+          7,
+          40,
+          70,
+          74
+        ]
+      ]
+    }
+  ]
+}

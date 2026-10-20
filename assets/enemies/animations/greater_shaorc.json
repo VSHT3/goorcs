@@ -1,0 +1,284 @@
+{
+  "authoring": "Shared articulated orc rig re-dressed per element: exact palette swap plus element geometry in the rig head/body joint space. No image service or sampled art.",
+  "identity": "Elder shaman in a wolf-pelt mantle, white beard braid and antler crown; lifts a gilded totem staff whose pale ward crystal flares to shield the horde.",
+  "generator": "tools/author_elemental_orcs.py",
+  "generator_sha256": "e9e3ae2a6b9af979ae8d93f987ac9d629e4a707a70352f5e4c9e0cec72e5a3b0",
+  "reproduce": "python3 tools/author_elemental_orcs.py",
+  "rig": "grunt",
+  "geometry_helpers": "tools/author_enemy_sprites.py",
+  "geometry_helpers_sha256": "f829e9a455c9e06be4846090aaff613e03c296d0a64ba0c1c41750070fc680d4",
+  "camera": "Elevated three-quarter facing left; top and left material planes lit.",
+  "alpha": "Binary 0/255, no antialiasing, dithering, smoothing, raster rotation or scaling.",
+  "frame_size": [
+    80,
+    80
+  ],
+  "sheet_size": [
+    2880,
+    80
+  ],
+  "base_anchor": [
+    0.5,
+    0.875
+  ],
+  "source_faces_left": true,
+  "recommended_world_height_cells": 0.66,
+  "still": "assets/enemies/animations/greater_shaorc_still.png",
+  "still_dimensions": [
+    80,
+    80
+  ],
+  "sheet_sha256": "4cd9cf2bc50082422b2c88480df25aef5669cd376fbd3a49d00f245e2e2bde3e",
+  "still_sha256": "e003860678528a7ad0b2f12e57841d770e68edc9e7e62c6c9490fc017f1012ff",
+  "sprite_frames_sha256": "5f22b46c3df86c35f3dec481ad00c0b6cc75643f06e06d95bce303487c42a75e",
+  "death": {
+    "duration_seconds": 0.8,
+    "blood_in_sprite": false,
+    "last_frame": "Settled corpse; Omega orbs scatter and fade over the first half."
+  },
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 9,
+      "frame_count": 12,
+      "duration_seconds": 1.3333333333333333,
+      "loop": true,
+      "alpha_bounds": [
+        [
+          11,
+          5,
+          62,
+          70
+        ],
+        [
+          12,
+          4,
+          61,
+          68
+        ],
+        [
+          13,
+          4,
+          59,
+          68
+        ],
+        [
+          16,
+          4,
+          59,
+          68
+        ],
+        [
+          18,
+          4,
+          60,
+          68
+        ],
+        [
+          18,
+          4,
+          59,
+          68
+        ],
+        [
+          18,
+          5,
+          59,
+          70
+        ],
+        [
+          17,
+          4,
+          60,
+          70
+        ],
+        [
+          16,
+          4,
+          60,
+          70
+        ],
+        [
+          13,
+          4,
+          59,
+          70
+        ],
+        [
+          11,
+          4,
+          59,
+          70
+        ],
+        [
+          11,
+          4,
+          62,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "heal",
+      "fps": 21.818181818181817,
+      "frame_count": 12,
+      "duration_seconds": 0.55,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          10,
+          5,
+          61,
+          70
+        ],
+        [
+          10,
+          5,
+          61,
+          70
+        ],
+        [
+          11,
+          5,
+          61,
+          70
+        ],
+        [
+          11,
+          3,
+          61,
+          70
+        ],
+        [
+          11,
+          3,
+          61,
+          70
+        ],
+        [
+          11,
+          3,
+          61,
+          70
+        ],
+        [
+          11,
+          3,
+          61,
+          70
+        ],
+        [
+          10,
+          3,
+          61,
+          70
+        ],
+        [
+          9,
+          3,
+          61,
+          70
+        ],
+        [
+          11,
+          5,
+          61,
+          70
+        ],
+        [
+          10,
+          5,
+          61,
+          70
+        ],
+        [
+          10,
+          5,
+          61,
+          70
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 15,
+      "frame_count": 12,
+      "duration_seconds": 0.8,
+      "loop": false,
+      "alpha_bounds": [
+        [
+          16,
+          13,
+          62,
+          70
+        ],
+        [
+          18,
+          13,
+          60,
+          71
+        ],
+        [
+          18,
+          14,
+          61,
+          71
+        ],
+        [
+          18,
+          16,
+          60,
+          70
+        ],
+        [
+          17,
+          22,
+          72,
+          70
+        ],
+        [
+          10,
+          29,
+          72,
+          71
+        ],
+        [
+          8,
+          33,
+          72,
+          71
+        ],
+        [
+          8,
+          36,
+          72,
+          72
+        ],
+        [
+          8,
+          38,
+          72,
+          73
+        ],
+        [
+          7,
+          40,
+          72,
+          74
+        ],
+        [
+          7,
+          40,
+          72,
+          74
+        ],
+        [
+          7,
+          40,
+          72,
+          74
+        ]
+      ]
+    }
+  ]
+}

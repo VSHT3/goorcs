@@ -87,8 +87,19 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' requires positive group odds." % enemy.id)
 		if not is_finite(enemy.heal_interval) or enemy.heal_interval < 0.0 or not is_finite(enemy.heal_radius) or enemy.heal_radius < 0.0 or not is_finite(enemy.heal_fraction) or enemy.heal_fraction < 0.0 or enemy.heal_fraction > 1.0 or (enemy.heal_interval > 0.0 and (enemy.heal_radius <= 0.0 or enemy.heal_fraction <= 0.0)):
 			errors.append("Enemy '%s' has invalid healing metadata." % enemy.id)
+		if (enemy.heal_restores_shield and (enemy.heal_interval <= 0.0 or enemy.hit_shield <= 0)) or not is_finite(enemy.shakra_radius) or enemy.shakra_radius < 0.0 or not is_finite(enemy.shakra_max_bonus) or enemy.shakra_max_bonus < 0.0 or ((enemy.shakra_radius > 0.0) != (enemy.shakra_max_bonus > 0.0)) or (enemy.shakra_radius > 0.0 and enemy.heal_interval <= 0.0):
+			errors.append("Enemy '%s' needs a heal for shield refills or OrcShakra, and a positive OrcShakra radius and bonus together." % enemy.id)
+		if not is_finite(enemy.ward_interval) or not is_finite(enemy.ward_duration) or not is_finite(enemy.ward_radius) or enemy.ward_interval < 0.0 or ((enemy.ward_interval > 0.0) != (enemy.ward_duration > 0.0 and enemy.ward_radius > 0.0)) or (enemy.ward_interval == 0.0 and (enemy.ward_duration != 0.0 or enemy.ward_radius != 0.0)) or enemy.boss and enemy.ward_interval > 0.0:
+			errors.append("Enemy '%s' needs a positive ward interval, duration and radius together on a non-boss." % enemy.id)
 		if not is_finite(enemy.physical_damage_multiplier) or enemy.physical_damage_multiplier <= 0.0 or not is_finite(enemy.nonphysical_damage_multiplier) or enemy.nonphysical_damage_multiplier <= 0.0 or not is_finite(enemy.fire_damage_multiplier) or enemy.fire_damage_multiplier <= 0.0 or not is_finite(enemy.lightning_damage_multiplier) or enemy.lightning_damage_multiplier <= 0.0:
 			errors.append("Enemy '%s' requires finite positive incoming damage multipliers." % enemy.id)
+		var immune: Dictionary = {}
+		for element: String in enemy.immune_elements:
+			if StringName(element) not in TowerDefinition.ELEMENTS or immune.has(element):
+				errors.append("Enemy '%s' lists an unknown or repeated immune element '%s'." % [enemy.id, element])
+			immune[element] = true
+		if immune.size() >= TowerDefinition.ELEMENTS.size() or (immune.has("fire") and not enemy.fire_immune) or (immune.has("ice") and not enemy.ice_immune):
+			errors.append("Enemy '%s' must stay damageable by one element, and Fire/Ice immunity also blocks burning/slows." % enemy.id)
 		if enemy.death_spawn_count < 0 or ((enemy.death_spawn_type == &"") != (enemy.death_spawn_count == 0)):
 			errors.append("Enemy '%s' requires a death child and positive count together." % enemy.id)
 		if not is_finite(enemy.enrage_health_fraction) or enemy.enrage_health_fraction < 0.0 or enemy.enrage_health_fraction > 1.0 or not is_finite(enemy.enrage_speed_multiplier) or enemy.enrage_speed_multiplier < 1.0 or (enemy.enrage_health_fraction > 0.0 and enemy.enrage_speed_multiplier <= 1.0) or (enemy.enrage_health_fraction == 0.0 and enemy.enrage_speed_multiplier != 1.0):

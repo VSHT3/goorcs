@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/frost_orc_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/frost_orc.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"frost_orc"
+title = "Frost Orc"
+description = "A pale orc wrapped in frozen furs, ice grown through its skull. Immune to Ice damage and never slowed."
+health_multiplier = 1.4
+speed_multiplier = 0.9
+ice_immune = true
+immune_elements = PackedStringArray("ice")
+spawn_weight = 2
+first_wave = 13
+max_per_wave = 1
+count_cap_growth = 1
+count_cap_growth_interval = 30
+max_weight_share = 0.15
+send_cost = 30
+send_income = 2
+send_first_wave = 19
+kill_bounty = 4
+reroll_drop_chance = 0.06
+reroll_drop_amount = 1
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.52
+board_anchor = Vector2(0.5, 0.875)

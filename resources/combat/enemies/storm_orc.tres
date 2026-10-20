@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/storm_orc_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/storm_orc.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"storm_orc"
+title = "Storm Orc"
+description = "A crackling orc that grounds every bolt thrown at it. Immune to Lightning damage."
+health_multiplier = 1.2
+speed_multiplier = 1.15
+immune_elements = PackedStringArray("lightning")
+spawn_weight = 2
+first_wave = 15
+max_per_wave = 1
+count_cap_growth = 1
+count_cap_growth_interval = 30
+max_weight_share = 0.15
+send_cost = 30
+send_income = 2
+send_first_wave = 21
+kill_bounty = 4
+reroll_drop_chance = 0.06
+reroll_drop_amount = 1
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 0.52
+board_anchor = Vector2(0.5, 0.875)
