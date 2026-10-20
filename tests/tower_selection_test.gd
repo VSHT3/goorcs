@@ -386,7 +386,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			screen.special_upgrade.pressed.emit()
 			for slot: int in range(2):
 				_check(model.towers[slot][0].get("freeze_upgraded", false) and MatchCombat.tower_level(model.towers[slot][0]) == 5 and model.coins[slot] == 0, "Follow-up button dispatches its real command and reaches level V on both solo boards")
-			_check(screen._special_upgrade_command == "rolling_stones" and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before, "Purchased follow-up disappears, leaving only the branch upgrade, without changing continuous damage stats or reviving Onyx")
+			_check(screen._special_upgrade_command == "rolling_stones" and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before.replace("Physical element", "Ice element"), "Purchased follow-up disappears, leaving only the branch upgrade, without changing continuous damage stats or reviving Onyx; only the element turns to Ice")
 			frozen = planning.combat.duplicate(true)
 			screen.special_upgrade.pressed.emit()
 			planning.upgrade_tower(0, id, "freeze_runes")

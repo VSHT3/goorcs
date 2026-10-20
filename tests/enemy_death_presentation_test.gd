@@ -41,6 +41,11 @@ func _run() -> void:
 		rules.catalog = board.content_catalog
 		var tower: TowerDefinition = rules.catalog.towers[0].duplicate(true)
 		tower.damage = 1000
+		# Kill with an element this enemy is not immune to (EleMetal resists Physical).
+		for element: StringName in TowerDefinition.ELEMENTS:
+			if not definition.immune_elements.has(String(element)):
+				tower.damage_type = element
+				break
 		rules.catalog = rules.catalog.duplicate() as ContentCatalog
 		rules.catalog.towers = [tower]
 		var model := MatchCombat.new(rules)
