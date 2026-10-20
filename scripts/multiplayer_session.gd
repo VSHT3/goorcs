@@ -11,6 +11,11 @@ const AUTH_FULL: String = INVITE_VERSION + "/FULL"
 const AUTH_INVALID: String = INVITE_VERSION + "/INVALID"
 const AUTH_VERSION: String = INVITE_VERSION + "/VERSION"
 const CONNECTION_TIMEOUT_SECONDS: float = 12.0
+# An invite may list several host addresses (one per network adapter, most
+# likely first). The guest tries each in turn; an address that has not answered
+# within this many seconds gives way to the next one.
+const ADDRESS_ATTEMPT_SECONDS: float = 3.0
+const MAX_INVITE_ADDRESSES: int = 6
 const AUTH_TIMEOUT_SECONDS: float = 5.0
 # Extra transport slots let a third player receive a useful rejection. Only one
 # authenticated guest is ever admitted to the SceneMultiplayer room.
@@ -31,6 +36,11 @@ var _guest_id: int = 0
 var _generation: int = 0
 var _connection_deadline_msec: int = 0
 var _rejected_peers: Dictionary[int, bool] = {}
+var _join_addresses: PackedStringArray = PackedStringArray()
+var _join_port: int = 0
+var _join_index: int = 0
+var _attempt_deadline_msec: int = 0
+var _reached_host: bool = false
 
 
 func _ready() -> void:
@@ -39,19 +49,27 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if state == State.CONNECTING and Time.get_ticks_msec() >= _connection_deadline_msec:
-		_fail("Connection timed out. Check that the host is still waiting, the address is reachable, and this UDP port is allowed or forwarded; otherwise use a private VPN.")
+	if state != State.CONNECTING:
+		return
+	var now: int = Time.get_ticks_msec()
+	# Once the host has answered, stay on that address until admission.
+	if not _reached_host and now >= _attempt_deadline_msec and _try_next_address():
+		return
+	if now >= _connection_deadline_msec:
+		_fail(_unreachable_message() if not _reached_host else "Connection timed out while joining the room. Ask the host for their current invite and try again.")
 
 
 func _exit_tree() -> void:
 	_close_network()
 
 
+# advertised_address may list several comma-separated addresses, most likely
+# first; the invite carries all of them so the guest can find a reachable one.
 func host(advertised_address: String, port: int = 7000) -> bool:
 	if _peer != null:
 		return _reject_active_action()
-	var address: String = advertised_address.strip_edges()
-	if not _valid_address(address):
+	var addresses: PackedStringArray = _address_list(advertised_address)
+	if addresses.is_empty():
 		return _fail("Enter the host's numeric IPv4 or IPv6 address, not a hostname or an unspecified/broadcast address. Use the address your friend can reach over LAN, forwarded internet UDP, or a private VPN.")
 	if port < 1 or port > 65535:
 		return _fail("Choose a UDP port from 1 to 65535; unprivileged ports above 1023 are recommended.")
@@ -65,7 +83,7 @@ func host(advertised_address: String, port: int = 7000) -> bool:
 		return _fail("Cannot host on UDP port %d: %s. Close the other host or choose another port; check firewall and port permissions." % [port, error_string(create_error)])
 	_room_token = random_bytes.hex_encode()
 	_room_token_bytes = _room_token.to_utf8_buffer()
-	invite_code = "%s/%s/%d/%s" % [INVITE_VERSION, address, port, _room_token]
+	invite_code = "%s/%s/%d/%s" % [INVITE_VERSION, ",".join(addresses), port, _room_token]
 	is_host = true
 	error_message = ""
 	state = State.HOSTING
@@ -82,7 +100,8 @@ func join(code: String) -> bool:
 		return _fail("Invalid invite. Paste the complete GORCS1/address/port/credential code copied by the host.")
 	if parts[0] != INVITE_VERSION:
 		return _fail("This invite uses an incompatible version. Both players need the same game version and a fresh GORCS1 invite.")
-	if not _valid_address(parts[1]):
+	var addresses: PackedStringArray = _address_list(parts[1])
+	if addresses.is_empty():
 		return _fail("The invite has an invalid numeric IP address. Ask the host to create a code with their reachable LAN, forwarded internet, or private VPN address.")
 	if parts[2].is_empty() or parts[2].length() > 5 or not _only_characters(parts[2], "0123456789"):
 		return _fail("The invite has an invalid UDP port. Ask the host to copy a new code.")
@@ -91,21 +110,45 @@ func join(code: String) -> bool:
 		return _fail("The invite's UDP port must be from 1 to 65535. Ask the host to copy a new code.")
 	if not _valid_token(parts[3]):
 		return _fail("The invite credential must contain exactly 32 lowercase hexadecimal characters. Paste the complete code copied by the host.")
-	var next_peer := ENetMultiplayerPeer.new()
-	var create_error: Error = next_peer.create_client(parts[1], port)
-	if create_error != OK:
-		next_peer.close()
-		return _fail("Cannot start the connection: %s. Check the invite address and network access, then try again." % error_string(create_error))
-	_room_token = parts[3]
 	invite_code = ""
 	is_host = false
 	error_message = ""
+	_join_addresses = addresses
+	_join_port = port
+	_join_index = -1
+	_reached_host = false
+	if not _try_next_address():
+		return false
+	_room_token = parts[3]
 	state = State.CONNECTING
-	_connection_deadline_msec = Time.get_ticks_msec() + int(CONNECTION_TIMEOUT_SECONDS * 1000.0)
-	_install_peer(next_peer)
+	# Every listed address gets its turn before the overall deadline.
+	_connection_deadline_msec = Time.get_ticks_msec() + int(maxf(CONNECTION_TIMEOUT_SECONDS, ADDRESS_ATTEMPT_SECONDS * addresses.size() + AUTH_TIMEOUT_SECONDS) * 1000.0)
 	set_process(true)
 	changed.emit()
 	return true
+
+
+# Connect to the next listed host address, replacing any unanswered attempt.
+func _try_next_address() -> bool:
+	while _join_index + 1 < _join_addresses.size():
+		_join_index += 1
+		var next_peer := ENetMultiplayerPeer.new()
+		if next_peer.create_client(_join_addresses[_join_index], _join_port) != OK:
+			next_peer.close()
+			continue
+		var token: String = _room_token
+		_drop_peer()
+		_room_token = token
+		_install_peer(next_peer)
+		_attempt_deadline_msec = Time.get_ticks_msec() + int(ADDRESS_ATTEMPT_SECONDS * 1000.0)
+		return true
+	if _peer == null:
+		_fail("Cannot start the connection. Check the invite address and network access, then try again.")
+	return false
+
+
+func _unreachable_message() -> String:
+	return "Cannot reach the host at %s. Check that the host is still waiting, both computers are on the same network (guest/public Wi-Fi can block devices from seeing each other), and the host allowed Gorcs through their firewall (on Windows, tick Private networks). Over the internet, forward UDP port %d or use a private VPN." % [", ".join(_join_addresses), _join_port]
 
 
 func leave() -> void:
@@ -145,8 +188,20 @@ func _install_peer(peer: ENetMultiplayerPeer) -> void:
 
 
 func _close_network() -> void:
-	_generation += 1
+	_drop_peer()
 	set_process(false)
+	_room_token = ""
+	_room_token_bytes.clear()
+	_guest_id = 0
+	_rejected_peers.clear()
+	_connection_deadline_msec = 0
+	_join_addresses = PackedStringArray()
+	_join_index = 0
+	_reached_host = false
+
+
+func _drop_peer() -> void:
+	_generation += 1
 	if _api != null:
 		_api.auth_callback = Callable()
 		_api.multiplayer_peer = null
@@ -154,11 +209,6 @@ func _close_network() -> void:
 		_peer.close()
 	_peer = null
 	_api = null
-	_room_token = ""
-	_room_token_bytes.clear()
-	_guest_id = 0
-	_rejected_peers.clear()
-	_connection_deadline_msec = 0
 
 
 func _current_attempt(generation: int) -> bool:
@@ -169,6 +219,7 @@ func _on_peer_authenticating(id: int, generation: int) -> void:
 	if not _current_attempt(generation) or not _api.get_authenticating_peers().has(id):
 		return
 	if not is_host and id == 1 and state == State.CONNECTING:
+		_reached_host = true
 		var send_error: Error = _api.send_auth(id, (INVITE_VERSION + "/" + _room_token).to_utf8_buffer())
 		if send_error != OK:
 			_fail("Cannot send the room credential. Check the connection and ask the host for a fresh invite.")
@@ -278,8 +329,8 @@ func _on_authentication_failed(id: int, generation: int) -> void:
 
 
 func _on_connection_failed(generation: int) -> void:
-	if _current_attempt(generation) and not is_host:
-		_fail("Cannot reach the host. Check the address, UDP port and firewall/forwarding, or connect both players through a private VPN.")
+	if _current_attempt(generation) and not is_host and not _try_next_address():
+		_fail(_unreachable_message())
 
 
 func _on_server_disconnected(generation: int) -> void:
@@ -312,6 +363,20 @@ static func _only_characters(value: String, allowed: String) -> bool:
 		if not allowed.contains(character):
 			return false
 	return true
+
+
+# Parse a comma-separated host address list; empty if any entry is invalid.
+static func _address_list(text: String) -> PackedStringArray:
+	var addresses := PackedStringArray()
+	for entry: String in text.split(",", false):
+		var address: String = entry.strip_edges()
+		if not _valid_address(address):
+			return PackedStringArray()
+		if address not in addresses:
+			addresses.append(address)
+	if addresses.size() > MAX_INVITE_ADDRESSES:
+		return PackedStringArray()
+	return addresses
 
 
 static func _valid_address(address: String) -> bool:

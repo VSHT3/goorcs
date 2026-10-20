@@ -50,7 +50,7 @@ Menu action activation uses a short, muted wood/metal clack; hovering, moving ke
 
 ## Play with a friend
 
-- Choose **Play → Host**, enter an IP address your friend can reach and a UDP port, then **Create room**.
+- Choose **Play → Host** and press **Create room**. On the same Wi-Fi/LAN, leave the shown Host IP as is: the invite carries every network address of your computer and your friend's game finds the one that works. Type a different address only for a shared VPN or a forwarded internet IP. Allow Gorcs through your firewall if asked (Windows: **Private networks**).
 - Use **Copy invite code** and share the complete code privately. Your friend chooses **Play → Join**, pastes it, and presses **Connect** or Enter.
 - After admission, both players choose loadouts together, privately, before board planning. Equip one to four distinct owned identities, then **Commit loadout**. Commitment locks your choices for that run; only the friend's choosing/committed status is shared, not their deck list. Both must commit before boards open. Discover opposing choices by scouting placed towers.
 - Planning opens in one continuous world: host on the left, guest on the right, initially focused on your own side. **WASD** or **middle-mouse drag** pans and **scroll / pinch** zooms within bounds around the cursor. **Home** returns from scouting and fits your current board, including map growth. The same camera controls work in Sandbox. Only your own board accepts edits, wherever the camera is looking. Match paths are separate from Sandbox and are not saved.

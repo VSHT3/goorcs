@@ -145,7 +145,7 @@ func _create_host() -> void:
 	_submitting = true
 	_refresh()
 	port_input.apply()
-	session.host(address_input.text.strip_edges(), int(port_input.value))
+	session.host(_advertised_addresses(address_input.text.strip_edges(), IP.get_local_interfaces()), int(port_input.value))
 	_submitting = false
 	_refresh()
 	_focus_action.call_deferred()
@@ -285,22 +285,44 @@ func _default_address() -> String:
 	return _preferred_host_address(IP.get_local_interfaces())
 
 
+# The shown (most likely) address plus every other usable local address as
+# fallbacks, so the guest connects through whichever network they share.
+# A typed address replaces the list: VPN/public hosting stays explicit.
+static func _advertised_addresses(typed: String, interfaces: Array[Dictionary]) -> String:
+	var detected: PackedStringArray = _host_addresses(interfaces)
+	if typed.is_empty() or (not detected.is_empty() and typed == detected[0]):
+		return ",".join(detected) if not detected.is_empty() else "127.0.0.1"
+	return typed
+
+
 static func _preferred_host_address(interfaces: Array[Dictionary]) -> String:
-	var candidate: String = "127.0.0.1"
-	var best_rank: int = -1
+	var addresses: PackedStringArray = _host_addresses(interfaces)
+	return addresses[0] if not addresses.is_empty() else "127.0.0.1"
+
+
+# Usable IPv4 addresses, most likely reachable by a LAN friend first: physical
+# Wi-Fi/Ethernet private addresses, other physical, other private (often VPN
+# tunnels), anything else, then virtual machine/container adapters.
+static func _host_addresses(interfaces: Array[Dictionary]) -> PackedStringArray:
+	var tiers: Array[PackedStringArray] = [PackedStringArray(), PackedStringArray(), PackedStringArray(), PackedStringArray(), PackedStringArray()]
 	for interface: Dictionary in interfaces:
 		var interface_name: String = String(interface.get("name", "")).to_lower()
 		var friendly: String = String(interface.get("friendly", "")).to_lower()
+		var virtual: bool = false
+		for marker: String in ["docker", "br-", "veth", "virbr", "vbox", "virtualbox", "vmware", "vmnet", "vethernet", "hyper-v", "wsl", "lxc", "lxd"]:
+			virtual = virtual or interface_name.contains(marker) or friendly.contains(marker)
 		# Interface enumeration can put a non-peer VPN tunnel before Wi-Fi.
-		# Prefer LAN adapters; VPN hosting remains available through manual entry.
-		var is_lan: bool = interface_name.begins_with("en") or interface_name.begins_with("eth") or interface_name.begins_with("wl") or friendly.contains("wi-fi") or friendly.contains("ethernet")
+		var is_lan: bool = not virtual and (interface_name.begins_with("en") or interface_name.begins_with("eth") or interface_name.begins_with("wl") or friendly.contains("wi-fi") or friendly.contains("wifi") or friendly.contains("wireless") or friendly.contains("ethernet"))
 		for address: String in interface.get("addresses", []):
 			if not address.is_valid_ip_address() or address.contains(":") or address.begins_with("127.") or address.begins_with("169.254.") or address.get_slice(".", 0).to_int() == 0 or address.get_slice(".", 0).to_int() >= 224:
 				continue
 			var second_octet: int = address.get_slice(".", 1).to_int()
 			var is_private: bool = address.begins_with("192.168.") or address.begins_with("10.") or (address.begins_with("172.") and second_octet >= 16 and second_octet <= 31)
-			var rank: int = (2 if is_lan else 0) + (1 if is_private else 0)
-			if rank > best_rank:
-				candidate = address
-				best_rank = rank
-	return candidate
+			var tier: int = 4 if virtual else (0 if is_lan and is_private else (1 if is_lan else (2 if is_private else 3)))
+			tiers[tier].append(address)
+	var ranked := PackedStringArray()
+	for tier: PackedStringArray in tiers:
+		for address: String in tier:
+			if address not in ranked and ranked.size() < MultiplayerSession.MAX_INVITE_ADDRESSES:
+				ranked.append(address)
+	return ranked

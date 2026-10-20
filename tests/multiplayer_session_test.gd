@@ -50,6 +50,17 @@ func _test_host_address_selection() -> void:
 		_check(MultiplayerLobby._preferred_host_address(interfaces) == "172.20.1.5", "LAN adapter is preferred on supported desktop interface names: " + name)
 	_check(MultiplayerLobby._preferred_host_address([{"name": "utun4", "addresses": ["172.16.0.2"]}]) == "172.16.0.2", "VPN-only machines retain an available numeric host address")
 	_check(MultiplayerLobby._preferred_host_address([{"name": "en0", "addresses": ["::1", "0.0.0.0", "127.0.0.1", "169.254.1.2", "224.0.0.1"]}]) == "127.0.0.1", "No usable interface falls back to local-only hosting")
+	# Windows lists WSL/Hyper-V switches as "vEthernet"; they never outrank Wi-Fi.
+	interfaces = [
+		{"name": "{guid-wsl}", "friendly": "vEthernet (WSL)", "addresses": ["172.28.16.1"]},
+		{"name": "docker0", "friendly": "docker0", "addresses": ["172.17.0.1"]},
+		{"name": "{guid-vpn}", "friendly": "Tailscale", "addresses": ["100.101.102.103"]},
+		{"name": "{guid-wifi}", "friendly": "Wi-Fi", "addresses": ["fe80::2", "192.168.0.42"]},
+		{"name": "{guid-eth}", "friendly": "Ethernet 2", "addresses": ["10.0.0.7"]},
+	]
+	_check(MultiplayerLobby._host_addresses(interfaces) == PackedStringArray(["192.168.0.42", "10.0.0.7", "100.101.102.103", "172.28.16.1", "172.17.0.1"]), "Every usable address is listed, physical LAN first and virtual adapters last: %s" % [MultiplayerLobby._host_addresses(interfaces)])
+	_check(MultiplayerLobby._advertised_addresses("", interfaces) == "192.168.0.42,10.0.0.7,100.101.102.103,172.28.16.1,172.17.0.1" and MultiplayerLobby._advertised_addresses("192.168.0.42", interfaces) == MultiplayerLobby._advertised_addresses("", interfaces), "The untouched Host IP invites through every network, best first")
+	_check(MultiplayerLobby._advertised_addresses("25.1.2.3", interfaces) == "25.1.2.3", "A typed address (VPN or public) is advertised alone")
 
 
 func _test_malformed_invites(port: int) -> void:
@@ -69,6 +80,9 @@ func _test_malformed_invites(port: int) -> void:
 		"GORCS1/127.0.0.1/%d/%s" % [port, token.left(31)],
 		"GORCS1/127.0.0.1/%d/%sz" % [port, token.left(31)],
 		"GORCS1/127.0.0.1/%d/%s/extra" % [port, token],
+		"GORCS1/127.0.0.1,localhost/%d/%s" % [port, token],
+		"GORCS1/,/%d/%s" % [port, token],
+		"GORCS1/%s/%d/%s" % [",".join(["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4", "10.0.0.5", "10.0.0.6", "10.0.0.7"]), port, token],
 	]
 	for code: String in malformed:
 		var snapshot: Dictionary = await _command("guest", {"action": "join", "code": code})
@@ -174,6 +188,19 @@ func _test_room_lifecycle(port: int) -> void:
 	_check(_matches(cancelled, {"result": true, "state": "IDLE", "count": 0, "error": "", "native_peers": []}), "A fresh unreachable attempt can be cancelled immediately after failure")
 	host_snapshot = await _command("host", {"action": "host", "port": port})
 	await _connect_guest("guest", "host", String(host_snapshot.get("code", "")))
+
+	# A multi-address invite skips an unanswering address and joins through the next.
+	await _command("guest", {"action": "leave"})
+	await _wait_for("host", {"state": "HOSTING", "count": 1, "native_peers": []}, "The host waits again before the fallback join")
+	var live: PackedStringArray = String(host_snapshot.get("code", "")).split("/")
+	var started: int = Time.get_ticks_msec()
+	await _connect_guest("guest", "host", "%s/192.0.2.1,%s/%s/%s" % [live[0], live[1], live[2], live[3]])
+	_check(Time.get_ticks_msec() - started < int((MultiplayerSession.ADDRESS_ATTEMPT_SECONDS + 5.0) * 1000.0), "The guest falls back to the next invite address within one attempt window")
+	var listed: Dictionary = await _command("host", {"action": "leave"})
+	listed = await _command("host", {"action": "host", "address": "192.0.2.1, 127.0.0.1", "port": port})
+	_check(String(listed.get("code", "")).begins_with("GORCS1/192.0.2.1,127.0.0.1/"), "Hosting with several addresses lists them all, in order, in one invite")
+	await _wait_for("guest", {"state": "ERROR", "count": 0, "native_peers": []}, "The guest notices the host left")
+	await _connect_guest("guest", "host", String(listed.get("code", "")))
 
 
 func _connect_guest(guest_lane: String, host_lane: String, code: String) -> void:
