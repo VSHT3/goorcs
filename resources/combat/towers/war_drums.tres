@@ -10,7 +10,7 @@ reward = ExtResource("2_reward")
 damage = 0
 range_cells = 2.0
 interval = 1.0
-cost = 90
+cost = 110
 upgrade_base_cost = 50
 behavior_kind = "support"
 ; Different stack groups combine; strongest duplicate per component wins.
@@ -18,17 +18,36 @@ behavior_config = {"stack_group": "war_drums", "damage_bonus": 0.15, "attack_spe
 upgrade_effects = {"damage": {"damage_bonus": 0.1}, "speed": {"attack_speed_bonus": 0.1}}
 roll_profile = "support"
 roll_attributes = PackedStringArray("range", "support_buff")
+; Branch steps raise their aura with behavior_add; range_bonus widens the
+; tower's own aura radius. range_aura adds reach to nearby attacking towers and
+; crit_chance gives their discrete hits that chance to deal double damage.
 evolutions = {
 "forge": {
 "title": "Forge",
-"cost": 300,
+"cost": 550,
 "behavior_kind": "support",
-"behavior_config": {"stack_group": "forge", "damage_bonus": 0.5, "attack_speed_bonus": 0.0}
+"behavior_config": {"stack_group": "forge", "damage_bonus": 0.3, "attack_speed_bonus": 0.0},
+"upgrades": [{"id": "tempered_steel", "title": "Tempered Steel", "cost": 600, "behavior_add": {"damage_bonus": 0.1}, "description": "+10% damage aura"}, {"id": "master_smith", "title": "Master Smith", "cost": 900, "range_bonus": 0.5, "behavior_add": {"damage_bonus": 0.1}, "description": "+10% damage aura · +0.5 aura radius"}, {"id": "dragonfire_forge", "title": "Dragonfire Forge", "cost": 1500, "behavior_add": {"damage_bonus": 0.2}, "description": "+20% damage aura"}]
 },
 "command_banner": {
 "title": "Command Banner",
-"cost": 300,
+"cost": 550,
 "behavior_kind": "support",
-"behavior_config": {"stack_group": "command_banner", "damage_bonus": 0.0, "attack_speed_bonus": 0.5}
+"behavior_config": {"stack_group": "command_banner", "damage_bonus": 0.0, "attack_speed_bonus": 0.3},
+"upgrades": [{"id": "drill_sergeant", "title": "Drill Sergeant", "cost": 600, "behavior_add": {"attack_speed_bonus": 0.1}, "description": "+10% attack speed aura"}, {"id": "rallying_cry", "title": "Rallying Cry", "cost": 900, "range_bonus": 0.5, "behavior_add": {"attack_speed_bonus": 0.1}, "description": "+10% attack speed aura · +0.5 aura radius"}, {"id": "warlords_standard", "title": "Warlord's Standard", "cost": 1500, "behavior_add": {"attack_speed_bonus": 0.2}, "description": "+20% attack speed aura"}]
+},
+"lookout_horn": {
+"title": "Lookout Horn",
+"cost": 500,
+"behavior_kind": "support",
+"behavior_config": {"stack_group": "lookout_horn", "damage_bonus": 0.05, "attack_speed_bonus": 0.05, "range_aura": 0.75},
+"upgrades": [{"id": "signal_fires", "title": "Signal Fires", "cost": 600, "range_bonus": 0.5, "behavior_add": {"range_aura": 0.25}, "description": "Nearby towers +0.25 range · +0.5 aura radius"}, {"id": "eagle_eyes", "title": "Eagle Eyes", "cost": 900, "behavior_add": {"range_aura": 0.25, "crit_chance": 0.05}, "description": "Nearby towers +0.25 range and 5% crit chance"}, {"id": "all_seeing_tower", "title": "All-Seeing Tower", "cost": 1500, "range_bonus": 1.0, "behavior_add": {"range_aura": 0.5}, "description": "Nearby towers +0.5 range · +1 aura radius"}]
+},
+"bloodlust_totem": {
+"title": "Bloodlust Totem",
+"cost": 500,
+"behavior_kind": "support",
+"behavior_config": {"stack_group": "bloodlust_totem", "damage_bonus": 0.05, "attack_speed_bonus": 0.05, "crit_chance": 0.1},
+"upgrades": [{"id": "sharpened_hooks", "title": "Sharpened Hooks", "cost": 600, "behavior_add": {"crit_chance": 0.05}, "description": "+5% crit chance aura"}, {"id": "blood_frenzy", "title": "Blood Frenzy", "cost": 900, "behavior_add": {"crit_chance": 0.05, "damage_bonus": 0.05}, "description": "+5% crit chance and +5% damage aura"}, {"id": "skullsplitter_totem", "title": "Skullsplitter Totem", "cost": 1500, "behavior_add": {"crit_chance": 0.1, "range_aura": 0.25}, "description": "+10% crit chance aura · nearby towers +0.25 range"}]
 }
 }

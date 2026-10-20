@@ -1796,7 +1796,7 @@ func _draw_tesla_sparks(tower: Dictionary, rect: Rect2) -> void:
 
 # Endgame sparks spiralling up from the tower, coloured by branch.
 func _draw_rising_motes(tower: Dictionary, foot: Vector2, top: Vector2) -> void:
-	var colors: Dictionary = {"boulders": Color("ffb347"), "onyx_ring": Color("d9c8ff"), "storm_sigil": STORM_COLOR, "void_monolith": Color("c79bff"), "bounce": MAGIC_CORE, "pierce": Color("ffcf7a"), "crystal_mine": SHARD_COLOR, "siege_arm": Color("ff9a3a"), "long_toss": Color("b6e37a")}
+	var colors: Dictionary = {"boulders": Color("ffb347"), "onyx_ring": Color("d9c8ff"), "storm_sigil": STORM_COLOR, "void_monolith": Color("c79bff"), "bounce": MAGIC_CORE, "pierce": Color("ffcf7a"), "crystal_mine": SHARD_COLOR, "siege_arm": Color("ff9a3a"), "long_toss": Color("b6e37a"), "forge": Color("8fe6ff"), "command_banner": Color("ff8a6a"), "lookout_horn": Color("ffd27a"), "bloodlust_totem": Color("ff4d4d")}
 	var color: Color = colors.get(tower.get("evolution", ""), MAGIC_CORE)
 	var pixel: float = maxf(2.0, roundf(_cell_size() * 0.025))
 	for index: int in range(10):

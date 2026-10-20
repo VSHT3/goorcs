@@ -234,6 +234,13 @@ static func _valid_board_variants(tower: TowerDefinition) -> bool:
 			for step: Variant in steps:
 				if step is Dictionary and typeof(step.get("id")) == TYPE_STRING:
 					branches[step["id"]] = true
+		var capstones: Variant = config.get("capstones")
+		if capstones is Dictionary:
+			for path: Variant in capstones:
+				if capstones[path] is Array:
+					for step: Variant in capstones[path]:
+						if step is Dictionary and typeof(step.get("id")) == TYPE_STRING:
+							branches[step["id"]] = true
 	for branch: Variant in art.board_variants:
 		if typeof(branch) != TYPE_STRING or String(branch).is_empty() or not branches.has(branch) or not art.board_variants[branch] is Dictionary:
 			return false

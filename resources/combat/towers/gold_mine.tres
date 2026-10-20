@@ -34,7 +34,13 @@ evolutions = {
 ; at zero; the interval applies once an upgrade adds periodic production.
 "behavior_config": {"clear_shards": 2, "periodic_shards": 0, "periodic_interval": 8.0},
 "description": "Digs Shards instead of Coins: 2 Shards each time a round is cleared.",
-"upgrades": [{"id": "deeper_veins", "title": "Deeper Veins", "cost": 400, "behavior_add": {"clear_shards": 2}, "description": "+2 Shards per cleared round."}, {"id": "geode_drill", "title": "Geode Drill", "cost": 550, "behavior_add": {"periodic_shards": 1}, "description": "Also drills 1 Shard every 8 combat seconds."}, {"id": "resonant_lattice", "title": "Resonant Lattice", "cost": 750, "periodic_interval_multiplier": 0.6, "behavior_add": {"periodic_shards": 1}, "description": "Drills 2 Shards per cycle, 40% more often."}, {"id": "mother_lode", "title": "Mother Lode", "cost": 1500, "periodic_interval_multiplier": 0.75, "behavior_add": {"clear_shards": 4, "periodic_shards": 1}, "description": "Endgame. +4 Shards per cleared round, 3 Shards per cycle, 25% more often."}]
+"upgrades": [{"id": "deeper_veins", "title": "Deeper Veins", "cost": 400, "behavior_add": {"clear_shards": 2}, "description": "+2 Shards per cleared round."}, {"id": "geode_drill", "title": "Geode Drill", "cost": 550, "behavior_add": {"periodic_shards": 1}, "description": "Also drills 1 Shard every 8 combat seconds."}, {"id": "resonant_lattice", "title": "Resonant Lattice", "cost": 750, "periodic_interval_multiplier": 0.6, "behavior_add": {"periodic_shards": 1}, "description": "Drills 2 Shards per cycle, 40% more often."}, {"id": "mother_lode", "title": "Mother Lode", "cost": 1500, "periodic_interval_multiplier": 0.75, "behavior_add": {"clear_shards": 4, "periodic_shards": 1}, "description": "Endgame. +4 Shards per cleared round, 3 Shards per cycle, 25% more often."}],
+; After Mother Lode, one exclusive late path: base durability or a compounding
+; Shard multiplier (a late-game Coin sink).
+"capstones": {
+"heart_of_the_mountain": [{"id": "heart_of_the_mountain", "title": "Heart of the Mountain", "cost": 1500, "base_max_health": 5, "base_regen": 5, "description": "+5 base max HP, restored at once; regenerates 5 base HP each cleared round."}],
+"mother": [{"id": "mother_i", "title": "Mother I", "cost": 1000, "output_multiplier": 1.1, "description": "+10% Shard output."}, {"id": "mother_ii", "title": "Mother II", "cost": 2000, "output_multiplier": 1.1, "description": "+10% Shard output, compounding."}, {"id": "mother_iii", "title": "Mother III", "cost": 3000, "output_multiplier": 1.1, "description": "+10% Shard output, compounding."}]
+}
 },
 "bounty_board": {
 "title": "Bounty Board",

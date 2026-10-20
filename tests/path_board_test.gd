@@ -576,7 +576,8 @@ func _check_translucent_art(underlay: Image, ghost: Image, actual_underlay: Imag
 func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
 	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
 	board.tower_types = {
-		"rune_obelisk": {"range": 1.0, "area_attack": true},
+		# The shipped Rune reach: 1.5 covers the 3x3 neighbourhood with circular range.
+		"rune_obelisk": {"range": 1.5, "area_attack": true},
 		"arrow_tower": {"range": 2.0, "area_attack": false},
 	}
 	for mirrored: bool in [false, true]:
@@ -631,7 +632,7 @@ func _check_ranges_and_attacks(board: PathBoard, viewport: SubViewport) -> void:
 
 func _check_rune_evolutions(board: PathBoard, viewport: SubViewport) -> void:
 	board.layout = PathLayout.new(Vector2i(5, 5), 20, Vector2i(0, 2), Vector2i(4, 2))
-	board.tower_types = {"rune_obelisk": {"range": 1.0, "area_attack": true}}
+	board.tower_types = {"rune_obelisk": {"range": 1.5, "area_attack": true}}
 	board.selected_tower_id = -1
 	for mirrored: bool in [false, true]:
 		board.mirror_horizontal = mirrored

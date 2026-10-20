@@ -2,9 +2,10 @@ extends "res://tests/match_planning_test.gd"
 
 
 func _run() -> void:
-	success_message = "PASS: isolated pacing clocks, solo mirroring, legal-route autoplay, finite rewards/results, and real peer consent/ownership/shared rosters/disconnect/rejoin"
+	success_message = "PASS: isolated pacing clocks, solo mirroring, legal-route autoplay, full autoplay through strategy rounds, finite rewards/results, and real peer consent/ownership/shared rosters/disconnect/rejoin"
 	_suite_deadline_msec = Time.get_ticks_msec() + 90000
 	_test_solo_autoplay()
+	_test_solo_full_autoplay()
 	_test_simulation_clock()
 	_directory = OS.get_temp_dir().path_join("goorcs_pacing_test_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	DirAccess.make_dir_recursive_absolute(_directory)
@@ -53,6 +54,28 @@ func _dispose_model(planning: MatchPlanning) -> void:
 func _model_route(planning: MatchPlanning) -> void:
 	for x: int in range(1, 13):
 		planning.request_edit(0, Vector2i(x, 4), true)
+
+
+func _test_solo_full_autoplay() -> void:
+	var planning: MatchPlanning = _new_solo(_model_rules())
+	_model_route(planning)
+	planning.request_pacing("autoplay", true)
+	_check(planning.combat["autoplay"] and not planning.combat["full_autoplay"] and planning.combat["wave"] == 0, "Plain autoplay still waits for Ready in the setup round")
+	planning.request_pacing("full_autoplay", true)
+	_check(planning.combat["full_autoplay"] and planning.combat["full_autoplay_votes"] == [true, true] and planning.combat["autoplay_votes"] == [true, true], "Full autoplay mirrors both solo votes and implies autoplay")
+	_check(planning.combat["wave"] == 1 and planning.locked, "Full autoplay starts the setup round once both paths are legal")
+	planning.request_pacing("autoplay", false)
+	_check(not planning.combat["autoplay"] and not planning.combat["full_autoplay"] and planning.combat["full_autoplay_votes"] == [false, false], "Withdrawing autoplay also withdraws full autoplay")
+	for tick: int in range(40):
+		if planning.combat["phase"] == MatchCombat.Phase.PLANNING:
+			break
+		planning._physics_process(0.5)
+	_check(planning.debug_set_values(10, 100, 8) and planning.combat["main_round"], "Fixture reaches a main round")
+	planning.request_pacing("autoplay", true)
+	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 9, "Plain autoplay pauses for the main round")
+	planning.request_pacing("full_autoplay", true)
+	_check(planning.combat["phase"] == MatchCombat.Phase.WAVE and planning.combat["wave"] == 10, "Full autoplay runs main rounds too")
+	_dispose_model(planning)
 
 
 func _test_solo_autoplay() -> void:

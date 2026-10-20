@@ -14,6 +14,8 @@ const NO_BONUS: Dictionary = {}
 var phase: Phase = Phase.PLANNING
 var wave: int = 0
 var base_health: Array[int] = []
+# Starting health plus every Heart of the Mountain bonus on that board.
+var base_max_health: Array[int] = []
 var coins: Array[int] = []
 var reroll_currency: Array[int] = [0, 0]
 # Recurring bonus on each surviving wave clear; queues belong to the target board.
@@ -70,6 +72,8 @@ var _roll_random := RandomNumberGenerator.new()
 var _drop_random := RandomNumberGenerator.new()
 # Magic Ballista bounce rolls never perturb waves, placement rolls or drops.
 var _magic_random := RandomNumberGenerator.new()
+# Critical hits from Bloodlust auras; only towers with crit chance draw from it.
+var _crit_random := RandomNumberGenerator.new()
 # Birth mutations never consume composition, timing, send, loot or combat rolls.
 var _variant_random := RandomNumberGenerator.new()
 # Per-source accepted exposure, not fractional HP or render-frame contacts.
@@ -139,6 +143,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 	if drop_random == null:
 		_drop_random.seed = _wave_random.seed ^ 0x44524f50
 	_magic_random.seed = _wave_random.seed ^ 0x4d414749
+	_crit_random.seed = _wave_random.seed ^ 0x43524954
 	_variant_random.seed = _wave_random.seed ^ 0x56415249
 	var reward_random := RandomNumberGenerator.new()
 	reward_random.seed = _wave_random.seed ^ 0x424f5353
@@ -159,6 +164,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		push_error("Combat speed requires a finite nonnegative baseline/growth fraction and positive milestone round span")
 		_roster_configuration_valid = false
 	base_health = [rules.base_health, rules.base_health]
+	base_max_health = [rules.base_health, rules.base_health]
 	coins = [rules.starting_coins, rules.starting_coins]
 	if rules.catalog == null:
 		push_error("Combat requires a content catalog")
@@ -311,7 +317,8 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"rarity": rolled["rarity"], "attributes": rolled["attributes"].duplicate(true),
 		"rarity_rerolls": 0, "attribute_rerolls": 0,
 		"rarity_reroll_cost": -1, "attribute_reroll_cost": -1,
-		"support_damage_bonus": 0.0, "support_speed_bonus": 0.0,
+		"support_damage_bonus": 0.0, "support_speed_bonus": 0.0, "support_range_bonus": 0.0, "crit_chance": 0.0, "crits": 0,
+		"capstone": "", "base_max_health_bonus": 0, "base_regen": 0, "output_multiplier": 1.0,
 		"invested": 0 if _sandbox_mode else cost, "sell_value": 0 if _sandbox_mode else _sell_value(cost),
 	})
 	_recap.register_tower(slot, towers[slot].back())
@@ -409,7 +416,7 @@ func _refresh_board(slot: int) -> void:
 		var magic_bounce: Dictionary = {}
 		var magic_split: int = 1
 		var orbit_bonus: int = 0
-		var extra_range: int = 0
+		var extra_range: float = 0.0
 		var max_hp_drain: float = float(branch.get("max_hp_damage", 0.0))
 		var interval_scale: float = 1.0
 		for step: Dictionary in branch.get("upgrades", []):
@@ -422,12 +429,23 @@ func _refresh_board(slot: int) -> void:
 				magic_bounce = step["magic_bounce"].duplicate()
 			magic_split = maxi(magic_split, int(step.get("magic_split", 1)))
 			orbit_bonus += int(step.get("orbit_bonus", 0))
-			extra_range += int(step.get("range_bonus", 0))
+			extra_range += float(step.get("range_bonus", 0.0))
 			max_hp_drain += float(step.get("max_hp_damage", 0.0))
 			interval_scale *= float(step.get("periodic_interval_multiplier", 1.0))
 			var added: Dictionary = step.get("behavior_add", {})
 			for key: String in added:
 				behavior[key] = behavior.get(key, 0) + added[key]
+		var output_multiplier: float = 1.0
+		var max_health_bonus: int = 0
+		var regen: int = 0
+		for step: Dictionary in branch.get("capstones", {}).get(tower.get("capstone", ""), []):
+			if tower["branch_upgrades"].has(step["id"]):
+				output_multiplier *= float(step.get("output_multiplier", 1.0))
+				max_health_bonus += int(step.get("base_max_health", 0))
+				regen += int(step.get("base_regen", 0))
+		tower["output_multiplier"] = output_multiplier
+		tower["base_max_health_bonus"] = max_health_bonus
+		tower["base_regen"] = regen
 		if kind == "crystal":
 			behavior["periodic_interval"] = float(behavior["periodic_interval"]) * interval_scale
 		tower["branch_pierce"] = branch_pierce
@@ -439,16 +457,14 @@ func _refresh_board(slot: int) -> void:
 		tower["max_hp_drain"] = max_hp_drain
 		var base_range: float = float(config.get("range_cells", definition["range"])) + extra_range
 		var range_bonus: float = float(modifiers.get("range", 0.0))
-		tower["range"] = base_range
-		# A signed range roll must change usable tiles, not just a fractional label.
-		# Zero preserves authored geometry; drawbacks floor at one cell or a smaller base.
-		if range_bonus > 0.0:
-			tower["range"] = ceilf(base_range * (1.0 + range_bonus))
-		elif range_bonus < 0.0:
-			tower["range"] = maxf(minf(1.0, base_range), floorf(base_range * (1.0 + range_bonus)))
+		# Rolled range scales the circular reach proportionally; drawbacks never
+		# shrink it below one cell (or a smaller authored base).
+		tower["range"] = maxf(minf(1.0, base_range), base_range * (1.0 + range_bonus)) if range_bonus < 0.0 else base_range * (1.0 + range_bonus)
 		tower["behavior_config"] = behavior
 		tower["support_damage_bonus"] = 0.0
 		tower["support_speed_bonus"] = 0.0
+		tower["support_range_bonus"] = 0.0
+		tower["crit_chance"] = 0.0
 		var damage_bonus: float = 0.0
 		var speed_bonus: float = 0.0
 		var income_bonus: float = float(modifiers.get("economy_production", 0.0))
@@ -465,12 +481,15 @@ func _refresh_board(slot: int) -> void:
 			var speed: float = float(behavior["attack_speed_bonus"])
 			behavior["damage_bonus"] = (damage + (damage_bonus + speed_bonus if speed == 0.0 else damage_bonus)) * strength if damage > 0.0 else 0.0
 			behavior["attack_speed_bonus"] = (speed + (damage_bonus + speed_bonus if damage == 0.0 else speed_bonus)) * strength if speed > 0.0 else 0.0
+			for aura: String in ["range_aura", "crit_chance"]:
+				if behavior.has(aura):
+					behavior[aura] = float(behavior[aura]) * strength
 		elif kind == "economy":
 			behavior["clear_income"] = ceili(float(behavior["clear_income"]) * (1.0 + income_bonus))
 			behavior["periodic_income"] = ceili(float(behavior["periodic_income"]) * (1.0 + income_bonus))
 		elif kind == "crystal":
-			behavior["clear_shards"] = ceili(float(behavior["clear_shards"]) * (1.0 + income_bonus))
-			behavior["periodic_shards"] = ceili(float(behavior["periodic_shards"]) * (1.0 + income_bonus))
+			behavior["clear_shards"] = ceili(float(behavior["clear_shards"]) * (1.0 + income_bonus) * output_multiplier - 0.000000001)
+			behavior["periodic_shards"] = ceili(float(behavior["periodic_shards"]) * (1.0 + income_bonus) * output_multiplier - 0.000000001)
 		elif kind == "bounty":
 			behavior["mark_income_bonus"] = float(behavior["mark_income_bonus"]) * (1.0 + income_bonus)
 		elif kind == "income_aura":
@@ -484,10 +503,13 @@ func _refresh_board(slot: int) -> void:
 				behavior["successive_hit_bonus"] += float(definition["special_upgrade_config"].get("successive_hit_bonus", 0.0))
 		tower["rarity_reroll_cost"] = -1 if _roll_rules == null else (0 if _sandbox_mode else _roll_rules.rarity_reroll_cost(tower["rarity_rerolls"]))
 		tower["attribute_reroll_cost"] = -1 if _roll_rules == null else (0 if _sandbox_mode else _roll_rules.attribute_reroll_cost(tower["attribute_rerolls"]))
+	_refresh_max_health(slot)
 	for tower: Dictionary in towers[slot]:
 		# Keep bonuses as 64-bit floats; Vector2 components narrow them to 32-bit.
 		var damage_groups: Dictionary[String, float] = {}
 		var speed_groups: Dictionary[String, float] = {}
+		var range_groups: Dictionary[String, float] = {}
+		var crit_groups: Dictionary[String, float] = {}
 		for support: Dictionary in towers[slot]:
 			if support["behavior_kind"] != "support" or float(support["stunned_remaining"]) > 0.000000001 or not cell_in_range(support["cell"], tower["cell"], support["range"]):
 				continue
@@ -495,10 +517,20 @@ func _refresh_board(slot: int) -> void:
 			var group: String = config["stack_group"]
 			damage_groups[group] = maxf(damage_groups.get(group, 0.0), float(config["damage_bonus"]))
 			speed_groups[group] = maxf(speed_groups.get(group, 0.0), float(config["attack_speed_bonus"]))
+			range_groups[group] = maxf(range_groups.get(group, 0.0), float(config.get("range_aura", 0.0)))
+			crit_groups[group] = maxf(crit_groups.get(group, 0.0), float(config.get("crit_chance", 0.0)))
 		for bonus: float in damage_groups.values():
 			tower["support_damage_bonus"] += bonus
 		for bonus: float in speed_groups.values():
 			tower["support_speed_bonus"] += bonus
+		# Reach and crits only help towers that attack; auras never extend auras.
+		if tower["behavior_kind"] in ["attack", "chain", "catapult"]:
+			for bonus: float in range_groups.values():
+				tower["support_range_bonus"] += bonus
+			tower["range"] = float(tower["range"]) + float(tower["support_range_bonus"])
+			for bonus: float in crit_groups.values():
+				tower["crit_chance"] += bonus
+			tower["crit_chance"] = minf(float(tower["crit_chance"]), TowerDefinition.MAX_CRIT_CHANCE)
 		var modifiers: Dictionary = tower["modifiers"]
 		var damage_multiplier: float = (1.0 + float(modifiers.get("damage", 0.0))) * (1.0 + float(tower["support_damage_bonus"]))
 		var speed_multiplier: float = (1.0 + float(modifiers.get("attack_speed", 0.0))) * (1.0 + float(tower["support_speed_bonus"]))
@@ -515,6 +547,14 @@ func _refresh_board(slot: int) -> void:
 			if index >= 0:
 				enemies[slot][index]["bounty_damage_bonus"] = tower["behavior_config"]["mark_damage_bonus"]
 				enemies[slot][index]["bounty_income_bonus"] = tower["behavior_config"]["mark_income_bonus"]
+
+
+func _refresh_max_health(slot: int) -> void:
+	var maximum: int = _rules.base_health
+	for tower: Dictionary in towers[slot]:
+		maximum += int(tower.get("base_max_health_bonus", 0))
+	base_max_health[slot] = maximum
+	base_health[slot] = mini(base_health[slot], maximum)
 
 
 func _clear_tower_mark(slot: int, tower: Dictionary) -> void:
@@ -564,6 +604,18 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 	var steps: Array = current.get("upgrades", [])
 	var purchased_steps: Array = tower.get("branch_upgrades", [])
 	var branch_step: bool = purchased_steps.size() < steps.size() and steps[purchased_steps.size()]["id"] == upgrade
+	# After the last ordered step, one exclusive capstone path continues in order.
+	var capstone_path: String = ""
+	var capstone_config: Dictionary = {}
+	if not branch_step and not steps.is_empty() and purchased_steps.size() >= steps.size():
+		var capstones: Dictionary = current.get("capstones", {})
+		var chosen: String = tower.get("capstone", "")
+		var bought: int = purchased_steps.size() - steps.size()
+		for path: String in capstones:
+			var path_steps: Array = capstones[path]
+			if (chosen.is_empty() or chosen == path) and bought < path_steps.size() and path_steps[bought]["id"] == upgrade:
+				capstone_path = path
+				capstone_config = path_steps[bought]
 	var config: Dictionary = {}
 	var flag: String = ""
 	if upgrade in ["damage", "speed"]:
@@ -595,6 +647,8 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 		config = current["followup"]
 	elif branch_step:
 		config = steps[purchased_steps.size()]
+	elif not capstone_path.is_empty():
+		config = capstone_config
 	else:
 		return false
 	var cost: int = int(config["cost"]) if not config.is_empty() else (int(definition["special_upgrade_cost"]) if upgrade == "special" else tower_upgrade_cost(tower, definition))
@@ -644,6 +698,12 @@ func _upgrade_tower(slot: int, tower_id: int, upgrade: String, mirrored: bool) -
 		tower["continuous_fire_time"] = 0.0
 		tower["refuel_remaining"] = 0.0
 		tower["refuel_duration"] = float(config.get("refuel_duration", 0.0))
+	elif not capstone_path.is_empty():
+		tower["branch_upgrades"].append(upgrade)
+		tower["capstone"] = capstone_path
+		# The new maximum arrives filled; selling later only lowers the cap.
+		if base_health[slot] > 0:
+			base_health[slot] += int(config.get("base_max_health", 0))
 	elif branch_step:
 		tower["branch_upgrades"].append(upgrade)
 		# Compound on the evolved base, like Arrow attack-rate advancements.
@@ -706,8 +766,17 @@ static func _sell_value(invested: int) -> int:
 	return floori(float(invested) * 0.6)
 
 
+# Tower reach is a circle around the tower's cell centre: fractional range
+# bonuses add only the few tiles they actually reach, instead of a whole ring.
 static func cell_in_range(origin: Vector2i, cell: Vector2i, range_cells: float) -> bool:
-	return maxi(absi(cell.x - origin.x), absi(cell.y - origin.y)) <= range_cells
+	var dx: int = cell.x - origin.x
+	var dy: int = cell.y - origin.y
+	return float(dx * dx + dy * dy) <= range_cells * range_cells + 0.000001
+
+
+# Square (Chebyshev) blast areas for enemy death stuns and Giant bombs.
+static func cell_in_square(origin: Vector2i, cell: Vector2i, radius: float) -> bool:
+	return maxi(absi(cell.x - origin.x), absi(cell.y - origin.y)) <= radius
 
 
 func has_tower(slot: int, cell: Vector2i) -> bool:
@@ -1142,6 +1211,7 @@ func advance(delta: float) -> bool:
 					reroll_currency[slot] += dug
 					tower["shards_generated"] += dug
 					_recap.add(slot, "earned", "production_shards", dug)
+					base_health[slot] = mini(base_max_health[slot], base_health[slot] + int(tower.get("base_regen", 0)))
 				_reset_firing(tower)
 				_clear_stun(tower)
 			_refresh_board(slot)
@@ -1324,10 +1394,10 @@ func _advance_bombs() -> void:
 		var origin := Vector2i(Vector2(bomb["pos"]).round())
 		var duration: float = bomb["stun_duration"]
 		for tower: Dictionary in towers[slot]:
-			if cell_in_range(origin, tower["cell"], float(bomb["radius"])):
+			if cell_in_square(origin, tower["cell"], float(bomb["radius"])):
 				_stun_tower(slot, tower, duration, "giant_skeltorc_bomb", bomb["pos"])
 		for enemy: Dictionary in enemies[slot]:
-			if int(enemy["hp"]) <= 0 or not cell_in_range(origin, Vector2i(Vector2(enemy["pos"]).round()), float(bomb["radius"])):
+			if int(enemy["hp"]) <= 0 or not cell_in_square(origin, Vector2i(Vector2(enemy["pos"]).round()), float(bomb["radius"])):
 				continue
 			enemy["stunned_remaining"] = maxf(float(enemy["stunned_remaining"]), duration)
 			enemy["stun_count"] += 1
@@ -1682,7 +1752,7 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 
 func snapshot(include_metadata: bool = true) -> Dictionary:
 	var result: Dictionary = {
-		"phase": phase, "wave": wave, "health": base_health.duplicate(),
+		"phase": phase, "wave": wave, "health": base_health.duplicate(), "max_health": base_max_health.duplicate(),
 		"statistics_id": statistics_id, "enemy_totals": enemy_totals.duplicate(true),
 		"recap": _recap.snapshot(_death_time) if phase == Phase.FINISHED else {},
 		"winner": winner, "coin_flip": coin_flip,
@@ -2447,8 +2517,8 @@ func _attack_pierce(slot: int, tower: Dictionary, range_cells: float, primary_in
 		tower["pierce_active"] = true
 		var reach: float = range_cells + float(tower.get("bolt_reach", 0.0))
 		var lane: float = 0.25 * float(tower.get("bolt_scale", 1.0))
-		var radius: float = floorf(reach) + 0.5 - 0.000001
-		tower["pierce_aim"] = origin + direction * (radius / maxf(absf(direction.x), absf(direction.y)))
+		# The straight bolt flies on to just past the circular reach.
+		tower["pierce_aim"] = origin + direction * (reach + 0.5 - 0.000001)
 		for contact: int in range(1 + pierce):
 			var selected: int = -1
 			var best_distance: float = INF
@@ -2836,7 +2906,7 @@ func _record_death(slot: int, enemy: Dictionary) -> void:
 	if float(definition["death_stun_duration"]) > 0.0:
 		var origin := Vector2i(Vector2(enemy["pos"]).round())
 		for tower: Dictionary in towers[slot]:
-			if cell_in_range(origin, tower["cell"], float(definition["death_stun_radius"])):
+			if cell_in_square(origin, tower["cell"], float(definition["death_stun_radius"])):
 				_stun_tower(slot, tower, float(definition["death_stun_duration"]), "kamikaorc", enemy["pos"])
 		_refresh_board(slot)
 		_update_bounties(slot)
@@ -2921,6 +2991,10 @@ func _accumulate_bonus(slot: int, enemy: Dictionary, credit: Dictionary, base_da
 func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, bounty_applied: bool = false, damage_type: StringName = &"", credit: Dictionary = NO_BONUS, shield_checked: bool = false) -> bool:
 	var enemy: Dictionary = enemies[slot][enemy_index]
 	var base_damage: int = int(tower["damage"]) if damage == -1 else damage
+	# Discrete hits may crit; continuous streams and burns (bounty_applied) never do.
+	var critical: bool = not bounty_applied and float(tower.get("crit_chance", 0.0)) > 0.0 and _crit_random.randf() < float(tower["crit_chance"])
+	if critical:
+		base_damage = ceili(float(base_damage) * TowerDefinition.CRIT_MULTIPLIER - 0.000000001)
 	var incoming_damage: int = base_damage
 	if not bounty_applied:
 		var resolved_type: StringName = _tower_damage_type(tower) if damage_type == &"" else damage_type
@@ -2954,6 +3028,8 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 		if indirect > 0:
 			source["indirect_damage"] += indirect
 	tower["damage_dealt"] += hit_damage - indirect
+	if critical and hit_damage > 0:
+		tower["crits"] = int(tower.get("crits", 0)) + 1
 	enemy["hp"] -= hit_damage
 	if hit_damage > 0:
 		EnemyMechanics.after_damage(enemy, _enemy_types[enemy["type_id"]])

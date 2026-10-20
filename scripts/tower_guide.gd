@@ -197,6 +197,15 @@ static func _stages(definition: TowerDefinition) -> Array[Dictionary]:
 			step_path.append(String(step["id"]))
 			stages.append(_stage(step_path, step["title"], step_parent))
 			step_parent = "/".join(step_path)
+		# Exclusive capstone paths fork from the last ordered step.
+		var capstones: Dictionary = branch.get("capstones", {})
+		for capstone: String in capstones:
+			var capstone_path: Array[String] = step_path.duplicate()
+			var capstone_parent: String = step_parent
+			for step: Dictionary in capstones[capstone]:
+				capstone_path.append(String(step["id"]))
+				stages.append(_stage(capstone_path, step["title"], capstone_parent))
+				capstone_parent = "/".join(capstone_path)
 	return stages
 
 
@@ -238,4 +247,8 @@ static func _command_title(catalog: ContentCatalog, type_id: StringName, command
 			for step: Dictionary in branch.get("upgrades", []):
 				if step["id"] == command:
 					return step["title"]
+			for path_steps: Array in branch.get("capstones", {}).values():
+				for step: Dictionary in path_steps:
+					if step["id"] == command:
+						return step["title"]
 	return command

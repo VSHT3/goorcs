@@ -143,7 +143,9 @@ func _execute_command(command: Dictionary) -> void:
 				var model: MatchCombat = planning._host_combat
 				for index: int in range(model.enemies[0].size()):
 					var enemy: Dictionary = model.enemies[0][index]
-					enemy["progress"] = 0.0 if index == 0 else 4.0
+					# Inside the Ballista's circular 4-cell reach from (4, 3): the
+					# victim starts west at x=1, the decoy waits south at x=4.
+					enemy["progress"] = 1.0 if index == 0 else 4.0
 					enemy["pos"] = model._position(enemy["route"], enemy["progress"])
 					enemy["hp"] = 300 if index == 0 else 100
 					enemy["max_hp"] = enemy["hp"]
@@ -170,7 +172,7 @@ func _execute_command(command: Dictionary) -> void:
 							enemy["progress"] = 12.0
 							enemy["pos"] = model._position(enemy["route"], enemy["progress"])
 						"dead":
-							enemy["progress"] = 8.001
+							enemy["progress"] = 7.001
 							enemy["pos"] = model._position(enemy["route"], enemy["progress"])
 							enemy["hp"] = 0
 						"absent":

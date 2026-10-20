@@ -247,13 +247,13 @@ func _test_range_and_ties() -> void:
 	combat.build(0, Vector2i(4, 3), &"arrow_tower", 0)
 	combat.start_wave(_routes())
 	combat.advance(0.1)
-	_check(combat.enemies[0][0]["hp"] == 4 and combat.towers[0][0]["shot"] == 1 and combat.towers[0][1]["shot"] == 1 and combat.towers[0][2]["shot"] == 0, "Tile range includes the full diagonal boundary and excludes the next outer tile")
-	_check(MatchCombat.cell_in_range(Vector2i.ZERO, Vector2i(1, 1), 1.0) and not MatchCombat.cell_in_range(Vector2i.ZERO, Vector2i(2, 1), 1.0), "Shared range rule includes eight neighboring cells only at range one")
-	# Tile membership rounds the authoritative position; it is not a continuous circle.
+	_check(combat.enemies[0][0]["hp"] == 6 and combat.towers[0][0]["shot"] == 1 and combat.towers[0][1]["shot"] == 0 and combat.towers[0][2]["shot"] == 0, "Circular range reaches its straight-line edge but not the square's far diagonal corner")
+	_check(MatchCombat.cell_in_range(Vector2i.ZERO, Vector2i(1, 0), 1.0) and not MatchCombat.cell_in_range(Vector2i.ZERO, Vector2i(1, 1), 1.0) and MatchCombat.cell_in_range(Vector2i.ZERO, Vector2i(1, 1), 1.5), "Range one reaches the four orthogonal neighbours; 1.5 adds the diagonals")
+	# Tile membership rounds the authoritative position, then measures between tile centres.
 	combat.enemies[0][0]["pos"] = Vector2(0.49, 0.49)
-	_check(combat._target(0, combat.towers[0][1], 3.0) == 0, "Fractional position inside the entrance tile remains on its diagonal boundary")
-	combat.enemies[0][0]["pos"] = Vector2(-0.51, 0.0)
-	_check(combat._target(0, combat.towers[0][1], 3.0) == -1, "Rounded enemy tile beyond a boundary is not in range")
+	_check(combat._target(0, combat.towers[0][0], 3.0) == 0, "Fractional position inside the entrance tile is measured from that tile")
+	combat.enemies[0][0]["pos"] = Vector2(0.49, -0.51)
+	_check(combat._target(0, combat.towers[0][0], 3.0) == -1, "Rounded enemy tile beyond a boundary is not in range")
 	for mode: int in MatchCombat.TargetMode.values():
 		rules = _rules()
 		rules.enemy_speed = 0.0
@@ -493,7 +493,8 @@ func _test_area_kills_and_bounties() -> void:
 	rules.enemy_speed = 0.0
 	rules.enemy_health = 2
 	rules.spawn_interval = 0.0
-	var area := _definition(&"test_area", 2, 1.0, 0.5)
+	# 1.5 cells: the tile and its eight neighbours, as for an unevolved Rune.
+	var area := _definition(&"test_area", 2, 1.5, 0.5)
 	area.area_attack = true
 	rules.catalog.towers = [area]
 	rules.catalog.starter_tower_id = &""
@@ -1168,7 +1169,7 @@ func _test_second_archer_targets_and_cadence() -> void:
 	combat.start_wave(_routes(100, 100))
 	combat.advance(0.01)
 	combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.STRONGEST)
-	combat.enemies[0][0]["progress"] = 3.0
+	combat.enemies[0][0]["progress"] = 2.0
 	combat.enemies[0][0]["hp"] = 100
 	combat.enemies[0][1]["progress"] = 0.0
 	combat.enemies[0][1]["hp"] = 90
@@ -1252,14 +1253,15 @@ func _test_ballista_bounce() -> void:
 	combat.advance(0.01)
 	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 100 and not tower["bounce_active"], "Unupgraded ballista remains single-target")
 	combat.upgrade_tower(0, tower["id"], "bounce")
-	combat.enemies[0][0]["progress"] = 4.0
-	combat.enemies[0][1]["progress"] = 5.0
-	combat.enemies[0][2]["progress"] = 8.0
-	combat.enemies[0][3]["progress"] = 10.0
+	# From (0, 1) with circular range 4, (3, 0) is in range and (4, 0) is not.
+	combat.enemies[0][0]["progress"] = 3.0
+	combat.enemies[0][1]["progress"] = 4.0
+	combat.enemies[0][2]["progress"] = 7.0
+	combat.enemies[0][3]["progress"] = 9.0
 	combat.advance(float(tower["interval"]))
 	_check(combat.enemies[0][0]["hp"] == 82 and combat.enemies[0][1]["hp"] == 95 and combat.enemies[0][2]["hp"] == 100 and combat.enemies[0][3]["hp"] == 100, "Bounce hits only the nearest other enemy beyond tower range, once, for rounded-up half damage")
 	_check(tower["damage_dealt"] == 23, "Primary and redirected bolt damage both accumulate once across volleys")
-	_check(tower["bounce_active"] and tower["aim"] == Vector2(4, 0) and tower["bounce_aim"] == Vector2(5, 0), "Primary event captures sequential primary-hit and bounce endpoints")
+	_check(tower["bounce_active"] and tower["aim"] == Vector2(3, 0) and tower["bounce_aim"] == Vector2(4, 0), "Primary event captures sequential primary-hit and bounce endpoints")
 	# Equal distances use stable IDs even after array reordering and primary removal.
 	combat = _prepared_special(_special_rules(&"orc_ballista", 100, 3), &"orc_ballista")
 	tower = combat.towers[0][0]
@@ -1269,19 +1271,19 @@ func _test_ballista_bounce() -> void:
 	var primary: Dictionary = combat.enemies[0][0]
 	var lower_id: Dictionary = combat.enemies[0][1]
 	var higher_id: Dictionary = combat.enemies[0][2]
-	primary["progress"] = 4.0
+	primary["progress"] = 3.0
 	primary["hp"] = 9
-	lower_id["progress"] = 5.0
+	lower_id["progress"] = 4.0
 	lower_id["hp"] = 5
-	higher_id["progress"] = 3.0
+	higher_id["progress"] = 2.0
 	higher_id["hp"] = 100
 	combat.enemies[0].reverse()
 	combat.set_targeting(0, tower["id"], MatchCombat.TargetMode.FURTHEST)
-	# The progress-five victim is outside range; progress-four remains primary.
+	# The progress-four victim is outside range; progress-three remains primary.
 	var before: int = combat.coins[0]
 	combat.advance(float(tower["interval"]))
 	_check(combat.enemies[0].size() == 1 and combat.enemies[0][0]["id"] == higher_id["id"] and combat.enemies[0][0]["hp"] == 100 and tower["kills"] == 2, "Bounce tie picks the smaller ID, survives primary removal, can kill and never chains to a third victim")
-	_check(combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]) and tower["aim"] == Vector2(4, 0) and tower["bounce_aim"] == Vector2(5, 0), "Both ballista kills retain tower attribution, bounties and immutable hit positions")
+	_check(combat.coins[0] == before + 2 * int(combat.snapshot()["rules"]["kill_bounty"]) and tower["aim"] == Vector2(3, 0) and tower["bounce_aim"] == Vector2(4, 0), "Both ballista kills retain tower attribution, bounties and immutable hit positions")
 	combat = _prepared_special(_special_rules(&"orc_ballista", 100, 1), &"orc_ballista")
 	tower = combat.towers[0][0]
 	combat.upgrade_tower(0, tower["id"], "bounce")
@@ -1352,7 +1354,7 @@ func _test_ballista_pierce_geometry() -> void:
 	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 91 and primary["hp"] == 100, "Two intervening enemies intercept Pierce before the aimed primary; only two total take full upgraded damage")
 	_check(tower["target_id"] == primary["id"] and tower["aim"] == Vector2(4, 1) and tower["pierce_active"] and not tower["bounce_active"] and tower["shot"] == 1, "Pierce retains the host-selected primary and aim without publishing a bounce")
 	var endpoint: Vector2 = tower["pierce_aim"]
-	_check(is_equal_approx(endpoint.x, 4.5) and is_equal_approx(endpoint.y, 1.0) and MatchCombat.cell_in_range(tower["cell"], Vector2i(endpoint.round()), 4.0), "Accepted straight bolt endpoint reaches the valid square range boundary")
+	_check(is_equal_approx(endpoint.x, 4.5) and is_equal_approx(endpoint.y, 1.0) and MatchCombat.cell_in_range(tower["cell"], Vector2i(endpoint.round()), 4.0), "Accepted straight bolt endpoint reaches just past the range boundary")
 	combat = _ballista_field([Vector2(-1, 1), Vector2(1, 1.251), Vector2(5, 1), Vector2(0, 1.2), Vector2(2, 1.25), Vector2(4, 1)])
 	tower = combat.towers[0][0]
 	combat._attack(0, 0.01)
@@ -1361,7 +1363,7 @@ func _test_ballista_pierce_geometry() -> void:
 	tower = combat.towers[0][0]
 	combat._attack(0, 0.01)
 	endpoint = tower["pierce_aim"]
-	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 91 and combat.enemies[0][2]["hp"] == 100 and combat.enemies[0][3]["hp"] == 100 and is_equal_approx(endpoint.x, 4.5) and is_equal_approx(endpoint.y, 5.5) and MatchCombat.cell_in_range(tower["cell"], Vector2i(endpoint.round()), 4.0), "Diagonal Pierce uses the straight ray and square Chebyshev edge, not a circular range")
+	_check(combat.enemies[0][0]["hp"] == 91 and combat.enemies[0][1]["hp"] == 91 and combat.enemies[0][2]["hp"] == 100 and combat.enemies[0][3]["hp"] == 100 and is_equal_approx(endpoint.distance_to(Vector2(tower["cell"])), 4.5) and is_equal_approx(endpoint.x, endpoint.y - 1.0), "Diagonal Pierce follows the straight ray to the circular range edge")
 	combat = _ballista_field([Vector2(1, 1), Vector2(1, 1), Vector2(1, 1), Vector2(4, 1)])
 	var lowest: Dictionary = combat.enemies[0][0]
 	var middle: Dictionary = combat.enemies[0][1]

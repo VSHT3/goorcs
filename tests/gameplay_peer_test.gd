@@ -284,7 +284,7 @@ func _support_scenario(code: String) -> void:
 		await _upgrade("host", 0, int(support["id"]), ["damage", "speed", "command_banner" if cell == Vector2i(4, 2) else "forge"])
 	state = await _agree("Independent permanent support families stack on actual peers")
 	archer = _tower(state, 0, Vector2i(4, 3))
-	_check(is_equal_approx(archer["support_damage_bonus"], 0.95) and is_equal_approx(archer["support_speed_bonus"], 0.95) and archer["damage"] == 20 and is_equal_approx(archer["interval"], 1.0 / 1.95), "Mixed Drums, pure-damage Forge and pure-speed Banner stack; duplicate Forges do not")
+	_check(is_equal_approx(archer["support_damage_bonus"], 0.75) and is_equal_approx(archer["support_speed_bonus"], 0.75) and archer["damage"] == 18 and is_equal_approx(archer["interval"], 1.0 / 1.75), "Mixed Drums, pure-damage Forge and pure-speed Banner stack; duplicate Forges do not")
 	_check(_tower(state, 1, Vector2i(4, 3))["damage"] == 10 and _tower(state, 1, Vector2i(4, 3))["interval"] == 1.0, "Support never crosses ownership into the opposing board")
 	var forge: Dictionary = _tower(state, 0, Vector2i(3, 2))
 	var banner: Dictionary = _tower(state, 0, Vector2i(4, 2))
@@ -447,13 +447,13 @@ func _directional_ballista_scenario(code: String) -> void:
 			var direction: int = 2 if view["mirrored"] else 6
 			_check(view["target_id"] == tower["target_id"] and _matches(view, {"poses": [direction, direction, direction]}) and view["released_pose"] == direction and view["trace_count"] == 1, "%s presents the host's westward shot and flips only its displayed directional choice" % lane)
 			_check(view["trace_aim"] == tower["aim"], "%s released bolt retains the actual accepted shot aim" % lane)
-	# Eight real host simulation seconds move only the accepted victim from west
+	# Six real host simulation seconds move only the accepted victim from west
 	# to east. The closer stationary decoy remains south; no new shot is due.
-	await _command("host", {"action": "step", "delta": 8.0})
+	await _command("host", {"action": "step", "delta": 6.0})
 	var moved: Dictionary = await _agree("Moving accepted victim reaches both real presentation consumers")
 	var moved_tower: Dictionary = _tower(moved, 0, Vector2i(4, 3))
 	_check(moved_tower["target_id"] == tower["target_id"] and moved_tower["aim"] == tower["aim"] and moved_tower["shot"] == tower["shot"], "Movement preserves the host's accepted target identity, release aim and shot counter")
-	_check(float(moved["enemies"][0][0]["progress"]) > 8.0 and float(moved["enemies"][0][1]["progress"]) == 4.0, "Actual host simulation moves the farther victim while its closer decoy stays south")
+	_check(float(moved["enemies"][0][0]["progress"]) > 7.0 and float(moved["enemies"][0][1]["progress"]) == 4.0, "Actual host simulation moves the farther victim while its closer decoy stays south")
 	var moving: Dictionary = await _ballista_views()
 	for lane: String in ["host", "guest"]:
 		for index: int in range(moving[lane].size()):

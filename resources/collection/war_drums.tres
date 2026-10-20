@@ -1,15 +1,21 @@
-[gd_resource type="Resource" script_class="TowerReward" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="TowerReward" load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
 [ext_resource type="Texture2D" path="res://assets/towers/war_drums.png" id="2_art"]
 [ext_resource type="Texture2D" path="res://assets/towers/forge.png" id="3_forge"]
 [ext_resource type="Texture2D" path="res://assets/towers/command_banner.png" id="4_banner"]
+[ext_resource type="Texture2D" path="res://assets/towers/forge_dragonfire.png" id="5_dragonfire"]
+[ext_resource type="Texture2D" path="res://assets/towers/banner_warlords_standard.png" id="6_standard"]
+[ext_resource type="Texture2D" path="res://assets/towers/lookout_horn.png" id="7_lookout"]
+[ext_resource type="Texture2D" path="res://assets/towers/lookout_all_seeing.png" id="8_all_seeing"]
+[ext_resource type="Texture2D" path="res://assets/towers/bloodlust_totem.png" id="9_totem"]
+[ext_resource type="Texture2D" path="res://assets/towers/bloodlust_skullsplitter.png" id="10_skullsplitter"]
 
 [resource]
 script = ExtResource("1_reward")
 id = &"war_drums"
 title = "War Drums"
-description = "Paired war drums strengthen the damage and attack speed of nearby towers. Evolve into a Forge or Command Banner."
+description = "Paired war drums strengthen the damage and attack speed of nearby towers. Evolve into a Forge, Command Banner, Lookout Horn or Bloodlust Totem."
 icon_texture = ExtResource("2_art")
 accent = Color(0.76, 0.40, 0.28, 1)
 board_height = 0.8
@@ -17,5 +23,11 @@ board_anchor = Vector2(0.5, 0.928571)
 mirror_board = true
 board_variants = {
 "forge": {"texture": ExtResource("3_forge"), "board_height": 1.05},
-"command_banner": {"texture": ExtResource("4_banner"), "board_height": 1.2}
+"command_banner": {"texture": ExtResource("4_banner"), "board_height": 1.2},
+"dragonfire_forge": {"texture": ExtResource("5_dragonfire"), "board_height": 1.152},
+"warlords_standard": {"texture": ExtResource("6_standard"), "board_height": 1.261},
+"lookout_horn": {"texture": ExtResource("7_lookout"), "board_height": 1.224},
+"all_seeing_tower": {"texture": ExtResource("8_all_seeing"), "board_height": 1.273},
+"bloodlust_totem": {"texture": ExtResource("9_totem"), "board_height": 1.03},
+"skullsplitter_totem": {"texture": ExtResource("10_skullsplitter"), "board_height": 1.2}
 }

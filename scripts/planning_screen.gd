@@ -823,7 +823,16 @@ func _request_pacing(option: String) -> void:
 		planning.cycle_singleplayer_speed()
 		return
 	var votes: Array = planning.combat.get(option + "_votes", [false, false])
-	planning.request_pacing(option, not bool(votes[planning.local_slot()]))
+	var slot: int = planning.local_slot()
+	if option == "autoplay":
+		# Off -> autoplay -> full autoplay (also main rounds) -> off.
+		var full: bool = bool(planning.combat.get("full_autoplay_votes", [false, false])[slot])
+		if bool(votes[slot]) and not full:
+			planning.request_pacing("full_autoplay", true)
+		else:
+			planning.request_pacing("autoplay", not bool(votes[slot]))
+		return
+	planning.request_pacing(option, not bool(votes[slot]))
 
 
 func _refresh_pacing() -> void:
@@ -840,10 +849,16 @@ func _refresh_pacing() -> void:
 		var color := Color("b5e2b7") if agreed else Color("e0bc77")
 		for theme_color: String in ["icon_normal_color", "icon_pressed_color", "icon_hover_color", "icon_hover_pressed_color"]:
 			button.add_theme_color_override(theme_color, color)
+		var full_vote: bool = bool(state.get("full_autoplay_votes", [false, false])[slot])
+		if option == "autoplay":
+			button.icon = preload("res://assets/ui/autoplay_full.svg") if full_vote else preload("res://assets/ui/autoplay.svg")
+			agreed = bool(state.get("full_autoplay", false)) if full_vote else agreed
 		if option == "speed":
 			var multiplier: int = int(state.get("speed_multiplier",1.0))
 			button.icon = preload("res://assets/ui/speed_triple.svg") if multiplier == 3 else (preload("res://assets/ui/speed_double.svg") if enabled else preload("res://assets/ui/speed_normal.svg"))
-		button.tooltip_text = ("%d× speed · click to cycle 1× / 2× / 3×" % int(state.get("speed_multiplier",1.0)) if planning != null and planning.singleplayer else "2× speed") if option == "speed" else "Autoplay"
+		button.tooltip_text = ("%d× speed · click to cycle 1× / 2× / 3×" % int(state.get("speed_multiplier",1.0)) if planning != null and planning.singleplayer else "2× speed") if option == "speed" else ("Full autoplay · includes main rounds" if full_vote else "Autoplay")
+		if option == "autoplay" and enabled and not full_vote:
+			button.tooltip_text += "\nClick again for full autoplay"
 		if agreed:
 			button.tooltip_text += " · On"
 		elif enabled:
@@ -852,7 +867,7 @@ func _refresh_pacing() -> void:
 			button.tooltip_text += " · Opponent enabled"
 		if option == "autoplay" and agreed and not planning.locked and (not planning.layouts[0].is_ready() or not planning.layouts[1].is_ready()):
 			button.tooltip_text += "\nWaiting for legal paths"
-		if option == "autoplay" and agreed and bool(state.get("path_editing", false)):
+		if option == "autoplay" and agreed and not bool(state.get("full_autoplay", false)) and bool(state.get("path_editing", false)):
 			button.tooltip_text += "\nStrategy break: both players must press Ready."
 
 
@@ -1027,6 +1042,9 @@ static func tower_display_title(tower: Dictionary, stats: Dictionary) -> String:
 	var purchased_steps: int = tower.get("branch_upgrades", []).size()
 	if purchased_steps > 0 and purchased_steps <= steps.size():
 		title = String(steps[purchased_steps - 1]["title"])
+	var capstone_steps: Array = branch.get("capstones", {}).get(String(tower.get("capstone", "")), [])
+	if purchased_steps > steps.size() and purchased_steps - steps.size() <= capstone_steps.size():
+		title = String(capstone_steps[purchased_steps - steps.size() - 1]["title"])
 	var level: int = MatchCombat.tower_level(tower)
 	var rarity: String = String(tower.get("rarity", ""))
 	return "%s%s · %s" % [rarity.capitalize() + " " if not rarity.is_empty() else "", title, roman_numeral(level)]
@@ -1094,6 +1112,10 @@ static func tower_stats_text(tower: Dictionary, stats: Dictionary) -> String:
 	var speed_buff: float = float(tower.get("support_speed_bonus", 0.0))
 	if damage_buff > 0.0 or speed_buff > 0.0:
 		lines.append("Buff: +%.0f%% damage / +%.0f%% speed" % [damage_buff * 100.0, speed_buff * 100.0])
+	if float(tower.get("support_range_bonus", 0.0)) > 0.0:
+		lines.append("Buff: +%s range" % String.num(float(tower["support_range_bonus"]), 2))
+	if float(tower.get("crit_chance", 0.0)) > 0.0:
+		lines.append("Crit chance %s%% · %d crits" % [String.num(float(tower["crit_chance"]) * 100.0, 1), int(tower.get("crits", 0))])
 	return "\n".join(lines)
 
 
@@ -1104,7 +1126,16 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 	var result: String
 	match kind:
 		"support":
-			result = "Nearby towers:\n+%.1f%% damage · +%.1f%% attack speed\nStrongest duplicate only" % [float(config.get("damage_bonus", 0.0)) * 100.0, float(config.get("attack_speed_bonus", 0.0)) * 100.0]
+			var auras := PackedStringArray()
+			if float(config.get("damage_bonus", 0.0)) > 0.0:
+				auras.append("+%s%% damage" % String.num(float(config["damage_bonus"]) * 100.0, 1))
+			if float(config.get("attack_speed_bonus", 0.0)) > 0.0:
+				auras.append("+%s%% attack speed" % String.num(float(config["attack_speed_bonus"]) * 100.0, 1))
+			if float(config.get("range_aura", 0.0)) > 0.0:
+				auras.append("+%s range" % String.num(float(config["range_aura"]), 2))
+			if float(config.get("crit_chance", 0.0)) > 0.0:
+				auras.append("%s%% crit chance (×%s damage)" % [String.num(float(config["crit_chance"]) * 100.0, 1), String.num(TowerDefinition.CRIT_MULTIPLIER, 1)])
+			result = "Nearby towers:\n%s\nStrongest duplicate only" % " · ".join(auras)
 		"economy":
 			result = "%s Coins / round clear" % String.num(float(config.get("clear_income", 0.0)), 1)
 			if float(config.get("periodic_income", 0.0)) > 0.0:
@@ -1113,6 +1144,10 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 			result = "%d Shards / round clear" % int(config.get("clear_shards", 0))
 			if int(config.get("periodic_shards", 0)) > 0:
 				result += "\n%d Shards / %.2fs combat" % [int(config["periodic_shards"]), float(config.get("periodic_interval", 0.0))]
+			if float(state.get("output_multiplier", 1.0)) > 1.0:
+				result += "\nShard output ×%s" % String.num(float(state["output_multiplier"]), 3)
+			if int(state.get("base_max_health_bonus", 0)) > 0 or int(state.get("base_regen", 0)) > 0:
+				result += "\n+%d base max HP · +%d HP / round clear" % [int(state.get("base_max_health_bonus", 0)), int(state.get("base_regen", 0))]
 		"bounty":
 			result = "Auto mark: highest max HP\n+%.1f%% damage taken\n+%.1f%% normal kill Coins\nOne persistent, exclusive target" % [float(config.get("mark_damage_bonus", 0.0)) * 100.0, float(config.get("mark_income_bonus", 0.0)) * 100.0]
 		"catapult":
@@ -1190,6 +1225,21 @@ static func tower_upgrade_actions(tower: Dictionary, stats: Dictionary) -> Dicti
 	for index: int in range(mini(steps.size(), purchased_steps.size() + 1)):
 		var step: Dictionary = steps[index]
 		actions[step["id"]] = {"title": step["title"], "cost": int(step["cost"]), "purchased": index < purchased_steps.size(), "locked": false, "description": branch_upgrade_description(step) + ("\nNext: " + String(steps[index + 1]["title"]) if index + 1 < steps.size() else "")}
+	# Once every ordered step is bought, choose one capstone path, then continue it.
+	var capstones: Dictionary = chosen_definition.get("capstones", {})
+	if not steps.is_empty() and purchased_steps.size() >= steps.size():
+		var chosen_capstone: String = String(tower.get("capstone", ""))
+		var bought: int = purchased_steps.size() - steps.size()
+		for path: String in capstones:
+			if not chosen_capstone.is_empty() and chosen_capstone != path:
+				continue
+			var path_steps: Array = capstones[path]
+			for index: int in range(mini(path_steps.size(), (bought if path == chosen_capstone else 0) + 1)):
+				var step: Dictionary = path_steps[index]
+				var tail: String = "\nNext: " + String(path_steps[index + 1]["title"]) if index + 1 < path_steps.size() else ""
+				if chosen_capstone.is_empty():
+					tail += "\nChoose one permanent path."
+				actions[step["id"]] = {"title": step["title"], "cost": int(step["cost"]), "purchased": path == chosen_capstone and index < bought, "locked": false, "description": branch_upgrade_description(step) + tail}
 	var followups: Dictionary = chosen_definition.get("followups", {})
 	var followup: String = String(tower.get("followup", ""))
 	for command: String in followups:
@@ -1402,7 +1452,7 @@ func _refresh() -> void:
 	var all_towers: Array = state.get("towers", [[], []])
 	var health: Array = state.get("health", [0, 0])
 	var rules: Dictionary = state.get("rules", {})
-	_refresh_health(int(health[own_slot]), int(rules.get("base_health", 0)))
+	_refresh_health(int(health[own_slot]), int(state.get("max_health", [rules.get("base_health", 0), rules.get("base_health", 0)])[own_slot]))
 	if _pending_tower_cell != Vector2i(-1, -1):
 		for tower: Dictionary in all_towers[own_slot]:
 			if tower["cell"] == _pending_tower_cell:

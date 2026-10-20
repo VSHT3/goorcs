@@ -307,10 +307,17 @@ func _stage_description(record: Dictionary, tower: Dictionary, stats: Dictionary
 	var bought: int = tower.get("branch_upgrades", []).size()
 	if bought > 0 and bought <= steps.size() and steps[bought - 1].has("description"):
 		return String(steps[bought - 1]["description"])
+	var capstone_steps: Array = authored.get("capstones", {}).get(String(tower.get("capstone", "")), [])
+	if bought > steps.size() and bought - steps.size() <= capstone_steps.size() and capstone_steps[bought - steps.size() - 1].has("description"):
+		return String(capstone_steps[bought - steps.size() - 1]["description"])
 	if bought == 0 and authored.has("description"):
 		return String(authored["description"])
 	match kind:
 		"support":
+			if float(config.get("crit_chance", 0.0)) > 0.0:
+				return "Gives nearby towers' hits a chance to deal double damage."
+			if float(config.get("range_aura", 0.0)) > 0.0:
+				return "Extends nearby attacking towers' range."
 			if float(config.get("attack_speed_bonus", 0.0)) == 0.0:
 				return "Increases nearby towers' damage."
 			if float(config.get("damage_bonus", 0.0)) == 0.0:
@@ -378,6 +385,10 @@ func _populate_role_stats(tower: Dictionary, stats: Dictionary) -> void:
 		"support":
 			_add_stat(_stats, &"damage_buff", "Nearby tower damage", "+%s%%" % _number(float(config["damage_bonus"]) * 100.0))
 			_add_stat(_stats, &"speed_buff", "Nearby attack speed", "+%s%%" % _number(float(config["attack_speed_bonus"]) * 100.0))
+			if float(config.get("range_aura", 0.0)) > 0.0:
+				_add_stat(_stats, &"range_aura", "Nearby tower range", "+%s cells" % _number(float(config["range_aura"])))
+			if float(config.get("crit_chance", 0.0)) > 0.0:
+				_add_stat(_stats, &"crit_chance", "Nearby crit chance", "%s%% for ×%s damage" % [_number(float(config["crit_chance"]) * 100.0), _number(TowerDefinition.CRIT_MULTIPLIER)])
 		"economy":
 			_add_stat(_stats, &"clear_income", "Round-clear income", "%d Coins" % int(config["clear_income"]))
 			if float(config["periodic_income"]) > 0.0:
@@ -400,6 +411,11 @@ func _populate_role_stats(tower: Dictionary, stats: Dictionary) -> void:
 				_add_stat(_stats, &"haste", "Landed enemy speed", "+%s%%" % _number((float(config["landing_haste"]) - 1.0) * 100.0))
 		"crystal":
 			_add_stat(_stats, &"clear_shards", "Round-clear Shards", "%d Shards" % int(config["clear_shards"]))
+			if float(tower.get("output_multiplier", 1.0)) > 1.0:
+				_add_stat(_stats, &"output_multiplier", "Shard output", "×%s" % String.num(float(tower["output_multiplier"]), 3))
+			if int(tower.get("base_max_health_bonus", 0)) > 0:
+				_add_stat(_stats, &"base_max_health", "Base max HP", "+%d" % int(tower["base_max_health_bonus"]))
+				_add_stat(_stats, &"base_regen", "Base regen", "+%d HP / round clear" % int(tower["base_regen"]))
 			if int(config["periodic_shards"]) > 0:
 				_add_stat(_stats, &"periodic_shards", "Periodic Shards", "%d Shards" % int(config["periodic_shards"]))
 				_add_stat(_stats, &"periodic_interval", "Production interval", "%s combat s" % _number(float(config["periodic_interval"])))

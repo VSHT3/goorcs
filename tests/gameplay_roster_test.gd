@@ -264,15 +264,15 @@ func _support() -> void:
 	upgrade(model, first, ["damage", "speed"])
 	check(is_equal_approx(attack["support_damage_bonus"], 0.3) and is_equal_approx(attack["support_speed_bonus"], 0.4), "Strongest upgraded duplicate wins each component")
 	upgrade(model, first, ["forge"])
-	check(first["behavior_config"]["attack_speed_bonus"] == 0.0 and is_equal_approx(first["behavior_config"]["damage_bonus"], 0.7), "Forge remains pure damage and both prerequisite purchases retain useful role effects")
-	check(is_equal_approx(attack["support_damage_bonus"], 0.9) and is_equal_approx(attack["support_speed_bonus"], 0.3), "Different mixed/Forge stack groups add")
+	check(first["behavior_config"]["attack_speed_bonus"] == 0.0 and is_equal_approx(first["behavior_config"]["damage_bonus"], 0.5), "Forge remains pure damage and both prerequisite purchases retain useful role effects")
+	check(is_equal_approx(attack["support_damage_bonus"], 0.7) and is_equal_approx(attack["support_speed_bonus"], 0.3), "Different mixed/Forge stack groups add")
 	upgrade(model, duplicate, ["damage", "speed", "command_banner"])
-	check(duplicate["behavior_config"]["damage_bonus"] == 0.0 and is_equal_approx(attack["support_damage_bonus"], 0.7) and is_equal_approx(attack["support_speed_bonus"], 0.7), "Banner replaces mixed role with pure speed while stacking independently with Forge")
+	check(duplicate["behavior_config"]["damage_bonus"] == 0.0 and is_equal_approx(attack["support_damage_bonus"], 0.5) and is_equal_approx(attack["support_speed_bonus"], 0.5), "Banner replaces mixed role with pure speed while stacking independently with Forge")
 	open_wave(model)
 	model._attack(0, 0.01)
 	check(first["shot"] == 0 and duplicate["shot"] == 0, "Support structures never perform passive attacks")
 	model.sell_tower(0, first["id"])
-	check(attack["support_damage_bonus"] == 0.0 and is_equal_approx(attack["support_speed_bonus"], 0.7), "Selling support immediately removes only its accepted buff")
+	check(attack["support_damage_bonus"] == 0.0 and is_equal_approx(attack["support_speed_bonus"], 0.5), "Selling support immediately removes only its accepted buff")
 	rules = fixture()
 	arrow = tower_definition(rules, &"arrow_tower")
 	drums = tower_definition(rules, &"war_drums")
@@ -286,7 +286,7 @@ func _support() -> void:
 	first = build(model, &"war_drums", Vector2i(0, 1))
 	check(is_equal_approx(attack["support_damage_bonus"], 0.225) and is_equal_approx(attack["support_speed_bonus"], 0.225), "Rolled range reaches a distant tower and rolled strength scales both mixed support components")
 	upgrade(model, first, ["damage", "speed", "forge"])
-	check(model.reroll_tower(0, first["id"], "rarity") and is_equal_approx(attack["support_damage_bonus"], 1.05) and attack["support_speed_bonus"] == 0.0, "Support rolls and role purchases survive evolution/reroll without compounding or restoring replaced mixed speed")
+	check(model.reroll_tower(0, first["id"], "rarity") and is_equal_approx(attack["support_damage_bonus"], 0.75) and attack["support_speed_bonus"] == 0.0, "Support rolls and role purchases survive evolution/reroll without compounding or restoring replaced mixed speed")
 
 func _support_damage_rounding() -> void:
 	var bonuses: Array[float] = [0.2, (0.1 + 0.2) * 1.5, 0.200001]
@@ -304,7 +304,9 @@ func _support_damage_rounding() -> void:
 		check(attack["support_damage_bonus"] == bonuses[index] and attack["damage"] == expected[index], "Support bonuses retain float precision and ceil only genuine fractional damage: %.9f" % bonuses[index])
 
 func _rolled_range_cells() -> void:
-	for bonus: float in [0.0, 0.25, -0.25]:
+	# Reach is circular: +50% takes the 1.5-cell Rune at (0,1) to 2.25, now
+	# reaching (2,0); the 2-cell drums reach 3; -50% floors both at one cell.
+	for bonus: float in [0.0, 0.5, -0.5]:
 		var rules := fixture()
 		rules.catalog.towers = [tower_definition(rules, &"rune_obelisk")]
 		if bonus != 0.0:
@@ -321,7 +323,7 @@ func _rolled_range_cells() -> void:
 		var enemy: Dictionary = model.enemies[0][0]
 		enemy["pos"] = Vector2(2, 0)
 		model._attack(0, 0.01)
-		check(rune["range"] == (2.0 if bonus > 0.0 else 1.0) and enemy["hp"] == (99 if bonus > 0.0 else 100), "A positive Rune range roll hits a newly included tile; unrolled range and minimum drawback radius stay intact")
+		check(is_equal_approx(rune["range"], 2.25 if bonus > 0.0 else (1.0 if bonus < 0.0 else 1.5)) and enemy["hp"] == (99 if bonus > 0.0 else 100), "A positive Rune range roll hits a newly included tile; unrolled range and minimum drawback radius stay intact")
 		var support_rules := fixture()
 		support_rules.catalog.towers = [tower_definition(support_rules, &"arrow_tower"), tower_definition(support_rules, &"war_drums")]
 		support_rules.roll_rules = rules.roll_rules
@@ -639,7 +641,7 @@ func _effective_original_attacks() -> void:
 		enemy["progress"] = 2.0
 		enemy["pos"] = Vector2(2, 0)
 		model.advance(1.0)
-		check(enemy["hp"] == 82 and tower["range"] == 2.0, "Rolled damage/range/speed all affect evolved %s combat" % branch)
+		check(enemy["hp"] == 82 and is_equal_approx(tower["range"], 3.0), "Rolled damage/range/speed all affect evolved %s combat" % branch)
 	var rules := fixture()
 	rules.catalog.towers = [tower_definition(rules, &"arrow_tower")]
 	rules.roll_rules = rolls({"damage": Vector2(1, 1)})

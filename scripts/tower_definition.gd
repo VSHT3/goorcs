@@ -13,6 +13,13 @@ const CONTINUOUS_RUNE_BRANCHES: Array[String] = ["boulders", "void_monolith"]
 # Orcapult evolutions and the arm properties their steps may raise.
 const CATAPULT_BRANCHES: Array[String] = ["siege_arm", "long_toss"]
 const CATAPULT_KEYS: Array[String] = ["lift", "throw_count", "slam_radius", "landing_progress", "landing_haste"]
+# War Drums evolutions and the aura strengths their steps may raise. range_aura
+# adds cells of reach to nearby attacking towers; crit_chance gives their
+# discrete hits that chance to deal CRIT_MULTIPLIER damage.
+const SUPPORT_BRANCHES: Array[String] = ["forge", "command_banner", "lookout_horn", "bloodlust_totem"]
+const SUPPORT_KEYS: Array[String] = ["damage_bonus", "attack_speed_bonus", "range_aura", "crit_chance"]
+const CRIT_MULTIPLIER: float = 2.0
+const MAX_CRIT_CHANCE: float = 0.75
 
 @export var reward: TowerReward
 @export var damage: int = 2
@@ -182,9 +189,11 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		for field: String in ["bolt_scale", "bolt_reach"]:
 			if config.has(field) and not _nonnegative_number(config[field]):
 				return false
-		for field: String in ["pierce", "orbit_bonus", "range_bonus"]:
+		for field: String in ["pierce", "orbit_bonus"]:
 			if config.has(field) and (not config[field] is int or int(config[field]) < 0):
 				return false
+		if config.has("range_bonus") and not _nonnegative_number(config["range_bonus"]):
+			return false
 		if config.has("description") and not config["description"] is String:
 			return false
 		if config.has("max_hp_damage") and (branch != "void_monolith" or not _nonnegative_number(config["max_hp_damage"])):
@@ -193,13 +202,20 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 			return false
 		if config.has("behavior_add"):
 			var added: Variant = config["behavior_add"]
-			if branch not in ["crystal_mine"] + CATAPULT_BRANCHES or not added is Dictionary or (added as Dictionary).is_empty():
+			if branch not in ["crystal_mine"] + CATAPULT_BRANCHES + SUPPORT_BRANCHES or not added is Dictionary or (added as Dictionary).is_empty():
 				return false
 			for key: Variant in added:
-				if branch == "crystal_mine":
+				if branch in SUPPORT_BRANCHES:
+					if key not in SUPPORT_KEYS or not _positive_number(added[key]):
+						return false
+				elif branch == "crystal_mine":
 					if key not in ["clear_shards", "periodic_shards"] or not added[key] is int or int(added[key]) <= 0:
 						return false
 				elif key not in CATAPULT_KEYS or not _positive_number(added[key]) or (key == "throw_count" and not added[key] is int):
+					return false
+		if branch in SUPPORT_BRANCHES:
+			for field: Variant in config:
+				if field not in ["id", "title", "cost", "description", "range_bonus", "behavior_add"]:
 					return false
 		if branch in CATAPULT_BRANCHES:
 			for field: Variant in config:
@@ -212,6 +228,51 @@ static func valid_branch_upgrades(branch: String, upgrades: Variant) -> bool:
 		if config.has("magic_bounce"):
 			var magic: Variant = config["magic_bounce"]
 			if branch != "bounce" or not magic is Dictionary or (magic as Dictionary).size() != 2 or not _positive_number(magic.get("chance")) or float(magic["chance"]) > 1.0 or not _nonnegative_number(magic.get("decay")):
+				return false
+	return true
+
+
+# Exclusive late paths offered once every ordered step is bought: a dictionary
+# of path key -> ordered steps. Steps may raise base max HP / per-clear regen
+# (whole HP) or multiply the mine's Shard output.
+static func valid_capstones(upgrades: Array, capstones: Variant) -> bool:
+	if not capstones is Dictionary or (capstones as Dictionary).size() < 2:
+		return false
+	var seen: Dictionary = {}
+	for step: Dictionary in upgrades:
+		seen[step["id"]] = true
+	for path: Variant in capstones:
+		var steps: Variant = capstones[path]
+		if not path is String or String(path).is_empty() or not steps is Array or (steps as Array).is_empty():
+			return false
+		for step: Variant in steps:
+			if not step is Dictionary:
+				return false
+			var config: Dictionary = step
+			var id: Variant = config.get("id")
+			if not id is String or String(id).is_empty() or seen.has(id) or id in ["damage", "speed", "special"]:
+				return false
+			seen[id] = true
+			if not config.get("title") is String or String(config["title"]).is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
+				return false
+			if config.has("description") and not config["description"] is String:
+				return false
+			var effects: int = 0
+			for field: Variant in config:
+				match field:
+					"id", "title", "cost", "description":
+						pass
+					"base_max_health", "base_regen":
+						if not config[field] is int or int(config[field]) <= 0:
+							return false
+						effects += 1
+					"output_multiplier":
+						if not _positive_number(config[field]) or float(config[field]) <= 1.0:
+							return false
+						effects += 1
+					_:
+						return false
+			if effects == 0:
 				return false
 	return true
 
@@ -278,7 +339,17 @@ static func _valid_behavior_config(kind: String, config: Dictionary) -> bool:
 		"chain":
 			return config.size() == 3 and config.get("hit_count") is int and int(config["hit_count"]) > 0 and _positive_number(config.get("jump_distance")) and _nonnegative_number(config.get("successive_hit_bonus"))
 		"support":
-			return config.size() == 3 and config.get("stack_group") is String and not String(config["stack_group"]).is_empty() and _nonnegative_number(config.get("damage_bonus")) and _nonnegative_number(config.get("attack_speed_bonus")) and (float(config["damage_bonus"]) > 0.0 or float(config["attack_speed_bonus"]) > 0.0)
+			if not config.get("stack_group") is String or String(config["stack_group"]).is_empty() or not _nonnegative_number(config.get("damage_bonus")) or not _nonnegative_number(config.get("attack_speed_bonus")):
+				return false
+			var strength: float = float(config["damage_bonus"]) + float(config["attack_speed_bonus"])
+			for key: Variant in config:
+				if key in ["range_aura", "crit_chance"]:
+					if not _nonnegative_number(config[key]):
+						return false
+					strength += float(config[key])
+				elif key not in ["stack_group", "damage_bonus", "attack_speed_bonus"]:
+					return false
+			return strength > 0.0 and float(config.get("crit_chance", 0.0)) <= MAX_CRIT_CHANCE
 		"economy":
 			if config.size() != 3 or not config.get("clear_income") is int or int(config["clear_income"]) <= 0 or not config.get("periodic_income") is int or int(config["periodic_income"]) < 0 or not _nonnegative_number(config.get("periodic_interval")):
 				return false
@@ -323,9 +394,20 @@ static func _valid_role_evolutions(definition: TowerDefinition) -> bool:
 				if branch != "longer_reach" or definition.special_upgrade != "escalating_chain" or config.size() != 5 or config["behavior_kind"] != "chain" or not _positive_number(config.get("range_cells")) or float(config["range_cells"]) <= definition.range_cells or float(config["behavior_config"]["jump_distance"]) <= float(definition.behavior_config.get("jump_distance", INF)):
 					return false
 			"support":
-				if branch not in ["forge", "command_banner"] or config.size() != 4 or config["behavior_kind"] != "support":
+				if branch not in SUPPORT_BRANCHES or config["behavior_kind"] != "support":
+					return false
+				for field: Variant in config:
+					if field not in ["title", "cost", "behavior_kind", "behavior_config", "description", "upgrades"]:
+						return false
+				if config.has("description") and not config["description"] is String:
+					return false
+				if config.has("upgrades") and not valid_branch_upgrades(String(branch), config["upgrades"]):
 					return false
 				var effect: Dictionary = config["behavior_config"]
+				if branch == "lookout_horn" and float(effect.get("range_aura", 0.0)) <= 0.0:
+					return false
+				if branch == "bloodlust_totem" and float(effect.get("crit_chance", 0.0)) <= 0.0:
+					return false
 				if branch == "forge" and (float(effect["damage_bonus"]) <= 0.0 or float(effect["attack_speed_bonus"]) != 0.0):
 					return false
 				if branch == "command_banner" and (float(effect["attack_speed_bonus"]) <= 0.0 or float(effect["damage_bonus"]) != 0.0):
@@ -338,8 +420,10 @@ static func _valid_role_evolutions(definition: TowerDefinition) -> bool:
 					if config["behavior_kind"] != "crystal" or not config.get("upgrades") is Array or not valid_branch_upgrades("crystal_mine", config["upgrades"]):
 						return false
 					for field: Variant in config:
-						if field not in ["title", "cost", "behavior_kind", "behavior_config", "description", "upgrades"]:
+						if field not in ["title", "cost", "behavior_kind", "behavior_config", "description", "upgrades", "capstones"]:
 							return false
+					if config.has("capstones") and not valid_capstones(config["upgrades"], config["capstones"]):
+						return false
 				elif branch == "bounty_board":
 					if config.size() != 5 or config["behavior_kind"] != "bounty" or not config.get("followups") is Dictionary or not _valid_bounty_followups(config["followups"], config["behavior_config"]):
 						return false

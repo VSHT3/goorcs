@@ -44,8 +44,10 @@ def prism_pixels(x0, base_y, width, height, lean):
     return pixels
 
 
-def stamp_cluster(image, prisms):
+def stamp_cluster(image, prisms, ramp=None, glow=None):
     """Prisms are drawn back to front, each with its own outline."""
+    ramp = ramp or RAMP
+    glow = glow or GLOW
     every = {}
     for prism in prisms:
         every.update(prism_pixels(*prism))
@@ -59,7 +61,7 @@ def stamp_cluster(image, prisms):
                 r, g, b, a = image.getpixel(p)
                 if a and image.getpixel(p) != OUTLINE:
                     t = 0.05
-                    image.putpixel(p, (int(r + (GLOW[0] - r) * t), int(g + (GLOW[1] - g) * t), int(b + (GLOW[2] - b) * t), a))
+                    image.putpixel(p, (int(r + (glow[0] - r) * t), int(g + (glow[1] - g) * t), int(b + (glow[2] - b) * t), a))
     for prism in prisms:
         filled = prism_pixels(*prism)
         for (x, y) in filled:
@@ -69,7 +71,7 @@ def stamp_cluster(image, prisms):
                     image.putpixel(n, OUTLINE)
         for p, shade in filled.items():
             if 0 <= p[0] < image.width and 0 <= p[1] < image.height:
-                image.putpixel(p, RAMP[shade])
+                image.putpixel(p, ramp[shade])
 
 
 def recolor_gold(image):
@@ -80,14 +82,14 @@ def recolor_gold(image):
                 image.putpixel((x, y), RAMP[GOLD[(r, g, b)] + 1])
 
 
-def tunnel_glow(image, strength):
+def tunnel_glow(image, strength, glow=GLOW):
     # Darkest tunnel interior pixels pick up a cool light from deeper crystal.
     for y in range(52, 100):
         for x in range(46, 74):
             r, g, b, a = image.getpixel((x, y))
             if a and r + g + b < 120:
                 t = strength * (1.0 - (y - 52) / 60.0)
-                image.putpixel((x, y), (int(r + (GLOW[0] - r) * t), int(g + (GLOW[1] - g) * t), int(b + (GLOW[2] - b) * t), a))
+                image.putpixel((x, y), (int(r + (glow[0] - r) * t), int(g + (glow[1] - g) * t), int(b + (glow[2] - b) * t), a))
 
 
 # Clusters as lists of prisms (x0, base_y, width, height, lean), back to front.
@@ -105,11 +107,28 @@ LODE = [
     [(112, 93, 3, 8, 1), (109, 93, 2, 5, -1)],                        # front-right boulder
 ]
 
+# Capstones after Mother Lode: Mother I/III keep growing the crystal field;
+# Heart of the Mountain sets a red heart-crystal glowing in the tunnel.
+MOTHER = [
+    [(40, 57, 3, 10, -1), (37, 58, 2, 6, -2)],                        # tunnel-left ledge
+    [(82, 59, 3, 10, 1), (85, 60, 2, 6, 2)],                          # tunnel-right ledge
+]
+MOTHER_III = [
+    [(25, 47, 3, 12, -1), (22, 48, 2, 7, -2), (28, 48, 2, 6, 1)],     # left shoulder
+    [(99, 51, 3, 12, 1), (102, 52, 2, 7, 2), (96, 52, 2, 6, -1)],     # right shoulder
+    [(47, 25, 3, 9, -2), (75, 26, 3, 9, 2)],                          # crown flanks
+]
+HEART_RAMP = [(70, 14, 22, 255), (140, 26, 38, 255), (212, 54, 58, 255), (250, 128, 112, 255), (255, 226, 214, 255)]
+HEART_GLOW = (235, 92, 70)
+HEART = [[(58, 84, 4, 12, 0), (55, 84, 3, 8, -2), (63, 85, 3, 8, 2)]]  # heart crystal in the tunnel
+
 base = Image.open(SRC).convert("RGBA")
 for name, clusters, glow in [
     ("crystal_mine", BASE, 0.25),
     ("crystal_geode", BASE + GEODE, 0.4),
     ("crystal_mother_lode", BASE + GEODE + LODE, 0.6),
+    ("crystal_mother", BASE + GEODE + LODE + MOTHER, 0.7),
+    ("crystal_mother_iii", BASE + GEODE + LODE + MOTHER + MOTHER_III, 0.85),
 ]:
     image = base.copy()
     recolor_gold(image)
@@ -118,3 +137,13 @@ for name, clusters, glow in [
         stamp_cluster(image, cluster)
     image.save(f"{OUT}/{name}.png")
     print("wrote", name)
+
+image = base.copy()
+recolor_gold(image)
+tunnel_glow(image, 0.7, HEART_GLOW)
+for cluster in BASE + GEODE + LODE:
+    stamp_cluster(image, cluster)
+for cluster in HEART:
+    stamp_cluster(image, cluster, HEART_RAMP, HEART_GLOW)
+image.save(f"{OUT}/crystal_heart.png")
+print("wrote crystal_heart")

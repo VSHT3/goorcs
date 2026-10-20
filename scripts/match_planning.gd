@@ -32,6 +32,8 @@ var _host_routes: Array[Array] = [[], []]
 var _host_speed_votes: Array[bool] = [false, false]
 var _solo_speed: int = 1
 var _host_autoplay_votes: Array[bool] = [false, false]
+# Full autoplay also starts setup/main strategy rounds once paths are legal.
+var _host_full_autoplay_votes: Array[bool] = [false, false]
 var _host_locked: bool = false
 var _active_peer_id: int = 0
 var _synced_guest_id: int = 0
@@ -93,6 +95,7 @@ func _physics_process(delta: float) -> void:
 			_host_speed_votes = [false, false]
 			_solo_speed = 1
 			_host_autoplay_votes = [false, false]
+			_host_full_autoplay_votes = [false, false]
 		else:
 			_enter_planning()
 			_try_start_wave()
@@ -277,6 +280,7 @@ func debug_set_values(round_number: int, money: int, shards: int) -> bool:
 		_host_speed_votes = [false, false]
 		_solo_speed = 1
 		_host_autoplay_votes = [false, false]
+		_host_full_autoplay_votes = [false, false]
 		_enter_planning()
 	_host_combat.coins[0] = money
 	_host_combat.reroll_currency[0] = shards
@@ -301,7 +305,7 @@ func submit_ready(value: bool) -> void:
 
 
 func request_pacing(option: String, enabled: bool) -> void:
-	if option not in ["speed", "autoplay"]:
+	if option not in ["speed", "autoplay", "full_autoplay"]:
 		return
 	_request_command(option, local_slot(), Vector2i.ZERO, enabled)
 
@@ -409,6 +413,7 @@ func _reset_match() -> void:
 	_host_speed_votes = [false, false]
 	_solo_speed = 1
 	_host_autoplay_votes = [false, false]
+	_host_full_autoplay_votes = [false, false]
 	_host_locked = false
 	ready_flags = [false, false]
 	locked_routes = [[], []]
@@ -549,7 +554,7 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 	if slot != permitted_slot:
 		_reject(sender, "Only your own board can be changed.")
 		return
-	if command in ["speed", "autoplay"]:
+	if command in ["speed", "autoplay", "full_autoplay"]:
 		_apply_pacing(command, permitted_slot, value)
 		return
 	if _host_locked:
@@ -618,13 +623,20 @@ func _apply_pacing(option: String, slot: int, enabled: bool) -> void:
 		_host_speed_votes = [enabled, enabled]
 		_publish_snapshot()
 		return
-	var votes: Array[bool] = _host_speed_votes if option == "speed" else _host_autoplay_votes
+	var votes: Array[bool] = _host_speed_votes if option == "speed" else (_host_full_autoplay_votes if option == "full_autoplay" else _host_autoplay_votes)
 	if votes[slot] == enabled:
 		return
-	votes[slot] = enabled
+	var slots: Array[int] = [slot]
 	if singleplayer:
-		votes[1 - slot] = enabled
-	if option == "autoplay" and _autoplay_enabled():
+		slots.append(1 - slot)
+	for voter: int in slots:
+		votes[voter] = enabled
+		# Full autoplay is a stronger autoplay vote; dropping autoplay drops both.
+		if option == "full_autoplay" and enabled:
+			_host_autoplay_votes[voter] = true
+		elif option == "autoplay" and not enabled:
+			_host_full_autoplay_votes[voter] = false
+	if option != "speed" and _autoplay_enabled():
 		_try_start_wave()
 	_publish_snapshot()
 
@@ -637,6 +649,10 @@ func _speed_multiplier() -> float:
 
 func _autoplay_enabled() -> bool:
 	return _host_autoplay_votes[0] and _host_autoplay_votes[1]
+
+
+func _full_autoplay_enabled() -> bool:
+	return _autoplay_enabled() and _host_full_autoplay_votes[0] and _host_full_autoplay_votes[1]
 
 
 
@@ -687,7 +703,8 @@ func _try_start_wave() -> bool:
 	if not active or _host_combat.phase != MatchCombat.Phase.PLANNING:
 		return false
 	if not (_host_ready[0] and _host_ready[1]):
-		if _is_strategy_round() or (not _autoplay_enabled() and _ready_seconds_left != 0.0):
+		var waits_for_strategy: bool = _is_strategy_round() and not _full_autoplay_enabled()
+		if waits_for_strategy or (not _autoplay_enabled() and _ready_seconds_left != 0.0):
 			return false
 	if not _host_layouts[0].is_ready() or not _host_layouts[1].is_ready():
 		return false
@@ -709,6 +726,8 @@ func _combat_snapshot(include_metadata: bool = true) -> Dictionary:
 	snapshot["autoplay_votes"] = _host_autoplay_votes.duplicate()
 	snapshot["speed_multiplier"] = _speed_multiplier()
 	snapshot["autoplay"] = _autoplay_enabled()
+	snapshot["full_autoplay_votes"] = _host_full_autoplay_votes.duplicate()
+	snapshot["full_autoplay"] = _full_autoplay_enabled()
 	snapshot["main_round"] = _is_main_round()
 	snapshot["setup_round"] = _is_setup_round()
 	snapshot["path_editing"] = _is_strategy_round()

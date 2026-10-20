@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="TowerReward" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="TowerReward" load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/tower_reward.gd" id="1_reward"]
 [ext_resource type="Texture2D" path="res://assets/towers/gold_mine.png" id="2_art"]
@@ -9,6 +9,9 @@
 [ext_resource type="Texture2D" uid="uid://b1tk31an6a2ne" path="res://assets/towers/crystal_mine.png" id="7_crystal"]
 [ext_resource type="Texture2D" uid="uid://cdq3nldvukhwi" path="res://assets/towers/crystal_geode.png" id="8_geode"]
 [ext_resource type="Texture2D" uid="uid://cd67xx73l3148" path="res://assets/towers/crystal_mother_lode.png" id="9_lode"]
+[ext_resource type="Texture2D" path="res://assets/towers/crystal_mother.png" id="10_mother"]
+[ext_resource type="Texture2D" path="res://assets/towers/crystal_mother_iii.png" id="11_mother_iii"]
+[ext_resource type="Texture2D" path="res://assets/towers/crystal_heart.png" id="12_heart"]
 
 [resource]
 script = ExtResource("1_reward")
@@ -27,5 +30,8 @@ board_variants = {
 "income_aura": {"texture": ExtResource("6_tribute"), "board_height": 1.06320755, "board_anchor": Vector2(0.5, 0.9375)},
 "crystal_mine": {"texture": ExtResource("7_crystal"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)},
 "geode_drill": {"texture": ExtResource("8_geode"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)},
-"mother_lode": {"texture": ExtResource("9_lode"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)}
+"mother_lode": {"texture": ExtResource("9_lode"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)},
+"mother_i": {"texture": ExtResource("10_mother"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)},
+"mother_iii": {"texture": ExtResource("11_mother_iii"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)},
+"heart_of_the_mountain": {"texture": ExtResource("12_heart"), "board_height": 0.84919355, "board_anchor": Vector2(0.5078125, 0.8984375)}
 }

@@ -110,8 +110,9 @@ func _test_void_drain() -> void:
 	combat.sandbox_start(routing, 1, [] as Array[String])
 	combat.sandbox_spawn(0, &"grunt", 1)
 	var enemy: Dictionary = combat.enemies[0][0]
-	enemy["progress"] = 1.0
-	enemy["pos"] = combat._position(route, 1.0)
+	# Void keeps the 1.5-cell Rune reach (only Storm Sigil gains range).
+	enemy["progress"] = 2.0
+	enemy["pos"] = combat._position(route, 2.0)
 	enemy["hp"] = 10000
 	enemy["max_hp"] = 10000
 	enemy["base_speed"] = 0.0

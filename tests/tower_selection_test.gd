@@ -77,6 +77,7 @@ func _run() -> void:
 	_check(screen.targeting_button.mode == MatchCombat.TargetMode.CLOSEST, "Selected targeting comes from host snapshot")
 	_check(screen.boards[0].selected_tower_id == id and screen.boards[1].selected_tower_id == -1, "Range selection stays local to owned board")
 	main.planning.combat["rules"]["base_health"] = 140
+	main.planning.combat["max_health"] = [140, 140]
 	main.planning.combat["health"] = [63, 17]
 	main.planning.changed.emit()
 	_check(screen._health_bar.max_value == 140 and screen._health_bar.value == 63, "Own health bar consumes accepted health and admitted maximum rather than local defaults or opponent health")
@@ -86,14 +87,17 @@ func _run() -> void:
 		_check(screen._health_bar.max_value == 140 and screen._health_bar.value == accepted_health, "Full, damaged, critical, depleted and restored health follow the accepted own-slot value")
 		_check(is_equal_approx(screen._health_bar.get_as_ratio(), float(accepted_health) / 140.0), "Health fill ratio uses the accepted maximum throughout damage and restoration")
 	main.planning.combat["rules"]["base_health"] = 80
+	main.planning.combat["max_health"] = [80, 80]
 	main.planning.combat["health"] = [20, 79]
 	main.planning.changed.emit()
 	_check(screen._health_bar.max_value == 80 and screen._health_bar.value == 20 and is_equal_approx(screen._health_bar.get_as_ratio(), 0.25), "A changed accepted maximum immediately remaps the own health ratio without using opponent health")
 	main.planning.combat["rules"]["base_health"] = 0
+	main.planning.combat["max_health"] = [0, 0]
 	main.planning.combat["health"] = [0, 79]
 	main.planning.changed.emit()
 	_check(screen._health_bar.value == 0 and screen._health_bar.get_as_ratio() == 0.0, "A zero accepted maximum renders an empty finite health display")
 	main.planning.combat["rules"]["base_health"] = 140
+	main.planning.combat["max_health"] = [140, 140]
 	main.planning.combat["health"] = [63, 17]
 	var accepted_health_state: Dictionary = main.planning.combat.duplicate(true)
 	main.planning.changed.emit()
