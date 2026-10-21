@@ -33,6 +33,6 @@ func _planning_rules() -> CombatRules:
 func _execute_command(command: Dictionary) -> void:
 	if String(command.get("action", "")) == "round_fixture":
 		if _lane == "host":
-			planning.debug_set_values(int(command["round"]), 1000, int(planning.combat["reroll_currency"][planning.local_slot()]))
+			planning._set_debug_values(int(command["round"]), 1000, int(planning.combat["reroll_currency"][planning.local_slot()]))
 	else:
 		super._execute_command(command)

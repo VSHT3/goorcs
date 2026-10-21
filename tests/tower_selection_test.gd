@@ -711,7 +711,9 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	main.session.state = MultiplayerSession.State.CONNECTED
 	planning._active_peer_id = 77
 	planning.changed.emit()
-	_check(screen.debug_button.visible, "An active host retains the same local debug control")
+	_check(not screen.debug_button.visible, "Multiplayer hosts get no debug control either")
+	screen.debug_button.pressed.emit()
+	_check(not screen.debug_popup.visible, "Programmatic host presses cannot open debug in multiplayer")
 	planning.singleplayer = true
 	main.session.is_host = was_host
 	main.session.state = was_state

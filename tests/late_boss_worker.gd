@@ -81,7 +81,7 @@ func _execute_command(command: Dictionary) -> void:
 				var seed_value: int = _three_boss_seed(combat, round_number) if bool(command.get("all_bosses", false)) else 1471
 				for index: int in range(streams.size()):
 					streams[index].seed = seed_value + index * 97
-				planning.debug_set_values(round_number, 100000, int(planning.combat["reroll_currency"][planning.local_slot()]))
+				planning._set_debug_values(round_number, 100000, int(planning.combat["reroll_currency"][planning.local_slot()]))
 		"send_economy_fixture":
 			if _lane == "host":
 				for slot: int in range(2):

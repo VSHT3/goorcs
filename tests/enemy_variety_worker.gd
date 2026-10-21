@@ -37,7 +37,7 @@ func _execute_command(command: Dictionary) -> void:
 	match String(command.get("action", "")):
 		"variety_round":
 			if _lane == "host":
-				planning.debug_set_values(66, 10000, 0)
+				planning._set_debug_values(66, 10000, 0)
 		"variety_damage":
 			if _lane == "host":
 				var combat: MatchCombat = planning._host_combat

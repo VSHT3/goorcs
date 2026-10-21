@@ -37,7 +37,7 @@ func _execute_command(command: Dictionary) -> void:
 	var action: String = String(command.get("action", ""))
 	if action == "late_round":
 		if _lane == "host":
-			planning.debug_set_values(152, 100000, 0)
+			planning._set_debug_values(152, 100000, 0)
 	elif action == "late_births":
 		if _lane == "host":
 			var core: MatchCombat = planning._host_combat

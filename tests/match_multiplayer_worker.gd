@@ -131,7 +131,7 @@ func _execute_command(command: Dictionary) -> void:
 			rules.max_spawn_interval_reduction = 0.5 if _lane == "host" else 0.9
 		planning.combat_rules = rules
 	elif action == "debug":
-		_last_result = planning.debug_set_values(int(command["round"]), int(command["money"]), int(command["shards"]))
+		_last_result = planning._set_debug_values(int(command["round"]), int(command["money"]), int(command["shards"]))
 	elif action == "step":
 		if _lane == "host":
 			planning._physics_process(float(command["delta"]))

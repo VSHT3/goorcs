@@ -34,6 +34,6 @@ func _execute_command(command: Dictionary) -> void:
 						enemy["base_speed"]=1000.0
 				planning._publish_snapshot()
 		"round_fixture":
-			if _session.is_host: planning.debug_set_values(3,5000,int(planning.combat["reroll_currency"][planning.local_slot()]))
+			if _session.is_host: planning._set_debug_values(3,5000,int(planning.combat["reroll_currency"][planning.local_slot()]))
 		_:
 			super._execute_command(command)

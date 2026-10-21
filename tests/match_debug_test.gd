@@ -16,7 +16,7 @@ func _run() -> void:
 	_test_bounds_and_terminal()
 	await process_frame
 	if failures == 0:
-		print("PASS: host/solo debug authority, atomic Coin/Shard bounds, currency-only state/RNG preservation, round reset without rewards, transient cancellation, milestone growth and permanent-state retention")
+		print("PASS: solo-only debug authority, atomic Coin/Shard bounds, currency-only state/RNG preservation, round reset without rewards, transient cancellation, milestone growth and permanent-state retention")
 	quit(1 if failures > 0 else 0)
 
 
@@ -95,20 +95,22 @@ func _test_authority() -> void:
 	planning._host_combat.coins = [111, 222]
 	planning._host_combat.reroll_currency = [13, 29]
 	planning._publish_snapshot()
-	_check(planning.can_debug() and planning.debug_set_values(4, 777, 61), "An active connected host can change its own round, Coins and Shards")
+	var untouched: Dictionary = planning._snapshot().duplicate(true)
+	_check(not planning.can_debug() and not planning.debug_set_values(4, 777, 61) and planning._snapshot() == untouched, "Multiplayer hosts get no round / Coin / Shard editing")
+	_check(planning._set_debug_values(4, 777, 61), "The host-side fixture setter still applies a validated jump")
 	_check(planning.combat["coins"] == [777, 222] and planning.combat["reroll_currency"] == [61, 29] and planning.combat["wave"] == 3 and planning.combat["phase"] == MatchCombat.Phase.PLANNING, "A host jump changes only slot zero balances and grants no wave or Shard reward to the guest")
 	planning.session.is_host = false
 	var before: Dictionary = planning._snapshot().duplicate(true)
-	_check(not planning.can_debug() and not planning.debug_set_values(9, 999, 999) and planning._snapshot() == before, "A synthetic connected guest cannot mutate authoritative debug values")
+	_check(not planning.can_debug() and not planning._set_debug_values(9, 999, 999) and planning._snapshot() == before, "A synthetic connected guest cannot mutate authoritative debug values")
 	planning.session.is_host = true
 	planning.active = false
 	planning.selecting_loadout = true
 	before = planning._snapshot().duplicate(true)
-	_check(not planning.can_debug() and not planning.debug_set_values(9, 999, 999) and planning._snapshot() == before, "Inactive hosts cannot use the debug API")
+	_check(not planning.can_debug() and not planning._set_debug_values(9, 999, 999) and planning._snapshot() == before, "Inactive hosts cannot use the debug API")
 	planning.active = true
 	planning.selecting_loadout = false
 	planning.session.state = MultiplayerSession.State.HOSTING
-	_check(not planning.can_debug() and not planning.debug_set_values(9, 999, 999), "A host still waiting for connection cannot alter a match")
+	_check(not planning.can_debug() and not planning._set_debug_values(9, 999, 999), "A host still waiting for connection cannot alter a match")
 	_dispose(planning)
 	planning = _new_model()
 	before = planning._snapshot().duplicate(true)
@@ -210,8 +212,8 @@ func _test_wave_jump() -> void:
 	var random_states: PackedInt64Array = _random_states(planning)
 	var elapsed: float = planning._host_combat._elapsed
 	for shards: int in [-1, 1000000001]:
-		_check(not planning.debug_set_values(31, 432, shards) and planning._snapshot() == before and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed, "Invalid third values reject before abandoning live combat or applying growth")
-	_check(planning.debug_set_values(7, 432, 73), "A host can cancel an active wave into a different upcoming round")
+		_check(not planning._set_debug_values(31, 432, shards) and planning._snapshot() == before and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed, "Invalid third values reject before abandoning live combat or applying growth")
+	_check(planning._set_debug_values(7, 432, 73), "The host-side setter can cancel an active wave into a different upcoming round")
 	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 6 and planning.combat["coins"] == [432, guest_money] and planning.combat["reroll_currency"] == [73, guest_shards] and _random_states(planning) == random_states, "Wave cancellation sets exact host balances without clear rewards, drops, refunds, income payout or RNG")
 	_check(planning.combat["health"] == health and planning.combat["income"] == income and _permanent_tower(planning.combat["towers"][0][0]) == tower, "Wave cancellation retains health, income and upgraded towers")
 	_check(planning.combat["enemies"] == [[], []] and planning.combat["queued_sends"] == [0, 0] and planning.combat["wave_roster"].is_empty() and planning.combat["spawn_times"].is_empty() and planning.combat["spawned"] == [0, 0] and planning.combat["total"] == 0 and planning._host_combat._elapsed == 0.0, "Wave cancellation clears every live enemy, regular timetable, send queue and elapsed wave counter")

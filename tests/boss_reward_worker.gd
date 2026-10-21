@@ -19,7 +19,7 @@ func _execute_command(command: Dictionary) -> void:
 	match String(command.get("action", "")):
 		"round_fixture":
 			if _lane == "host":
-				planning.debug_set_values(int(command["round"]), 10000, int(planning.combat["reroll_currency"][0]))
+				planning._set_debug_values(int(command["round"]), 10000, int(planning.combat["reroll_currency"][0]))
 		"boss_hit_fixture":
 			if _session.is_host:
 				var model: MatchCombat = planning._host_combat

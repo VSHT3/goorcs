@@ -266,14 +266,24 @@ func can_manage_towers(slot: int) -> bool:
 	return phase == MatchCombat.Phase.WAVE or (phase == MatchCombat.Phase.PLANNING and not ready_flags[slot])
 
 
+# Round / Coin / Shard editing is a solo tool; multiplayer matches never offer it.
 func can_debug() -> bool:
+	return singleplayer and _host_can_set_values()
+
+
+func debug_set_values(round_number: int, money: int, shards: int) -> bool:
+	return can_debug() and _set_debug_values(round_number, money, shards)
+
+
+func _host_can_set_values() -> bool:
 	if not active or _host_combat == null or _host_combat.phase == MatchCombat.Phase.FINISHED:
 		return false
 	return singleplayer or (session != null and session.is_host and session.state == MultiplayerSession.State.CONNECTED and _active_peer_id != 0)
 
 
-func debug_set_values(round_number: int, money: int, shards: int) -> bool:
-	if not can_debug() or round_number < 1 or round_number > 1000 or money < 0 or money > 1000000000 or shards < 0 or shards > 1000000000:
+# Host-authoritative round/balance jump; test fixtures use it in network matches.
+func _set_debug_values(round_number: int, money: int, shards: int) -> bool:
+	if not _host_can_set_values() or round_number < 1 or round_number > 1000 or money < 0 or money > 1000000000 or shards < 0 or shards > 1000000000:
 		return false
 	var displayed_round: int = _host_combat.wave + 1 if _host_combat.phase == MatchCombat.Phase.PLANNING else _host_combat.wave
 	if round_number != displayed_round:
