@@ -252,8 +252,9 @@ func _test_paid_boss_sends() -> void:
 		var before: Dictionary = await _agree("Exact boss price and penalty are available")
 		for lane: String in ["host", "guest"]:
 			await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": type_id})
-		state = await _agree("Real host and guest commands purchase a boss at its unlock")
-		_check(_matches(state, {"coins": [0, 0], "income": [0, 0], "send_queues": [[type_id], [type_id]]}), "Both send paths charge captured host Coins/income exactly once and queue one boss")
+		var purchased: Dictionary = {"coins": [0, 0], "income": [0, 0], "send_queues": [[type_id], [type_id]]}
+		state = await _agree_matching(purchased, "Real host and guest commands purchase a boss at its unlock")
+		_check(_matches(state, purchased), "Both send paths charge captured host Coins/income exactly once and queue one boss")
 		for slot: int in range(2):
 			_check(int(state["enemy_totals"][slot]["sent"].get(type_id, 0)) == int(before["enemy_totals"][slot]["sent"].get(type_id, 0)) + 1, "Each authenticated sender receives exactly one accepted boss send count")
 		await _reject_paid_order(type_id, state)
@@ -283,3 +284,14 @@ func _first(state: Dictionary, type_id: String, slot: int = 0) -> Dictionary:
 	var found: Array[Dictionary] = _of_type(state, type_id, slot)
 	_check(not found.is_empty(), "Expected accepted live boss " + type_id)
 	return {} if found.is_empty() else found[0]
+
+
+# Peers can agree on the host's purchase while the guest's order is still in
+# flight, so wait for agreement on the accepted result itself.
+func _agree_matching(expected: Dictionary, description: String) -> Dictionary:
+	var deadline: int = mini(_suite_deadline_msec, Time.get_ticks_msec() + 5000)
+	var state: Dictionary = await _agree(description)
+	while not _matches(state, expected) and Time.get_ticks_msec() < deadline:
+		await create_timer(0.02).timeout
+		state = await _agree(description)
+	return state

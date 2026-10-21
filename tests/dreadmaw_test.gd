@@ -4,6 +4,8 @@ extends SceneTree
 ## deaths only, enrage below half HP, and Skeltorcs spilling out on death.
 
 const ID := &"dreadmaw"
+# From round 151 any Skeltorc birth may roll into a Giant Skeltorc.
+const SKELTORCS: Array[String] = ["skeleorc", "giant_skeltorc"]
 
 var failures: int = 0
 
@@ -141,11 +143,11 @@ func _test_raise_dead() -> void:
 	dread["next_spell"] = float(dread["age"])
 	_check(_until(combat, dread, "raise_dead", 3.0), "Raise the Fallen begins")
 	combat.advance(1.9)
-	var risen: Array = combat.enemies[0].filter(func(enemy: Dictionary) -> bool: return enemy["type_id"] == "skeleorc")
+	var risen: Array = combat.enemies[0].filter(func(enemy: Dictionary) -> bool: return enemy["type_id"] in SKELTORCS)
 	_check(risen.size() == 6, "Six of the fallen rise again: %d" % risen.size())
 	_check(risen.all(func(enemy: Dictionary) -> bool: return int(enemy["summoner_id"]) == int(dread["id"]) and float(enemy["progress"]) >= 4.0 and float(enemy["progress"]) <= 6.2), "They rise where they fell, bound to Dreadmaw")
 	for enemy: Dictionary in risen:
-		combat._hit(0, arrow, combat._enemy_index(0, enemy["id"]), 100000)
+		combat._hit(0, arrow, combat._enemy_index(0, enemy["id"]), 100000000)
 	combat.advance(0.01)
 	_check(combat._fallen[0].size() == 3, "Only the unraised fallen remain and the risen never rise twice: %d" % combat._fallen[0].size())
 
@@ -163,7 +165,7 @@ func _test_enrage_and_death() -> void:
 	combat._hit(0, arrow, combat.enemies[0].find(dread), 100000)
 	_check(int(dread["hp"]) == 40000 and is_equal_approx(float(dread["base_speed"]), calm * 1.7), "Below half HP it moves 70%% faster")
 	combat._hit(0, arrow, combat.enemies[0].find(dread), 100000)
-	var skeletons: int = combat.enemies[0].filter(func(enemy: Dictionary) -> bool: return enemy["type_id"] == "skeleorc").size()
+	var skeletons: int = combat.enemies[0].filter(func(enemy: Dictionary) -> bool: return enemy["type_id"] in SKELTORCS).size()
 	_check(skeletons == 8, "Its death spills eight Skeltorcs: %d" % skeletons)
 
 

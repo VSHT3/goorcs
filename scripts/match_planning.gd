@@ -30,6 +30,8 @@ var _host_layouts: Array[PathLayout] = []
 var _host_ready: Array[bool] = [false, false]
 var _host_routes: Array[Array] = [[], []]
 var _host_speed_votes: Array[bool] = [false, false]
+# 3× is a stronger speed vote: it only applies once both players pick it.
+var _host_triple_speed_votes: Array[bool] = [false, false]
 var _solo_speed: int = 1
 var _host_autoplay_votes: Array[bool] = [false, false]
 # Full autoplay also starts setup/main strategy rounds once paths are legal.
@@ -93,6 +95,7 @@ func _physics_process(delta: float) -> void:
 			_host_ready = [false, false]
 			_ready_seconds_left = -1.0
 			_host_speed_votes = [false, false]
+			_host_triple_speed_votes = [false, false]
 			_solo_speed = 1
 			_host_autoplay_votes = [false, false]
 			_host_full_autoplay_votes = [false, false]
@@ -278,6 +281,7 @@ func debug_set_values(round_number: int, money: int, shards: int) -> bool:
 			return false
 		_host_routes = [[], []]
 		_host_speed_votes = [false, false]
+		_host_triple_speed_votes = [false, false]
 		_solo_speed = 1
 		_host_autoplay_votes = [false, false]
 		_host_full_autoplay_votes = [false, false]
@@ -305,7 +309,7 @@ func submit_ready(value: bool) -> void:
 
 
 func request_pacing(option: String, enabled: bool) -> void:
-	if option not in ["speed", "autoplay", "full_autoplay"]:
+	if option not in ["speed", "triple_speed", "autoplay", "full_autoplay"]:
 		return
 	_request_command(option, local_slot(), Vector2i.ZERO, enabled)
 
@@ -315,6 +319,7 @@ func cycle_singleplayer_speed() -> bool:
 		return false
 	_solo_speed = _solo_speed % 3 + 1
 	_host_speed_votes = [_solo_speed > 1, _solo_speed > 1]
+	_host_triple_speed_votes = [_solo_speed > 2, _solo_speed > 2]
 	_publish_snapshot()
 	return true
 
@@ -411,6 +416,7 @@ func _reset_match() -> void:
 	_host_ready = [false, false]
 	_host_routes = [[], []]
 	_host_speed_votes = [false, false]
+	_host_triple_speed_votes = [false, false]
 	_solo_speed = 1
 	_host_autoplay_votes = [false, false]
 	_host_full_autoplay_votes = [false, false]
@@ -554,7 +560,7 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 	if slot != permitted_slot:
 		_reject(sender, "Only your own board can be changed.")
 		return
-	if command in ["speed", "autoplay", "full_autoplay"]:
+	if command in ["speed", "triple_speed", "autoplay", "full_autoplay"]:
 		_apply_pacing(command, permitted_slot, value)
 		return
 	if _host_locked:
@@ -618,12 +624,23 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 func _apply_pacing(option: String, slot: int, enabled: bool) -> void:
 	if not active or _host_combat.phase not in [MatchCombat.Phase.PLANNING, MatchCombat.Phase.WAVE]:
 		return
-	if singleplayer and option == "speed":
-		_solo_speed = 2 if enabled else 1
-		_host_speed_votes = [enabled, enabled]
+	if singleplayer and option in ["speed", "triple_speed"]:
+		if option == "speed":
+			_solo_speed = 2 if enabled else 1
+		else:
+			_solo_speed = 3 if enabled else mini(_solo_speed, 2)
+		_host_speed_votes = [_solo_speed > 1, _solo_speed > 1]
+		_host_triple_speed_votes = [_solo_speed > 2, _solo_speed > 2]
 		_publish_snapshot()
 		return
-	var votes: Array[bool] = _host_speed_votes if option == "speed" else (_host_full_autoplay_votes if option == "full_autoplay" else _host_autoplay_votes)
+	var votes: Array[bool] = _host_autoplay_votes
+	match option:
+		"speed":
+			votes = _host_speed_votes
+		"triple_speed":
+			votes = _host_triple_speed_votes
+		"full_autoplay":
+			votes = _host_full_autoplay_votes
 	if votes[slot] == enabled:
 		return
 	var slots: Array[int] = [slot]
@@ -631,12 +648,16 @@ func _apply_pacing(option: String, slot: int, enabled: bool) -> void:
 		slots.append(1 - slot)
 	for voter: int in slots:
 		votes[voter] = enabled
-		# Full autoplay is a stronger autoplay vote; dropping autoplay drops both.
+		# Full autoplay and 3× are stronger votes; dropping the base vote drops both.
 		if option == "full_autoplay" and enabled:
 			_host_autoplay_votes[voter] = true
 		elif option == "autoplay" and not enabled:
 			_host_full_autoplay_votes[voter] = false
-	if option != "speed" and _autoplay_enabled():
+		elif option == "triple_speed" and enabled:
+			_host_speed_votes[voter] = true
+		elif option == "speed" and not enabled:
+			_host_triple_speed_votes[voter] = false
+	if option in ["autoplay", "full_autoplay"] and _autoplay_enabled():
 		_try_start_wave()
 	_publish_snapshot()
 
@@ -644,7 +665,9 @@ func _apply_pacing(option: String, slot: int, enabled: bool) -> void:
 func _speed_multiplier() -> float:
 	if singleplayer:
 		return float(_solo_speed)
-	return 2.0 if _host_speed_votes[0] and _host_speed_votes[1] else 1.0
+	if not (_host_speed_votes[0] and _host_speed_votes[1]):
+		return 1.0
+	return 3.0 if _host_triple_speed_votes[0] and _host_triple_speed_votes[1] else 2.0
 
 
 func _autoplay_enabled() -> bool:
@@ -723,6 +746,7 @@ func _try_start_wave() -> bool:
 func _combat_snapshot(include_metadata: bool = true) -> Dictionary:
 	var snapshot: Dictionary = _host_combat.snapshot(include_metadata)
 	snapshot["speed_votes"] = _host_speed_votes.duplicate()
+	snapshot["triple_speed_votes"] = _host_triple_speed_votes.duplicate()
 	snapshot["autoplay_votes"] = _host_autoplay_votes.duplicate()
 	snapshot["speed_multiplier"] = _speed_multiplier()
 	snapshot["autoplay"] = _autoplay_enabled()

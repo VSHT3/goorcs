@@ -2,10 +2,11 @@ extends "res://tests/match_planning_test.gd"
 
 
 func _run() -> void:
-	success_message = "PASS: isolated pacing clocks, solo mirroring, legal-route autoplay, full autoplay through strategy rounds, finite rewards/results, and real peer consent/ownership/shared rosters/disconnect/rejoin"
+	success_message = "PASS: isolated pacing clocks, solo mirroring, 3× speed votes, legal-route autoplay, full autoplay through strategy rounds, finite rewards/results, and real peer consent/ownership/shared rosters/disconnect/rejoin"
 	_suite_deadline_msec = Time.get_ticks_msec() + 90000
 	_test_solo_autoplay()
 	_test_solo_full_autoplay()
+	_test_triple_speed_votes()
 	_test_simulation_clock()
 	_directory = OS.get_temp_dir().path_join("goorcs_pacing_test_%d_%d" % [OS.get_process_id(), Time.get_ticks_usec()])
 	DirAccess.make_dir_recursive_absolute(_directory)
@@ -75,6 +76,31 @@ func _test_solo_full_autoplay() -> void:
 	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 9, "Plain autoplay pauses for the main round")
 	planning.request_pacing("full_autoplay", true)
 	_check(planning.combat["phase"] == MatchCombat.Phase.WAVE and planning.combat["wave"] == 10, "Full autoplay runs main rounds too")
+	_dispose_model(planning)
+
+
+func _test_triple_speed_votes() -> void:
+	var planning: MatchPlanning = _new_solo(_model_rules())
+	_check(planning.combat["triple_speed_votes"] == [false, false], "Fresh snapshots carry no 3× votes")
+	planning.request_pacing("triple_speed", true)
+	_check(planning.combat["speed_multiplier"] == 3.0 and planning.combat["speed_votes"] == [true, true] and planning.combat["triple_speed_votes"] == [true, true], "Solo 3× mirrors both votes and implies 2×")
+	planning.request_pacing("triple_speed", false)
+	_check(planning.combat["speed_multiplier"] == 2.0 and planning.combat["triple_speed_votes"] == [false, false], "Dropping 3× falls back to 2×")
+	planning.request_pacing("speed", false)
+	_check(planning.combat["speed_multiplier"] == 1.0 and planning.combat["speed_votes"] == [false, false], "Dropping speed returns to 1×")
+	# The same host now applies the multiplayer rule: each slot only votes for itself.
+	planning.singleplayer = false
+	planning._apply_pacing("triple_speed", 0, true)
+	_check(planning._speed_multiplier() == 1.0 and planning._host_speed_votes == [true, false] and planning._host_triple_speed_votes == [true, false], "One 3× vote also counts as that player's 2× vote but changes nothing alone")
+	planning._apply_pacing("speed", 1, true)
+	_check(planning._speed_multiplier() == 2.0, "A 3× vote and a 2× vote agree on 2×")
+	planning._apply_pacing("triple_speed", 1, true)
+	_check(planning._speed_multiplier() == 3.0 and planning.combat["speed_multiplier"] == 3.0, "Both players picking 3× runs at 3×")
+	planning._apply_pacing("triple_speed", 0, false)
+	_check(planning._speed_multiplier() == 2.0 and planning._host_speed_votes == [true, true], "Either player stepping back from 3× leaves 2×")
+	planning._apply_pacing("speed", 1, false)
+	_check(planning._speed_multiplier() == 1.0 and planning._host_speed_votes == [true, false] and planning._host_triple_speed_votes == [false, false], "Withdrawing speed drops that player's 3× vote and stops both")
+	planning.singleplayer = true
 	_dispose_model(planning)
 
 
@@ -206,6 +232,18 @@ func _test_peer_pacing(port: int) -> void:
 	await _wait_combat("host", {"speed_votes": [true, true], "speed_multiplier": 2.0}, "Both peers activate double speed")
 	await _pacing("guest", "speed", false)
 	await _wait_combat("host", {"speed_votes": [true, false], "speed_multiplier": 1.0}, "Guest withdrawal stops both without erasing host consent")
+	await _pacing("host", "triple_speed", true)
+	await _wait_combat("guest", {"speed_votes": [true, false], "triple_speed_votes": [true, false], "speed_multiplier": 1.0}, "Host 3× alone cannot accelerate the guest")
+	await _command("host", {"action": "forged_pacing", "option": "triple_speed", "slot": 1, "enabled": true})
+	await _pacing("guest", "speed", true)
+	await _wait_combat("host", {"speed_votes": [true, true], "triple_speed_votes": [true, false], "speed_multiplier": 2.0}, "Host 3× and guest 2× agree on 2× and a forged 3× vote is rejected")
+	await _pacing("guest", "triple_speed", true)
+	await _wait_combat("host", {"triple_speed_votes": [true, true], "speed_multiplier": 3.0}, "Both players picking 3× runs at 3×")
+	await _wait_combat("guest", {"triple_speed_votes": [true, true], "speed_multiplier": 3.0}, "Guest receives the agreed 3×")
+	await _pacing("guest", "speed", false)
+	await _wait_combat("host", {"speed_votes": [true, false], "triple_speed_votes": [true, false], "speed_multiplier": 1.0}, "Guest withdrawal drops its 3× vote and stops both without erasing host consent")
+	await _pacing("host", "triple_speed", false)
+	await _wait_combat("guest", {"speed_votes": [true, false], "triple_speed_votes": [false, false], "speed_multiplier": 1.0}, "Stepping back from 3× keeps the 2× vote")
 	await _pacing("host", "autoplay", true)
 	await _wait_combat("guest", {"autoplay_votes": [true, false], "autoplay": false, "wave": 0}, "Unilateral autoplay remains pending")
 	await _pacing("guest", "autoplay", true)
@@ -263,25 +301,27 @@ func _test_peer_pacing(port: int) -> void:
 		await _command(lane, {"action": "terminal_scenario"})
 	await _command("guest", {"action": "leave"})
 	await _wait_for("host", {"active": false}, "Disconnect resets active match")
-	_check(_snapshot("host")["combat"]["speed_votes"] == [false, false] and _snapshot("host")["combat"]["autoplay_votes"] == [false, false], "Disconnect resets all host-private votes")
+	_check(_snapshot("host")["combat"]["speed_votes"] == [false, false] and _snapshot("host")["combat"]["triple_speed_votes"] == [false, false] and _snapshot("host")["combat"]["autoplay_votes"] == [false, false], "Disconnect resets all host-private votes")
 	await _connect_guest("guest", "host", code)
 	await _wait_for("guest", {"active": true, "locked": false, "flags": [false, false]}, "Rejoin starts fresh planning")
 	for lane: String in ["host", "guest"]:
-		await _wait_combat(lane, {"wave": 0, "speed_votes": [false, false], "autoplay_votes": [false, false], "speed_multiplier": 1.0, "autoplay": false}, "Fresh peer session has no inherited consent")
+		await _wait_combat(lane, {"wave": 0, "speed_votes": [false, false], "triple_speed_votes": [false, false], "autoplay_votes": [false, false], "speed_multiplier": 1.0, "autoplay": false}, "Fresh peer session has no inherited consent")
 	await _peer_route("host", 0)
 	await _peer_route("guest", 1)
 	var terminal_start_coins: Array = _snapshot("host")["combat"]["coins"].duplicate()
 	for lane: String in ["host", "guest"]:
 		await _pacing(lane, "speed", true)
+		await _pacing(lane, "triple_speed", true)
 		await _pacing(lane, "autoplay", true)
 	await _command("host", {"action": "ready", "value": true})
 	await _command("guest", {"action": "ready", "value": true})
 	await _wait_combat("host", {"phase": MatchCombat.Phase.FINISHED}, "Autoplay reaches a real terminal result")
 	await _wait_combat("guest", {"phase": MatchCombat.Phase.FINISHED}, "Terminal state is accepted by the guest")
 	var terminal: Dictionary = _snapshot("host")["combat"].duplicate(true)
-	_check(terminal["wave"] == 1 and terminal["coins"] == terminal_start_coins and terminal["speed_votes"] == [false, false] and terminal["autoplay_votes"] == [false, false] and terminal["speed_multiplier"] == 1.0 and not terminal["autoplay"], "Terminal wave has no reward or extra start and clears pacing votes; observed " + str(terminal))
+	_check(terminal["wave"] == 1 and terminal["coins"] == terminal_start_coins and terminal["speed_votes"] == [false, false] and terminal["triple_speed_votes"] == [false, false] and terminal["autoplay_votes"] == [false, false] and terminal["speed_multiplier"] == 1.0 and not terminal["autoplay"], "Terminal wave has no reward or extra start and clears pacing votes; observed " + str(terminal))
 	for lane: String in ["host", "guest"]:
 		await _pacing(lane, "speed", true)
+		await _pacing(lane, "triple_speed", true)
 		await _pacing(lane, "autoplay", true)
 	await create_timer(0.15).timeout
 	_check(_snapshot("host")["combat"] == terminal and _snapshot("guest")["combat"] == terminal, "Results reject pacing from both real senders without mutating shared terminal state")

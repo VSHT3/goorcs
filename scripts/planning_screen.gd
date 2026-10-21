@@ -816,23 +816,24 @@ func _target_selected(mode: int) -> void:
 	_refresh_targeting()
 
 
+# The vote a pacing click sends: off -> on -> stronger (3× speed, or full
+# autoplay that also runs main rounds) -> off.
+static func pacing_request(option: String, state: Dictionary, slot: int) -> Array:
+	var stronger: String = "triple_speed" if option == "speed" else "full_autoplay"
+	var voted: bool = bool(state.get(option + "_votes", [false, false])[slot])
+	if voted and not bool(state.get(stronger + "_votes", [false, false])[slot]):
+		return [stronger, true]
+	return [option, not voted]
+
+
 func _request_pacing(option: String) -> void:
 	if planning == null or not planning.active:
 		return
 	if option == "speed" and planning.singleplayer:
 		planning.cycle_singleplayer_speed()
 		return
-	var votes: Array = planning.combat.get(option + "_votes", [false, false])
-	var slot: int = planning.local_slot()
-	if option == "autoplay":
-		# Off -> autoplay -> full autoplay (also main rounds) -> off.
-		var full: bool = bool(planning.combat.get("full_autoplay_votes", [false, false])[slot])
-		if bool(votes[slot]) and not full:
-			planning.request_pacing("full_autoplay", true)
-		else:
-			planning.request_pacing("autoplay", not bool(votes[slot]))
-		return
-	planning.request_pacing(option, not bool(votes[slot]))
+	var request: Array = pacing_request(option, planning.combat, planning.local_slot())
+	planning.request_pacing(String(request[0]), bool(request[1]))
 
 
 func _refresh_pacing() -> void:
@@ -844,6 +845,13 @@ func _refresh_pacing() -> void:
 		var votes: Array = state.get(option + "_votes", [false, false])
 		var enabled: bool = bool(votes[slot])
 		var agreed: bool = float(state.get("speed_multiplier", 1.0)) > 1.0 if option == "speed" else bool(state.get("autoplay", false))
+		var solo: bool = planning != null and planning.singleplayer
+		var multiplier: int = int(state.get("speed_multiplier", 1.0))
+		var triple_votes: Array = state.get("triple_speed_votes", [false, false])
+		var triple_vote: bool = bool(triple_votes[slot])
+		# A 3× vote stays gold until both players pick 3×.
+		if option == "speed" and triple_vote and not solo:
+			agreed = multiplier == 3
 		button.disabled = not available
 		button.set_pressed_no_signal(enabled)
 		var color := Color("b5e2b7") if agreed else Color("e0bc77")
@@ -854,17 +862,30 @@ func _refresh_pacing() -> void:
 			button.icon = preload("res://assets/ui/autoplay_full.svg") if full_vote else preload("res://assets/ui/autoplay.svg")
 			agreed = bool(state.get("full_autoplay", false)) if full_vote else agreed
 		if option == "speed":
-			var multiplier: int = int(state.get("speed_multiplier",1.0))
-			button.icon = preload("res://assets/ui/speed_triple.svg") if multiplier == 3 else (preload("res://assets/ui/speed_double.svg") if enabled else preload("res://assets/ui/speed_normal.svg"))
-		button.tooltip_text = ("%d× speed · click to cycle 1× / 2× / 3×" % int(state.get("speed_multiplier",1.0)) if planning != null and planning.singleplayer else "2× speed") if option == "speed" else ("Full autoplay · includes main rounds" if full_vote else "Autoplay")
-		if option == "autoplay" and enabled and not full_vote:
-			button.tooltip_text += "\nClick again for full autoplay"
+			# Solo shows the running speed; multiplayer shows your own vote.
+			var shown: int = multiplier if solo else (3 if triple_vote else (2 if enabled else 1))
+			button.icon = preload("res://assets/ui/speed_triple.svg") if shown == 3 else (preload("res://assets/ui/speed_double.svg") if shown == 2 else preload("res://assets/ui/speed_normal.svg"))
+			if solo:
+				button.tooltip_text = "%d× speed · click to cycle 1× / 2× / 3×" % multiplier
+			else:
+				button.tooltip_text = "3× speed" if triple_vote else "2× speed"
+				if enabled and not triple_vote:
+					button.tooltip_text += "\nClick again for 3× speed"
+		else:
+			button.tooltip_text = "Full autoplay · includes main rounds" if full_vote else "Autoplay"
+			if enabled and not full_vote:
+				button.tooltip_text += "\nClick again for full autoplay"
 		if agreed:
 			button.tooltip_text += " · On"
 		elif enabled:
 			button.tooltip_text += " · Waiting for opponent"
 		elif bool(votes[1 - slot]):
 			button.tooltip_text += " · Opponent enabled"
+		if option == "speed" and not solo:
+			if triple_vote and multiplier == 2:
+				button.tooltip_text += " · Running at 2×"
+			elif bool(triple_votes[1 - slot]) and not triple_vote:
+				button.tooltip_text += "\nOpponent picked 3×"
 		if option == "autoplay" and agreed and not planning.locked and (not planning.layouts[0].is_ready() or not planning.layouts[1].is_ready()):
 			button.tooltip_text += "\nWaiting for legal paths"
 		if option == "autoplay" and agreed and not bool(state.get("full_autoplay", false)) and bool(state.get("path_editing", false)):
