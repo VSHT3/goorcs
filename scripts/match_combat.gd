@@ -1350,7 +1350,7 @@ func _begin_spell(slot: int, mage: Dictionary, book: Dictionary, spell: String) 
 	var config: Dictionary = book[spell]
 	match spell:
 		"barrier":
-			if float(mage["hp"]) > float(mage["max_hp"]) * float(config["below"]):
+			if float(mage["hp"]) > float(mage["max_hp"]) * float(config["below"]) or int(mage["barriers"]) >= int(config["limit"]):
 				return false
 		"fireball":
 			if towers[slot].is_empty():
@@ -1463,6 +1463,7 @@ func _resolve_spell(slot: int, mage: Dictionary, book: Dictionary) -> void:
 			mage["shield_hits"] = int(config["hits"])
 			mage["shield_max_hits"] = int(config["hits"])
 			mage["hp"] = mini(int(mage["max_hp"]), int(mage["hp"]) + maxi(1, ceili(float(mage["max_hp"]) * float(config["heal"]))))
+			mage["barriers"] = int(mage["barriers"]) + 1
 			mage["spell_effect"] = effect
 	mage["spell"] = ""
 	mage["spell_phase"] = ""
@@ -2443,7 +2444,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 	EnemyMechanics.initialize(enemies[slot].back(), definition)
 	if not definition["spellbook"].is_empty():
 		enemies[slot].back().merge({
-			"spell": "", "spell_phase": "", "spell_index": 0, "spell_count": 0,
+			"spell": "", "spell_phase": "", "spell_index": 0, "spell_count": 0, "barriers": 0,
 			"next_spell": float(definition["spellbook"]["glide"]), "spell_duration": 0.0,
 			"spell_aim": Vector2.ZERO, "spell_shielded": false, "spell_effect": {},
 		})

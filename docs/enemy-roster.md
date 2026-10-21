@@ -145,7 +145,7 @@ Every **8 seconds**, a **1.2-second** door-opening action releases **4–7** hos
 
 ### Grand Mage Orcafus (round 140)
 
-`grand_mage_orcafus` is a mid-sized gliding archmage: **120×** HP, **0.3×** speed, silent **0.5% max-HP regeneration every 2 s**, and immune to **Fire, Ice and Magic** (only Physical and Lightning hurt him). His debut is guaranteed at **round 140**; afterwards he rolls **5% + 0.6 points per round, up to 50%**, so he becomes a regular sight in late waves. Paid sends unlock at round 160 for **30,000 Coins / −600 income**.
+`grand_mage_orcafus` is a mid-sized gliding archmage: **100×** HP, **0.3×** speed, silent **0.25% max-HP regeneration every 2 s**, and immune to **Fire, Ice and Magic** (only Physical and Lightning hurt him). His debut is guaranteed at **round 140**; afterwards he rolls **5% + 0.6 points per round, up to 50%**, so he becomes a regular sight in late waves. Paid sends unlock at round 160 for **30,000 Coins / −600 income**.
 
 He glides **1.4 s**, then stops for the next castable spell of his `spellbook` rotation, spending most of his time standing still and casting:
 
@@ -155,7 +155,7 @@ He glides **1.4 s**, then stops for the next castable spell of his `spellbook` r
 | Fireball | 1.4 s windup | Aimed at a random tower; stuns towers within **1.6 cells** of the impact for **4 s**. |
 | Portal | 2.4 s | Pulls the **10 rearmost** non-boss orcs to just in front of him. |
 | Haste | 1.8 s | Orcs within **5 cells** move **40% faster** for **6 s** (refreshes, never stacks). |
-| Barrier | 1.8 s | Only below **85% HP**: a **10-hit shield** and **20%** max-HP heal. |
+| Barrier | 1.8 s | Only below **50% HP**, at most **twice** per life: a **10-hit shield** and **20%** max-HP heal. |
 
 When he dies, his last swing sends a lightning bolt that stuns your **most valuable tower** (highest investment) for **10 s**, then he slowly crumbles to dust.
 

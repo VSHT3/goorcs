@@ -10,12 +10,12 @@ const FIELDS: Dictionary = {
 	"fireball": ["windup", "radius", "stun"],
 	"portal": ["cast", "count"],
 	"haste": ["cast", "radius", "multiplier", "duration"],
-	"barrier": ["cast", "hits", "heal", "below"],
+	"barrier": ["cast", "hits", "heal", "below", "limit"],
 	"soulfire": ["windup", "radius", "wither", "duration"],
 	"raise_dead": ["cast", "radius", "count", "window", "type"],
 }
 # Integer counts; fractions must stay within (0, 1]; multipliers must exceed one.
-const WHOLE: Array[String] = ["count", "hits"]
+const WHOLE: Array[String] = ["count", "hits", "limit"]
 const FRACTIONS: Array[String] = ["heal", "below", "wither"]
 # Text fields: the enemy type a spell raises (checked against the catalog).
 const NAMES: Array[String] = ["type"]
@@ -87,7 +87,7 @@ static func summary(book: Dictionary) -> PackedStringArray:
 			"haste":
 				lines.append("Haste: orcs within %s cells move %s%% faster for %ss" % [String.num(float(config["radius"]), 1), String.num((float(config["multiplier"]) - 1.0) * 100.0, 0), String.num(float(config["duration"]), 1)])
 			"barrier":
-				lines.append("Barrier (below %s%% HP): %d-hit shield and heals %s%% max HP" % [String.num(float(config["below"]) * 100.0, 0), int(config["hits"]), String.num(float(config["heal"]) * 100.0, 0)])
+				lines.append("Barrier (below %s%% HP, at most %d times): %d-hit shield and heals %s%% max HP" % [String.num(float(config["below"]) * 100.0, 0), int(config["limit"]), int(config["hits"]), String.num(float(config["heal"]) * 100.0, 0)])
 			"soulfire":
 				lines.append("Soulfire Breath: %ss windup at your densest towers · towers within %s cells deal %s%% less damage for %ss" % [String.num(float(config["windup"]), 1), String.num(float(config["radius"]), 1), String.num(float(config["wither"]) * 100.0, 0), String.num(float(config["duration"]), 1)])
 			"raise_dead":

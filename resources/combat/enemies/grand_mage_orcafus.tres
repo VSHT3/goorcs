@@ -9,14 +9,14 @@ script = ExtResource("1_enemy")
 id = &"grand_mage_orcafus"
 title = "Grand Mage Orcafus"
 description = "The oldest and wisest of the orc archmages glides over the battlefield, stopping to work spell after spell. Only Physical and Lightning damage reach him."
-health_multiplier = 120.0
+health_multiplier = 100.0
 speed_multiplier = 0.3
 base_damage = 12
 fire_immune = true
 ice_immune = true
 immune_elements = PackedStringArray("fire", "ice", "magic")
 regeneration_interval = 2.0
-regeneration_fraction = 0.005
+regeneration_fraction = 0.0025
 spawn_weight = 80
 first_wave = 140
 max_weight_share = 0.6
@@ -37,7 +37,7 @@ spellbook = {
 "fireball": {"windup": 1.4, "radius": 1.6, "stun": 4.0},
 "portal": {"cast": 2.4, "count": 10},
 "haste": {"cast": 1.8, "radius": 5.0, "multiplier": 1.4, "duration": 6.0},
-"barrier": {"cast": 1.8, "hits": 10, "heal": 0.2, "below": 0.85},
+"barrier": {"cast": 1.8, "hits": 10, "heal": 0.2, "below": 0.5, "limit": 2},
 "death_bolt": {"stun": 10.0}
 }
 texture = ExtResource("2_sprite")

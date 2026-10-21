@@ -647,11 +647,23 @@ Facing derives from `source_faces_left` and the captured route. `EnemyVisuals` s
 
 ### Shared pacing
 
-In multiplayer the fixed HUD's > / >> button requests normal/double simulation speed through the existing unanimous votes; the loop-arrow button requests autoplay. Either withdrawal stops the shared effect without erasing the other vote. Gold means pending and green means active. Solo instead cycles > / >> / >>> through 1×/2×/3× using the host-owned multiplier, while autoplay mirrors consent immediately. Votes/speed survive ordinary waves; results, disconnect, new runs, and round-changing debug resets clear them.
+In multiplayer the fixed HUD's > / >> / >>> button cycles a player's speed vote off → 2× → 3× → off; the loop-arrow button requests autoplay. A 3× vote (`triple_speed`) also counts as that player's 2× vote and dropping speed drops both, so the host runs 3× only when both players picked it and 2× while both picked at least 2×. Either withdrawal stops the shared effect without erasing the other vote. Gold means pending and green means active. Solo instead cycles > / >> / >>> through 1×/2×/3× using the host-owned multiplier, while autoplay mirrors consent immediately. Votes/speed survive ordinary waves; results, disconnect, new runs, and round-changing debug resets clear them.
 
 Only host combat delta uses the selected multiplier; movement, attacks, statuses, abilities, and spawn clocks scale together. Ready countdowns remain real time, and camera/UI/music are unscaled. Autoplay preserves legal start gates and untimed initial/main strategy. Results remain terminal; only the solo result action creates a different fresh model. Full transition rules and checks are in [results and playback](match-results.md).
 
 Verification passed weighted/combat regressions (exact budgets, caps/unlocks, deterministic seed repeatability/diversity, identical actual streams, type scaling, extra sends, Brute damage/clamping, and a constrained fourth resource), solo clocks/autoplay, and separate authenticated host/client pacing with unilateral requests, unanimity, withdrawal, forged ownership, shared random rosters, clearance, results, disconnect, and rejoin. Existing solo/peer combat, peer planning, camera/input, native drag/drop, selection, navigation, rendered inspection/board, import, and main-scene smoke passed. Graphical main-scene clicks exercised > / >> and autoplay through six weighted waves; 1280×720 and 1000×720 captures were inspected for compact controls and mixed live enemies. Internet reachability remains unverified.
+
+### Balance bot
+
+`tools/balance_bot.gd` plays real headless matches on the shipped rules with two identical mixed-build players and no sends:
+
+```
+godot --headless --path . -s tools/balance_bot.gd -- <seeds> [first_seed] [max_round] [log] [start_round start_coins]
+```
+
+Each player draws a six-lane zig-zag path that lengthens with every main-round expansion, keeps a Physical / Lightning / Magic tower mix (every third Arrow, Ballista and Lightning tower targets Strongest), adds three early Gold Mines and one War Drums per seven attack towers, then spends on whichever tower or upgrade buys the most estimated damage per Coin, spreading branch choices across towers. The log records each round's base HP, Coins, towers, invested Coins, path length, wave time, and every boss's fate (killed or leaked, with its lowest HP). A start round fast-forwards: the board grows to that round and each player spends `start_coins` at once (invested Coins run roughly 45k at round 100, 61k at 120, 80k at 140).
+
+It is a competent generic player, not an optimal or boss-specific one, and it never sends, rerolls, or upgrades mines. First results (October 2026): it reaches round 130+ with 80–100 base HP; damage comes only from boss debuts (Mancer at 40 on one seed, War Machine at 100, about −20). Combat alone takes about 55 minutes to round 100 and 75 to round 120 at 1×. Orcafus at 120× HP with an 85% Barrier gate reset himself to full every rotation and always leaked; he is now 100× HP with a Barrier below 50% at most twice and halved regeneration, and round-140 builds kill him about 80–85% of the way along his path.
 
 ### Adding a tower
 

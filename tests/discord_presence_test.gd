@@ -113,7 +113,10 @@ func _test_match_clock() -> void:
 	var started_at: int = presence.activity()["start_timestamp"]
 	_check(started_at > 0, "The run clock starts when board planning is admitted, even with sharing disabled")
 	# Cross a Unix-second boundary so a clock incorrectly reset on every snapshot fails.
-	await create_timer(1.1).timeout
+	# Wait on the wall clock itself: a timer's first frame delta also counts time
+	# spent earlier in that frame, so a 1.1 s timer can finish in under a second.
+	while int(Time.get_unix_time_from_system()) <= started_at:
+		await create_timer(0.05).timeout
 	_check(planning.debug_set_values(10, 200, 8), "Clock fixture changes round through the real owner")
 	_check(presence.activity()["start_timestamp"] == started_at, "Round changes cannot reset elapsed match time")
 	preferences.set_enabled(true)

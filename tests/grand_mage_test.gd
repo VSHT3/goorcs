@@ -208,21 +208,38 @@ func _test_barrier_and_regen() -> void:
 	_next_cast(mage, "barrier")
 	combat.advance(1.5)
 	_check(mage["spell"] != "barrier", "A healthy mage skips the Barrier")
+	var scratched := _board()
+	var grazed := _spawn(scratched, ID, 6.0)
+	grazed["hp"] = 60000
+	_next_cast(grazed, "barrier")
+	scratched.advance(1.5)
+	_check(grazed["spell"] != "barrier", "Above half HP the Barrier stays down")
 	var healthy := _board()
 	var hurt := _spawn(healthy, ID, 6.0)
-	hurt["hp"] = 50000
+	hurt["hp"] = 40000
 	_next_cast(hurt, "barrier")
 	_check(_until(healthy, hurt, "barrier"), "A wounded mage raises the Barrier")
 	var before: int = hurt["hp"]
 	healthy.advance(1.9)
 	_check(int(hurt["shield_hits"]) == 10 and int(hurt["shield_max_hits"]) == 10, "The Barrier is a ten-hit shield")
 	_check(int(hurt["hp"]) >= before + 20000, "The Barrier heals 20%% of maximum HP: %d -> %d" % [before, hurt["hp"]])
+	for repeat: int in range(2):
+		hurt["hp"] = 40000
+		hurt["spell"] = ""
+		hurt["cast_remaining"] = 0.0
+		hurt["next_spell"] = float(hurt["age"])
+		_next_cast(hurt, "barrier")
+		healthy.advance(0.05)
+		if repeat == 0:
+			_check(hurt["spell"] == "barrier", "A second Barrier is allowed")
+			healthy.advance(1.9)
+	_check(hurt["spell"] != "barrier" and int(hurt["barriers"]) == 2, "He raises the Barrier at most twice per life")
 	var regen := _board()
 	var resting := _spawn(regen, ID, 6.0)
 	resting["hp"] = 50000
 	resting["next_spell"] = 1000.0
 	regen.advance(2.05)
-	_check(int(resting["hp"]) == 50500 and resting["animation"] == "walk", "He silently regenerates 0.5%% every two seconds")
+	_check(int(resting["hp"]) == 50250 and resting["animation"] == "walk", "He silently regenerates 0.25%% every two seconds")
 
 
 func _test_death_bolt() -> void:
