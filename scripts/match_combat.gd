@@ -30,6 +30,10 @@ var enemies: Array[Array] = [[], []]
 # Enemies thrown by an Orcapult, airborne until they land on the target board.
 var flights: Array[Dictionary] = []
 var bombs: Array[Dictionary] = []
+# Grand Mage Nullify: simulation time until each board's Magic towers fall silent.
+var _magic_nullified_until: Array[float] = [0.0, 0.0]
+# Recent deaths a Raise the Fallen spell may call back: progress, route and time.
+var _fallen: Array[Array] = [[], []]
 var _bomb_explosions: Array[Dictionary] = []
 var _next_bomb_id: int = 1
 var _next_flight_id: int = 1
@@ -208,6 +212,8 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 			"heal_restores_shield": definition.heal_restores_shield,
 			"shakra_radius": definition.shakra_radius, "shakra_max_bonus": definition.shakra_max_bonus,
 			"ward_interval": definition.ward_interval, "ward_duration": definition.ward_duration, "ward_radius": definition.ward_radius,
+			"spellbook": definition.spellbook.duplicate(true),
+			"phase_interval": definition.phase_interval, "phase_immune_elements": _element_set(definition.phase_immune_elements),
 			"summon_interval": definition.summon_interval,
 			"summon_cast_duration": definition.summon_cast_duration,
 			"summon_type": String(definition.summon_type),
@@ -323,6 +329,7 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 		"rarity_rerolls": 0, "attribute_rerolls": 0,
 		"rarity_reroll_cost": -1, "attribute_reroll_cost": -1,
 		"support_damage_bonus": 0.0, "support_speed_bonus": 0.0, "support_range_bonus": 0.0, "crit_chance": 0.0, "crits": 0,
+		"withered_until": 0.0, "wither": 0.0, "wither_remaining": 0.0, "nullified": false,
 		"capstone": "", "base_max_health_bonus": 0, "base_max_health_per_round": 0, "base_max_health_limit": 0,
 		"base_regen": 0, "output_multiplier": 1.0,
 		"invested": 0 if _sandbox_mode else cost, "sell_value": 0 if _sandbox_mode else _sell_value(cost),
@@ -547,6 +554,9 @@ func _refresh_board(slot: int) -> void:
 			tower["crit_chance"] = minf(float(tower["crit_chance"]), TowerDefinition.MAX_CRIT_CHANCE)
 		var modifiers: Dictionary = tower["modifiers"]
 		var damage_multiplier: float = (1.0 + float(modifiers.get("damage", 0.0))) * (1.0 + float(tower["support_damage_bonus"]))
+		# Dreadmaw's Soulfire withers a tower's damage until it fades.
+		if float(tower.get("withered_until", 0.0)) > _elapsed + 0.000000001:
+			damage_multiplier *= 1.0 - float(tower["wither"])
 		var speed_multiplier: float = (1.0 + float(modifiers.get("attack_speed", 0.0))) * (1.0 + float(tower["support_speed_bonus"]))
 		var old_interval: float = tower["interval"]
 		tower["damage_multiplier"] = damage_multiplier
@@ -898,6 +908,8 @@ func debug_set_round(round_number: int) -> bool:
 	_fork_cursors = [{}, {}]
 	_spawned = [0, 0]
 	_elapsed = 0.0
+	_magic_nullified_until = [0.0, 0.0]
+	_fallen = [[], []]
 	_step_start_time = 0.0
 	_continuous_damage.clear()
 	_continuous_bonus.clear()
@@ -913,6 +925,7 @@ func debug_set_round(round_number: int) -> bool:
 			tower["cooldown"] = tower["interval"] if tower["evolution"] == "onyx_ring" else 0.0
 			_reset_firing(tower)
 			_clear_stun(tower)
+			_clear_spell_marks(tower)
 			tower["target_id"] = -1
 			tower["secondary_target_id"] = -1
 			tower["shot"] = 0
@@ -1018,13 +1031,20 @@ func _admit_wave(routing: Array[Dictionary], wave_number: int, groups: Array[Dic
 	if _sandbox_mode:
 		_spawned[1] = wave_roster.size()
 	_elapsed = 0.0
+	_magic_nullified_until = [0.0, 0.0]
+	_fallen = [[], []]
 	_next_send_times = [0.0, 0.0]
 	wave = wave_number
 	phase = Phase.WAVE
-	for board: Array in towers:
-		for tower: Dictionary in board:
+	for slot: int in range(2):
+		var withered: bool = false
+		for tower: Dictionary in towers[slot]:
 			_reset_firing(tower)
 			_clear_stun(tower)
+			withered = withered or float(tower.get("withered_until", 0.0)) > 0.0
+			_clear_spell_marks(tower)
+		if withered:
+			_refresh_board(slot)
 	for slot: int in range(2):
 		if _pending_sends(slot) > 0:
 			_spawn_send(slot)
@@ -1192,8 +1212,10 @@ func advance(delta: float) -> bool:
 				_clear_tower_mark(slot, tower)
 				_reset_firing(tower)
 				_clear_stun(tower)
+				_clear_spell_marks(tower)
 				tower["production_elapsed"] = 0.0
 			_refresh_board(slot)
+		_magic_nullified_until = [0.0, 0.0]
 		flights.clear()
 		bombs.clear()
 		_bomb_explosions.clear()
@@ -1230,7 +1252,9 @@ func advance(delta: float) -> bool:
 					base_health[slot] = mini(base_max_health[slot], base_health[slot] + int(tower["base_regen"]))
 				_reset_firing(tower)
 				_clear_stun(tower)
+				_clear_spell_marks(tower)
 			_refresh_board(slot)
+		_magic_nullified_until = [0.0, 0.0]
 		phase = Phase.PLANNING
 	return true
 
@@ -1250,8 +1274,11 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 			for tower: Dictionary in towers[slot]:
 				if float(tower["stunned_remaining"]) > 0.000000001:
 					duration = minf(duration, float(tower["stunned_remaining"]))
-				elif tower["behavior_kind"] in ["attack", "chain"] and float(tower["cooldown"]) > 0.000000001:
+				elif tower["behavior_kind"] in ["attack", "chain"] and float(tower["cooldown"]) > 0.000000001 and not _silenced(slot, tower):
 					duration = minf(duration, float(tower["cooldown"]))
+		for tower: Dictionary in towers[slot]:
+			if float(tower["withered_until"]) > _elapsed:
+				duration = minf(duration, float(tower["withered_until"]) - _elapsed)
 		if periodic:
 			for tower: Dictionary in towers[slot]:
 				if float(tower["stunned_remaining"]) <= 0.000000001 and _periodic_amount(tower) > 0:
@@ -1288,9 +1315,227 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 				duration = minf(duration, _heal_wait(slot, enemy, definition))
 			if float(definition["ward_interval"]) > 0.0:
 				duration = minf(duration, maxf(0.000000001, float(enemy["next_ward"]) - float(enemy["age"])))
+			if float(definition["phase_interval"]) > 0.0:
+				var interval: float = definition["phase_interval"]
+				duration = minf(duration, maxf(0.000000001, interval - fposmod(float(enemy["age"]), interval)))
+			if not definition["spellbook"].is_empty() and String(enemy["spell"]).is_empty():
+				duration = minf(duration, maxf(0.000000001, float(enemy["next_spell"]) - float(enemy["age"])))
 			if float(enemy.get("ward_until", 0.0)) > _elapsed:
 				duration = minf(duration, float(enemy["ward_until"]) - _elapsed)
+			if float(enemy.get("haste_until", 0.0)) > _elapsed:
+				duration = minf(duration, float(enemy["haste_until"]) - _elapsed)
+			if _magic_nullified_until[slot] > _elapsed:
+				duration = minf(duration, _magic_nullified_until[slot] - _elapsed)
 	return maxf(0.000000001, duration)
+
+
+# Grand Mage: glide, then stand still for the next castable spell in the rotation.
+func _advance_spellbook(slot: int, mage: Dictionary, book: Dictionary) -> void:
+	if not String(mage["spell"]).is_empty():
+		if float(mage["cast_remaining"]) <= 0.000000001:
+			_resolve_spell(slot, mage, book)
+		return
+	if float(mage["age"]) + 0.000000001 < float(mage["next_spell"]) or not BossMechanics.can_act(mage) or float(mage["tower_attack_remaining"]) > 0.000000001:
+		return
+	var order: Array = book["order"]
+	for attempt: int in range(order.size()):
+		var index: int = (int(mage["spell_index"]) + attempt) % order.size()
+		if _begin_spell(slot, mage, book, String(order[index])):
+			mage["spell_index"] = (index + 1) % order.size()
+			return
+	mage["next_spell"] = float(mage["age"]) + float(book["glide"])
+
+
+func _begin_spell(slot: int, mage: Dictionary, book: Dictionary, spell: String) -> bool:
+	var config: Dictionary = book[spell]
+	match spell:
+		"barrier":
+			if float(mage["hp"]) > float(mage["max_hp"]) * float(config["below"]):
+				return false
+		"fireball":
+			if towers[slot].is_empty():
+				return false
+			mage["spell_aim"] = Vector2(towers[slot][_group_random.randi_range(0, towers[slot].size() - 1)]["cell"])
+		"portal":
+			if _portal_passengers(slot, mage, int(config["count"])).is_empty():
+				return false
+			mage["spell_aim"] = _position(mage["route"], minf(float(mage["progress"]) + Spellbook.PORTAL_LEAD, float(mage["route"].size() - 1) - 0.5))
+		"soulfire":
+			if towers[slot].is_empty():
+				return false
+			mage["spell_aim"] = _densest_tower_cell(slot, float(config["radius"]))
+		"raise_dead":
+			if _risen_candidates(slot, mage, config).is_empty():
+				return false
+	mage["spell"] = spell
+	mage["spell_phase"] = "shield" if spell == "nullify" else "cast"
+	mage["spell_shielded"] = spell == "nullify"
+	mage["cast_remaining"] = Spellbook.cast_time(book, spell)
+	mage["spell_duration"] = mage["cast_remaining"]
+	mage["spell_count"] += 1
+	mage["animation"] = spell
+	mage["animation_elapsed"] = 0.0
+	mage["speed"] = 0.0
+	_sound_events.record(CombatSoundEvents.Cue.RUNE, slot, mage["pos"], _death_time)
+	return true
+
+
+func _resolve_spell(slot: int, mage: Dictionary, book: Dictionary) -> void:
+	var spell: String = mage["spell"]
+	var config: Dictionary = book[spell]
+	var effect: Dictionary = {"id": int(mage["spell_count"]), "kind": spell, "pos": mage["pos"]}
+	match spell:
+		"nullify":
+			if mage["spell_phase"] == "shield":
+				# The channel ends in a staff strike that silences the board's Magic.
+				mage["spell_shielded"] = false
+				mage["spell_phase"] = "strike"
+				mage["cast_remaining"] = float(config["strike"])
+				mage["spell_duration"] = mage["cast_remaining"]
+				mage["animation"] = "nullify_strike"
+				mage["animation_elapsed"] = 0.0
+				_magic_nullified_until[slot] = maxf(_magic_nullified_until[slot], _elapsed + float(config["duration"]))
+				mage["spell_effect"] = effect
+				_sound_events.record(CombatSoundEvents.Cue.TROLL_STOMP, slot, mage["pos"], _death_time)
+				return
+		"fireball":
+			var aim: Vector2 = mage["spell_aim"]
+			effect["to"] = aim
+			for tower: Dictionary in towers[slot]:
+				if cell_in_range(Vector2i(aim), tower["cell"], float(config["radius"])):
+					_stun_tower(slot, tower, float(config["stun"]), "fireball", aim)
+			_refresh_board(slot)
+			_update_bounties(slot)
+			mage["spell_effect"] = effect
+			_sound_events.record(CombatSoundEvents.Cue.EXPLOSION, slot, aim, _death_time)
+		"portal":
+			var from: Array[Vector2] = []
+			var front: float = float(mage["progress"]) + Spellbook.PORTAL_LEAD
+			for passenger: Dictionary in _portal_passengers(slot, mage, int(config["count"])):
+				from.append(passenger["pos"])
+				passenger["progress"] = minf(front, float(passenger["route"].size() - 1) - 0.5)
+				passenger["pos"] = _position(passenger["route"], passenger["progress"])
+				_slow_motion.erase(passenger["id"])
+			_target_grid_valid[slot] = false
+			effect["from"] = from
+			effect["to"] = _position(mage["route"], minf(front, float(mage["route"].size() - 1) - 0.5))
+			mage["spell_effect"] = effect
+			_sound_events.record(CombatSoundEvents.Cue.PORTAL, slot, effect["to"], _death_time)
+		"haste":
+			var radius_squared: float = float(config["radius"]) * float(config["radius"])
+			for ally: Dictionary in enemies[slot]:
+				if ally["id"] == mage["id"] or int(ally["hp"]) <= 0 or _enemy_types[ally["type_id"]]["boss"]:
+					continue
+				if Vector2(mage["pos"]).distance_squared_to(ally["pos"]) > radius_squared:
+					continue
+				# Refreshing an active haste extends it; it never stacks.
+				if float(ally.get("haste_multiplier", 1.0)) == 1.0:
+					ally["base_speed"] = float(ally["base_speed"]) * float(config["multiplier"])
+					ally["haste_multiplier"] = float(config["multiplier"])
+				ally["haste_until"] = _elapsed + float(config["duration"])
+				ally["haste_remaining"] = float(config["duration"])
+				_prepare_motion(ally)
+			mage["spell_effect"] = effect
+		"soulfire":
+			var aim: Vector2 = mage["spell_aim"]
+			effect["to"] = aim
+			for tower: Dictionary in towers[slot]:
+				if cell_in_range(Vector2i(aim), tower["cell"], float(config["radius"])):
+					tower["withered_until"] = maxf(float(tower["withered_until"]), _elapsed + float(config["duration"]))
+					tower["wither"] = float(config["wither"])
+					tower["wither_remaining"] = float(tower["withered_until"]) - _elapsed
+			_refresh_board(slot)
+			mage["spell_effect"] = effect
+			_sound_events.record(CombatSoundEvents.Cue.EXPLOSION, slot, aim, _death_time)
+		"raise_dead":
+			var risen: Array[Vector2] = []
+			var candidates: Array[Dictionary] = _risen_candidates(slot, mage, config)
+			for record: Dictionary in candidates:
+				var route: Array[Vector2i] = []
+				route.assign(record["route"])
+				_spawn_enemy(slot, String(config["type"]), minf(float(record["progress"]), float(route.size() - 1) - 0.5), _elapsed, route, int(mage["id"]))
+				_fallen[slot].erase(record)
+				risen.append(record["pos"])
+			effect["from"] = risen
+			mage["spell_effect"] = effect
+			_sound_events.record(CombatSoundEvents.Cue.BONES, slot, mage["pos"], _death_time)
+		"barrier":
+			mage["shield_hits"] = int(config["hits"])
+			mage["shield_max_hits"] = int(config["hits"])
+			mage["hp"] = mini(int(mage["max_hp"]), int(mage["hp"]) + maxi(1, ceili(float(mage["max_hp"]) * float(config["heal"]))))
+			mage["spell_effect"] = effect
+	mage["spell"] = ""
+	mage["spell_phase"] = ""
+	mage["animation"] = "walk"
+	mage["animation_elapsed"] = 0.0
+	mage["next_spell"] = float(mage["age"]) + float(book["glide"])
+	BossMechanics.prepare(mage)
+
+
+# The tower cell with the most towers within the radius; ties keep the oldest tower.
+func _densest_tower_cell(slot: int, radius: float) -> Vector2:
+	var best: Dictionary = towers[slot][0]
+	var best_count: int = -1
+	for tower: Dictionary in towers[slot]:
+		var count: int = 0
+		for other: Dictionary in towers[slot]:
+			count += int(cell_in_range(tower["cell"], other["cell"], radius))
+		if count > best_count:
+			best = tower
+			best_count = count
+	return Vector2(best["cell"])
+
+
+# The most recent fallen within reach, newest first.
+func _risen_candidates(slot: int, caster: Dictionary, config: Dictionary) -> Array[Dictionary]:
+	var radius_squared: float = float(config["radius"]) * float(config["radius"])
+	var result: Array[Dictionary] = []
+	for index: int in range(_fallen[slot].size() - 1, -1, -1):
+		var record: Dictionary = _fallen[slot][index]
+		if float(record["time"]) < _elapsed - float(config["window"]) or Vector2(record["pos"]).distance_squared_to(caster["pos"]) > radius_squared:
+			continue
+		result.append(record)
+		if result.size() >= int(config["count"]):
+			break
+	return result
+
+
+# Rearmost living, walking non-boss orcs that are well behind the portal exit.
+func _portal_passengers(slot: int, mage: Dictionary, count: int) -> Array[Dictionary]:
+	var front: float = float(mage["progress"]) + Spellbook.PORTAL_LEAD
+	var result: Array[Dictionary] = []
+	for enemy: Dictionary in enemies[slot]:
+		if enemy["id"] == mage["id"] or int(enemy["hp"]) <= 0 or _enemy_types[enemy["type_id"]]["boss"] or not BossMechanics.can_act(enemy):
+			continue
+		if float(_enemy_spawn_times[enemy["id"]]) > _elapsed + 0.000000001 or float(enemy["progress"]) >= minf(front, float(enemy["route"].size() - 1) - 0.5) - 1.0:
+			continue
+		result.append(enemy)
+	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["progress"]) < float(b["progress"]) or (float(a["progress"]) == float(b["progress"]) and int(a["id"]) < int(b["id"])))
+	return result.slice(0, count)
+
+
+# Stunned orcs stay put whatever their base speed becomes.
+func _prepare_motion(enemy: Dictionary) -> void:
+	BossMechanics.prepare(enemy)
+	if float(enemy["stunned_remaining"]) > 0.000000001:
+		enemy["speed"] = 0.0
+
+
+# A slain Grand Mage's last swing: a long stun on the board's most valuable tower.
+func _death_bolt(slot: int, enemy: Dictionary, definition: Dictionary) -> void:
+	var bolt: Dictionary = definition["spellbook"].get("death_bolt", NO_BONUS)
+	if bolt.is_empty() or towers[slot].is_empty():
+		return
+	var target: Dictionary = towers[slot][0]
+	for tower: Dictionary in towers[slot]:
+		var value := Vector2i(int(tower["invested"]), int(tower["damage_dealt"]))
+		var best := Vector2i(int(target["invested"]), int(target["damage_dealt"]))
+		if value.x > best.x or (value.x == best.x and (value.y > best.y or (value.y == best.y and int(tower["id"]) < int(target["id"])))):
+			target = tower
+	_stun_tower(slot, target, float(bolt["stun"]), "death_bolt", enemy["pos"])
+	enemy["death_bolt_to"] = Vector2(target["cell"])
+	_refresh_board(slot)
+	_update_bounties(slot)
 
 
 func _cast_ward(slot: int, caster: Dictionary, definition: Dictionary) -> void:
@@ -1377,7 +1622,7 @@ func _next_attack_entry(slot: int, enemy: Dictionary, definition: Dictionary, ma
 
 
 func _requires_combat_events(definition: Dictionary, wave_number: int = 0) -> bool:
-	if BossMechanics.has_abilities(definition) or int(definition["hit_shield"]) > 0 or float(definition["death_stun_duration"]) > 0.0 or float(definition["death_bomb_fuse"]) > 0.0:
+	if BossMechanics.has_abilities(definition) or not definition["spellbook"].is_empty() or float(definition["phase_interval"]) > 0.0 or int(definition["hit_shield"]) > 0 or float(definition["death_stun_duration"]) > 0.0 or float(definition["death_bomb_fuse"]) > 0.0:
 		return true
 	var variant: String = definition["spawn_variant"]
 	var birth_wave: int = wave if wave_number == 0 else wave_number
@@ -1394,7 +1639,7 @@ func _shield_event_step(slot: int, enemy: Dictionary, maximum: float) -> float:
 		duration = minf(duration, maxf(0.000000001, (boundary - float(enemy["progress"])) / speed))
 	var streams: Dictionary = _shield_exposure.get(int(enemy["id"]), NO_BONUS)
 	for tower: Dictionary in towers[slot]:
-		if float(tower["stunned_remaining"]) > 0.000000001:
+		if float(tower["stunned_remaining"]) > 0.000000001 or _silenced(slot, tower):
 			continue
 		var definition: Dictionary = _tower_types[tower["type_id"]]
 		var flame: bool = definition["advancements"].get(tower["advancement"], {}).get("weapon", "") == "flamethrower"
@@ -1499,7 +1744,7 @@ func _death_stun_event_step(slot: int, enemy: Dictionary, maximum: float) -> flo
 		burn_fraction = float(burn["fraction"])
 		duration = minf(duration, maxf(0.000000001, float(burn["end_time"]) - _elapsed))
 	for tower: Dictionary in towers[slot]:
-		if float(tower["stunned_remaining"]) > 0.000000001 or float(streams.get(int(tower["id"]), 0.0)) > 0.000000001:
+		if float(tower["stunned_remaining"]) > 0.000000001 or _silenced(slot, tower) or float(streams.get(int(tower["id"]), 0.0)) > 0.000000001:
 			continue
 		if not cell_in_range(tower["cell"], Vector2i(Vector2(enemy["pos"]).round()), tower["range"]):
 			continue
@@ -1513,10 +1758,17 @@ func _death_stun_event_step(slot: int, enemy: Dictionary, maximum: float) -> flo
 				duration = minf(duration, float(tower["refuel_remaining"]))
 				continue
 			var selected: int = _target(slot, tower, tower["range"], -1, -1, -1, -1, -1.0, true)
-			if selected < 0 or int(enemies[slot][selected]["id"]) != id:
+			if selected < 0:
 				continue
+			var share: float = 1.0
+			if int(enemies[slot][selected]["id"]) != id:
+				# A scorched neighbour of the stream's target takes its share.
+				var scorch: float = float(config.get("scorch_radius", 0.0))
+				if scorch <= 0.0 or Vector2(enemy["pos"]).distance_squared_to(enemies[slot][selected]["pos"]) > scorch * scorch:
+					continue
+				share = float(config["scorch_fraction"])
 			duration = minf(duration, maxf(0.000000001, float(config["fuel_duration"]) - float(tower["continuous_fire_time"])))
-			rate = float(config["continuous_dps"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * _damage_multiplier(enemy, &"fire")
+			rate = float(config["continuous_dps"]) * share * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * _damage_multiplier(enemy, &"fire")
 			burn_rate = maxf(burn_rate, float(config["burn_dps"]) * float(tower["damage_multiplier"]) * _damage_multiplier(enemy, &"fire"))
 		elif definition["area_attack"] and definition["evolutions"].get(tower["evolution"], {}).get("continuous", false):
 			# Ignoring the tendril limit can only overestimate, which shortens the step.
@@ -1623,14 +1875,25 @@ func _enemy_abilities(slot: int) -> void:
 	active.clear()
 	active.append_array(enemies[slot])
 	for enemy: Dictionary in active:
+		var phasing: float = float(_enemy_types[enemy["type_id"]]["phase_interval"])
+		if phasing > 0.0:
+			enemy["ethereal"] = int(floorf((float(enemy["age"]) + 0.000000001) / phasing)) % 2 == 1
 		enemy["ward_remaining"] = maxf(0.0, float(enemy.get("ward_until", 0.0)) - _elapsed)
 		enemy["warded"] = float(enemy["ward_remaining"]) > 0.000000001
+		if enemy.has("haste_until"):
+			enemy["haste_remaining"] = maxf(0.0, float(enemy["haste_until"]) - _elapsed)
+			if float(enemy["haste_remaining"]) <= 0.000000001 and float(enemy["haste_multiplier"]) != 1.0:
+				enemy["base_speed"] = float(enemy["base_speed"]) / float(enemy["haste_multiplier"])
+				enemy["haste_multiplier"] = 1.0
+				_prepare_motion(enemy)
 	for enemy: Dictionary in active:
 		if int(enemy["hp"]) <= 0 or float(enemy["stunned_remaining"]) > 0.000000001 or (float(enemy["progress"]) >= enemy["route"].size() - 1 and BossMechanics.can_act(enemy)):
 			continue
 		var definition: Dictionary = _enemy_types[enemy["type_id"]]
 		if float(definition["ward_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_ward"]):
 			_cast_ward(slot, enemy, definition)
+		if not definition["spellbook"].is_empty():
+			_advance_spellbook(slot, enemy, definition["spellbook"])
 		if BossMechanics.has_abilities(definition):
 			_boss_abilities(slot, enemy, definition)
 			if int(enemy["hp"]) <= 0 or float(enemy["progress"]) >= enemy["route"].size() - 1:
@@ -1841,6 +2104,7 @@ func snapshot(include_metadata: bool = true) -> Dictionary:
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"flights": flights.duplicate(true), "flight_duration": FLIGHT_DURATION,
 		"bombs": bombs.duplicate(true), "bomb_explosions": _bomb_explosions.duplicate(true),
+		"magic_nullified": [maxf(0.0, _magic_nullified_until[0] - _elapsed), maxf(0.0, _magic_nullified_until[1] - _elapsed)],
 		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
 		"death_generation": _death_generation,
 		"sounds": _sound_events.snapshot(_death_time),
@@ -2164,7 +2428,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"next_heal": _enemy_types[type_id]["heal_interval"],
 		"heal_charge": 0.0, "heal_clock": maxf(0.0, _elapsed - spawn_time), "shakra_bonus": 0.0,
 		"next_ward": _enemy_types[type_id]["ward_interval"], "ward_count": 0,
-		"ward_until": 0.0, "ward_source": -1, "warded": false,
+		"ward_until": 0.0, "ward_source": -1, "warded": false, "ethereal": false,
 		"next_summon": _enemy_types[type_id]["summon_interval"],
 		"tower_attack_count": 0, "tower_attack_target_ids": [] as Array[int], "tower_attack_aims": [] as Array[Vector2],
 		"tower_attack_remaining": 0.0, "next_tower_attack": _enemy_types[type_id]["tower_attack_interval"],
@@ -2177,6 +2441,12 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"stepped": false, "launched": false,
 	})
 	EnemyMechanics.initialize(enemies[slot].back(), definition)
+	if not definition["spellbook"].is_empty():
+		enemies[slot].back().merge({
+			"spell": "", "spell_phase": "", "spell_index": 0, "spell_count": 0,
+			"next_spell": float(definition["spellbook"]["glide"]), "spell_duration": 0.0,
+			"spell_aim": Vector2.ZERO, "spell_shielded": false, "spell_effect": {},
+		})
 	_enemy_spawn_times[_next_enemy_id] = spawn_time
 	_next_enemy_id += 1
 
@@ -2200,6 +2470,19 @@ func _clear_stun(tower: Dictionary) -> void:
 	tower["stunned_remaining"] = 0.0
 	tower["stun_source"] = ""
 	_stun_refresh_times.erase(int(tower["id"]))
+
+
+# Withering and silencing end with the wave that cast them.
+func _clear_spell_marks(tower: Dictionary) -> void:
+	tower["withered_until"] = 0.0
+	tower["wither"] = 0.0
+	tower["wither_remaining"] = 0.0
+	tower["nullified"] = false
+
+
+# Nullify freezes Magic towers outright, timers included.
+func _silenced(slot: int, tower: Dictionary) -> bool:
+	return tower.get("element", "") == "magic" and _magic_nullified_until[slot] > _elapsed + 0.000000001
 
 
 func _advance_stuns(slot: int, delta: float) -> void:
@@ -2345,6 +2628,8 @@ func _attack_flame(slot: int, tower: Dictionary, config: Dictionary, delta: floa
 		selected = _enemy_index(slot, id)
 		if selected >= 0:
 			_ignite(enemies[slot][selected], tower, config, end)
+		if float(config.get("scorch_fraction", 0.0)) > 0.0 and exposure > 0.0:
+			_flame_scorch(slot, tower, config, id, Vector2(tower["aim"]), time, end)
 		time = end
 		if float(tower["continuous_fire_time"]) >= float(config["fuel_duration"]) - 0.000000001:
 			tower["refuel_remaining"] = float(config["refuel_duration"])
@@ -2356,6 +2641,41 @@ func _attack_flame(slot: int, tower: Dictionary, config: Dictionary, delta: floa
 
 # Sum two independent fractional HP streams and stop on the lethal whole-HP
 # crossing so a coarse simulation tick can retarget without wasting fuel.
+# The flame stream also scorches orcs crowding its target: a share of the stream
+# over the same span, plus ignition, through the usual shield and burn ledgers.
+func _flame_scorch(slot: int, tower: Dictionary, config: Dictionary, primary_id: int, center: Vector2, start: float, end: float) -> void:
+	var radius_squared: float = float(config["scorch_radius"]) * float(config["scorch_radius"])
+	var victims: Array[int] = []
+	for enemy: Dictionary in enemies[slot]:
+		if int(enemy["id"]) == primary_id or int(enemy["hp"]) <= 0 or bool(enemy["fire_immune"]) or _immune(enemy, &"fire"):
+			continue
+		if float(_enemy_spawn_times[enemy["id"]]) > start + 0.000000001:
+			continue
+		if _position(enemy["route"], _historical_progress(enemy, end)).distance_squared_to(center) <= radius_squared:
+			victims.append(int(enemy["id"]))
+	var fractions: Dictionary = _continuous_damage[tower["id"]]
+	for id: int in victims:
+		_burn_until(slot, id, start)
+		var index: int = _enemy_index(slot, id)
+		if index < 0:
+			continue
+		var enemy: Dictionary = enemies[slot][index]
+		var base_rate: float = float(config["continuous_dps"]) * float(config["scorch_fraction"]) * float(tower["damage_multiplier"]) * float(tower["speed_multiplier"]) * _elemental_damage_multiplier(enemy, &"fire")
+		var span: float = _shield_continuous_exposure(enemy, tower["id"], end - start, _shield_contact_interval(tower), base_rate)
+		if span > 0.000000001:
+			var total: float = float(fractions.get(id, 0.0)) + base_rate * (1.0 + float(enemy["bounty_damage_bonus"])) * span
+			var bonus: Dictionary = _continuous_bonus_stream(tower["id"], id, float(enemy["bounty_damage_bonus"]) > 0.0)
+			_accumulate_bonus(slot, enemy, bonus, base_rate * span)
+			var damage: int = floori(total + 0.000000001)
+			fractions[id] = maxf(0.0, total - damage)
+			if damage > 0:
+				_hit(slot, tower, index, damage, true, &"", bonus, true)
+		_burn_until(slot, id, end)
+		index = _enemy_index(slot, id)
+		if index >= 0:
+			_ignite(enemies[slot][index], tower, config, end)
+
+
 func _flame_lethal_time(enemy: Dictionary, fraction: float, rate: float, time: float) -> float:
 	var burn: Dictionary = _burns[enemy["id"]]
 	if float(burn["last_time"]) > time + 0.000000001:
@@ -2393,7 +2713,20 @@ func _flame_motion_boundary(slot: int, time: float, finish: float) -> float:
 
 
 func _attack(slot: int, delta: float) -> void:
+	var faded: bool = false
 	for tower: Dictionary in towers[slot]:
+		if float(tower["withered_until"]) > 0.0 and float(tower["withered_until"]) <= _elapsed + 0.000000001:
+			tower["withered_until"] = 0.0
+			faded = true
+		tower["wither_remaining"] = maxf(0.0, float(tower["withered_until"]) - _elapsed)
+	if faded:
+		_refresh_board(slot)
+	for tower: Dictionary in towers[slot]:
+		# Nullify silences Magic towers entirely: no shots, pulses or tendrils.
+		tower["nullified"] = _silenced(slot, tower)
+		if tower["nullified"]:
+			tower["drain_targets"].clear()
+			continue
 		if float(tower["stunned_remaining"]) > 0.000000001:
 			tower["drain_targets"].clear()
 			continue
@@ -3030,8 +3363,15 @@ func _record_death(slot: int, enemy: Dictionary) -> void:
 		"pos": enemy["pos"], "faces_left": faces_left, "time": _death_time,
 		"hp": enemy["hp"], "max_hp": enemy["max_hp"],
 		"death_stun_radius": _enemy_types[enemy["type_id"]]["death_stun_radius"],
+		"bolt_to": enemy.get("death_bolt_to", Vector2(-1, -1)),
 	})
 	_next_death_id += 1
+	# Remember ordinary deaths briefly for Raise the Fallen; bosses and the risen stay dead.
+	if not _enemy_types[enemy["type_id"]]["boss"] and int(enemy["summoner_id"]) < 0:
+		var fallen: Array = _fallen[slot]
+		while not fallen.is_empty() and float(fallen[0]["time"]) < _elapsed - Spellbook.FALLEN_MEMORY:
+			fallen.pop_front()
+		fallen.append({"progress": float(enemy["progress"]), "route": enemy["route"], "pos": enemy["pos"], "time": _elapsed})
 	_sound_events.record(int(_enemy_types[enemy["type_id"]]["death_sound"]), slot, enemy["pos"], _death_time)
 	var definition: Dictionary = _enemy_types[enemy["type_id"]]
 	if float(definition["death_bomb_fuse"]) > 0.0:
@@ -3118,10 +3458,13 @@ static func _element_set(elements: PackedStringArray) -> Dictionary:
 
 
 func _immune(enemy: Dictionary, damage_type: StringName) -> bool:
-	if float(enemy.get("ward_until", 0.0)) > _elapsed + 0.000000001:
+	if float(enemy.get("ward_until", 0.0)) > _elapsed + 0.000000001 or bool(enemy.get("spell_shielded", false)):
 		return true
 	var type: Dictionary = _enemy_types.get(String(enemy.get("type_id", "")), NO_BONUS)
-	return not type.is_empty() and type["immune_elements"].has(String(TowerDefinition.element_of(damage_type)))
+	if type.is_empty():
+		return false
+	var element: String = TowerDefinition.element_of(damage_type)
+	return type["immune_elements"].has(element) or (bool(enemy.get("ethereal", false)) and type["phase_immune_elements"].has(element))
 
 
 func _damage_multiplier(enemy: Dictionary, damage_type: StringName) -> float:
@@ -3220,6 +3563,7 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 		if int(definition["reroll_drop_amount"]) > 0 and float(definition["reroll_drop_chance"]) > 0.0 and _drop_random.randf() < float(definition["reroll_drop_chance"]):
 			reroll_currency[slot] += int(definition["reroll_drop_amount"])
 			_recap.add(slot, "earned", "drop_shards", int(definition["reroll_drop_amount"]))
+		_death_bolt(slot, enemy, definition)
 		var reward: Dictionary = _boss_loot.claim(slot, String(enemy["type_id"]), definition, wave, _death_time)
 		if not reward.is_empty():
 			coins[slot] += int(reward["coins"])

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ContentCatalog" load_steps=35 format=3]
+[gd_resource type="Resource" script_class="ContentCatalog" load_steps=39 format=3]
 
 [ext_resource type="Script" path="res://scripts/content_catalog.gd" id="1_catalog"]
 [ext_resource type="Script" path="res://scripts/tower_definition.gd" id="2_tower"]
@@ -34,9 +34,13 @@
 [ext_resource type="Resource" path="res://resources/combat/enemies/omega_orc.tres" id="32_omega_orc"]
 [ext_resource type="Resource" path="res://resources/combat/enemies/shaorc.tres" id="33_shaorc"]
 [ext_resource type="Resource" path="res://resources/combat/enemies/greater_shaorc.tres" id="34_greater_shaorc"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/grand_mage_orcafus.tres" id="35_orcafus"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/heavy_duty_orc.tres" id="36_heavy_duty"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/dreadmaw.tres" id="37_dreadmaw"]
+[ext_resource type="Resource" path="res://resources/combat/enemies/wraithorc.tres" id="38_wraithorc"]
 
 [resource]
 script = ExtResource("1_catalog")
 towers = Array[ExtResource("2_tower")]([ExtResource("4_arrow"), ExtResource("5_ballista"), ExtResource("6_rune"), ExtResource("14_lightning"), ExtResource("15_drums"), ExtResource("16_mine"), ExtResource("24_orcapult")])
-enemies = Array[ExtResource("3_enemy")]([ExtResource("7_grunt"), ExtResource("8_runner"), ExtResource("20_scrapguard"), ExtResource("9_brute"), ExtResource("10_orcling"), ExtResource("21_crate"), ExtResource("11_chief"), ExtResource("22_rage"), ExtResource("12_necro"), ExtResource("13_skeleton"), ExtResource("25_giant"), ExtResource("26_kamika"), ExtResource("17_boss"), ExtResource("23_moss"), ExtResource("27_ember_orc"), ExtResource("28_frost_orc"), ExtResource("29_storm_orc"), ExtResource("30_arcane_orc"), ExtResource("31_elemetal_orc"), ExtResource("32_omega_orc"), ExtResource("33_shaorc"), ExtResource("34_greater_shaorc"), ExtResource("18_troll"), ExtResource("19_machine")])
+enemies = Array[ExtResource("3_enemy")]([ExtResource("7_grunt"), ExtResource("8_runner"), ExtResource("20_scrapguard"), ExtResource("9_brute"), ExtResource("10_orcling"), ExtResource("21_crate"), ExtResource("11_chief"), ExtResource("22_rage"), ExtResource("12_necro"), ExtResource("13_skeleton"), ExtResource("25_giant"), ExtResource("26_kamika"), ExtResource("17_boss"), ExtResource("23_moss"), ExtResource("36_heavy_duty"), ExtResource("38_wraithorc"), ExtResource("27_ember_orc"), ExtResource("28_frost_orc"), ExtResource("29_storm_orc"), ExtResource("30_arcane_orc"), ExtResource("31_elemetal_orc"), ExtResource("32_omega_orc"), ExtResource("33_shaorc"), ExtResource("34_greater_shaorc"), ExtResource("18_troll"), ExtResource("19_machine"), ExtResource("35_orcafus"), ExtResource("37_dreadmaw")])
 starter_tower_id = &"arrow_tower"

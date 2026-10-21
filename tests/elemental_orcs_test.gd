@@ -16,8 +16,9 @@ func _init() -> void:
 	_test_spawns()
 	_test_shaorc()
 	_test_greater_shaorc()
+	_test_wraithorc()
 	if failures == 0:
-		print("PASS: tower elements, immune-element damage and targeting, explosive as Fire, Elemental Orc debuts, ShaOrc heals/shield refills/OrcShakra and Greater ShaOrc wards that end with the caster")
+		print("PASS: tower elements, immune-element damage and targeting, explosive as Fire, Elemental Orc debuts, ShaOrc heals/shield refills/OrcShakra and Greater ShaOrc wards that end with the caster, and Wraithorc phasing")
 	quit(1 if failures else 0)
 
 
@@ -223,3 +224,24 @@ func _test_greater_shaorc() -> void:
 	_check(not bool(ally["warded"]) and int(caster["ward_count"]) == 1, "The ward fades after 10s")
 	timed.advance(2.0)
 	_check(bool(ally["warded"]) and int(caster["ward_count"]) == 2, "It wards again every 12s")
+
+
+func _test_wraithorc() -> void:
+	var combat := _board()
+	var wraith := _spawn(combat, &"wraithorc", 6.0)
+	combat.build(0, Vector2i(3, 1), &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
+	combat.build(0, Vector2i(4, 1), &"lightning", MatchCombat.TargetMode.FURTHEST)
+	var arrow: Dictionary = combat.towers[0][0]
+	var bolt: Dictionary = combat.towers[0][1]
+	arrow["cooldown"] = 1000.0
+	bolt["cooldown"] = 1000.0
+	combat.advance(1.0)
+	_check(not bool(wraith["ethereal"]) and combat._hit(0, arrow, combat.enemies[0].find(wraith), 10), "A solid Wraithorc takes Physical damage")
+	combat.advance(2.5)
+	_check(bool(wraith["ethereal"]), "After three seconds it turns ethereal")
+	var hp: int = wraith["hp"]
+	_check(not combat._hit(0, arrow, combat.enemies[0].find(wraith), 10) and int(wraith["hp"]) == hp, "Physical damage passes through an ethereal Wraithorc")
+	_check(combat._target(0, arrow, 10.0) != combat.enemies[0].find(wraith), "Physical towers switch targets while it is ethereal")
+	_check(combat._hit(0, bolt, combat.enemies[0].find(wraith), 10) and int(wraith["hp"]) < hp, "Lightning still hurts it")
+	combat.advance(3.0)
+	_check(not bool(wraith["ethereal"]) and combat.snapshot()["enemies"][0][0].has("ethereal"), "It turns solid again on schedule, and the board sees the phase")

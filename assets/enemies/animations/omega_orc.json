@@ -2,7 +2,7 @@
   "authoring": "Shared articulated orc rig re-dressed per element: exact palette swap plus element geometry in the rig head/body joint space. No image service or sampled art.",
   "identity": "Obsidian-skinned armoured hulk with white-gold trim and blazing eyes; fire, ice, lightning and magic orbs orbit it.",
   "generator": "tools/author_elemental_orcs.py",
-  "generator_sha256": "e9e3ae2a6b9af979ae8d93f987ac9d629e4a707a70352f5e4c9e0cec72e5a3b0",
+  "generator_sha256": "89c8a8ecb8ed18a7c6bbf793c4d59f6489c3c73fda7e99024eb054e6b74c5dbf",
   "reproduce": "python3 tools/author_elemental_orcs.py",
   "rig": "brute",
   "geometry_helpers": "tools/author_enemy_sprites.py",

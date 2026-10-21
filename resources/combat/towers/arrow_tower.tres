@@ -24,7 +24,7 @@ advancements = {
 "fire_arrows": {"title": "Fire Arrows", "cost": 600, "archer_count": 2, "primary_multiplier": 1.0, "burn_dps": 4.0, "burn_duration": 3.0},
 "molotov": {"title": "Molotov Cocktails", "cost": 800, "requires": "fire_arrows", "weapon": "molotov", "archer_count": 2, "primary_multiplier": 1.25, "splash_multiplier": 0.65, "splash_radius": 1.0, "burn_dps": 4.0, "burn_duration": 3.0},
 "quick_pitch": {"title": "Quick Pitch", "cost": 1000, "requires": "molotov", "weapon": "molotov", "attack_rate_multiplier": 1.5, "archer_count": 2, "primary_multiplier": 1.25, "splash_multiplier": 0.65, "splash_radius": 1.0, "burn_dps": 4.0, "burn_duration": 3.0},
-"flamethrower": {"title": "Flamethrower", "cost": 1800, "requires": "quick_pitch", "weapon": "flamethrower", "archer_count": 1, "continuous_dps": 144.0, "burn_dps": 12.0, "burn_duration": 5.0, "fuel_duration": 60.0, "refuel_duration": 6.0},
+"flamethrower": {"title": "Flamethrower", "cost": 1800, "requires": "quick_pitch", "weapon": "flamethrower", "archer_count": 1, "continuous_dps": 144.0, "burn_dps": 12.0, "burn_duration": 5.0, "fuel_duration": 60.0, "refuel_duration": 6.0, "scorch_radius": 0.85, "scorch_fraction": 0.5},
 "bomb_arrows": {"title": "Bomb Arrows", "cost": 750, "archer_count": 2, "primary_multiplier": 1.5, "splash_multiplier": 0.5, "splash_radius": 0.85},
 "bigger_bombs": {"title": "Bigger Explosions", "cost": 250, "requires": "bomb_arrows", "archer_count": 2, "primary_multiplier": 1.5, "splash_multiplier": 0.5, "splash_radius": 1.25},
 "anti_orc_grenades": {"title": "Anti-Orc Grenades", "cost": 1000, "requires": "bigger_bombs", "weapon": "grenade", "attack_rate_multiplier": 1.1, "archer_count": 2, "primary_multiplier": 2.0, "splash_multiplier": 1.0, "splash_radius": 1.5},

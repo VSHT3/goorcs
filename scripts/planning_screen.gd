@@ -1178,6 +1178,8 @@ static func behavior_summary(state: Dictionary, fallback: Dictionary = {}) -> St
 		var interval: float = maxf(float(state.get("interval", 1.0)), 0.001)
 		if weapon == "flamethrower":
 			result = "%s FIRE / s · 1 operator\n%ss fuel · %ss refuel" % [String.num(float(advancement.get("continuous_dps", 0.0)) * float(state.get("damage_multiplier", 1.0)) * float(state.get("speed_multiplier", 1.0)), 1), String.num(float(advancement.get("fuel_duration", 60.0)), 0), String.num(float(advancement.get("refuel_duration", 6.0)), 0)]
+			if advancement.has("scorch_fraction"):
+				result += "\nScorches orcs within %s cells for %s%%" % [String.num(float(advancement["scorch_radius"]), 2), String.num(float(advancement["scorch_fraction"]) * 100.0, 0)]
 		elif weapon == "minigun":
 			result = "3 crew · 1 arrow stream\n%s damage · %.2f arrows/s" % [String.num(damage, 0), 1.0 / interval]
 		else:

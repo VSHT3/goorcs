@@ -52,7 +52,7 @@ The Giant carries a bomb on its back. Confirmed death drops one bomb on its **sa
 
 ## Varied regular enemies
 
-These four roles join the existing roster progressively. All are available directly in Sandbox and fully animated in Orcieary. Their count/share caps and rewards remain provisional playtest tuning.
+These five roles join the existing roster progressively. All are available directly in Sandbox and fully animated in Orcieary. Their count/share caps and rewards remain provisional playtest tuning.
 
 | Enemy | Regular / Send round | HP / Speed multiplier | Weight / share | Send Coins / income | Gimmick |
 | --- | --- | --- | --- | --- | --- |
@@ -60,6 +60,7 @@ These four roles join the existing roster progressively. All are available direc
 | CrateOrc | 18 / 28 | 2.2 / 0.7 | 5 / 25% | 50 / +3 | A confirmed death releases exactly two individual Orclings. |
 | RageOrc | 28 / 40 | 3.5 / 0.8 | 7 / 30% | 80 / +4 | First surviving hit to ≤50% HP permanently multiplies speed by 1.6. |
 | MossOrc | 52 / 66 | 6 / 0.55 | 12 / 20% | 120 / +5 | Regenerates 8% of maximum HP every four simulation seconds. |
+| HeavyDutyOrc | 30 / 40 | 9 / 0.4 | 10 / 25% | 90 / +4 | Slowest regular orc; industrial plate takes Physical ×0.5 and every other element ×0.9; leaks for 6. |
 
 Crate children inherit the captured parent route/current progress, start fresh at birth, keep ordinary Orcling rewards, and prevent clearance. Tower kills award the crate bounty once; collateral death releases children without awarding the player; leaks release none. Combined summon/death-child graphs reject missing references, boss children, and cycles.
 
@@ -115,7 +116,7 @@ The existing sound-backed reel shows each tier's scaled payout and the accepted 
 
 ## Late-game bosses
 
-All three bosses have late-game paid sends with high Coin prices and recurring-income penalties, listed above. Regular encounters still reserve at most one of each type at its guaranteed debut, then roll occasional later encounters under the normal weight/share rules; paid orders use the independent send FIFO instead. Bosses remain available directly in Sandbox and have debut-scaled Orcieary entries. Numeric balance is provisional until real friend playtests.
+All bosses have late-game paid sends with high Coin prices and recurring-income penalties, listed above. Regular encounters still reserve at most one of each type at its guaranteed debut, then roll occasional later encounters under the normal weight/share rules; paid orders use the independent send FIFO instead. Bosses remain available directly in Sandbox and have debut-scaled Orcieary entries. Numeric balance is provisional until real friend playtests.
 
 | Mechanic | Trollorc | Orc king war orchine |
 | --- | ---: | ---: |
@@ -137,6 +138,39 @@ Every **8 seconds**, a **1.2-second** door-opening action releases **4–7** hos
 
 **Stun ownership:** the host owns `stunned_remaining` and every impact. Stuns refresh nonstackingly and suspend every tower role: fresh discrete/continuous attacks and firing streaks, emitted support buffs, mine production/round-clear payout, bounty marks, and income auras. Periodic production clocks freeze without accumulating catch-up income. Recovery restores eligible effects immediately, with strongest-duplicate stacking preserved. Already-applied burns keep ticking. Timers use simulation time, respecting pause and playback speed; reset/abandoned rounds clear status. Camera, stars, projectiles, and sound never decide outcomes. Display-name changes preserve the stable `troll` / `orc_war_machine` IDs and records.
 
+
+### Wraithorc (round 120)
+
+`wraithorc` is a late elite shade: **7×** HP, **0.75×** speed, **4** leak damage, weight 14 (one per wave, +1 every 20 rounds), sends from round 135 for 160 Coins. Every **3 s** it switches between solid and ethereal; while ethereal it is drawn translucent and **Physical and Fire deal nothing**, so towers of those elements switch targets until it turns solid again. Lightning, Ice and Magic always hurt it. The phase follows its own simulation clock (`phase_interval`, `phase_immune_elements`).
+
+### Grand Mage Orcafus (round 140)
+
+`grand_mage_orcafus` is a mid-sized gliding archmage: **120×** HP, **0.3×** speed, silent **0.5% max-HP regeneration every 2 s**, and immune to **Fire, Ice and Magic** (only Physical and Lightning hurt him). His debut is guaranteed at **round 140**; afterwards he rolls **5% + 0.6 points per round, up to 50%**, so he becomes a regular sight in late waves. Paid sends unlock at round 160 for **30,000 Coins / −600 income**.
+
+He glides **1.4 s**, then stops for the next castable spell of his `spellbook` rotation, spending most of his time standing still and casting:
+
+| Spell | Cast | Effect |
+| --- | --- | --- |
+| Nullify | 2.5 s immune channel + 0.6 s strike | Immune to all damage while channelling; the staff strike silences every **Magic** tower on his board for **8 s** (no shots, pulses or tendrils). A crossed sigil marks silenced towers and a violet border frames the arena. |
+| Fireball | 1.4 s windup | Aimed at a random tower; stuns towers within **1.6 cells** of the impact for **4 s**. |
+| Portal | 2.4 s | Pulls the **10 rearmost** non-boss orcs to just in front of him. |
+| Haste | 1.8 s | Orcs within **5 cells** move **40% faster** for **6 s** (refreshes, never stacks). |
+| Barrier | 1.8 s | Only below **85% HP**: a **10-hit shield** and **20%** max-HP heal. |
+
+When he dies, his last swing sends a lightning bolt that stuns your **most valuable tower** (highest investment) for **10 s**, then he slowly crumbles to dust.
+
+### Dreadmaw, the Bone Wyrm (round 200)
+
+`dreadmaw` is a colossal skeletal dragon ridden by a lich warlord: **650×** HP, **0.12×** speed, **25** leak damage. Bone takes **60%** of Physical damage, Fire deals **150%**, and it is immune to Ice. Below **50% HP** it enrages and moves **1.7×** faster. Its death spills **8 Skeltorcs**. Debut guaranteed at **round 200**, then **3% + 0.3 points per round, up to 30%**; sends from round 220 for **120,000 Coins / −2,500 income**.
+
+It walks **3 s** between casts:
+
+- **Soulfire Breath** (1.6 s windup): aimed at your densest group of towers; towers within **2.2 cells** are **Withered**, dealing **50% less damage for 8 s** (green flames on the tower).
+- **Raise the Fallen** (1.8 s): up to **6** non-boss orcs that died within **5 cells** in the last **12 s** rise again as Skeltorcs where they fell. Risen and summoned orcs never rise twice.
+
+### Boss loot
+
+Every first boss kill now drops **Rare or better** (`minimum_rarity = "rare"` in `boss_rewards.tres`): Rare 67%, Epic 25%, Legendary 7%, Mythic 1%. The reward reel only shows those tiers.
 
 ## Health progression
 

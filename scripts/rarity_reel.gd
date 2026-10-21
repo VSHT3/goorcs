@@ -29,6 +29,8 @@ var _landing_position: float = float(WINNER_INDEX)
 var _peak_speed: float = 0.0
 var _revealed: bool = false
 var _winner_rank: int = 0
+# Lowest rank the current presentation can land on; filler cards never show less.
+var _floor_rank: int = 0
 var _winner_name: String = ""
 var _winner_color: Color
 var _winner_payout: String = ""
@@ -206,6 +208,7 @@ func present(tower: Dictionary, artwork: Texture2D) -> void:
 		_strip.names[index] = RARITIES[index].capitalize()
 	_winner_payout = ""
 	_heading.text = "Rarity"
+	_floor_rank = 0
 	_start(String(tower.get("rarity", "common")), artwork)
 
 
@@ -214,10 +217,12 @@ func present_reward(award: Dictionary, artwork: Texture2D = null) -> void:
 		return
 	_strip.coins.resize(RARITIES.size())
 	_strip.shards.resize(RARITIES.size())
+	_floor_rank = RARITIES.size() - 1
 	for tier: Dictionary in award["tiers"]:
 		var rank: int = RARITIES.find(String(tier["id"]))
 		if rank < 0:
 			continue
+		_floor_rank = mini(_floor_rank, rank)
 		_strip.names[rank] = String(tier["title"])
 		_strip.coins[rank] = "%d Coins" % int(tier["coins"])
 		_strip.shards[rank] = "%d Shards" % int(tier["shards"])
@@ -239,17 +244,18 @@ func _start(rarity: String, artwork: Texture2D, winner_name: String = "") -> voi
 	_winner_rank = RARITIES.find(rarity)
 	if _winner_rank < 0:
 		_winner_rank = 2
+	_floor_rank = mini(_floor_rank, _winner_rank)
 	_winner_name = _strip.names[_winner_rank] if winner_name.is_empty() else winner_name
 	_winner_color = MatchPlanningScreen.tower_rarity_color({"rarity": rarity})
 	_strip.set_artwork(artwork)
 	_strip.rarities.resize(CARD_COUNT)
 	for index: int in range(CARD_COUNT):
-		_strip.rarities[index] = _rng.randi_range(0, RARITIES.size() - 1)
+		_strip.rarities[index] = _rng.randi_range(_floor_rank, RARITIES.size() - 1)
 	_strip.rarities[WINNER_INDEX] = _winner_rank
 	# Clear every potentially visible landing neighbor before staging one near-miss.
 	for index: int in range(WINNER_INDEX - LANDING_RADIUS, WINNER_INDEX + LANDING_RADIUS + 1):
 		if index != WINNER_INDEX:
-			_strip.rarities[index] = _rng.randi_range(0, mini(_winner_rank, RARITIES.find("rare")))
+			_strip.rarities[index] = _rng.randi_range(_floor_rank, maxi(_floor_rank, mini(_winner_rank, RARITIES.find("rare"))))
 	if _winner_rank < RARITIES.size() - 1:
 		var offset: int = _rng.randi_range(1, 2)
 		if _rng.randi_range(0, 1) == 0:

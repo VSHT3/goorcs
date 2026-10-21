@@ -92,6 +92,9 @@ var combat_towers: Array = []:
 		_draw_order_dirty = true
 		_sync_combat_animation()
 		queue_redraw()
+# Grand Mage presentation: seconds of Nullify left on this board and seen spell effects.
+var _magic_nullified_remaining: float = 0.0
+var _spell_seen: Dictionary[int, int] = {}
 var combat_enemies: Array = []:
 	# Only presentation state is blended; accepted enemy dictionaries stay untouched.
 	set(value):
@@ -332,7 +335,7 @@ func _process(delta: float) -> void:
 	if not _corpse_paused:
 		for index: int in range(_corpse_traces.size() - 1, -1, -1):
 			_corpse_traces[index]["age"] += delta * _corpse_speed
-			if float(_corpse_traces[index]["age"]) >= CORPSE_LIFETIME:
+			if float(_corpse_traces[index]["age"]) >= _corpse_lifetime(_corpse_traces[index]):
 				_corpse_traces.remove_at(index)
 				expired = true
 	if expired:
@@ -358,6 +361,7 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 		_boss_effects.clear()
 		_boss_seen_enemy.clear()
 		_boss_seen_stuns.clear()
+		_spell_seen.clear()
 		_shield_hit_counts.clear()
 		_shield_hit_life.clear()
 		_enemy_lifts.clear()
@@ -372,13 +376,15 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 		_death_generation = generation
 	_corpse_speed = maxf(0.0, speed)
 	_corpse_paused = paused
+	var nullified: Array = state.get("magic_nullified", [0.0, 0.0])
+	_magic_nullified_remaining = float(nullified[slot]) if slot >= 0 and slot < nullified.size() else 0.0
 	var clock: float = float(state.get("death_time", 0.0))
 	_bomb_visual_clock = clock
 	_capture_bombs(state, slot, clock)
 	for index: int in range(_corpse_traces.size() - 1, -1, -1):
 		var trace: Dictionary = _corpse_traces[index]
 		trace["age"] = maxf(float(trace["age"]), clock - float(trace["time"]))
-		if float(trace["age"]) >= CORPSE_LIFETIME:
+		if float(trace["age"]) >= _corpse_lifetime(trace):
 			_corpse_traces.remove_at(index)
 	_capture_flights(state, slot, clock)
 	var deaths: Array = state.get("deaths", [[], []])
@@ -389,7 +395,7 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 				continue
 			_last_death_id = id
 			var age: float = maxf(0.0, clock - float(event["time"]))
-			if age >= CORPSE_LIFETIME or not _enemy_art.has(event["type_id"]):
+			if not _enemy_art.has(event["type_id"]) or age >= _corpse_lifetime(event):
 				continue
 			var trace: Dictionary = event.duplicate()
 			trace["age"] = age
@@ -704,6 +710,15 @@ func _enemy_faces_left(route: Array, progress: float) -> bool:
 	return mirror_horizontal
 
 
+# Aimed casts turn the caster toward the towers it strikes; otherwise sprites face the route.
+func _enemy_facing_left(enemy: Dictionary, progress: float) -> bool:
+	if enemy.get("spell", "") in ["fireball", "soulfire"] and enemy["route"].size() >= 2:
+		var dx: float = Vector2(enemy.get("spell_aim", Vector2.ZERO)).x - _route_position(enemy["route"], progress).x
+		if absf(dx) > 0.25:
+			return (dx < 0.0) != mirror_horizontal
+	return _enemy_faces_left(enemy["route"], progress)
+
+
 func cell_center(cell: Vector2i) -> Vector2:
 	return _position_center(Vector2(cell))
 
@@ -913,6 +928,7 @@ func _draw() -> void:
 	_draw_combat()
 	_draw_projectiles()
 	_draw_boss_effects()
+	_draw_arena_nullify()
 
 
 func _update_ground() -> void:
@@ -1288,7 +1304,7 @@ func _update_enemy_geometry(item: Dictionary, foot: Vector2, progress: float, ce
 	var enemy: Dictionary = item["data"]
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
 	var frame: Texture2D = item["frame"]
-	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
+	var flip: bool = _enemy_facing_left(enemy, progress) != artwork.source_faces_left
 	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, cell_size * artwork.board_height, _enemy_render_foot(enemy, foot), flip)
 	var bounds: Rect2 = EnemyVisuals.opaque_bounds(frame)
 	if flip:
@@ -1321,7 +1337,7 @@ func _draw_combat() -> void:
 		var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
 		var width: float = cell_size * artwork.board_height * 0.26
 		draw_set_transform(item["foot"], 0.0, Vector2(1.0, 0.30))
-		var alpha: float = 0.35 * (_corpse_alpha(float(item["data"]["age"])) if int(item["kind"]) == 3 else 1.0)
+		var alpha: float = 0.35 * (_corpse_alpha(float(item["data"]["age"]), _corpse_lifetime(item["data"])) if int(item["kind"]) == 3 else 1.0)
 		draw_circle(Vector2.ZERO, width, Color(0.06, 0.10, 0.07, alpha))
 	draw_set_transform(Vector2.ZERO)
 	for item: Dictionary in _draw_order:
@@ -1403,6 +1419,15 @@ func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
 	if orbiting:
 		_draw_boulders(tower, foot, true)
 	_draw_stun_stars(tower, foot, true)
+	if bool(tower.get("nullified", false)):
+		_draw_nullified_sigil(tower, foot)
+	if float(tower.get("wither_remaining", 0.0)) > 0.0:
+		# Withered by Soulfire: green flames gutter on the tower until it fades.
+		var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
+		var phase: int = int(float(tower.get("wither_remaining", 0.0)) * 8.0) + int(tower["id"])
+		var top: Vector2 = _tower_stun_center(tower, foot)
+		for index: int in range(3):
+			_draw_pixel_flame(top + Vector2((float(index) - 1.0) * pixel * 6.0, pixel * (2.0 + (index % 2) * 3.0)), pixel, phase + index, SOULFIRE_RAMP)
 
 
 func _draw_support_context(tower: Dictionary, foot: Vector2) -> void:
@@ -2014,8 +2039,14 @@ func _draw_rune_stone(position: Vector2, radius: float, rotation: float, onyx: b
 	draw_set_transform(Vector2.ZERO)
 
 
-func _corpse_alpha(age: float) -> float:
-	return clampf((CORPSE_LIFETIME - age) / 0.5, 0.0, 1.0)
+func _corpse_alpha(age: float, lifetime: float = CORPSE_LIFETIME) -> float:
+	return clampf((lifetime - age) / 0.5, 0.0, 1.0)
+
+
+# A type may keep its corpse longer (Grand Mage Orcafus slowly turns to dust).
+func _corpse_lifetime(trace: Dictionary) -> float:
+	var artwork: EnemyDefinition = _enemy_art.get(trace.get("type_id", ""))
+	return CORPSE_LIFETIME if artwork == null or artwork.corpse_lifetime <= 0.0 else artwork.corpse_lifetime
 
 
 func _draw_death_blood(trace: Dictionary, foot: Vector2) -> void:
@@ -2023,7 +2054,7 @@ func _draw_death_blood(trace: Dictionary, foot: Vector2) -> void:
 	if artwork.blood_color.a <= 0.0:
 		return
 	var age: float = trace["age"]
-	var color := Color(artwork.blood_color, artwork.blood_color.a * _corpse_alpha(age) * 0.85)
+	var color := Color(artwork.blood_color, artwork.blood_color.a * _corpse_alpha(age, _corpse_lifetime(trace)) * 0.85)
 	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
 	var spread: float = clampf(age / 0.13, 0.0, 1.0)
 	var sign_x: float = -1.0 if int(trace["enemy_id"]) % 2 else 1.0
@@ -2043,7 +2074,11 @@ func _draw_enemy_death(item: Dictionary) -> void:
 	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, item["foot"], flip)
 	if flip:
 		rect.size.x = -rect.size.x
-	draw_texture_rect(frame, rect, false, Color(1.0, 1.0, 1.0, _corpse_alpha(float(trace["age"]))))
+	draw_texture_rect(frame, rect, false, Color(1.0, 1.0, 1.0, _corpse_alpha(float(trace["age"]), _corpse_lifetime(trace))))
+	var bolt_to: Vector2 = trace.get("bolt_to", Vector2(-1, -1))
+	if bolt_to.x >= 0.0 and float(trace["age"]) < 0.7:
+		# The slain mage's last swing: a bolt from the staff to the stunned tower.
+		_draw_bolt(item["foot"] + Vector2(-_cell_size() * 0.35 * (-1.0 if flip else 1.0), -_cell_size() * artwork.board_height * 0.95), _position_center(bolt_to) - Vector2(0.0, _cell_size() * 0.45), 1.0 - float(trace["age"]) / 0.7, int(trace["enemy_id"]))
 
 
 func _draw_enemy(item: Dictionary) -> void:
@@ -2065,7 +2100,8 @@ func _draw_enemy(item: Dictionary) -> void:
 		texture = _burning_texture(frame)
 	elif bool(enemy.get("slowed", false)) and not bool(enemy.get("ice_immune", false)):
 		texture = _slowed_texture(frame)
-	draw_texture_rect(texture, rect, false)
+	# An ethereal Wraithorc is a translucent pale shade until it turns solid again.
+	draw_texture_rect(texture, rect, false, Color(0.72, 0.95, 1.0, 0.45) if bool(enemy.get("ethereal", false)) else Color.WHITE)
 	if burning:
 		var pixel: float = maxf(1.0, floorf(_cell_size() * 0.022))
 		var phase: int = int(float(enemy.get("age", 0.0)) * 10.0) + int(enemy["id"])
@@ -2073,13 +2109,25 @@ func _draw_enemy(item: Dictionary) -> void:
 		_draw_pixel_flame(item["foot"] + Vector2(pixel * 3.0, -_cell_size() * artwork.board_height * 0.48), pixel, phase + 2)
 	if bool(enemy.get("warded", false)):
 		EnemyVisuals.draw_ward(self, item["bounds"], _cell_size(), float(enemy.get("ward_remaining", 0.0)), float(enemy.get("age", 0.0)))
+	if bool(enemy.get("spell_shielded", false)):
+		_draw_spell_shield(enemy, item["bounds"])
+	if float(enemy.get("haste_remaining", 0.0)) > 0.0:
+		# Haste: short speed streaks trail behind the hastened orc.
+		var bounds: Rect2 = item["bounds"]
+		var behind: float = 1.0 if artwork.source_faces_left != flip else -1.0
+		var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
+		var edge: float = bounds.end.x if behind > 0.0 else bounds.position.x
+		for index: int in range(3):
+			var y: float = bounds.position.y + bounds.size.y * (0.3 + index * 0.2)
+			var length: float = pixel * (5.0 + float((int(enemy["id"]) + index) % 3) * 2.0)
+			draw_line(Vector2(edge + behind * pixel * 2.0, y), Vector2(edge + behind * (pixel * 2.0 + length), y), Color(SPELL_HASTE, 0.75), pixel)
 	if bool(enemy.get("launched", false)) or float(enemy.get("stunned_remaining", 0.0)) > 0.0:
 		_draw_dizzy_stars(enemy, item["foot"] - Vector2(0.0, _cell_size() * artwork.board_height * 0.92))
 
 
 func _enemy_sprite_bounds(enemy: Dictionary, foot: Vector2, progress: float) -> Rect2:
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
-	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
+	var flip: bool = _enemy_facing_left(enemy, progress) != artwork.source_faces_left
 	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
 	return EnemyVisuals.visible_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, foot), flip)
 
@@ -2088,7 +2136,7 @@ func _enemy_contains_point(enemy: Dictionary, foot: Vector2, progress: float, po
 	if not _enemy_sprite_bounds(enemy, foot, progress).has_point(position):
 		return false
 	var artwork: EnemyDefinition = _enemy_art[enemy["type_id"]]
-	var flip: bool = _enemy_faces_left(enemy["route"], progress) != artwork.source_faces_left
+	var flip: bool = _enemy_facing_left(enemy, progress) != artwork.source_faces_left
 	var frame: Texture2D = EnemyVisuals.enemy_texture(artwork, enemy)
 	var rect: Rect2 = EnemyVisuals.sprite_rect(artwork, frame, _cell_size() * artwork.board_height, _enemy_render_foot(enemy, foot), flip)
 	return _sprite_contains_point(frame, rect, flip, position)
@@ -2628,15 +2676,19 @@ func _draw_archer_bow(tower: Dictionary, archer_index: int, geometry: Dictionary
 		_draw_pixel_flame(tip, pixel, phase)
 
 
-func _draw_pixel_flame(position: Vector2, pixel: float, phase: int) -> void:
+const FIRE_RAMP: Array[Color] = [Color("b94027"), Color("ef7d35"), Color("ffe3a0")]
+const SOULFIRE_RAMP: Array[Color] = [Color("1f6b43"), Color("4fd27f"), Color("dcffe6")]
+
+
+func _draw_pixel_flame(position: Vector2, pixel: float, phase: int, ramp: Array[Color] = FIRE_RAMP) -> void:
 	# Deliberately tiny, hard-edged native pixels, not a glow/particle billboard.
 	var base: Vector2 = position.floor()
 	var lean: float = float(posmod(phase, 3) - 1) * pixel
 	var height: float = float(4 + posmod(phase, 2)) * pixel
-	draw_rect(Rect2(base + Vector2(-pixel * 2.0, -pixel * 2.0), Vector2(pixel * 4.0, pixel * 3.0)), Color("b94027"))
-	draw_rect(Rect2(base + Vector2(-pixel, -height), Vector2(pixel * 2.0, height + pixel)), Color("ef7d35"))
-	draw_rect(Rect2(base + Vector2(lean, -height - pixel), Vector2(pixel, pixel * 2.0)), Color("ef7d35"))
-	draw_rect(Rect2(base + Vector2(0.0, -pixel * 2.0), Vector2(pixel, pixel * 2.0)), Color("ffe3a0"))
+	draw_rect(Rect2(base + Vector2(-pixel * 2.0, -pixel * 2.0), Vector2(pixel * 4.0, pixel * 3.0)), ramp[0])
+	draw_rect(Rect2(base + Vector2(-pixel, -height), Vector2(pixel * 2.0, height + pixel)), ramp[1])
+	draw_rect(Rect2(base + Vector2(lean, -height - pixel), Vector2(pixel, pixel * 2.0)), ramp[1])
+	draw_rect(Rect2(base + Vector2(0.0, -pixel * 2.0), Vector2(pixel, pixel * 2.0)), ramp[2])
 
 
 func _draw_bomb_head(position: Vector2, pixel: float, phase: int) -> void:
@@ -2685,10 +2737,39 @@ func _capture_boss_actions() -> void:
 		if count.y > previous.y:
 			_boss_effects.append({"kind": "stomp", "pos": enemy["pos"], "radius": definition.stomp_radius, "age": 0.0, "duration": 0.55})
 		_boss_seen_enemy[id] = count
+		if not definition.spellbook.is_empty():
+			# Casters are tracked from their first sighting, so their first spell plays too.
+			var spell: Dictionary = enemy.get("spell_effect", {})
+			var spell_id: int = int(spell.get("id", 0))
+			if spell_id > int(_spell_seen.get(id, spell_id)):
+				_capture_spell(spell, definition)
+			_spell_seen[id] = spell_id
 	for id: int in _boss_seen_enemy.keys():
 		if not active.has(id):
 			_boss_seen_enemy.erase(id)
+	for id: int in _spell_seen.keys():
+		if not active.has(id):
+			_spell_seen.erase(id)
 	_limit_boss_effects()
+
+
+func _capture_spell(spell: Dictionary, definition: EnemyDefinition) -> void:
+	var book: Dictionary = definition.spellbook
+	match String(spell["kind"]):
+		"nullify":
+			_boss_effects.append({"kind": "nullify_wave", "pos": spell["pos"], "age": 0.0, "duration": 1.1})
+		"fireball":
+			_boss_effects.append({"kind": "fireball_blast", "pos": spell["to"], "radius": float(book["fireball"]["radius"]), "age": 0.0, "duration": 0.7})
+		"portal":
+			_boss_effects.append({"kind": "portal_jump", "from": spell.get("from", []), "pos": spell["to"], "age": 0.0, "duration": 0.9})
+		"haste":
+			_boss_effects.append({"kind": "haste_wave", "pos": spell["pos"], "radius": float(book["haste"]["radius"]), "age": 0.0, "duration": 0.7})
+		"barrier":
+			_boss_effects.append({"kind": "barrier_flash", "pos": spell["pos"], "age": 0.0, "duration": 0.7})
+		"soulfire":
+			_boss_effects.append({"kind": "soulfire_blast", "pos": spell["to"], "radius": float(book["soulfire"]["radius"]), "age": 0.0, "duration": 0.9})
+		"raise_dead":
+			_boss_effects.append({"kind": "raise_dead", "from": spell.get("from", []), "age": 0.0, "duration": 1.0})
 
 
 func _capture_stuns() -> void:
@@ -2727,6 +2808,7 @@ func _draw_boss_telegraphs() -> void:
 				draw_set_transform(foot, 0.0, Vector2(1.0, 0.35))
 				draw_arc(Vector2.ZERO, cell_size * (0.48 + phase * 0.12), 0.0, TAU, 24, Color(0.95, 0.73, 0.33, 0.80), 2.0, false)
 				draw_set_transform(Vector2.ZERO)
+		_draw_spell_telegraph(enemy)
 		if float(enemy.get("tower_attack_remaining", 0.0)) > 0.0:
 			for aim: Vector2 in enemy.get("tower_attack_aims", []):
 				var target: Vector2 = _position_center(aim)
@@ -2765,6 +2847,58 @@ func _draw_boss_effects() -> void:
 				var angle: float = float(index) * TAU / 7.0
 				var dust: Vector2 = foot + Vector2(cos(angle), sin(angle) * 0.42) * radius * phase
 				draw_rect(Rect2(dust.floor(), Vector2(pixel * 3.0, pixel * 2.0)), Color(0.65, 0.57, 0.40, 1.0 - phase))
+		elif effect["kind"] == "nullify_wave":
+			# The staff strike's anti-magic wave rolls out across the whole arena.
+			var center: Vector2 = _position_center(effect["pos"]) + Vector2(0.0, cell_size * 0.28)
+			var reach: float = size.length() * phase
+			var color := Color(SPELL_VOID, 1.0 - phase)
+			draw_set_transform(center, 0.0, Vector2(1.0, 0.55))
+			draw_arc(Vector2.ZERO, reach, 0.0, TAU, 64, color, pixel * 3.0, false)
+			draw_arc(Vector2.ZERO, reach * 0.82, 0.0, TAU, 64, Color(color, color.a * 0.45), pixel, false)
+			draw_set_transform(Vector2.ZERO)
+		elif effect["kind"] == "fireball_blast":
+			var center: Vector2 = _position_center(effect["pos"])
+			var radius: float = float(effect["radius"]) * cell_size
+			draw_set_transform(center, 0.0, Vector2(1.0, 0.5))
+			draw_circle(Vector2.ZERO, radius * (0.4 + phase * 0.6), Color(SPELL_FIRE, 0.30 * (1.0 - phase)))
+			draw_arc(Vector2.ZERO, radius * (0.4 + phase * 0.6), 0.0, TAU, 40, Color(Color("ffd26a"), 1.0 - phase), pixel * 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+			for index: int in range(9):
+				var angle: float = float(index) * TAU / 9.0
+				var ember: Vector2 = center + Vector2(cos(angle), sin(angle) * 0.5) * radius * phase - Vector2(0.0, cell_size * 0.4 * phase)
+				draw_rect(Rect2(ember.floor(), Vector2.ONE * pixel * 2.0), Color(SPELL_FIRE, 1.0 - phase))
+		elif effect["kind"] == "portal_jump":
+			for origin: Vector2 in effect["from"]:
+				_draw_portal(_position_center(origin), cell_size * 0.32 * (1.0 - phase), phase * 6.0, 1.0 - phase)
+			_draw_portal(_position_center(effect["pos"]), cell_size * (0.45 + 0.15 * sin(phase * PI)), phase * 6.0, 1.0 - phase * 0.8)
+		elif effect["kind"] == "haste_wave":
+			var center: Vector2 = _position_center(effect["pos"]) + Vector2(0.0, cell_size * 0.28)
+			draw_set_transform(center, 0.0, Vector2(1.0, 0.45))
+			draw_arc(Vector2.ZERO, float(effect["radius"]) * cell_size * phase, 0.0, TAU, 48, Color(SPELL_HASTE, 1.0 - phase), pixel * 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+		elif effect["kind"] == "barrier_flash":
+			var center: Vector2 = _position_center(effect["pos"]) - Vector2(0.0, cell_size * 0.55)
+			_draw_rune_ring(center, cell_size * (0.55 + phase * 0.2), phase * 3.0, Color(SPELL_GOLD, 1.0 - phase), pixel)
+		elif effect["kind"] == "soulfire_blast":
+			var center: Vector2 = _position_center(effect["pos"])
+			var radius: float = float(effect["radius"]) * cell_size
+			draw_set_transform(center, 0.0, Vector2(1.0, 0.5))
+			draw_circle(Vector2.ZERO, radius * (0.3 + phase * 0.7), Color(SOULFIRE_RAMP[1], 0.28 * (1.0 - phase)))
+			draw_arc(Vector2.ZERO, radius * (0.3 + phase * 0.7), 0.0, TAU, 40, Color(SOULFIRE_RAMP[2], 1.0 - phase), pixel * 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+			for index: int in range(10):
+				var angle: float = float(index) * TAU / 10.0
+				var tongue: Vector2 = center + Vector2(cos(angle), sin(angle) * 0.5) * radius * phase * 0.8 - Vector2(0.0, cell_size * 0.5 * phase)
+				_draw_pixel_flame(tongue, pixel, index + int(phase * 6.0), SOULFIRE_RAMP)
+		elif effect["kind"] == "raise_dead":
+			for origin: Vector2 in effect["from"]:
+				var base: Vector2 = _position_center(origin) + Vector2(0.0, cell_size * 0.25)
+				var height: float = cell_size * (0.4 + 0.6 * sin(phase * PI))
+				draw_rect(Rect2(base - Vector2(pixel * 3.0, height), Vector2(pixel * 6.0, height)), Color(SOULFIRE_RAMP[1], 0.45 * (1.0 - phase)))
+				draw_rect(Rect2(base - Vector2(pixel, height), Vector2(pixel * 2.0, height)), Color(SOULFIRE_RAMP[2], 0.7 * (1.0 - phase)))
+				draw_set_transform(base, 0.0, Vector2(1.0, 0.4))
+				draw_arc(Vector2.ZERO, cell_size * 0.3 * (0.5 + phase), 0.0, TAU, 20, Color(SOULFIRE_RAMP[1], 1.0 - phase), pixel * 2.0, false)
+				draw_set_transform(Vector2.ZERO)
 		elif effect["kind"] == "stun":
 			var point: Vector2 = _position_center(effect["pos"]) - Vector2(0.0, cell_size * 0.48)
 			if effect.get("source", "") == "club":
@@ -2773,6 +2907,156 @@ func _draw_boss_effects() -> void:
 				var angle: float = float(index) * TAU / 6.0
 				var start: Vector2 = point + Vector2(cos(angle), sin(angle)) * cell_size * (0.12 + phase * 0.28)
 				draw_line(start, start + Vector2(cos(angle), sin(angle)) * pixel * 4.0, Color(1.0, 0.83, 0.38, 1.0 - phase), pixel * 2.0)
+
+
+const SPELL_VOID := Color("b48cff")
+const SPELL_FIRE := Color("f08a2c")
+const SPELL_HASTE := Color("f2e66a")
+const SPELL_GOLD := Color("f0cc62")
+
+
+# Ongoing Grand Mage casts, from accepted cast state only.
+func _draw_spell_telegraph(enemy: Dictionary) -> void:
+	var spell: String = enemy.get("spell", "")
+	if spell.is_empty():
+		return
+	var cell_size: float = _cell_size()
+	var pixel: float = maxf(1.0, floorf(cell_size * 0.025))
+	var total: float = maxf(0.001, float(enemy.get("spell_duration", 1.0)))
+	var progress: float = clampf(1.0 - float(enemy.get("cast_remaining", 0.0)) / total, 0.0, 1.0)
+	var foot: Vector2 = _position_center(_enemy_position(enemy)) + Vector2(0.0, cell_size * 0.28)
+	var time: float = float(enemy.get("animation_elapsed", 0.0))
+	match spell:
+		"fireball":
+			var target: Vector2 = _position_center(enemy.get("spell_aim", Vector2.ZERO))
+			var definition: EnemyDefinition = _enemy_art.get(enemy["type_id"])
+			var radius: float = float(definition.spellbook["fireball"]["radius"]) * cell_size if definition != null else cell_size
+			var pulse: float = 0.5 + 0.5 * sin(time * 10.0)
+			draw_set_transform(target, 0.0, Vector2(1.0, 0.5))
+			draw_circle(Vector2.ZERO, radius, Color(SPELL_FIRE, 0.08 + 0.10 * progress))
+			draw_arc(Vector2.ZERO, radius, 0.0, TAU, 40, Color(SPELL_FIRE, 0.55 + 0.35 * pulse), pixel * 2.0, false)
+			draw_arc(Vector2.ZERO, radius * progress, 0.0, TAU, 40, Color(Color("ffd26a"), 0.7), pixel, false)
+			draw_set_transform(Vector2.ZERO)
+			if progress > 0.7:
+				# The hurled fireball arcs from the staff onto the marked towers.
+				var travel: float = (progress - 0.7) / 0.3
+				var start: Vector2 = foot - Vector2(cell_size * 0.35 * _facing_sign(enemy), cell_size * 1.5)
+				var point: Vector2 = start.lerp(target, travel) - Vector2(0.0, sin(travel * PI) * cell_size * 0.8)
+				var tail: Vector2 = point + (start - target).normalized() * pixel * 9.0
+				draw_line(tail, point, Color(SPELL_FIRE, 0.8), pixel * 4.0)
+				draw_circle(point, pixel * 4.0, Color("c1471c"))
+				draw_circle(point, pixel * 2.5, Color("ffd26a"))
+		"portal":
+			var exit: Vector2 = _position_center(enemy.get("spell_aim", Vector2.ZERO))
+			_draw_portal(exit, cell_size * 0.45 * minf(1.0, progress * 1.6), time * 4.0, 0.9)
+		"haste":
+			draw_set_transform(foot, 0.0, Vector2(1.0, 0.4))
+			draw_arc(Vector2.ZERO, cell_size * (0.4 + progress * 0.4), time * 3.0, time * 3.0 + TAU * 0.75, 32, Color(SPELL_HASTE, 0.8), pixel * 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+		"barrier":
+			_draw_rune_ring(foot - Vector2(0.0, cell_size * 0.8), cell_size * 0.5 * progress, time * 2.0, Color(SPELL_GOLD, 0.8), pixel)
+		"soulfire":
+			var target: Vector2 = _position_center(enemy.get("spell_aim", Vector2.ZERO))
+			var definition: EnemyDefinition = _enemy_art.get(enemy["type_id"])
+			var radius: float = float(definition.spellbook["soulfire"]["radius"]) * cell_size if definition != null else cell_size
+			var pulse: float = 0.5 + 0.5 * sin(time * 9.0)
+			draw_set_transform(target, 0.0, Vector2(1.0, 0.5))
+			draw_circle(Vector2.ZERO, radius, Color(SOULFIRE_RAMP[0], 0.10 + 0.12 * progress))
+			draw_arc(Vector2.ZERO, radius, 0.0, TAU, 40, Color(SOULFIRE_RAMP[1], 0.5 + 0.4 * pulse), pixel * 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+			if progress > 0.55:
+				# The breath pours from the jaws across the board onto the marked towers.
+				var reach: float = (progress - 0.55) / 0.45
+				var mouth: Vector2 = foot - Vector2(cell_size * 1.1 * _facing_sign(enemy), cell_size * 1.9)
+				for index: int in range(9):
+					var t: float = float(index) / 8.0 * reach
+					var point: Vector2 = mouth.lerp(target, t) + Vector2(sin(time * 20.0 + index) * pixel * 3.0, 0.0)
+					_draw_pixel_flame(point, pixel * (1.0 + t), index + int(time * 12.0), SOULFIRE_RAMP)
+		"raise_dead":
+			draw_set_transform(foot, 0.0, Vector2(1.0, 0.35))
+			var definition: EnemyDefinition = _enemy_art.get(enemy["type_id"])
+			var radius: float = float(definition.spellbook["raise_dead"]["radius"]) * cell_size if definition != null else cell_size
+			draw_arc(Vector2.ZERO, radius * progress, time * 2.0, time * 2.0 + TAU, 48, Color(SOULFIRE_RAMP[1], 0.6), pixel * 2.0, false)
+			draw_set_transform(Vector2.ZERO)
+
+
+# +1 when the enemy's sprite faces left on this board (its head is at -x), else -1.
+func _facing_sign(enemy: Dictionary) -> float:
+	var item: Dictionary = _draw_items.get(Vector2i(2, int(enemy["id"])), {})
+	var artwork: EnemyDefinition = _enemy_art.get(enemy["type_id"])
+	if item.is_empty() or artwork == null:
+		return 1.0
+	return 1.0 if artwork.source_faces_left != bool(item.get("flip", false)) else -1.0
+
+
+# Immunity during the Nullify channel: a turning arcane circle, unlike wards and shields.
+func _draw_spell_shield(enemy: Dictionary, bounds: Rect2) -> void:
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
+	var time: float = float(enemy.get("animation_elapsed", 0.0))
+	var center: Vector2 = bounds.get_center()
+	var radius: float = maxf(bounds.size.x, bounds.size.y) * 0.62
+	draw_circle(center, radius, Color(SPELL_VOID, 0.10 + 0.04 * sin(time * 6.0)))
+	_draw_rune_ring(center, radius, time * 1.5, Color(SPELL_VOID, 0.85), pixel)
+	_draw_rune_ring(center, radius * 0.8, -time * 2.2, Color(Color("ecd9ff"), 0.5), pixel)
+
+
+func _draw_rune_ring(center: Vector2, radius: float, turn: float, color: Color, pixel: float) -> void:
+	if radius <= 0.5:
+		return
+	draw_arc(center, radius, turn, turn + TAU, 40, color, pixel, false)
+	for index: int in range(6):
+		var angle: float = turn + float(index) * TAU / 6.0
+		var point: Vector2 = center + Vector2(cos(angle), sin(angle)) * radius
+		draw_rect(Rect2((point - Vector2.ONE * pixel * 1.5).floor(), Vector2.ONE * pixel * 3.0), color)
+
+
+func _draw_portal(center: Vector2, radius: float, turn: float, alpha: float) -> void:
+	if radius <= 0.5 or alpha <= 0.0:
+		return
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
+	draw_set_transform(center, 0.0, Vector2(0.62, 1.0))
+	draw_circle(Vector2.ZERO, radius, Color(Color("1b1830"), 0.75 * alpha))
+	for ring: int in range(3):
+		var r: float = radius * (1.0 - float(ring) * 0.25)
+		var start: float = turn * (1.0 + ring * 0.4) + ring
+		draw_arc(Vector2.ZERO, r, start, start + TAU * 0.7, 28, Color(SPELL_VOID if ring != 1 else Color("6ccbec"), alpha), pixel * 2.0, false)
+	draw_set_transform(Vector2.ZERO)
+
+
+func _draw_bolt(start: Vector2, end: Vector2, alpha: float, seed: int) -> void:
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
+	var points := PackedVector2Array([start])
+	var normal: Vector2 = (end - start).orthogonal().normalized()
+	for index: int in range(1, 7):
+		var t: float = float(index) / 7.0
+		var jitter: float = (float((seed * 31 + index * 17) % 9) - 4.0) * pixel * 2.0
+		points.append(start.lerp(end, t) + normal * jitter)
+	points.append(end)
+	draw_polyline(points, Color(Color("6ccbec"), alpha), pixel * 5.0)
+	draw_polyline(points, Color(1.0, 1.0, 1.0, alpha), pixel * 2.0)
+
+
+# While Nullify holds, a faint violet border frames the silenced arena.
+func _draw_arena_nullify() -> void:
+	if _magic_nullified_remaining <= 0.0:
+		return
+	var pixel: float = maxf(1.0, floorf(_cell_size() * 0.025))
+	var fade: float = minf(1.0, _magic_nullified_remaining / 0.6)
+	var pulse: float = 0.5 + 0.5 * sin(_magic_nullified_remaining * 4.0)
+	var rect := Rect2(Vector2.ONE * pixel * 2.0, size - Vector2.ONE * pixel * 4.0)
+	draw_rect(rect, Color(SPELL_VOID, (0.25 + 0.2 * pulse) * fade), false, pixel * 3.0)
+
+
+# A silenced Magic tower carries a crossed-out arcane sigil.
+func _draw_nullified_sigil(tower: Dictionary, foot: Vector2) -> void:
+	var cell_size: float = _cell_size()
+	var pixel: float = maxf(1.0, floorf(cell_size * 0.025))
+	var center: Vector2 = _tower_stun_center(tower, foot) - Vector2(0.0, cell_size * 0.12)
+	var radius: float = cell_size * 0.13
+	draw_circle(center, radius, Color(Color("1b1830"), 0.75))
+	draw_arc(center, radius, 0.0, TAU, 20, SPELL_VOID, pixel * 1.5, false)
+	draw_rect(Rect2((center - Vector2.ONE * pixel).floor(), Vector2.ONE * pixel * 2.0), Color("ecd9ff"))
+	draw_line(center + Vector2(-radius, radius) * 0.75, center + Vector2(radius, -radius) * 0.75, Color("ff6b6b"), pixel * 1.5)
 
 
 func _draw_stun_stars(tower: Dictionary, foot: Vector2, front: bool) -> void:

@@ -168,9 +168,9 @@ func _sandbox_run_controls(sandbox: SandboxScreen) -> void:
 	var before: Dictionary = sandbox.controller.state.duplicate(true)
 	await _key(KEY_R)
 	_check(sandbox.restart_button.disabled and sandbox.controller.state == before, "R cannot create a run before an accepted test")
-	for expected: float in [2.0, 4.0, 1.0]:
+	for expected: float in [2.0, 4.0, 8.0, 1.0]:
 		await _key(KEY_F)
-		_check(sandbox.controller.speed == expected and [1.0, 2.0, 4.0][sandbox.speed_selector.selected] == expected, "F cycles accepted speed and keeps its selector synchronized")
+		_check(sandbox.controller.speed == expected and [1.0, 2.0, 4.0, 8.0][sandbox.speed_selector.selected] == expected, "F cycles accepted speed and keeps its selector synchronized")
 	await _click(sandbox.speed_selector.get_global_rect().get_center())
 	await _key(KEY_DOWN)
 	await _key(KEY_DOWN)

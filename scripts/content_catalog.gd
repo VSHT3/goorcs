@@ -91,6 +91,17 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Enemy '%s' needs a heal for shield refills or OrcShakra, and a positive OrcShakra radius and bonus together." % enemy.id)
 		if not is_finite(enemy.ward_interval) or not is_finite(enemy.ward_duration) or not is_finite(enemy.ward_radius) or enemy.ward_interval < 0.0 or ((enemy.ward_interval > 0.0) != (enemy.ward_duration > 0.0 and enemy.ward_radius > 0.0)) or (enemy.ward_interval == 0.0 and (enemy.ward_duration != 0.0 or enemy.ward_radius != 0.0)) or enemy.boss and enemy.ward_interval > 0.0:
 			errors.append("Enemy '%s' needs a positive ward interval, duration and radius together on a non-boss." % enemy.id)
+		if not is_finite(enemy.phase_interval) or enemy.phase_interval < 0.0 or (enemy.phase_interval > 0.0) == enemy.phase_immune_elements.is_empty() or enemy.phase_immune_elements.size() >= TowerDefinition.ELEMENTS.size() or Array(enemy.phase_immune_elements).any(func(element: String) -> bool: return StringName(element) not in TowerDefinition.ELEMENTS):
+			errors.append("Enemy '%s' needs a positive phase interval together with known phase immunities that leave an element." % enemy.id)
+		var spellbook_error: String = Spellbook.validation_error(enemy.spellbook)
+		if not spellbook_error.is_empty():
+			errors.append("Enemy '%s' spellbook %s." % [enemy.id, spellbook_error])
+		elif enemy.spellbook.has("raise_dead"):
+			var risen: String = enemy.spellbook["raise_dead"]["type"]
+			if not enemies.any(func(other: EnemyDefinition) -> bool: return other != null and String(other.id) == risen and not other.boss):
+				errors.append("Enemy '%s' raises an unknown or boss type '%s'." % [enemy.id, risen])
+		if not is_finite(enemy.corpse_lifetime) or enemy.corpse_lifetime < 0.0:
+			errors.append("Enemy '%s' needs a nonnegative corpse lifetime." % enemy.id)
 		if not is_finite(enemy.physical_damage_multiplier) or enemy.physical_damage_multiplier <= 0.0 or not is_finite(enemy.nonphysical_damage_multiplier) or enemy.nonphysical_damage_multiplier <= 0.0 or not is_finite(enemy.fire_damage_multiplier) or enemy.fire_damage_multiplier <= 0.0 or not is_finite(enemy.lightning_damage_multiplier) or enemy.lightning_damage_multiplier <= 0.0:
 			errors.append("Enemy '%s' requires finite positive incoming damage multipliers." % enemy.id)
 		var immune: Dictionary = {}
@@ -132,8 +143,13 @@ func validation_errors() -> PackedStringArray:
 			var required: Array[StringName] = [&"walk"]
 			if enemy.enrage_health_fraction > 0.0:
 				required.append(&"walk_enraged")
-			if enemy.heal_interval > 0.0 or enemy.regeneration_interval > 0.0:
+			# A Grand Mage regenerates silently; its spells carry their own poses.
+			if enemy.heal_interval > 0.0 or (enemy.regeneration_interval > 0.0 and enemy.spellbook.is_empty()):
 				required.append(&"heal")
+			for spell: Variant in enemy.spellbook.get("order", []):
+				required.append(StringName(spell))
+				if spell == "nullify":
+					required.append(&"nullify_strike")
 			if enemy.summon_interval > 0.0:
 				required.append(&"cast")
 			if enemy.tower_attack_interval > 0.0:

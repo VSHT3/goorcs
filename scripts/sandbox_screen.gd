@@ -5,7 +5,7 @@ signal back_requested
 
 const NUMBERS: Font = preload("res://assets/fonts/silkscreen/Silkscreen-Regular.ttf")
 const MATCH_THEME: Theme = preload("res://resources/ui/match_theme.tres")
-const SPEEDS: Array[float] = [1.0, 2.0, 4.0]
+const SPEEDS: Array[float] = [1.0, 2.0, 4.0, 8.0]
 
 
 class FreeShopButton extends TowerShopButton:
@@ -30,6 +30,7 @@ var count_input: SpinBox
 var enemy_selector: OptionButton
 var targeting: TargetingCycle
 var sell_button: Button
+var max_button: Button
 var advancement_buttons: Dictionary[String, Button] = {}
 var play_button: Button
 var restart_button: Button
@@ -143,7 +144,7 @@ func _build_interface() -> void:
 	header.add_child(summary)
 	_label(summary, "Sandbox").custom_minimum_size.x = 115
 	_label(summary, "Round")
-	round_input = _spin(summary, 1, 1000, 1, true)
+	round_input = _spin(summary, 1, 9999, 1, true)
 	round_input.value_changed.connect(_round_changed)
 	wave_button = _button(summary, "Weighted wave", _start_wave)
 	wave_button.tooltip_text = "Replace enemies with the regular weighted roster for this round. Uses the same wave rules as a match."
@@ -152,7 +153,7 @@ func _build_interface() -> void:
 	play_button.tooltip_text = "Space: pause/resume. Starts a weighted wave when stopped."
 	restart_button = _button(summary, "Restart [R]", _restart)
 	speed_selector = OptionButton.new()
-	for title: String in ["1× [F]", "2× [F]", "4× [F]"]:
+	for title: String in ["1× [F]", "2× [F]", "4× [F]", "8× [F]"]:
 		speed_selector.add_item(title)
 	speed_selector.item_selected.connect(_select_speed)
 	summary.add_child(speed_selector)
@@ -166,16 +167,27 @@ func _build_interface() -> void:
 	var spawn_row := HBoxContainer.new()
 	header.add_child(spawn_row)
 	enemy_selector = OptionButton.new()
-	enemy_selector.custom_minimum_size.x = 180
-	for enemy: EnemyDefinition in catalog.enemies:
-		enemy_selector.add_item(enemy.title)
-		enemy_selector.set_item_metadata(enemy_selector.item_count - 1, enemy.id)
-		enemy_selector.set_item_tooltip(enemy_selector.item_count - 1, enemy.description)
+	enemy_selector.custom_minimum_size.x = 220
+	# Grouped like the Orcieary, each entry with its small portrait.
+	enemy_selector.get_popup().add_theme_constant_override("icon_max_width", 28)
+	enemy_selector.add_theme_constant_override("icon_max_width", 24)
+	for category: int in range(3):
+		enemy_selector.add_separator(["Basic", "Elite", "Boss"][category])
+		for enemy: EnemyDefinition in catalog.enemies:
+			if (2 if enemy.boss else (1 if enemy.elite else 0)) != category:
+				continue
+			if enemy.texture != null:
+				enemy_selector.add_icon_item(enemy.texture, enemy.title)
+			else:
+				enemy_selector.add_item(enemy.title)
+			enemy_selector.set_item_metadata(enemy_selector.item_count - 1, enemy.id)
+			enemy_selector.set_item_tooltip(enemy_selector.item_count - 1, enemy.description)
+	enemy_selector.select(1)
 	spawn_row.add_child(enemy_selector)
 	_label(spawn_row, "Count")
 	count_input = _spin(spawn_row, 1, 100, 1, true)
 	spawn_button = _button(spawn_row, "Spawn", _spawn)
-	spawn_button.tooltip_text = "Spawn this exact number, including summon-only types. While stopped, creates a paused empty run; Play resumes it."
+	spawn_button.tooltip_text = "Spawn this exact number, including summon-only types. While stopped, creates a paused empty run; Play resumes it. [E]"
 	_button(spawn_row, "Stop / clear", _stop).tooltip_text = "Remove all enemies and queued spawns; keep paths, towers, upgrades, and selected round. Unlocks path editing."
 	_status = _label(spawn_row, "", true)
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -294,6 +306,8 @@ func _build_management() -> void:
 		button.add_theme_font_override("font", NUMBERS)
 		button.add_theme_font_size_override("font_size", 16)
 		advancement_buttons[command] = button
+	max_button = _button(content, "Max upgrades", _max_upgrades)
+	max_button.tooltip_text = "Buy every remaining upgrade for free, taking the first open branch at each choice. [M]"
 	sell_button = _button(content, "Sell tower", _sell)
 
 
@@ -631,6 +645,29 @@ func _refresh_management(state: Dictionary) -> void:
 	_upgrade_row.visible = _upgrade_row.get_children().any(func(button: Button) -> bool: return button.visible)
 
 
+# Sandbox: keep buying the first open upgrade until the tower is fully upgraded.
+func _max_upgrades() -> void:
+	if not _active or not max_button.is_visible_in_tree():
+		return
+	for attempt: int in range(64):
+		var tower: Dictionary = _find(controller.state["towers"][0], selected_tower_id)
+		if tower.is_empty():
+			return
+		var stats: Dictionary = controller.state["tower_types"][tower["type_id"]]
+		var options: Dictionary = MatchPlanningScreen.tower_upgrade_actions(tower, stats)
+		if bool(tower["special_upgraded"]):
+			options.merge(MatchPlanningScreen.advancement_actions(tower, stats))
+		var bought: bool = false
+		for command: String in options:
+			var action: Dictionary = options[command]
+			if not bool(action.get("purchased", false)) and not bool(action.get("locked", false)) and controller.upgrade(selected_tower_id, command):
+				bought = true
+				break
+		if not bought:
+			break
+	_refresh()
+
+
 func _upgrade(command: String) -> void:
 	var button: Button = advancement_buttons.get(command, _upgrade_buttons.get(command))
 	if button != null and button.is_visible_in_tree() and not button.disabled:
@@ -713,6 +750,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	if event.keycode == KEY_B:
 		if _build_another():
+			get_viewport().set_input_as_handled()
+		return
+	if event.keycode == KEY_E:
+		_spawn()
+		get_viewport().set_input_as_handled()
+		return
+	if event.keycode == KEY_M:
+		if _management.is_visible_in_tree():
+			_max_upgrades()
 			get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_R:

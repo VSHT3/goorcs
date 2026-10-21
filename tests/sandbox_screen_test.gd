@@ -20,7 +20,15 @@ func _run() -> void:
 	await _settle()
 	_check(screen.world.boards[0].visible and not screen.world.boards[1].visible, "Sandbox renders only its isolated owned board")
 	_check(screen.shop_buttons.size() == screen.catalog.towers.size(), "Whole tower catalog is visible without collection unlocks")
-	_check(screen.enemy_selector.item_count == screen.catalog.enemies.size(), "Enemy selector includes every definition, including summon-only")
+	var listed: Array[StringName] = []
+	var groups: Array[String] = []
+	for index: int in range(screen.enemy_selector.item_count):
+		if screen.enemy_selector.is_item_separator(index):
+			groups.append(screen.enemy_selector.get_item_text(index))
+		else:
+			listed.append(StringName(screen.enemy_selector.get_item_metadata(index)))
+	_check(listed.size() == screen.catalog.enemies.size() and screen.catalog.enemies.all(func(enemy: EnemyDefinition) -> bool: return enemy.id in listed), "Enemy selector includes every definition, including summon-only")
+	_check(groups == ["Basic", "Elite", "Boss"] and not screen.enemy_selector.is_item_separator(screen.enemy_selector.selected), "Enemy selector groups Basic, Elite and Boss and starts on an enemy")
 	for width: int in [1280, 1000]:
 		root.size = Vector2i(width, 720)
 		root.content_scale_size = Vector2i(width, 720)

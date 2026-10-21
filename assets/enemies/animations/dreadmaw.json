@@ -1,0 +1,463 @@
+{
+  "authoring": "Original local integer-coordinate pixel geometry on an articulated joint rig through the shared Pixels primitive; no sampled art, model output, raster rotation or translucency.",
+  "identity": "Colossal skeletal dragon: horned dragon skull with soulfire eyes and jaws, S-curved spiked neck, open ribcage around a burning green soul-heart, spiked spine and tail vertebrae, four clawed legs, tattered bone wings, and a lich orc warlord rider with a spiked crown and soulfire war banner.",
+  "generator": "tools/author_dreadmaw.py",
+  "generator_sha256": "6548c133941f328a363ef7c0993985c612f5fd14cbfeec2e6f9487dbae3c294c",
+  "reproduce": "python3 tools/author_dreadmaw.py",
+  "frame_size": [
+    288,
+    288
+  ],
+  "sheet_size": [
+    4608,
+    1440
+  ],
+  "layout": "one animation per row",
+  "base_anchor": [
+    0.5,
+    0.8541666666666666
+  ],
+  "source_faces_left": true,
+  "alpha": "binary 0/255",
+  "camera": "elevated three-quarter left-facing; upper-left highlights",
+  "sheet_sha256": "6bdc36c806c7a97eb5d21117488d57ed8ae8a8197f1d3d9c250406bd9f8a187b",
+  "still": "assets/enemies/animations/dreadmaw_still.png",
+  "still_sha256": "adaa8c116d1106b54936323f1f36df0b41e60fcb2cc1fdee75c7b5ffc80ef99c",
+  "sprite_frames_sha256": "3e4f2ae2b8727562a3e23669a036c5d27ed980071b3ec9b2d3e83f73f64b1825",
+  "animations": [
+    {
+      "name": "walk",
+      "fps": 7.5,
+      "frame_count": 12,
+      "duration_seconds": 1.6,
+      "loop": true,
+      "atlas_row": 0,
+      "alpha_bounds": [
+        [
+          30,
+          44,
+          287,
+          250
+        ],
+        [
+          30,
+          44,
+          287,
+          250
+        ],
+        [
+          30,
+          44,
+          287,
+          250
+        ],
+        [
+          30,
+          44,
+          287,
+          250
+        ],
+        [
+          30,
+          42,
+          287,
+          250
+        ],
+        [
+          30,
+          42,
+          287,
+          250
+        ],
+        [
+          30,
+          44,
+          287,
+          250
+        ],
+        [
+          30,
+          43,
+          287,
+          250
+        ],
+        [
+          30,
+          41,
+          287,
+          250
+        ],
+        [
+          30,
+          39,
+          287,
+          250
+        ],
+        [
+          30,
+          39,
+          287,
+          250
+        ],
+        [
+          30,
+          41,
+          287,
+          250
+        ]
+      ]
+    },
+    {
+      "name": "walk_enraged",
+      "fps": 11,
+      "frame_count": 12,
+      "duration_seconds": 1.0909090909090908,
+      "loop": true,
+      "atlas_row": 1,
+      "alpha_bounds": [
+        [
+          30,
+          37,
+          287,
+          250
+        ],
+        [
+          30,
+          41,
+          287,
+          250
+        ],
+        [
+          30,
+          43,
+          287,
+          250
+        ],
+        [
+          30,
+          43,
+          287,
+          250
+        ],
+        [
+          30,
+          41,
+          287,
+          250
+        ],
+        [
+          30,
+          39,
+          287,
+          250
+        ],
+        [
+          30,
+          37,
+          287,
+          250
+        ],
+        [
+          30,
+          35,
+          287,
+          250
+        ],
+        [
+          30,
+          33,
+          287,
+          250
+        ],
+        [
+          30,
+          31,
+          287,
+          250
+        ],
+        [
+          30,
+          31,
+          287,
+          250
+        ],
+        [
+          30,
+          33,
+          287,
+          250
+        ]
+      ]
+    },
+    {
+      "name": "soulfire",
+      "fps": 7.5,
+      "frame_count": 12,
+      "duration_seconds": 1.6,
+      "loop": false,
+      "atlas_row": 2,
+      "alpha_bounds": [
+        [
+          30,
+          44,
+          287,
+          250
+        ],
+        [
+          28,
+          44,
+          287,
+          250
+        ],
+        [
+          26,
+          44,
+          287,
+          250
+        ],
+        [
+          24,
+          44,
+          287,
+          250
+        ],
+        [
+          22,
+          44,
+          287,
+          250
+        ],
+        [
+          20,
+          44,
+          287,
+          250
+        ],
+        [
+          22,
+          44,
+          287,
+          250
+        ],
+        [
+          26,
+          42,
+          287,
+          250
+        ],
+        [
+          30,
+          40,
+          287,
+          250
+        ],
+        [
+          34,
+          39,
+          287,
+          250
+        ],
+        [
+          38,
+          40,
+          287,
+          250
+        ],
+        [
+          42,
+          42,
+          287,
+          250
+        ]
+      ]
+    },
+    {
+      "name": "raise_dead",
+      "fps": 6.666666666666666,
+      "frame_count": 12,
+      "duration_seconds": 1.8000000000000003,
+      "loop": false,
+      "atlas_row": 3,
+      "alpha_bounds": [
+        [
+          26,
+          24,
+          287,
+          255
+        ],
+        [
+          26,
+          27,
+          287,
+          255
+        ],
+        [
+          26,
+          29,
+          287,
+          255
+        ],
+        [
+          26,
+          30,
+          287,
+          255
+        ],
+        [
+          26,
+          29,
+          287,
+          255
+        ],
+        [
+          26,
+          27,
+          287,
+          255
+        ],
+        [
+          26,
+          24,
+          287,
+          255
+        ],
+        [
+          26,
+          21,
+          287,
+          255
+        ],
+        [
+          26,
+          19,
+          287,
+          255
+        ],
+        [
+          26,
+          18,
+          287,
+          255
+        ],
+        [
+          26,
+          19,
+          287,
+          255
+        ],
+        [
+          26,
+          21,
+          287,
+          255
+        ]
+      ]
+    },
+    {
+      "name": "death",
+      "fps": 8,
+      "frame_count": 16,
+      "duration_seconds": 2.0,
+      "loop": false,
+      "atlas_row": 4,
+      "alpha_bounds": [
+        [
+          30,
+          44,
+          287,
+          250
+        ],
+        [
+          30,
+          45,
+          287,
+          251
+        ],
+        [
+          30,
+          47,
+          287,
+          253
+        ],
+        [
+          30,
+          50,
+          287,
+          256
+        ],
+        [
+          30,
+          55,
+          287,
+          261
+        ],
+        [
+          30,
+          61,
+          287,
+          267
+        ],
+        [
+          30,
+          69,
+          287,
+          275
+        ],
+        [
+          30,
+          78,
+          287,
+          284
+        ],
+        [
+          62,
+          163,
+          267,
+          254
+        ],
+        [
+          62,
+          162,
+          267,
+          253
+        ],
+        [
+          62,
+          162,
+          267,
+          253
+        ],
+        [
+          62,
+          161,
+          267,
+          252
+        ],
+        [
+          62,
+          161,
+          267,
+          252
+        ],
+        [
+          62,
+          160,
+          267,
+          251
+        ],
+        [
+          62,
+          160,
+          267,
+          251
+        ],
+        [
+          62,
+          159,
+          267,
+          250
+        ]
+      ]
+    }
+  ]
+}

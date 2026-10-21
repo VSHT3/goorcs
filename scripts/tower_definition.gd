@@ -90,7 +90,7 @@ static func valid_advancements(definition: TowerDefinition) -> bool:
 static func _valid_advancement(config: Dictionary) -> bool:
 	if not config.get("title") is String or String(config["title"]).strip_edges().is_empty() or not config.get("cost") is int or int(config["cost"]) <= 0:
 		return false
-	var numeric: Array[String] = ["attack_rate_multiplier", "primary_multiplier", "splash_multiplier", "splash_radius", "burn_dps", "burn_duration", "continuous_dps", "fuel_duration", "refuel_duration"]
+	var numeric: Array[String] = ["attack_rate_multiplier", "primary_multiplier", "splash_multiplier", "splash_radius", "burn_dps", "burn_duration", "continuous_dps", "fuel_duration", "refuel_duration", "scorch_radius", "scorch_fraction"]
 	for field: Variant in config:
 		if field in numeric:
 			if not _positive_number(config[field]):
@@ -113,6 +113,9 @@ static func _valid_advancement(config: Dictionary) -> bool:
 	if weapon in ["molotov", "grenade", "rocket"] and (not config.has("primary_multiplier") or not config.has("splash_radius")):
 		return false
 	if weapon == "molotov" and not config.has("burn_dps"):
+		return false
+	# Only the Flamethrower scorches orcs around its target, with a paired radius and share (<= 1).
+	if (config.has("scorch_radius") or config.has("scorch_fraction")) and (weapon != "flamethrower" or config.has("scorch_radius") != config.has("scorch_fraction") or float(config.get("scorch_fraction", 0.0)) > 1.0):
 		return false
 	if weapon == "flamethrower":
 		return config.has("continuous_dps") and config.has("fuel_duration") and config.has("refuel_duration") and config.has("burn_dps") and not config.has("primary_multiplier") and not config.has("splash_radius")

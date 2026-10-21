@@ -74,6 +74,11 @@ extends Resource
 @export var ward_interval: float = 0.0
 @export var ward_duration: float = 0.0
 @export var ward_radius: float = 0.0
+# Wraithorc: every interval it toggles solid/ethereal; while ethereal these elements deal nothing.
+@export var phase_interval: float = 0.0
+@export var phase_immune_elements: PackedStringArray = PackedStringArray()
+# Grand Mage spell rotation (glide, order, per-spell tuning, death_bolt); see Spellbook.
+@export var spellbook: Dictionary = {}
 @export var summon_interval: float = 0.0
 @export var summon_cast_duration: float = 0.0
 @export var summon_type: StringName
@@ -108,3 +113,5 @@ extends Resource
 @export var board_anchor: Vector2 = Vector2(0.5, 0.90625)
 # Transparent for bloodless types; corpse anatomy is authored in the death frames.
 @export var blood_color: Color = Color("713535")
+# Seconds a corpse stays on the board; zero keeps the shared default.
+@export var corpse_lifetime: float = 0.0

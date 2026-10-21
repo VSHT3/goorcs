@@ -126,10 +126,17 @@ func _test_weights_and_scaling() -> void:
 		counts[rarity] = int(counts.get(rarity, 0)) + 1
 		repeated = repeated or rarity == previous
 		previous = rarity
-	_check(repeated and counts.size() == 8, "All eight tiers remain possible and consecutive rarity results are not excluded")
+	# Bosses drop Rare or better: only those tiers roll, at their authored weights.
+	var floor_index: int = TowerRollRules.RARITIES.find(SHIPPED.minimum_rarity)
+	var eligible_weight: float = 0.0
+	for tier: Dictionary in SHIPPED.rarity_rules.rarities:
+		if TowerRollRules.RARITIES.find(tier["id"]) >= floor_index:
+			eligible_weight += float(tier["weight"])
+	_check(SHIPPED.minimum_rarity == "rare" and repeated and counts.size() == 4, "Rare, Epic, Legendary and Mythic remain possible and consecutive rarity results are not excluded")
 	for tier: Dictionary in SHIPPED.rarity_rules.rarities:
 		var observed: float = float(counts.get(tier["id"], 0)) / 10000.0
-		_check(absf(observed - float(tier["weight"]) / 100.0) < 0.025, "Observed independent draws follow referenced authored weight: " + str(tier["id"]))
+		var expected: float = float(tier["weight"]) / eligible_weight if TowerRollRules.RARITIES.find(tier["id"]) >= floor_index else 0.0
+		_check(absf(observed - expected) < 0.025, "Observed independent draws follow referenced authored weight above the Rare floor: " + str(tier["id"]))
 	for round_number: int in [1, 39, 40, 41, 60, 61, 80, 100]:
 		var award: Dictionary = ledger.claim(1, str(round_number), BOSS, round_number, 0.0)
 		var previous_coins: int = 0
@@ -197,7 +204,7 @@ func _test_host_kills() -> void:
 	_check(other_streams == [combat._wave_random.state, combat._timing_random.state, combat._group_random.state, combat._roll_random.state], "Boss reward rolls never perturb wave, timing, group or tower-roll RNG")
 	var detached: Dictionary = combat.snapshot()
 	detached["boss_rewards"][0][0]["tiers"].clear()
-	_check(combat.snapshot()["boss_rewards"][0][0]["tiers"].size() == 8, "Host snapshots deeply detach reward history")
+	_check(combat.snapshot()["boss_rewards"][0][0]["tiers"].size() == 4, "Host snapshots deeply detach reward history")
 	_check(combat.debug_set_round(100), "Debug jump remains available")
 	_check(combat.start_wave(_routing()), "Debug jump re-admits actual routes for repeated kill")
 	_kill(combat, 0, BOSSES[0])

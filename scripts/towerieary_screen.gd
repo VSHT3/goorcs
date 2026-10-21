@@ -448,6 +448,8 @@ func _populate_attack_stats(tower: Dictionary, stats: Dictionary) -> void:
 	if weapon == "flamethrower":
 		_add_stat(_stats, &"fuel_duration", "Uninterrupted fire", "%s s" % _number(float(advancement.get("fuel_duration", 60.0))))
 		_add_stat(_stats, &"refuel_duration", "Mandatory refuel", "%s s" % _number(float(advancement.get("refuel_duration", 6.0))))
+		if advancement.has("scorch_fraction"):
+			_add_stat(_stats, &"scorch", "Scorches nearby orcs", "%s%% within %s cells" % [_number(float(advancement["scorch_fraction"]) * 100.0), _number(float(advancement["scorch_radius"]))])
 	if tower.get("behavior_kind", "attack") == "chain":
 		var config: Dictionary = tower["behavior_config"]
 		_add_stat(_stats, &"chain_hits", "Maximum chain hits", str(int(config["hit_count"])))

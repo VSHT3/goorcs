@@ -5,6 +5,8 @@ extends Resource
 @export var rarity_rules: TowerRollRules
 # Rarity ID -> Vector2i(Coins, Shards), before round scaling.
 @export var payouts: Dictionary = {}
+# Lowest rarity a boss can drop; lower tiers leave the roll and the reel.
+@export var minimum_rarity: String = ""
 
 
 func validation_errors() -> PackedStringArray:
@@ -43,13 +45,16 @@ func validation_errors() -> PackedStringArray:
 	for id: Variant in payouts:
 		if typeof(id) != TYPE_STRING or id not in TowerRollRules.RARITIES:
 			errors.append("Boss rewards contain an unknown payout rarity.")
+	if not minimum_rarity.is_empty() and minimum_rarity not in TowerRollRules.RARITIES:
+		errors.append("Boss reward minimum rarity '%s' is unknown." % minimum_rarity)
 	return errors
 
 
 ## Call only after validation; capture scalars rather than retain resource aliases.
 func capture_tiers() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for id: String in TowerRollRules.RARITIES:
+	var floor_index: int = maxi(0, TowerRollRules.RARITIES.find(minimum_rarity))
+	for id: String in TowerRollRules.RARITIES.slice(floor_index):
 		for tier: Dictionary in rarity_rules.rarities:
 			if tier["id"] == id:
 				var payout: Vector2i = payouts[id]

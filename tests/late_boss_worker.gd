@@ -114,16 +114,19 @@ func _three_boss_seed(combat: MatchCombat, round_number: int) -> int:
 	for seed_value: int in range(1, 10001):
 		probe.seed = seed_value + 97
 		var admitted: int = 0
+		var eligible: int = 0
 		for definition: Dictionary in combat._enemy_types.values():
 			var elapsed: int = round_number - int(definition["first_wave"])
 			if not bool(definition["boss"]) or not bool(definition["regular_spawn_enabled"]) or elapsed < 0:
 				continue
+			eligible += 1
 			var chance: float = minf(float(definition["boss_spawn_chance_cap"]), float(definition["boss_spawn_chance"]) + maxi(0, elapsed - 1) * float(definition["boss_spawn_chance_growth"]))
 			if elapsed == 0 or probe.randf() < chance:
 				admitted += 1
-		if admitted == 3:
+		# Every boss eligible this round rolls in together.
+		if admitted == eligible and eligible >= 3:
 			return seed_value
-	push_error("No ordinary three-boss encounter seed found")
+	push_error("No ordinary all-boss encounter seed found")
 	return 1471
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Author the six Elemental Orcs from the shared articulated orc rigs (Pillow only).
+"""Author the Elemental Orcs, ShaOrcs and HeavyDutyOrc from the shared orc rigs (Pillow only).
 
 Run: python3 tools/author_elemental_orcs.py (requires Pillow).
 The four basic elementals and the EleMetal Orc re-dress the authored Grunt rig;
@@ -23,9 +23,9 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'assets/enemies/animations'
 PREVIEW = Path('/tmp/gorcs-elemental-orcs')
 SIZE = 80
-KINDS = ('ember_orc', 'frost_orc', 'storm_orc', 'arcane_orc', 'elemetal_orc', 'omega_orc', 'shaorc', 'greater_shaorc')
-FPS = {'ember_orc': 12, 'frost_orc': 11, 'storm_orc': 13, 'arcane_orc': 12, 'elemetal_orc': 9, 'omega_orc': 9, 'shaorc': 10, 'greater_shaorc': 9}
-HEIGHTS = {'ember_orc': .52, 'frost_orc': .52, 'storm_orc': .52, 'arcane_orc': .52, 'elemetal_orc': .56, 'omega_orc': .74, 'shaorc': .56, 'greater_shaorc': .66}
+KINDS = ('ember_orc', 'frost_orc', 'storm_orc', 'arcane_orc', 'elemetal_orc', 'omega_orc', 'shaorc', 'greater_shaorc', 'heavy_duty_orc', 'wraithorc')
+FPS = {'ember_orc': 12, 'frost_orc': 11, 'storm_orc': 13, 'arcane_orc': 12, 'elemetal_orc': 9, 'omega_orc': 9, 'shaorc': 10, 'greater_shaorc': 9, 'heavy_duty_orc': 6, 'wraithorc': 9}
+HEIGHTS = {'ember_orc': .52, 'frost_orc': .52, 'storm_orc': .52, 'arcane_orc': .52, 'elemetal_orc': .56, 'omega_orc': .74, 'shaorc': .56, 'greater_shaorc': .66, 'heavy_duty_orc': .74, 'wraithorc': .6}
 EYE = '#d6b65d'
 IDENTITY = {
     'ember_orc': 'Ash-skinned orc with smouldering chest cracks, a flickering flame crest and rising embers; charred leathers.',
@@ -35,6 +35,8 @@ IDENTITY = {
     'elemetal_orc': 'Grunt sealed in heavy full-body iron plate: visored bowl helm with red glare, breathing grille, huge pauldrons and banded cuirass.',
     'shaorc': 'Hunched orc shaman in a red-brown robe with a bone necklace and feather crest; raises a bone staff whose green spirit crystal flares to heal.',
     'greater_shaorc': 'Elder shaman in a wolf-pelt mantle, white beard braid and antler crown; lifts a gilded totem staff whose pale ward crystal flares to shield the horde.',
+    'wraithorc': 'Hooded orc spirit in a tattered shroud that trails into wisps instead of legs; pale teal skin, burning white eyes and broken chains swinging from its outstretched wrists.',
+    'heavy_duty_orc': 'Hulking plodder in industrial heavy plate: hazard-orange armour over dark steel, black-and-yellow striped pauldron, riveted visor and twin exhaust stacks puffing smoke.',
     'omega_orc': 'Obsidian-skinned armoured hulk with white-gold trim and blazing eyes; fire, ice, lightning and magic orbs orbit it.',
 }
 # Exact-colour palette swaps of the shared rigs: skin, leather, gold trim, armour, bone, eyes.
@@ -53,6 +55,10 @@ SWAPS = {
     'shaorc': {LE: ('#3a2220', '#6b3428', '#9a5236', '#c58450'), GO: ('#8f8a6e', '#c4bd96', '#e6dfba', '#fbf6dd')},
     'greater_shaorc': {SK: ('#3d4a36', '#5c6d48', '#87985c', '#b6c48a'), LE: ('#24283a', '#3a3f5c', '#5a5f86', '#8489b0'),
                        GO: ('#7a6122', '#b8952f', '#e6c65a', '#fff0a8')},
+    'wraithorc': {SK: ('#3a4850', '#5b7581', '#8fb0ba', '#cdebf0'), LE: ('#10161c', '#1f2b33', '#344751', '#587581'),
+                  GO: ('#3a4850', '#5b7581', '#8fb0ba', '#cdebf0'), EYE: '#f4ffff'},
+    'heavy_duty_orc': {FE: ('#4a2f12', '#91571c', '#cf8a2a', '#f2c25a'), LE: ('#1c1e22', '#30333a', '#4d5159', '#767b84'),
+                       GO: ('#4a3c10', '#a88a1c', '#e8c42a', '#fff07a'), BO: ('#3b4046', '#5d646b', '#8c949b', '#c3cacf')},
     'omega_orc': {SK: ('#1f1c26', '#35303f', '#544b63', '#7d7290'), FE: ('#272a35', '#3f4456', '#636b85', '#9ba3c0'),
                   LE: ('#1b1a21', '#2c2a35', '#45414f', '#635d70'), GO: ('#6b5a2a', '#b39540', '#e6cf72', '#fff3c0'),
                   '#e3b567': '#f4f0ff'},
@@ -364,12 +370,112 @@ def shaman_death(frame, greater):
     return image
 
 
+CHAIN = ('#2a2f33', '#4f575d', '#8a949b')
+
+
+def wraith(frame, dying=False):
+    """A hooded orc spirit: shroud for legs, reaching arms trailing broken chains."""
+    image = Image.new('RGBA', (SIZE, SIZE))
+    phase = frame*math.tau/12
+    hover = round(math.sin(phase)*1.5)
+    p = Pixels(image, 0, hover)
+    sway = math.sin(phase)*2
+    if dying:
+        t = frame / 11
+        hover = -round(t*8)
+        p = Pixels(image, 0, hover)
+    # Shroud trailing into wisps where legs would be.
+    p.p([(26, 44), (50, 42), (54, 58), (52, 64 + sway), (46, 61), (42, 68 - sway), (36, 62), (30, 67 + sway), (24, 60)], LE[1])
+    p.p([(28, 46), (36, 45), (34, 60), (28, 62)], LE[2], None)
+    for k, x in enumerate((30, 42, 50)):
+        w = math.sin(phase*2 + k)*2
+        p.l([(x, 64), (x + w, 68), (x - w + 1, 72)], SWAPS['wraithorc'][SK][1])
+    # Far arm reaching forward.
+    reach = 2 + math.sin(phase)*2
+    p.l([(46, 36), (34 - reach, 40), (24 - reach, 41)], O, 6)
+    p.l([(46, 36), (34 - reach, 40), (24 - reach, 41)], SK[1], 4)
+    # Torso under the shroud and the hood.
+    p.p([(28, 32), (46, 30), (52, 44), (26, 46)], LE[1])
+    p.l([(30, 34), (45, 32)], LE[3])
+    p.p([(26, 26), (30, 16), (40, 12), (50, 16), (54, 28), (48, 34), (30, 34)], LE[1])
+    p.p([(29, 18), (38, 14), (44, 16), (36, 20), (30, 26)], LE[3], None)
+    p.p([(28, 22), (44, 21), (46, 32), (30, 33)], LE[0])
+    p.p([(28, 24), (40, 22), (42, 30), (31, 32)], SK[2], O)
+    p.r((31, 25, 33, 26), EYE)
+    p.r((37, 25, 39, 26), EYE)
+    p.r((32, 25, 32, 25), '#ffffff')
+    p.r((38, 25, 38, 25), '#ffffff')
+    p.p([(31, 31), (30, 28), (32, 28), (33, 31)], BO[3], O)
+    p.p([(38, 31), (38, 28), (40, 28), (40, 31)], BO[3], O)
+    # Near arm reaching forward with a shackle and dangling broken chain.
+    reach2 = 2 + math.sin(phase + 1)*2
+    hand = (16 - reach2, 40)
+    p.l([(30, 36), (22 - reach2, 38), hand], O, 7)
+    p.l([(30, 36), (22 - reach2, 38), hand], SK[2], 5)
+    p.p([(hand[0] - 3, hand[1] - 2), (hand[0] + 1, hand[1] - 3), (hand[0] + 2, hand[1] + 1), (hand[0] - 2, hand[1] + 2)], SK[3], O)
+    p.r((hand[0] + 3, hand[1] - 2, hand[0] + 5, hand[1] + 2), CHAIN[1])
+    swing = math.sin(phase - .5)*3
+    for k in range(4):
+        x, y = hand[0] + 4 + swing*k/3, hand[1] + 3 + k*3
+        p.r((x - 1, y, x + 1, y + 1), CHAIN[2 if k % 2 else 1])
+    if dying:
+        # The shade comes apart in rising wisps.
+        t = frame / 11
+        out = image.load()
+        for y in range(SIZE):
+            for x in range(SIZE):
+                if out[x, y][3] and ((x * 7 + y * 13 + frame) % 11) < round(t * 9):
+                    out[x, y] = (0, 0, 0, 0)
+    return image
+
+
+SMOKE = ('#3c3d40', '#5f6166', '#8b8e93')
+STRIPE = '#16171a'
+
+
+def heavy_duty(frame, dying=False):
+    """Brute anatomy in industrial plate: hazard stripes, visor slit, exhaust stacks."""
+    image = swap(death('brute', frame) if dying else pose('brute', frame), 'heavy_duty_orc')
+    if dying:
+        return image
+    phase, bob, counter = frame_space(frame)
+    body = Pixels(image, counter, bob, math.sin(phase)*1.4)
+    head = Pixels(image, counter-2, bob)
+    # Twin exhaust stacks behind the far shoulder, puffing in step with the stride.
+    for x, top in ((56, 12), (63, 16)):
+        body.p([(x, top), (x + 4, top), (x + 4, top + 14), (x, top + 14)], SWAPS['heavy_duty_orc'][LE][1], O)
+        body.l([(x + 1, top + 1), (x + 1, top + 12)], SWAPS['heavy_duty_orc'][LE][3])
+        body.r((x - 1, top, x + 5, top + 1), SWAPS['heavy_duty_orc'][LE][0])
+    for k in range(3):
+        rise = (frame * 2 + k * 8) % 24
+        x = 58 + k * 3 + round(math.sin(frame * .7 + k) * 2)
+        y = 9 - rise
+        if y > 1:
+            r = 1 + rise // 8
+            Pixels(image).p([(x - r, y), (x, y - r), (x + r, y), (x, y + r)], SMOKE[min(2, rise // 8)])
+    # Black-and-yellow hazard stripes across the near pauldron.
+    for k in range(4):
+        x = 14 + k * 5
+        body.l([(x, 39), (x + 5, 27)], STRIPE, 2)
+    # Riveted visor slit across the helmet face.
+    head.r((25, 29, 43, 31), O)
+    head.r((28, 30, 31, 30), '#ff8a3a')
+    head.r((38, 30, 40, 30), '#ff8a3a')
+    for x in (24, 46):
+        head.r((x, 26, x + 1, 27), SWAPS['heavy_duty_orc'][BO][3])
+    return image
+
+
 DRESS = {'ember_orc': ember, 'frost_orc': frost, 'storm_orc': storm, 'arcane_orc': arcane, 'elemetal_orc': elemetal}
 
 
 def walk(kind, frame):
     if kind == 'omega_orc':
         return omega(frame)
+    if kind == 'wraithorc':
+        return swap(wraith(frame), kind)
+    if kind == 'heavy_duty_orc':
+        return heavy_duty(frame)
     if kind in ('shaorc', 'greater_shaorc'):
         return swap(shaman(frame, kind == 'greater_shaorc'), kind)
     image = swap(pose('grunt', frame), kind)
@@ -380,6 +486,10 @@ def walk(kind, frame):
 def dying(kind, frame):
     if kind == 'omega_orc':
         return omega(frame, True)
+    if kind == 'wraithorc':
+        return swap(wraith(frame, True), kind)
+    if kind == 'heavy_duty_orc':
+        return heavy_duty(frame, True)
     if kind in ('shaorc', 'greater_shaorc'):
         return swap(shaman_death(frame, kind == 'greater_shaorc'), kind)
     return swap(death('grunt', frame), kind)

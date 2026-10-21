@@ -40,7 +40,8 @@ func _run() -> void:
 		rules.enemy_health = 1
 		rules.catalog = board.content_catalog
 		var tower: TowerDefinition = rules.catalog.towers[0].duplicate(true)
-		tower.damage = 1000
+		# One hit must kill even round-200 bone armour (650 HP here, Physical x0.6).
+		tower.damage = 100000
 		# Kill with an element this enemy is not immune to (EleMetal resists Physical).
 		for element: StringName in TowerDefinition.ELEMENTS:
 			if not definition.immune_elements.has(String(element)):

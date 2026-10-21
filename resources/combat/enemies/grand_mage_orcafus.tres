@@ -1,0 +1,49 @@
+[gd_resource type="Resource" script_class="EnemyDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy_definition.gd" id="1_enemy"]
+[ext_resource type="Texture2D" path="res://assets/enemies/animations/grand_mage_orcafus_still.png" id="2_sprite"]
+[ext_resource type="SpriteFrames" path="res://assets/enemies/animations/grand_mage_orcafus.tres" id="3_animation"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"grand_mage_orcafus"
+title = "Grand Mage Orcafus"
+description = "The oldest and wisest of the orc archmages glides over the battlefield, stopping to work spell after spell. Only Physical and Lightning damage reach him."
+health_multiplier = 120.0
+speed_multiplier = 0.3
+base_damage = 12
+fire_immune = true
+ice_immune = true
+immune_elements = PackedStringArray("fire", "ice", "magic")
+regeneration_interval = 2.0
+regeneration_fraction = 0.005
+spawn_weight = 80
+first_wave = 140
+max_weight_share = 0.6
+boss = true
+boss_spawn_chance = 0.05
+boss_spawn_chance_growth = 0.006
+boss_spawn_chance_cap = 0.5
+send_cost = 30000
+send_income = -600
+send_first_wave = 160
+kill_bounty = 180
+reroll_drop_chance = 1.0
+reroll_drop_amount = 12
+spellbook = {
+"glide": 1.4,
+"order": ["nullify", "fireball", "portal", "haste", "barrier"],
+"nullify": {"shield": 2.5, "strike": 0.6, "duration": 8.0},
+"fireball": {"windup": 1.4, "radius": 1.6, "stun": 4.0},
+"portal": {"cast": 2.4, "count": 10},
+"haste": {"cast": 1.8, "radius": 5.0, "multiplier": 1.4, "duration": 6.0},
+"barrier": {"cast": 1.8, "hits": 10, "heal": 0.2, "below": 0.85},
+"death_bolt": {"stun": 10.0}
+}
+texture = ExtResource("2_sprite")
+animation_frames = ExtResource("3_animation")
+source_faces_left = true
+board_height = 1.45
+board_anchor = Vector2(0.5, 0.875)
+corpse_lifetime = 4.2
+blood_color = Color(0, 0, 0, 0)

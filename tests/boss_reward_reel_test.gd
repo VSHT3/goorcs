@@ -19,6 +19,7 @@ func _check(condition: bool, message: String) -> void:
 
 func _run() -> void:
 	await _test_reel()
+	_test_floor()
 	_test_history_cursor()
 	await _test_planning_consumer()
 	main.queue_free()
@@ -116,6 +117,24 @@ func _test_reel() -> void:
 		reel.cancel()
 	host.queue_free()
 	await process_frame
+
+
+func _test_floor() -> void:
+	var host := Control.new()
+	root.add_child(host)
+	var reel := RarityReel.new()
+	host.add_child(reel)
+	# Shipped boss loot starts at Rare: the reel never spins past a card it cannot pay.
+	var award: Dictionary = _award(40, "rare")
+	var floor_rank: int = RarityReel.RARITIES.find("rare")
+	award["tiers"] = award["tiers"].slice(floor_rank)
+	reel.present_reward(award)
+	_check(reel._strip.rarities[RarityReel.WINNER_INDEX] == floor_rank, "A Rare-floor reward still lands on its accepted Rare")
+	_check(Array(reel._strip.rarities).all(func(rank: int) -> bool: return rank >= floor_rank and not reel._strip.coins[rank].is_empty()), "Every card on a Rare-floor reel is Rare or better with a payout")
+	reel.cancel()
+	reel.present({"rarity": "mythic"}, null)
+	_check(reel.is_busy() and Array(reel._strip.rarities).any(func(rank: int) -> bool: return rank < floor_rank), "Tower rolls keep the full rarity range after a boss reel")
+	host.queue_free()
 
 
 func _test_history_cursor() -> void:

@@ -83,5 +83,7 @@ static func advance(enemy: Dictionary, definition: Dictionary) -> void:
 			continue
 		enemy["hp"] = int(enemy["hp"]) + healed
 		enemy["regeneration_count"] = int(enemy["regeneration_count"]) + 1
-		enemy["animation"] = "heal"
-		enemy["animation_elapsed"] = 0.0
+		# Spellcasters regenerate silently rather than interrupting a cast pose.
+		if definition.get("spellbook", {}).is_empty():
+			enemy["animation"] = "heal"
+			enemy["animation_elapsed"] = 0.0

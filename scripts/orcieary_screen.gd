@@ -357,6 +357,12 @@ func _mechanics(definition: EnemyDefinition) -> String:
 		lines.append("Every %ss raises its staff: other non-boss orcs within %s tiles
 are immune to all damage for %ss · towers ignore them
 Wards end the moment it dies · never wards itself or another warder" % [String.num(definition.ward_interval, 1), String.num(definition.ward_radius, 1), String.num(definition.ward_duration, 1)])
+	if definition.phase_interval > 0.0:
+		var phased := PackedStringArray()
+		for element: String in definition.phase_immune_elements:
+			phased.append(MatchPlanningScreen.element_title(element))
+		lines.append("Phases every %ss between solid and ethereal\nWhile ethereal: immune to %s · towers switch targets" % [String.num(definition.phase_interval, 1), " and ".join(phased)])
+	lines.append_array(Spellbook.summary(definition.spellbook))
 	if definition.summon_interval > 0.0:
 		lines.append("Summons %d–%d every %ss · %ss cast\nAt most %d living summons" % [definition.summon_min, definition.summon_max, String.num(definition.summon_interval, 2), String.num(definition.summon_cast_duration, 2), definition.summon_limit])
 		if not definition.summon_pool.is_empty():
