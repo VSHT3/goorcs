@@ -42,6 +42,13 @@ func used_tiles() -> int:
 	return _tiles.size()
 
 
+## Placed path tiles, excluding the fixed entrance and base.
+func tiles() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	result.assign(_tiles.keys())
+	return result
+
+
 func is_ready() -> bool:
 	return not route.is_empty() and disconnected_count == 0
 

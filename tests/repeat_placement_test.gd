@@ -301,6 +301,11 @@ func _solo_build_another(screen: MatchPlanningScreen) -> void:
 	var coins_before: int = int(main.planning.combat["coins"][0])
 	var tower_count: int = main.planning.combat["towers"][0].size()
 	await _key(KEY_BACKSPACE)
+	_check(main.planning.combat["towers"][0].size() == tower_count and screen.is_sell_armed() and screen.sell_button.text.begins_with("Confirm"), "First Backspace only arms the sale")
+	await _key(KEY_BACKSPACE)
+	_check(main.planning.combat["towers"][0].size() == tower_count and screen.is_sell_armed(), "A second Backspace inside the double-press guard does not sell")
+	screen._sell_armed_msec -= MatchPlanningScreen.SELL_CONFIRM_GUARD_MSEC
+	await _key(KEY_BACKSPACE)
 	_check(main.planning.combat["towers"][0].size() == tower_count - 1 and main.planning.combat["towers"][1].size() == tower_count - 1 and main.planning.combat["coins"][0] == coins_before + refund, "Native Backspace submits one ordinary validated mirrored sale with the accepted refund")
 	_check(screen.selected_tower_id == -1 and screen.boards[0].selected_tower_id == -1 and not screen._management.visible, "Accepted Backspace sale clears inspector and board selection")
 
