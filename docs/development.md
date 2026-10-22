@@ -678,8 +678,10 @@ Verification passed weighted/combat regressions (exact budgets, caps/unlocks, de
 `tools/balance_bot.gd` plays real headless matches on the shipped rules with two identical mixed-build players and, by default, no sends:
 
 ```
-godot --headless --path . -s tools/balance_bot.gd -- <seeds> [first_seed] [max_round] [log] [start_round start_coins] [send_share send_policy]
+godot --headless --path . -s tools/balance_bot.gd -- <seeds> [first_seed] [max_round] [log] [start_round start_coins] [send_share send_policy] [elements]
 ```
+
+A comma-separated `elements` list (`physical`, `lightning`, `magic`) restricts both players to those towers in equal shares, e.g. `1 0 0 income magic` after the log and start arguments for a Rune-only build.
 
 A positive `send_share` makes player 0 alone spend that share of its Coins on sends before building each round: policy `income` buys the unlocked send that repays its price soonest, any other value names one enemy type. Its log lines add Coins sent that round and recurring income.
 
@@ -693,6 +695,8 @@ Send and tower audit (October 2026, seeds 0–2):
 - **Pressure sends** were measured with fast-forwarded builds, base HP raised so leaks are counted, and player 0 spending 20% of 11k Coins at round 44 or 10% of 27k / 47k at rounds 75 / 104 on one type. Orc, Orcling, Runner, Brute, Scrapguard, CrateOrc, RageOrc, MossOrc, NecOrcmancer, Greater ShaOrc, KamikaOrc and the elemental Orcs leaked nothing. HeavyDutyOrc (9× armored HP for 90) dealt 102 / 60 base damage at rounds 44 / 75 and Chief (heals stack across a dense send stream) 87 / 115, against ShaOrc 18 / 46 and Omega 21 at round 75. Chief now costs 130 and HeavyDutyOrc 110: 45 / 75 and 60 / 0, still the strongest pressure but no longer several times the next. At round 104 Chief deals 173, Omega 96, ShaOrc 83 and HeavyDutyOrc nothing.
 - **KamikaOrc** sends at 250 / +8 had the worst ordinary payback (31 rounds) and leaked nothing at round 104 even at 150; 200 matches the 24–27-round payback of MossOrc and WraithOrc.
 - **Towers** were compared by a scratch probe: one tower beside the bot path, damage dealt per invested Coin over three regular waves at round 55 (two seeds) and 85. Full Rune paths: Storm Sigil 3.2–6.4, Boulders 1.7–2.5, Onyx Ring 1.2–2.6, Void 1.2–1.6 (Void leads against the round-60 Trollorc, 2.4). Obsidian Crown added only 0.4–1.6 damage per Coin because pulses fire into gaps; at 50% faster pulses the Onyx path reaches 1.4–3.0, level with Boulders. Storm Sigil stays the strongest Rune path, level with the Flamethrower (2.8–5.7) at the top; it is unchanged because Rune-only builds already die first. Weak marginal buys remain Ballista Stronger Magic (+100–650 damage for 1,200) and the Biggest Wood steps; Orcapult deals almost no damage by design.
+
+Composition audit (October 2026, seeds 0–3, full matches to round 100, `start_round` 1): ordinary waves pick uniformly among eligible types and spend weight per pick, so a type's share is bounded by its count cap until about 35 picks share ~20 types (round 80+); raising caps further, or lowering weights, buys little. Single-element builds died mostly to immune Elemental Orc leaks (EleMetal 2 per leak, Omega 3). Elemental cap growth went from +1 per 30 rounds to +1 per 10, and Omega now debuts at 32 (was 38) with +1 cap per 12 rounds (was 20); elemental weight share at rounds 40–50 rose from ~22% to ~25% (from about a quarter to a third of round-45 units; `elemental_orcs_test` now bounds that at 35%). Ended rounds before → after: Physical-only 70/68/76/69 → 64/61/61/54, Lightning-only 61/63/58/63 → 59/58/52/61, Lightning+Magic 75/80/75/76 → 74/71/66/72; Magic-only stays 47–60 either way (it dies to the round-40 Mancer and thin damage; its Arcane leaks stayed about one per round). The default mixed bot still leaks no ordinary wave to round 100 on all four seeds; its only damage is the War Machine debut (−16 to −20) and seed 3's usual round-2–5 opening leaks.
 
 ### Adding a tower
 

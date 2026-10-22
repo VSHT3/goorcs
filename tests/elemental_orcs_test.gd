@@ -152,7 +152,7 @@ func _test_spawns() -> void:
 		if StringName(id) in ELEMENTALS:
 			elementals += int(seen[id])
 	var share: float = float(elementals) / float(total)
-	_check(share > 0.1 and share < 0.27, "Elemental Orcs season waves without replacing the horde: %.0f%%" % (share * 100.0))
+	_check(share > 0.1 and share < 0.35, "Elemental Orcs season waves without replacing the horde: %.0f%%" % (share * 100.0))
 
 
 func _test_shaorc() -> void:
