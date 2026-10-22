@@ -129,6 +129,13 @@ func _definition(type_id: String) -> EnemyDefinition:
 	return _definitions.get(type_id)
 
 
+## A head-and-shoulders crop: the top square of the opaque artwork.
+static func portrait_region(texture: Texture2D) -> Rect2:
+	var bounds: Rect2 = EnemyVisuals.opaque_bounds(texture)
+	var side: float = minf(bounds.size.x, bounds.size.y)
+	return Rect2(bounds.position.x + (bounds.size.x - side) * 0.5, bounds.position.y, side, side)
+
+
 func _row_finished(row: Row) -> void:
 	_rows.erase(row.enemy_id)
 	row.queue_free()
@@ -167,10 +174,7 @@ class Row extends Control:
 	func _ready() -> void:
 		if definition != null and definition.texture != null:
 			_portrait = definition.texture
-			var bounds: Rect2 = EnemyVisuals.opaque_bounds(_portrait)
-			# A head-and-shoulders crop: the top square of the opaque artwork.
-			var side: float = minf(bounds.size.x, bounds.size.y)
-			_portrait_region = Rect2(bounds.position.x + (bounds.size.x - side) * 0.5, bounds.position.y, side, side)
+			_portrait_region = BossHealthBars.portrait_region(_portrait)
 
 	func accept(enemy: Dictionary) -> void:
 		var next_max: float = maxf(1.0, float(enemy.get("max_hp", 1)))

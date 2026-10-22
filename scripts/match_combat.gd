@@ -54,6 +54,9 @@ var wave_groups: Array[Dictionary] = []
 var statistics_id: String = Crypto.new().generate_random_bytes(16).hex_encode()
 var enemy_totals: Array[Dictionary] = [{"kills": {}, "sent": {}}, {"kills": {}, "sent": {}}]
 var _recap := MatchRecap.new()
+## Coins and Shards each board received from its latest round clear, published
+## with the clear count so clients can mark the moment without inferring it.
+var _clear_gains: Array = [[0, 0], [0, 0]]
 var _death_events: Array[Array] = [[], []]
 var _death_heads: Array[int] = [0, 0]
 var _death_time: float = 0.0
@@ -1257,6 +1260,8 @@ func advance(delta: float) -> bool:
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
 		_recap.rounds_cleared += 1
 		for slot: int in range(2):
+			var coins_before: int = coins[slot]
+			var shards_before: int = reroll_currency[slot]
 			coins[slot] += reward + income[slot]
 			reroll_currency[slot] += _rules.clear_reroll_currency
 			_recap.add(slot, "earned", "wave_coins", reward)
@@ -1282,6 +1287,7 @@ func advance(delta: float) -> bool:
 				_reset_firing(tower)
 				_clear_stun(tower)
 				_clear_spell_marks(tower)
+			_clear_gains[slot] = [coins[slot] - coins_before, reroll_currency[slot] - shards_before]
 			_refresh_board(slot)
 		_magic_nullified_until = [0.0, 0.0]
 		phase = Phase.PLANNING
@@ -2143,6 +2149,7 @@ func snapshot(include_metadata: bool = true) -> Dictionary:
 		"magic_nullified": [maxf(0.0, _magic_nullified_until[0] - _elapsed), maxf(0.0, _magic_nullified_until[1] - _elapsed)],
 		"deaths": [_death_snapshot(0), _death_snapshot(1)], "death_time": _death_time,
 		"death_generation": _death_generation,
+		"clears": {"count": _recap.rounds_cleared, "gains": _clear_gains.duplicate(true)},
 		"sounds": _sound_events.snapshot(_death_time),
 		"boss_rewards": [_boss_loot.awards(0), _boss_loot.awards(1)],
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
@@ -3398,7 +3405,8 @@ func _reset_death_events() -> void:
 	_death_events = [[], []]
 
 
-func _record_death(slot: int, enemy: Dictionary) -> void:
+## `coins` is the kill bounty just paid, carried only so the killing board can show it.
+func _record_death(slot: int, enemy: Dictionary, coins: int = 0) -> void:
 	var route: Array = enemy["route"]
 	var progress: float = enemy["progress"]
 	var faces_left: bool = false
@@ -3423,6 +3431,7 @@ func _record_death(slot: int, enemy: Dictionary) -> void:
 		"hp": enemy["hp"], "max_hp": enemy["max_hp"],
 		"death_stun_radius": _enemy_types[enemy["type_id"]]["death_stun_radius"],
 		"bolt_to": enemy.get("death_bolt_to", Vector2(-1, -1)),
+		"coins": coins,
 	})
 	_next_death_id += 1
 	# Remember ordinary deaths briefly for Raise the Fallen; bosses and the risen stay dead.
@@ -3630,7 +3639,7 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 			_recap.add(slot, "earned", "boss_coins", int(reward["coins"]))
 			_recap.add(slot, "earned", "boss_shards", int(reward["shards"]))
 		_add_total(slot, "kills", enemy["type_id"])
-		_record_death(slot, enemy)
+		_record_death(slot, enemy, payout)
 		_retire_enemy(enemy["id"])
 		enemies[slot].remove_at(enemy_index)
 	return true

@@ -310,6 +310,16 @@ Cleanup verification exercised menu/workshop/collection/lobby and two real gamep
 
 `tests/hud_feedback_test.gd` covers boss-only rows, trail hold/drain, heal, kill versus leak, ID reuse, the three-row cap, click-to-inspect in the real match and Sandbox, unchanged accepted state, status chips appearing and expiring with a real stun, whole-word choice buttons in both screens and an unclipped round label at both widths. `tests/late_boss_presentation_test.gd` additionally renders a row and checks fill, trail, drain, enrage colour and portrait pixels.
 
+### Match feedback beats
+
+Short, non-blocking flourishes mark the big moments; all of them read accepted snapshots and none feeds gameplay. `MatchCombat` only adds two cosmetic facts: each death event's `coins` (the kill bounty actually paid; 0 for collateral stomps) and `clears` (round-clear count plus each board's Coin/Shard gain from that clear). Debug round jumps never count as clears.
+
+- `MatchBanner` (HUD, local real time): a boss reaching your own board shows its portrait and name for under 3 s; a counted clear shows **Round N cleared** with your accepted Coin/Shard gain. A boss cuts a round beat short, duplicates of a showing type are dropped, a new run only sets a baseline and results clear it. The panel centers over the free world span, below the header and clear of the inspection panels and notices, at 1280 and 1000 px.
+- `BaseHealthFeedback` (HUD, real time): an accepted base-HP drop flashes the gauge, leaves a pale trail that drains after 0.35 s, tints the value and pops the loss beside it; leaks within 0.6 s add into one number.
+- `BoardFeedback` (battlefield, simulation time, so pause and 1x/2x/3x carry through): the crystal shakes, flashes a white silhouette, sprays shards and shows the HP lost, scaled by damage; red corners pulse around a crystal once an enemy is within 3 route cells; elite and boss kills burst outside the body and pop their accepted bounty as a coin. Ordinary kills stay quiet so hordes remain readable. Both boards show these, including Sandbox kills.
+
+`tests/match_feedback_test.gd` covers the published facts, banner/health rules and a real solo leak, clear and Trollorc debut without changing accepted state; `tests/match_feedback_presentation_test.gd` checks the rendered pixels and clean expiry.
+
 ### Pixel typography
 
 The game bundles [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) by Stefie Justprince at `assets/fonts/PixelifySans.ttf`, with its copyright notice and SIL Open Font License in `assets/fonts/OFL.txt`. The unchanged variable font comes from upstream commit `39df74aba80df8157546034b878e8be1eb565ced`; keep the license with any redistributed build. No font service or runtime download is used.

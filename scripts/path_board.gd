@@ -230,6 +230,11 @@ var _ground_dimensions := Vector2i.ZERO
 var _ground_style: int = -1
 var _ground_layout: PathLayout
 var _ground_revision: int = -1
+## Accepted crystal HP losses on this board: {"age", "damage", "seed"}.
+var _crystal_hits: Array[Dictionary] = []
+var _health_run: String = ""
+var _last_health: int = -1
+var _crystal_flash_texture: AtlasTexture
 
 
 func _ready() -> void:
@@ -276,10 +281,12 @@ func _advance_endpoints() -> void:
 	# Mutate only the atlas regions; cached framing stays fixed for the whole loop.
 	_portal_texture.region.position.x = _endpoint_frame * ENDPOINT_FRAME_SIZE
 	_crystal_texture.region.position.x = _endpoint_frame * ENDPOINT_FRAME_SIZE
+	if _crystal_flash_texture != null:
+		_crystal_flash_texture.region = _crystal_texture.region
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or _has_catapult_motion or not _flight_traces.is_empty() or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty() or not _ground_bombs.is_empty() or not _bomb_explosion_traces.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or _has_catapult_motion or not _flight_traces.is_empty() or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty() or not _ground_bombs.is_empty() or not _bomb_explosion_traces.is_empty() or not _crystal_hits.is_empty()))
 
 
 func _process(delta: float) -> void:
@@ -327,6 +334,10 @@ func _process(delta: float) -> void:
 		_shot_traces[index]["life"] -= visual_delta
 		if float(_shot_traces[index]["life"]) <= 0.0:
 			_shot_traces.remove_at(index)
+	for index: int in range(_crystal_hits.size() - 1, -1, -1):
+		_crystal_hits[index]["age"] += visual_delta
+		if float(_crystal_hits[index]["age"]) >= BoardFeedback.CRYSTAL_HIT:
+			_crystal_hits.remove_at(index)
 	for index: int in range(_boss_effects.size() - 1, -1, -1):
 		_boss_effects[index]["age"] += visual_delta
 		if float(_boss_effects[index]["age"]) >= float(_boss_effects[index]["duration"]):
@@ -348,8 +359,29 @@ func _process(delta: float) -> void:
 func apply_combat(state: Dictionary, slot: int, speed: float = 1.0, paused: bool = false) -> void:
 	tower_types = state.get("tower_types", {})
 	apply_deaths(state, slot, speed, paused)
+	_observe_base_health(state, slot)
 	combat_enemies = state.get("enemies", [[], []])[slot]
 	combat_towers = state.get("towers", [[], []])[slot]
+
+
+## A drop in this board's accepted base HP within one run shakes and flashes
+## its crystal; the first snapshot of a run only sets the baseline.
+func _observe_base_health(state: Dictionary, slot: int) -> void:
+	var health: Array = state.get("health", [])
+	if slot < 0 or slot >= health.size():
+		return
+	var run: String = String(state.get("statistics_id", ""))
+	var value: int = int(health[slot])
+	if run == _health_run and _last_health >= 0 and value < _last_health:
+		_crystal_hits.append({"age": 0.0, "damage": _last_health - value, "seed": _last_health})
+		if _crystal_hits.size() > 3:
+			_crystal_hits.pop_front()
+		_sync_combat_animation()
+		queue_redraw()
+	elif run != _health_run:
+		_crystal_hits.clear()
+	_health_run = run
+	_last_health = value
 
 
 func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool = false) -> void:
@@ -928,6 +960,7 @@ func _draw() -> void:
 	_draw_combat()
 	_draw_projectiles()
 	_draw_boss_effects()
+	_draw_feedback()
 	_draw_arena_nullify()
 
 
@@ -1350,8 +1383,10 @@ func _draw_combat() -> void:
 					draw_set_transform(item["foot"], 0.0, Vector2(-1.0, 1.0))
 					draw_texture_rect(texture, _sprite_rect(texture, 1.05, anchor, Vector2.ZERO), false)
 					draw_set_transform(Vector2.ZERO)
-				else:
+				elif item["cell"] == layout.entrance:
 					draw_texture_rect(texture, _sprite_rect(texture, 1.05, anchor, item["foot"]), false)
+				else:
+					_draw_crystal(item["foot"])
 			1:
 				_draw_tower(item["data"], item["foot"])
 			2:
@@ -3127,3 +3162,89 @@ func _draw_ground_bombs() -> void:
 		EnemyVisuals.draw_ground_bomb(self, foot, bomb, _bomb_visual_clock, cell_size)
 	for event: Dictionary in _bomb_explosion_traces:
 		EnemyVisuals.draw_death_stun(self, _position_center(event["pos"]), float(event["radius"]), float(event["age"]), cell_size)
+
+
+const CRYSTAL_ANCHOR := Vector2(0.50390625, 0.9296875)
+
+
+func _crystal_rect(foot: Vector2) -> Rect2:
+	return _sprite_rect(_crystal_texture, 1.05, CRYSTAL_ANCHOR, foot)
+
+
+## The opaque crystal and pedestal inside the drawn frame, without canvas padding.
+func _crystal_body(foot: Vector2) -> Rect2:
+	var rect: Rect2 = _crystal_rect(foot)
+	var bounds: Rect2 = _texture_bounds[_crystal_texture]
+	var scale: float = rect.size.y / float(ENDPOINT_FRAME_SIZE)
+	return Rect2(rect.position + bounds.position * scale, bounds.size * scale)
+
+
+## The crystal shakes for a moment after an accepted hit and flashes a white
+## silhouette on top of the same animation frame.
+func _draw_crystal(foot: Vector2) -> void:
+	var cell_size: float = _cell_size()
+	var shake: float = 0.0
+	var flash: float = 0.0
+	for hit: Dictionary in _crystal_hits:
+		var age: float = float(hit["age"])
+		shake += BoardFeedback.crystal_shake(age, int(hit["damage"]), cell_size)
+		if age < BoardFeedback.CRYSTAL_FLASH:
+			flash = maxf(flash, 1.0 - age / BoardFeedback.CRYSTAL_FLASH)
+	var rect: Rect2 = _crystal_rect(foot + Vector2(shake, 0.0))
+	draw_texture_rect(_crystal_texture, rect, false)
+	var silhouette: AtlasTexture = _crystal_flash() if flash > 0.0 else null
+	if silhouette != null:
+		draw_texture_rect(silhouette, rect, false, Color(1.0, 1.0, 1.0, 0.85 * flash))
+
+
+func _crystal_flash() -> AtlasTexture:
+	if _crystal_flash_texture == null:
+		var sheet: Image = _crystal_texture.atlas.get_image()
+		if sheet == null:
+			return null
+		if sheet.is_compressed():
+			sheet.decompress()
+		sheet.convert(Image.FORMAT_RGBA8)
+		var white := Image.create(sheet.get_width(), sheet.get_height(), false, Image.FORMAT_RGBA8)
+		white.fill(Color(0.92, 0.98, 1.0))
+		var silhouette := Image.create(sheet.get_width(), sheet.get_height(), false, Image.FORMAT_RGBA8)
+		silhouette.blit_rect_mask(white, sheet, Rect2i(Vector2i.ZERO, sheet.get_size()), Vector2i.ZERO)
+		_crystal_flash_texture = AtlasTexture.new()
+		_crystal_flash_texture.atlas = ImageTexture.create_from_image(silhouette)
+		_crystal_flash_texture.region = _crystal_texture.region
+	return _crystal_flash_texture
+
+
+## Elite/boss kill bursts with their accepted bounty, crystal hits and the
+## approaching-leak warning, drawn above units so a crowd cannot bury them.
+func _draw_feedback() -> void:
+	var cell_size: float = _cell_size()
+	for trace: Dictionary in _corpse_traces:
+		var artwork: EnemyDefinition = _enemy_art.get(trace["type_id"])
+		if artwork == null or not (artwork.boss or artwork.elite):
+			continue
+		var coins: int = int(trace.get("coins", 0))
+		var age: float = float(trace["age"])
+		if age >= BoardFeedback.kill_duration(artwork.boss, coins):
+			continue
+		var foot: Vector2 = _position_center(trace["pos"]) + Vector2(0, cell_size * 0.28)
+		var body_radius: float = cell_size * artwork.board_height * 0.5
+		BoardFeedback.draw_kill_burst(self, foot - Vector2(0.0, body_radius), body_radius, age, cell_size, artwork.boss, coins, int(trace["enemy_id"]))
+	if layout == null or layout.base.x < 0:
+		return
+	var crystal_foot: Vector2 = cell_center(layout.base) + Vector2(0, cell_size * 0.28)
+	var crystal: Rect2 = _crystal_body(crystal_foot)
+	for hit: Dictionary in _crystal_hits:
+		BoardFeedback.draw_crystal_hit(self, crystal, crystal_foot, float(hit["age"]), int(hit["damage"]), cell_size, int(hit["seed"]))
+	BoardFeedback.draw_leak_warning(self, crystal, leak_danger(), _bomb_visual_clock, cell_size)
+
+
+## Closeness (0..1) of the enemy nearest to this board's crystal along its route.
+func leak_danger() -> float:
+	var nearest: float = INF
+	for enemy: Dictionary in combat_enemies:
+		var route: Array = enemy.get("route", [])
+		if route.size() < 2 or int(enemy.get("hp", 1)) <= 0:
+			continue
+		nearest = minf(nearest, float(route.size() - 1) - _enemy_route_progress(enemy))
+	return BoardFeedback.leak_danger(nearest) if nearest < INF else 0.0
