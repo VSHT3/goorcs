@@ -235,7 +235,8 @@ func _test_paid_boss_kills() -> void:
 		for kill_number: int in range(2):
 			if kill_number == 1:
 				_check(combat.send_enemy(0, StringName(type_id)), "A second fully paid boss can use the same ordinary FIFO")
-			combat.advance(rules.send_spawn_interval + 0.001)
+			# Heavy boss orders leave a weight-scaled gap before the next one.
+			combat.advance(MatchCombat.send_order_gap(rules.send_spawn_interval, int(terms["spawn_weight"])) + 0.001)
 			var index: int = -1
 			for candidate: int in range(combat.enemies[1].size()):
 				if combat.enemies[1][candidate]["type_id"] == type_id:

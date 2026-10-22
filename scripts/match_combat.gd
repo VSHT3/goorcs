@@ -10,6 +10,11 @@ const MAX_BOUNCE_POINTS: int = 24
 # Seconds an Orcapult-thrown enemy spends in the air between the two boards.
 const FLIGHT_DURATION: float = 1.6
 const NO_BONUS: Dictionary = {}
+# Send orders may wait off-screen for one board up to this many at a time.
+const SEND_QUEUE_LIMIT: int = 20
+# Each wave-weight point above light rabble lengthens the gap after a send order by 5%.
+const SEND_WEIGHT_DELAY: float = 0.05
+const SEND_WEIGHT_FREE: int = 5
 const NO_ARCHERS: Array = []
 
 var phase: Phase = Phase.PLANNING
@@ -24,6 +29,10 @@ var income: Array[int] = [0, 0]
 var queued_sends: Array[int]:
 	get:
 		return [_pending_sends(0), _pending_sends(1)]
+# Whole send orders (a group counts once) still waiting for each target board.
+var queued_send_orders: Array[int]:
+	get:
+		return [_pending_orders(0), _pending_orders(1)]
 var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
@@ -838,7 +847,7 @@ func _can_send_enemy(slot: int, type_id: StringName) -> bool:
 		return false
 	var definition: Dictionary = _enemy_types[String(type_id)]
 	var delivery_wave: int = wave + 1 if phase == Phase.PLANNING else wave
-	return definition["send_enabled"] and delivery_wave >= int(definition["send_first_wave"]) and (_sandbox_mode or coins[slot] >= int(definition["send_cost"])) and income[slot] >= -int(definition["send_income"])
+	return definition["send_enabled"] and delivery_wave >= int(definition["send_first_wave"]) and (_sandbox_mode or coins[slot] >= int(definition["send_cost"])) and income[slot] >= -int(definition["send_income"]) and _pending_orders(1 - slot) < SEND_QUEUE_LIMIT
 
 
 func send_enemy(slot: int, type_id: StringName) -> bool:
@@ -884,6 +893,19 @@ func _valid_send_timing() -> bool:
 
 func _pending_sends(slot: int) -> int:
 	return _send_queues[slot].size() - _send_heads[slot]
+
+
+func _pending_orders(slot: int) -> int:
+	var orders: int = 0
+	for index: int in range(_send_heads[slot], _send_group_ends[slot].size()):
+		if _send_group_ends[slot][index]:
+			orders += 1
+	return orders
+
+
+# Heavier sends take slightly longer to clear the portal before the next order.
+static func send_order_gap(base_gap: float, weight: int) -> float:
+	return base_gap * (1.0 + SEND_WEIGHT_DELAY * maxf(0.0, float(weight - SEND_WEIGHT_FREE)))
 
 
 
@@ -2113,7 +2135,7 @@ func snapshot(include_metadata: bool = true) -> Dictionary:
 		"winner": winner, "coin_flip": coin_flip,
 		"coins": coins.duplicate(),
 		"reroll_currency": reroll_currency.duplicate(),
-		"income": income.duplicate(), "queued_sends": queued_sends,
+		"income": income.duplicate(), "queued_sends": queued_sends, "queued_send_orders": queued_send_orders,
 		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
 		"flights": flights.duplicate(true), "flight_duration": FLIGHT_DURATION,
@@ -2142,6 +2164,7 @@ func snapshot(include_metadata: bool = true) -> Dictionary:
 			"wave_reward": _rules.wave_reward + maxi(1, wave) * _rules.wave_reward_growth,
 			"base_health": _rules.base_health,
 			"send_spawn_interval": _send_spawn_interval * _spawn_interval_multiplier(wave + 1) if phase == Phase.PLANNING else _active_send_spawn_interval,
+			"send_queue_limit": SEND_QUEUE_LIMIT,
 			"main_round_interval": _rules.main_round_interval,
 			"ready_window_seconds": _rules.ready_window_seconds,
 			"tiles_per_expansion": _rules.tiles_per_expansion,
@@ -2410,7 +2433,7 @@ func _spawn_send(slot: int) -> void:
 	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave)
 	_spawn_enemy(slot, type_id, progress, _next_send_times[slot])
 	_sound_events.record(CombatSoundEvents.Cue.PORTAL, slot, Vector2(_routes[slot][0]), _death_time)
-	_next_send_times[slot] += _active_send_spawn_interval if _send_group_ends[slot][_send_heads[slot]] else float(_enemy_types[type_id]["group_interval"])
+	_next_send_times[slot] += send_order_gap(_active_send_spawn_interval, int(_enemy_types[type_id]["spawn_weight"])) if _send_group_ends[slot][_send_heads[slot]] else float(_enemy_types[type_id]["group_interval"])
 	_send_heads[slot] += 1
 	if _send_heads[slot] == _send_queues[slot].size():
 		_send_queues[slot].clear()

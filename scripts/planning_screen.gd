@@ -754,8 +754,11 @@ func _refresh_sends() -> void:
 	var cost: int = int(stats.get("send_cost", 0))
 	var gain: int = int(stats.get("send_income", 0))
 	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured and bool(stats.get("send_available", false))
+	var orders: Array = state.get("queued_send_orders", [0, 0])
+	var queue_limit: int = int(rules.get("send_queue_limit", MatchCombat.SEND_QUEUE_LIMIT))
+	var queue_full: bool = int(orders[1 - own_slot]) >= queue_limit
 	enemy_selector.disabled = planning == null or not planning.active or finished or types.is_empty()
-	send_button.disabled = not available or _own_coins() < cost or int(income[own_slot]) < -gain
+	send_button.disabled = not available or _own_coins() < cost or int(income[own_slot]) < -gain or queue_full
 	send_button.text = "Send · %d/%+d" % [cost, gain] if configured else "Send unavailable"
 	if finished:
 		send_button.text = "Match finished"
@@ -787,8 +790,11 @@ func _refresh_sends() -> void:
 			delivery += "\nNeed %d more Coins." % (cost - _own_coins())
 		if int(income[own_slot]) < -gain:
 			delivery += "\nNeed %d more recurring income." % (-gain - int(income[own_slot]))
+		if queue_full:
+			delivery += "\nQueue full: %d orders are waiting to reach your opponent." % queue_limit
 	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
-	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nOrder cooldown: %.3f simulation seconds after its final member." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, float(rules["send_spawn_interval"])]
+	var gap: float = MatchCombat.send_order_gap(float(rules["send_spawn_interval"]), int(stats.get("spawn_weight", 1)))
+	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nOutgoing orders: %d/%d.\nOrder cooldown: %.3f simulation seconds after its final member (heavier orcs take longer)." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, int(orders[1 - own_slot]), queue_limit, gap]
 	enemy_selector.tooltip_text = send_button.tooltip_text
 	for index: int in range(enemy_selector.item_count):
 		var type_stats: Dictionary = types[String(enemy_selector.get_item_metadata(index))]

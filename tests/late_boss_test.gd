@@ -314,10 +314,10 @@ func _test_send_atomicity() -> void:
 		repeated.coins = [cost * 3, cost]
 		repeated.income = [penalty * 3 + 7, penalty]
 		for order: int in range(3):
-			_check(repeated.send_enemy(0, id), "Funded late-game bosses have no added send cap or cooldown")
+			_check(repeated.send_enemy(0, id), "Funded late-game bosses need no boss-only cap beyond the shared order queue")
 		_check(repeated.coins[0] == 0 and repeated.income[0] == 7 and repeated.queued_sends[1] == 3, "Repeated orders pay each full penalty and preserve residual income")
 		_check(repeated.start_wave(_routing(_layout())), "Queued boss orders start through the real regular-wave path")
-		repeated.advance(repeated._active_send_spawn_interval * 2.0 + 0.001)
+		repeated.advance(MatchCombat.send_order_gap(repeated._active_send_spawn_interval, int(repeated._enemy_types[String(id)]["spawn_weight"])) * 2.0 + 0.001)
 		var bosses: int = 0
 		for enemy: Dictionary in repeated.enemies[1]:
 			if enemy["type_id"] == String(id):

@@ -343,16 +343,25 @@ func _test_long_fifo() -> void:
 	rules.enemy_speed = 0.01
 	var combat := _combat(rules)
 	var orders: Array[String] = []
+	var started: bool = false
+	var most_waiting: int = 0
+	# The queue holds twenty orders; keep it topped up as deliveries free slots.
 	for index: int in range(131):
 		var type_id: String = ["brute", "runner", "grunt"][index % 3]
 		orders.append(type_id)
-		_check(combat.send_enemy(0, StringName(type_id)), "A funded long FIFO accepts every typed order")
-	combat.start_wave(_routing())
-	combat.advance(22.41)
+		var waits: int = 0
+		while not combat.send_enemy(0, StringName(type_id)) and waits < 100:
+			if not started:
+				started = combat.start_wave(_routing())
+			combat.advance(0.05)
+			waits += 1
+		most_waiting = maxi(most_waiting, combat.queued_send_orders[1])
+	_check(combat.queued_send_orders[1] == MatchCombat.SEND_QUEUE_LIMIT and most_waiting == MatchCombat.SEND_QUEUE_LIMIT, "A funded long FIFO keeps exactly the twenty-order limit waiting")
 	var pending: Dictionary = combat.snapshot()
-	_check(pending["queued_sends"] == [0, 66] and pending["send_queues"][1] == orders.slice(65), "Long-running FIFO snapshots expose only the unconsumed ordered suffix")
+	var waiting: int = pending["queued_sends"][1]
+	_check(pending["send_queues"][1] == orders.slice(orders.size() - waiting), "Long-running FIFO snapshots expose only the unconsumed ordered suffix")
 	pending["send_queues"][1].clear()
-	_check(combat.snapshot()["send_queues"][1] == orders.slice(65), "Long FIFO snapshot mutation cannot erase authoritative future deliveries")
+	_check(combat.snapshot()["send_queues"][1] == orders.slice(orders.size() - waiting), "Long FIFO snapshot mutation cannot erase authoritative future deliveries")
 	combat.advance(24.0)
 	var delivered: Array[String] = _types(combat.enemies[1])
 	delivered.remove_at(1) # The independent regular Grunt arrived at zero after the first send.
