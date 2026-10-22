@@ -49,13 +49,24 @@ func _process(_delta: float) -> bool:
 		push_error("Session worker exceeded its bounded lifetime")
 		quit(1)
 		return false
+	# Read the command file once per frame: the deferral check and dispatch must
+	# see the same command, or a command published between two reads would skip
+	# the check and run before the worker is ready for it.
 	var command: Dictionary = _read_json(_path("command"))
 	if int(command.get("id", 0)) > _command_id:
+		if _defers_command(command):
+			_publish()
+			return false
 		_command_id = int(command["id"])
 		_executing_command = true
 		_execute_command(command)
 		_executing_command = false
 	_publish()
+	return false
+
+
+# Subclasses keep a new command pending (unacknowledged) until they can run it.
+func _defers_command(_command: Dictionary) -> bool:
 	return false
 
 

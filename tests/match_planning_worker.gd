@@ -25,16 +25,10 @@ func _planning_rules() -> CombatRules:
 	return rules
 
 
-func _process(delta: float) -> bool:
-	if planning != null and _session.state == MultiplayerSession.State.CONNECTED and not planning.active and Time.get_ticks_msec() < _deadline_msec:
-		var command: Dictionary = _read_json(_path("command"))
-		var action: String = String(command.get("action", ""))
-		if int(command.get("id", 0)) > _command_id and action in ["edit", "clear", "ready", "build", "target", "upgrade", "sell", "send", "debug", "step"]:
-			# Transport admission precedes both explicit deck commits. Keep this
-			# command pending until gameplay is admitted, then dispatch it once.
-			_publish()
-			return false
-	return super._process(delta)
+func _defers_command(command: Dictionary) -> bool:
+	# Transport admission precedes both explicit deck commits. Keep this
+	# command pending until gameplay is admitted, then dispatch it once.
+	return planning != null and _session.state == MultiplayerSession.State.CONNECTED and not planning.active and String(command.get("action", "")) in ["edit", "clear", "ready", "build", "target", "upgrade", "sell", "send", "debug", "step"]
 
 
 func _on_planning_changed() -> void:
