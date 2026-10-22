@@ -302,6 +302,14 @@ Match path strokes on the fixed entrance/base or outside the board are silent no
 
 Cleanup verification exercised menu/workshop/collection/lobby and two real gameplay peers in rendered 1280×720 and 1000×720 subviewports, including live targeting, ordinary/coin-flip results, rejoin, visible errors, and idle notice expiry. The unchanged reset warning was visually inspected; reset/cancellation behavior remains covered by the passing chest-flow regression. Linux save-directory preservation and corrected `GORCS1` peer admission also passed. PDF/brief files were intentionally unchanged.
 
+### Boss rows, tower status and choice wrapping
+
+`BossHealthBars` reads only accepted snapshots: the own board's `enemies` whose type is a boss, plus that board's `deaths` to tell a kill (drain to empty, then fade) from a leak (fade only). It owns no HP; the pale damage trail is a local display lag that holds 0.35s, eases toward accepted HP and stops processing once settled. Rows sit bottom-left above the palette, clear of the right-side management/inspector panels and the top-left notices at 1280×720 and 1000×720. A new run (`statistics_id`), results, hiding or leaving clears them; a reused ID gets a fresh row. Clicking a row goes through the normal enemy-inspection path.
+
+`TowerStatusStrip` turns accepted `stunned_remaining`, `wither`/`wither_remaining` and the board's `magic_nullified` time (Magic towers only) into chips pinned under the management title in matches and Sandbox. `UpgradeChoiceRow` replaces the purchase `HBoxContainer`: it keeps choices in one row when every choice's longest word fits its column, otherwise it wraps into balanced rows. Before this, four War Drums branches read "COMMA ND BANNE R" and Sandbox Lightning "ESCALA CHAIN". The match header's send selector no longer sizes itself to its longest boss title (it ellipsizes at 220px), so the round label keeps its number at 1000px instead of reading "ROUND".
+
+`tests/hud_feedback_test.gd` covers boss-only rows, trail hold/drain, heal, kill versus leak, ID reuse, the three-row cap, click-to-inspect in the real match and Sandbox, unchanged accepted state, status chips appearing and expiring with a real stun, whole-word choice buttons in both screens and an unclipped round label at both widths. `tests/late_boss_presentation_test.gd` additionally renders a row and checks fill, trail, drain, enrage colour and portrait pixels.
+
 ### Pixel typography
 
 The game bundles [Pixelify Sans](https://github.com/eifetx/Pixelify-Sans) by Stefie Justprince at `assets/fonts/PixelifySans.ttf`, with its copyright notice and SIL Open Font License in `assets/fonts/OFL.txt`. The unchanged variable font comes from upstream commit `39df74aba80df8157546034b878e8be1eb565ced`; keep the license with any redistributed build. No font service or runtime download is used.

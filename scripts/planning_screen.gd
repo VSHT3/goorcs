@@ -49,6 +49,9 @@ var _pending_rarity_id: int = -1
 var _pending_rarity_count: int = -1
 var _queued_rarity_tower: Dictionary = {}
 var _boss_rewards := BossRewardPresenter.new()
+var boss_bars: BossHealthBars
+var tower_status: TowerStatusStrip
+var _boss_bar_run: String = ""
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -82,7 +85,7 @@ var _boss_rewards := BossRewardPresenter.new()
 @onready var speed_upgrade: Button = %SpeedUpgrade
 @onready var special_upgrade: Button = %SpecialUpgrade
 @onready var alternate_upgrade: Button = %AlternateUpgrade
-@onready var _upgrade_row: HBoxContainer = %Upgrades
+@onready var _upgrade_row: UpgradeChoiceRow = %Upgrades
 @onready var sell_button: Button = %SellTower
 @onready var close_button: Button = %CloseTower
 @onready var targeting_button: TargetingCycle = %Targeting
@@ -113,6 +116,7 @@ func _ready() -> void:
 	_build_currencies()
 	_build_health()
 	_build_tower_management()
+	_build_boss_bars()
 	_cancel_placement.pressed.connect(cancel_interaction)
 	close_button.pressed.connect(cancel_interaction)
 	_enemy_inspector.close_requested.connect(cancel_interaction)
@@ -133,6 +137,12 @@ func _ready() -> void:
 	ready_button.pressed.connect(_toggle_ready)
 	send_button.pressed.connect(_send_enemy)
 	enemy_selector.item_selected.connect(_enemy_type_selected)
+	# Sizing the selector to its longest boss title starved the round label at
+	# 1000px ("ROUND" without its number); long titles now ellipsize instead.
+	enemy_selector.fit_to_longest_item = false
+	enemy_selector.custom_minimum_size.x = 220
+	enemy_selector.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_status.custom_minimum_size.x = ceilf(_status.get_theme_font("font").get_string_size("Round 000", HORIZONTAL_ALIGNMENT_LEFT, -1, _status.get_theme_font_size("font_size")).x)
 	speed_button.pressed.connect(_request_pacing.bind("speed"))
 	autoplay_button.pressed.connect(_request_pacing.bind("autoplay"))
 	MenuAudio.bind_action(menu_button)
@@ -208,6 +218,41 @@ func _build_tower_management() -> void:
 	_tower_title.reparent(heading, false)
 	_tower_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	close_button.reparent(heading, false)
+	# Pinned beneath the title so crowd control stays visible while stats scroll.
+	tower_status = TowerStatusStrip.new()
+	shell.add_child(tower_status)
+	shell.move_child(tower_status, 1)
+
+
+# Bottom-left, above the palette: clear of the right-side inspection panels
+# and the top-left notices at both supported widths.
+func _build_boss_bars() -> void:
+	boss_bars = BossHealthBars.new()
+	$HUD.add_child(boss_bars)
+	boss_bars.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	boss_bars.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	boss_bars.offset_left = 14
+	boss_bars.offset_right = 14 + BossHealthBars.ROW_SIZE.x
+	boss_bars.offset_top = -108
+	boss_bars.offset_bottom = -108
+	boss_bars.boss_selected.connect(func(enemy_id: int) -> void:
+		if planning != null:
+			_enemy_clicked(enemy_id, planning.local_slot())
+	)
+
+
+func _refresh_boss_bars(state: Dictionary, own_slot: int, finished: bool) -> void:
+	var run: String = String(state.get("statistics_id", ""))
+	if not planning.active or finished or not is_visible_in_tree() or run != _boss_bar_run:
+		_boss_bar_run = run
+		boss_bars.clear()
+		if not planning.active or finished or not is_visible_in_tree():
+			return
+	boss_bars.catalog = planning.combat_rules.catalog
+	var enemies: Array = state.get("enemies", [[], []])
+	var deaths: Array = state.get("deaths", [[], []])
+	boss_bars.refresh(enemies[own_slot], state.get("enemy_types", {}), deaths[own_slot] if own_slot < deaths.size() else [])
+	boss_bars.selected_id = selected_enemy_id if selected_enemy_slot == own_slot else -1
 
 
 
@@ -426,6 +471,7 @@ func _visibility_changed() -> void:
 		selected_enemy_id = -1
 		selected_enemy_slot = -1
 		_enemy_inspector.hide()
+		boss_bars.clear()
 		for board: PathBoard in boards:
 			board.selected_enemy_id = -1
 		_clear_feedback()
@@ -941,6 +987,8 @@ func _refresh_targeting() -> void:
 	_tower_title.add_theme_color_override("font_color", tower_rarity_color(tower))
 	_tower_stats.text = tower_stats_text(tower, stats)
 	_roll_details.text = roll_details_text(tower)
+	var silenced: Array = planning.combat.get("magic_nullified", [0.0, 0.0])
+	tower_status.refresh(tower, float(silenced[planning.local_slot()]) if planning.local_slot() < silenced.size() else 0.0)
 	targeting_button.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
 	targeting_button.mode = int(tower["mode"])
 	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
@@ -1457,6 +1505,7 @@ func _refresh() -> void:
 		selected_enemy_id = -1
 		selected_enemy_slot = -1
 		_enemy_inspector.hide()
+		boss_bars.clear()
 		_status.text = "Planning unavailable"
 		return
 	var own_slot: int = planning.local_slot()
@@ -1557,6 +1606,7 @@ func _refresh() -> void:
 	_refresh_targeting()
 	_refresh_pacing()
 	_refresh_enemy_inspector()
+	_refresh_boss_bars(state, own_slot, finished)
 	if not planning.active:
 		cancel_strokes()
 	world.set_active(planning.active and is_visible_in_tree())

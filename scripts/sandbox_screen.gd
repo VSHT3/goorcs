@@ -47,7 +47,7 @@ var _notice_timer: Timer
 var _management: PanelContainer
 var _tower_title: Label
 var _tower_stats: Label
-var _upgrade_row: HBoxContainer
+var _upgrade_row: UpgradeChoiceRow
 var _upgrade_buttons: Dictionary[String, Button] = {}
 var _inspector: EnemyInspector
 var _pending_dimensions := Vector2i.ZERO
@@ -57,6 +57,8 @@ var _roll_details: Label
 var rarity_reroll: Button
 var attribute_reroll: Button
 var _rarity_reel: RarityReel
+var boss_bars: BossHealthBars
+var tower_status: TowerStatusStrip
 
 @onready var world: SandboxWorld = $World
 @onready var board: PathBoard = world.boards[0]
@@ -238,6 +240,16 @@ func _build_interface() -> void:
 	_notice_timer.timeout.connect(func() -> void: _notice.text = "")
 	add_child(_notice_timer)
 	_build_management()
+	boss_bars = BossHealthBars.new()
+	boss_bars.catalog = catalog
+	add_child(boss_bars)
+	boss_bars.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	boss_bars.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	boss_bars.offset_left = 14
+	boss_bars.offset_right = 14 + BossHealthBars.ROW_SIZE.x
+	boss_bars.offset_top = -128
+	boss_bars.offset_bottom = -128
+	boss_bars.boss_selected.connect(_enemy_clicked)
 	_inspector = preload("res://scenes/enemy_inspector.tscn").instantiate() as EnemyInspector
 	add_child(_inspector)
 	_inspector.offset_top = 110
@@ -273,6 +285,8 @@ func _build_management() -> void:
 	_tower_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_tower_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	CloseButtonStyle.apply(_button(heading, "X", cancel_interaction))
+	tower_status = TowerStatusStrip.new()
+	shell.add_child(tower_status)
 	var scroll := ScrollContainer.new()
 	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -295,8 +309,7 @@ func _build_management() -> void:
 	attribute_reroll.name = "RerollAttributes"
 	attribute_reroll.tooltip_text = MatchPlanningScreen.reroll_tooltip("attributes") + "\nFree in Sandbox."
 	targeting = _target_selector(content)
-	_upgrade_row = HBoxContainer.new()
-	_upgrade_row.add_theme_constant_override("separation", 8)
+	_upgrade_row = UpgradeChoiceRow.new()
 	content.add_child(_upgrade_row)
 	for command: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
 		var button: Button = _button(_upgrade_row, "", _upgrade.bind(command))
@@ -579,6 +592,12 @@ func _refresh() -> void:
 		selected_enemy_id = -1
 		board.selected_enemy_id = -1
 	_inspector.refresh(enemy, state["enemy_types"].get(String(enemy.get("type_id", "")), {}))
+	if _active and is_visible_in_tree():
+		boss_bars.catalog = catalog
+		boss_bars.refresh(state["enemies"][0], state["enemy_types"], state.get("deaths", [[]])[0])
+		boss_bars.selected_id = selected_enemy_id
+	else:
+		boss_bars.clear()
 
 
 func _find(items: Array, id: int) -> Dictionary:
@@ -600,6 +619,7 @@ func _refresh_management(state: Dictionary) -> void:
 	_tower_title.add_theme_color_override("font_color", MatchPlanningScreen.tower_rarity_color(tower))
 	_tower_stats.text = MatchPlanningScreen.tower_stats_text(tower, stats)
 	_roll_details.text = MatchPlanningScreen.roll_details_text(tower)
+	tower_status.refresh(tower, float(state.get("magic_nullified", [0.0])[0]))
 	rarity_reroll.disabled = not _active or int(tower.get("rarity_reroll_cost", -1)) < 0 or _rarity_reel.is_busy()
 	attribute_reroll.disabled = not _active or int(tower.get("attribute_reroll_cost", -1)) < 0 or _rarity_reel.is_busy()
 	targeting.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
