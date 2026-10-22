@@ -7,13 +7,16 @@ extends SceneTree
 ## upgrade or tower that buys the most estimated damage per Coin. Every third
 ## Arrow, Ballista and Lightning tower targets Strongest to focus bosses.
 ##
-## Usage: godot --headless --path . -s tools/balance_bot.gd -- <seeds> [first_seed] [max_round] [log] [start_round start_coins] [send_share send_policy]
+## Usage: godot --headless --path . -s tools/balance_bot.gd -- <seeds> [first_seed] [max_round] [log] [start_round start_coins] [send_share send_policy] [elements]
 ## Prints one line per seed: the round the match ended and both players' state.
 ## A start round fast-forwards: the board grows to that round and each player
 ## spends `start_coins` at once, approximating an economy built up to it.
 ## A positive `send_share` makes player 0 alone spend that share of its Coins
 ## on sends before building each round: `income` buys the unlocked send that
 ## repays its price soonest, any other policy names one enemy type.
+## `elements` (comma-separated: physical, lightning, magic) restricts both
+## players to those elements' towers in equal shares, e.g. `magic` for a
+## Rune-only build; omitted or empty keeps the default mix.
 
 const STEP: float = 0.1
 const WAVE_LIMIT: float = 1500.0
@@ -40,6 +43,7 @@ var _coverage_cache: Dictionary = {}
 var log_file: FileAccess
 var send_share: float = 0.0
 var send_policy: String = "income"
+var element_shares: Dictionary = ELEMENT_SHARES
 
 
 func _initialize() -> void:
@@ -53,6 +57,12 @@ func _initialize() -> void:
 	var start_coins: int = int(args[5]) if args.size() > 5 else 0
 	send_share = float(args[6]) if args.size() > 6 else 0.0
 	send_policy = args[7] if args.size() > 7 else "income"
+	if args.size() > 8 and not args[8].is_empty():
+		var chosen: PackedStringArray = args[8].split(",", false)
+		element_shares = {}
+		for element: String in chosen:
+			assert(ELEMENT_TOWERS.has(element), "Unknown bot element %s" % element)
+			element_shares[element] = 1.0 / chosen.size()
 	for seed_index: int in range(first, first + seeds):
 		_play(seed_index, max_round, start_round, start_coins)
 	quit()
@@ -322,15 +332,15 @@ func _next_tower_type(slot: int, attackers: Array) -> StringName:
 		var element: String = "physical" if tower.get("element", "") == "fire" else String(tower.get("element", "physical"))
 		counts[element] = int(counts.get(element, 0)) + 1
 	var total: float = maxf(1.0, float(attackers.size()))
-	var lacking: String = "physical"
 	var deficit: float = -INF
-	for element: String in ELEMENT_SHARES:
-		var gap: float = float(ELEMENT_SHARES[element]) - float(counts[element]) / total
+	var lacking: String = element_shares.keys()[0]
+	for element: String in element_shares:
+		var gap: float = float(element_shares[element]) - float(counts.get(element, 0)) / total
 		if gap > deficit:
 			deficit = gap
 			lacking = element
 	var choices: Array = ELEMENT_TOWERS[lacking]
-	return choices[int(counts[lacking]) % choices.size()]
+	return choices[int(counts.get(lacking, 0)) % choices.size()]
 
 
 func _drums_cell(slot: int, attackers: Array) -> Vector2i:

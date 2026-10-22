@@ -74,14 +74,14 @@ An enemy listed as immune to an element takes no damage from it. Single-target t
 
 | Enemy | Regular / Send round | HP / Speed multiplier | Weight / cap | Send Coins / income | Gimmick |
 | --- | --- | --- | --- | --- | --- |
-| Ember Orc | 10 / 16 | 1.3 / 1.0 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Fire (including explosions); never burns. |
-| Frost Orc | 13 / 19 | 1.4 / 0.9 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Ice; never slowed. |
-| Storm Orc | 15 / 21 | 1.2 / 1.15 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Lightning. |
-| Arcane Orc | 17 / 23 | 1.3 / 1.0 | 2 / 1 (+1 per 30 rounds) | 30 / +2 | Immune to Magic. |
-| EleMetal Orc | 20 / 26 | 1.6 / 0.75 | 3 / 1 (+1 per 30 rounds) | 40 / +3 | Heavy full-body iron plate: immune to Physical, takes 50% more Lightning. |
-| Omega Elemental Orc (elite) | 38 / 48 | 4 / 0.7 | 12 / 1 (+1 per 20 rounds) | 90 / +5 | Immune to Fire, Ice, Lightning and Magic; only Physical hurts it. |
+| Ember Orc | 10 / 16 | 1.3 / 1.0 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Fire (including explosions); never burns. |
+| Frost Orc | 13 / 19 | 1.4 / 0.9 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Ice; never slowed. |
+| Storm Orc | 15 / 21 | 1.2 / 1.15 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Lightning. |
+| Arcane Orc | 17 / 23 | 1.3 / 1.0 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Magic. |
+| EleMetal Orc | 20 / 26 | 1.6 / 0.75 | 3 / 1 (+1 per 10 rounds) | 40 / +3 | Heavy full-body iron plate: immune to Physical, takes 50% more Lightning. |
+| Omega Elemental Orc (elite) | 32 / 48 | 4 / 0.7 | 12 / 1 (+1 per 12 rounds) | 90 / +5 | Immune to Fire, Ice, Lightning and Magic; only Physical hurts it. |
 
-Together the Elemental Orcs make up about a fifth of a mid-game wave and a quarter late on: enough to punish a single-element defence without replacing the horde.
+Their caps grow quickly so one or two of each season most mid-game waves: together the Elemental Orcs take about a quarter of a round-40–50 wave's weight and just under a fifth by round 100, when more types share the draw. That is enough to punish a single-element defence without replacing the horde.
 
 ## ShaOrcs
 
