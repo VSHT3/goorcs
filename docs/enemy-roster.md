@@ -16,14 +16,14 @@ Health and movement use the existing wave-scaled baseline in `CombatRules`: each
 | Orc (`grunt`) | 1 | 1 | 1 | 1 | 6 | 1 | 100% | 20 / +2 |
 | Runner | 0.6 | 1.7 | 1 | 6 | 12 | 2 | 30% | 25 / +2 |
 | Brute | 2.5 | 0.65 | 3 | 12 | 22 | 5 | 35% | 40 / +4 |
-| Orc Chief | 6 | 0.5 | 5 | 22 | 34 | 12 | 25% | 100 / +5 |
+| Orc Chief | 6 | 0.5 | 5 | 22 | 34 | 12 | 25% | 130 / +5 |
 | NecOrcmancer | 5 | 0.5 | 3 | 34 | 46 | 15 | 25% | 140 / +6 |
 | NecOrcmancer Mancer | 30 | 0.3 | 8 | 40, then occasional | 60 | 40 | 50% | 7,500 / −100 |
 | Trollorc | 180 | 0.09 | 10 | 60, then occasional | 80 | 60 | 65% | 20,000 / −300 |
 | Orc king war orchine | 450 | 0.07 | 10 | 100, then occasional | 120 | 100 | 75% | 50,000 / −1,000 |
 | Skeltorc | 0.5 | 1.05 | 1 | Summoned only | Not purchasable | Not in regular roster | — | — |
 | Giant Skeltorc | 50× rounded Skeltorc HP | 0.84 | 1 | 1% Skeltorc births from 151 | Not purchasable | Not in regular roster | — | — |
-| KamikaOrc | 0.35 | 1.1 | 2 | 80 | 100 | 8 | 12% | 250 / +8 |
+| KamikaOrc | 0.35 | 1.1 | 2 | 80 | 100 | 8 | 12% | 200 / +8 |
 
 The first five rounds allow only Orcling sends. Each later send unlock trails its regular threat tier; the ordinary NecOrcmancer send unlock is deliberately delayed until round 46. UI previews and command validation use the same accepted gate. Earlier-round debug jumps relock later sends. Skeltorcs and Giants remain available directly in Sandbox.
 
@@ -60,7 +60,7 @@ These five roles join the existing roster progressively. All are available direc
 | CrateOrc | 18 / 28 | 2.2 / 0.7 | 5 / 25% | 50 / +3 | A confirmed death releases exactly two individual Orclings. |
 | RageOrc | 28 / 40 | 3.5 / 0.8 | 7 / 30% | 80 / +4 | First surviving hit to ≤50% HP permanently multiplies speed by 1.6. |
 | MossOrc | 52 / 66 | 6 / 0.55 | 12 / 20% | 120 / +5 | Regenerates 8% of maximum HP every four simulation seconds. |
-| HeavyDutyOrc | 30 / 40 | 9 / 0.4 | 10 / 25% | 90 / +4 | Slowest regular orc; industrial plate takes Physical ×0.5 and every other element ×0.9; leaks for 6. |
+| HeavyDutyOrc | 30 / 40 | 9 / 0.4 | 10 / 25% | 110 / +4 | Slowest regular orc; industrial plate takes Physical ×0.5 and every other element ×0.9; leaks for 6. |
 
 Crate children inherit the captured parent route/current progress, start fresh at birth, keep ordinary Orcling rewards, and prevent clearance. Tower kills award the crate bounty once; collateral death releases children without awarding the player; leaks release none. Combined summon/death-child graphs reject missing references, boss children, and cycles.
 
