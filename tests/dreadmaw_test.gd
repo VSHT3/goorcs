@@ -163,7 +163,7 @@ func _test_enrage_and_death() -> void:
 	dread["next_spell"] = 1000.0
 	# Bone takes 60% of Physical damage: 100000 lands as 60000.
 	combat._hit(0, arrow, combat.enemies[0].find(dread), 100000)
-	_check(int(dread["hp"]) == 40000 and is_equal_approx(float(dread["base_speed"]), calm * 1.7), "Below half HP it moves 70%% faster")
+	_check(int(dread["hp"]) == 40000 and is_equal_approx(float(dread["base_speed"]), calm * 1.3), "Below half HP it moves 30%% faster")
 	combat._hit(0, arrow, combat.enemies[0].find(dread), 100000)
 	var skeletons: int = combat.enemies[0].filter(func(enemy: Dictionary) -> bool: return enemy["type_id"] in SKELTORCS).size()
 	_check(skeletons == 8, "Its death spills eight Skeltorcs: %d" % skeletons)

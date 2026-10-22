@@ -161,7 +161,7 @@ When he dies, his last swing sends a lightning bolt that stuns your **most valua
 
 ### Dreadmaw, the Bone Wyrm (round 200)
 
-`dreadmaw` is a colossal skeletal dragon ridden by a lich warlord: **650×** HP, **0.12×** speed, **25** leak damage. Bone takes **60%** of Physical damage, Fire deals **150%**, and it is immune to Ice. Below **50% HP** it enrages and moves **1.7×** faster. Its death spills **8 Skeltorcs**. Debut guaranteed at **round 200**, then **3% + 0.3 points per round, up to 30%**; sends from round 220 for **120,000 Coins / −2,500 income**.
+`dreadmaw` is a colossal skeletal dragon ridden by a lich warlord: **250×** HP, **0.12×** speed, **25** leak damage. Bone takes **60%** of Physical damage, Fire deals **150%**, and it is immune to Ice. Below **50% HP** it enrages and moves **1.3×** faster. Its death spills **8 Skeltorcs**. Debut guaranteed at **round 200**, then **3% + 0.3 points per round, up to 30%**; sends from round 220 for **120,000 Coins / −2,500 income**.
 
 It walks **3 s** between casts:
 
