@@ -328,7 +328,7 @@ func _test_kills_and_persistence() -> void:
 
 func _test_tower_type_stats() -> void:
 	var type_ids: Array[StringName] = [&"arrow_tower", &"orc_ballista", &"rune_obelisk"]
-	var damages: Array[int] = [2, 6, 1]
+	var damages: Array[int] = [2, 6, 2]
 	var boundary_shots: Array[int] = [1, 2, 0]
 	for index: int in range(type_ids.size()):
 		var rules := _catalog_rules()
@@ -557,7 +557,7 @@ func _test_builtin_upgrade_values() -> void:
 	var ids: Array[StringName] = [&"arrow_tower", &"orc_ballista", &"rune_obelisk"]
 	var costs: Array[int] = [45, 85, 70]
 	var upgrade_prices: Array[int] = [30, 55, 45]
-	var effective_damage: Array[int] = [3, 9, 2]
+	var effective_damage: Array[int] = [3, 9, 3]
 	var multipliers: Array[float] = [0.8, 0.75, 0.85]
 	for index: int in range(ids.size()):
 		var rules := _catalog_rules()
@@ -1812,10 +1812,10 @@ func _test_freeze_damage_and_expiry() -> void:
 	combat.start_wave(_routes(100, 100))
 	combat.advance(0.01)
 	var enemy: Dictionary = combat.enemies[0][0]
-	_check(enemy["hp"] == 18 and not enemy["slowed"], "Ordinary Rune damage is real HP damage, not an early slow")
+	_check(enemy["hp"] == 17 and not enemy["slowed"], "Ordinary Rune damage is real HP damage, not an early slow")
 	combat.upgrade_tower(0, tower["id"], "boulders")
 	combat.advance(0.34)
-	_check(enemy["hp"] == 16 and not enemy["slowed"], "Unupgraded Boulders deals physical damage without slowing")
+	_check(enemy["hp"] == 15 and not enemy["slowed"], "Unupgraded Boulders deals physical damage without slowing")
 	var hp: int = enemy["hp"]
 	combat.upgrade_tower(0, tower["id"], "freeze_runes")
 	_check(enemy["hp"] == hp and not enemy["slowed"] and enemy["slow_remaining"] == 0.0, "Buying Freeze grants neither retroactive slow nor damage")

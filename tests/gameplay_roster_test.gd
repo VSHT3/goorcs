@@ -323,7 +323,7 @@ func _rolled_range_cells() -> void:
 		var enemy: Dictionary = model.enemies[0][0]
 		enemy["pos"] = Vector2(2, 0)
 		model._attack(0, 0.01)
-		check(is_equal_approx(rune["range"], 2.25 if bonus > 0.0 else (1.0 if bonus < 0.0 else 1.5)) and enemy["hp"] == (99 if bonus > 0.0 else 100), "A positive Rune range roll hits a newly included tile; unrolled range and minimum drawback radius stay intact")
+		check(is_equal_approx(rune["range"], 2.25 if bonus > 0.0 else (1.0 if bonus < 0.0 else 1.5)) and enemy["hp"] == (98 if bonus > 0.0 else 100), "A positive Rune range roll hits a newly included tile; unrolled range and minimum drawback radius stay intact")
 		var support_rules := fixture()
 		support_rules.catalog.towers = [tower_definition(support_rules, &"arrow_tower"), tower_definition(support_rules, &"war_drums")]
 		support_rules.roll_rules = rules.roll_rules
