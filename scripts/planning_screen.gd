@@ -56,6 +56,17 @@ var _pending_rarity_count: int = -1
 var _queued_rarity_tower: Dictionary = {}
 var _boss_rewards := BossRewardPresenter.new()
 var boss_bars: BossHealthBars
+# Sell asks for a second press: purchased upgrade buttons vanish and slide Sell
+# under the pointer, so one stray click must not liquidate a tower.
+const SELL_CONFIRM_SECONDS: float = 3.0
+# A confirming press this soon after arming is a double-click, not intent.
+const SELL_CONFIRM_GUARD_MSEC: int = 350
+var _sell_armed_id: int = -1
+var _sell_armed_msec: int = 0
+var _sell_timer: Timer
+# Path tiles removed by this run's last Clear, restorable until the path changes.
+var _cleared_path: Array[Vector2i] = []
+var _cleared_path_key: String = ""
 var tower_status: TowerStatusStrip
 var banner: MatchBanner
 var health_feedback: BaseHealthFeedback
@@ -172,6 +183,12 @@ func _ready() -> void:
 	results_menu.replay_requested.connect(_replay_results)
 	visibility_changed.connect(_visibility_changed)
 	_feedback_timer.timeout.connect(_clear_feedback)
+	_sell_timer = Timer.new()
+	_sell_timer.name = "SellConfirmTimer"
+	_sell_timer.one_shot = true
+	_sell_timer.wait_time = SELL_CONFIRM_SECONDS
+	add_child(_sell_timer)
+	_sell_timer.timeout.connect(_sell_confirm_expired)
 	_rarity_reel = RarityReel.new()
 	add_child(_rarity_reel)
 	_rarity_reel.finished.connect(_rarity_reel_finished)
@@ -832,7 +849,10 @@ func _refresh_sends() -> void:
 	enemy_selector.tooltip_text = send_button.tooltip_text
 	for index: int in range(enemy_selector.item_count):
 		var type_stats: Dictionary = types[String(enemy_selector.get_item_metadata(index))]
-		enemy_selector.set_item_tooltip(index, "%s\nHost stats for wave %d: %d HP · %.2f cells/s." % [_enemy_send_description(type_stats), stats_wave, int(type_stats.get("health", 0)), float(type_stats.get("speed", 0.0))])
+		var item_tooltip: String = "%s\nHost stats for wave %d: %d HP · %.2f cells/s." % [_enemy_send_description(type_stats), stats_wave, int(type_stats.get("health", 0)), float(type_stats.get("speed", 0.0))]
+		if not bool(type_stats.get("send_available", false)):
+			item_tooltip += "\nAvailable from round %d." % int(type_stats.get("send_first_wave", 1))
+		enemy_selector.set_item_tooltip(index, item_tooltip)
 
 
 func _refresh_enemy_selector(types: Dictionary) -> void:
@@ -840,6 +860,12 @@ func _refresh_enemy_selector(types: Dictionary) -> void:
 	for id: String in types:
 		if bool(types[id].get("send_enabled", false)):
 			ids.append(id)
+	# Unlock order, so locked entries read as an upcoming timeline.
+	var catalog_order: Array[String] = ids.duplicate()
+	ids.sort_custom(func(a: String, b: String) -> bool:
+		var a_round: int = int(types[a].get("send_first_wave", 1))
+		var b_round: int = int(types[b].get("send_first_wave", 1))
+		return a_round < b_round if a_round != b_round else catalog_order.find(a) < catalog_order.find(b))
 	var rebuild: bool = enemy_selector.item_count != ids.size()
 	if not rebuild:
 		for index: int in range(ids.size()):
@@ -860,11 +886,19 @@ func _refresh_enemy_selector(types: Dictionary) -> void:
 				_selected_enemy_type = StringName(id)
 				break
 	for index: int in range(ids.size()):
-		enemy_selector.set_item_text(index, String(types[ids[index]].get("title", ids[index])))
+		enemy_selector.set_item_text(index, send_item_text(types[ids[index]], ids[index]))
 		var available: bool = bool(types[ids[index]].get("send_available", false))
 		enemy_selector.set_item_disabled(index, not available)
 		if ids[index] == String(_selected_enemy_type) and enemy_selector.selected != index:
 			enemy_selector.select(index)
+
+
+## Locked send types name their unlock round so the list doubles as a timeline.
+static func send_item_text(stats: Dictionary, fallback: String) -> String:
+	var title: String = String(stats.get("title", fallback))
+	if bool(stats.get("send_available", false)):
+		return title
+	return "%s · round %d" % [title, int(stats.get("send_first_wave", 1))]
 
 
 func _enemy_send_description(stats: Dictionary) -> String:
@@ -1017,6 +1051,8 @@ func _selected_tower() -> Dictionary:
 
 func _refresh_targeting() -> void:
 	var tower: Dictionary = _selected_tower()
+	if tower.is_empty() or int(tower["id"]) != _sell_armed_id:
+		_disarm_sell()
 	_management.visible = not tower.is_empty()
 	if tower.is_empty():
 		targeting_button.mode = _default_targeting
@@ -1102,9 +1138,13 @@ func _refresh_targeting() -> void:
 		else:
 			button.disabled = true
 	_upgrade_row.visible = _upgrade_row.get_children().any(func(button: Button) -> bool: return button.visible)
-	sell_button.text = "Sell · +%d" % int(tower.get("sell_value", 0))
-	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
 	sell_button.disabled = targeting_button.disabled
+	if sell_button.disabled:
+		_disarm_sell()
+	var armed: bool = is_sell_armed()
+	sell_button.text = "%s · +%d" % ["Confirm" if armed else "Sell", int(tower.get("sell_value", 0))]
+	sell_button.tooltip_text = "60%% of %d invested Coins, including upgrades." % int(tower.get("invested", 0))
+	sell_button.tooltip_text += "\nPress again to sell." if armed else "\nPress twice to sell."
 
 
 func _refresh_action(button: Button, action: Dictionary) -> void:
@@ -1508,13 +1548,78 @@ func _upgrade(upgrade: String) -> void:
 
 
 func _sell() -> void:
-	if planning != null and not sell_button.disabled and not _selected_tower().is_empty():
-		planning.sell_tower(planning.local_slot(), selected_tower_id)
+	if planning == null or sell_button.disabled or _selected_tower().is_empty():
+		return
+	if not is_sell_armed():
+		_sell_armed_id = selected_tower_id
+		_sell_armed_msec = Time.get_ticks_msec()
+		_sell_timer.start()
+		_refresh_targeting()
+		return
+	if Time.get_ticks_msec() - _sell_armed_msec < SELL_CONFIRM_GUARD_MSEC:
+		return
+	_disarm_sell()
+	planning.sell_tower(planning.local_slot(), selected_tower_id)
+
+
+func is_sell_armed() -> bool:
+	return _sell_armed_id >= 0 and _sell_armed_id == selected_tower_id
+
+
+func _disarm_sell() -> void:
+	_sell_armed_id = -1
+	if _sell_timer != null:
+		_sell_timer.stop()
+
+
+func _sell_confirm_expired() -> void:
+	_disarm_sell()
+	_refresh_targeting()
 
 
 func _clear() -> void:
-	if planning != null and not clear_button.disabled:
-		planning.request_clear(planning.local_slot())
+	if planning == null or clear_button.disabled:
+		return
+	var slot: int = planning.local_slot()
+	if can_undo_clear():
+		_undo_clear(slot)
+		return
+	# Recorded before the request: solo applies it synchronously.
+	_cleared_path = planning.layouts[slot].tiles()
+	_cleared_path_key = _clear_undo_key()
+	planning.request_clear(slot)
+
+
+func can_undo_clear() -> bool:
+	return not _cleared_path.is_empty() and planning != null and planning.layouts[planning.local_slot()].used_tiles() == 0
+
+
+func _clear_undo_key() -> String:
+	return "%s:%d" % [String(planning.combat.get("statistics_id", "")), int(planning.combat.get("wave", 0))]
+
+
+# Keeps the record only while the path is untouched since Clear: still awaiting
+# the host (unchanged tiles) or accepted (empty). Drawing anything discards it.
+func _validate_clear_undo() -> void:
+	if _cleared_path.is_empty():
+		return
+	var slot: int = planning.local_slot() if planning != null else 0
+	var current: Array[Vector2i] = planning.layouts[slot].tiles() if planning != null else []
+	var untouched: bool = current.is_empty() or (current.size() == _cleared_path.size() and current.all(func(cell: Vector2i) -> bool: return _cleared_path.has(cell)))
+	if planning == null or not planning.can_edit_path(slot) or _cleared_path_key != _clear_undo_key() or not untouched:
+		_cleared_path.clear()
+
+
+# Replays the cleared tiles as ordinary edit commands; the host validates each.
+func _undo_clear(slot: int) -> void:
+	var cells: Array[Vector2i] = _cleared_path.duplicate()
+	_cleared_path.clear()
+	var occupied: Dictionary[Vector2i, bool] = {}
+	for tower: Dictionary in planning.combat.get("towers", [[], []])[slot]:
+		occupied[tower["cell"]] = true
+	for cell: Vector2i in cells:
+		if not occupied.has(cell):
+			planning.request_edit(slot, cell, true)
 
 
 func _toggle_ready() -> void:
@@ -1616,7 +1721,11 @@ func _refresh() -> void:
 		_counts[slot].text = "%d/%d tiles%s" % [layout.used_tiles(), layout.budget, " · Main" if bool(state.get("main_round", false)) else ""]
 		_counts[slot].tooltip_text = "%s\nPaths change only in setup and main rounds. WASD: pan · Scroll / pinch: zoom · Home: fit your board." % path_state
 		_counts[slot].modulate = Color("b5e2b7") if layout.is_ready() else Color("e0bc77")
-	clear_button.disabled = not editable or planning.layouts[own_slot].used_tiles() == 0
+	_validate_clear_undo()
+	var undo_clear: bool = can_undo_clear()
+	clear_button.disabled = not editable or (planning.layouts[own_slot].used_tiles() == 0 and not undo_clear)
+	clear_button.text = "Undo clear" if undo_clear else "Clear path"
+	clear_button.tooltip_text = "Restore the %d path tiles you cleared." % _cleared_path.size() if undo_clear else "Remove your path tiles during an uncommitted main-round strategy break."
 	ready_button.disabled = not finished and (not planning.active or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[own_slot] or not planning.layouts[own_slot].is_ready())
 	clear_button.visible = planning.active and bool(state.get("main_round", false))
 	ready_button.visible = planning.active and (phase == MatchCombat.Phase.PLANNING or finished)
