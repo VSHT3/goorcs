@@ -67,6 +67,7 @@ var _sell_timer: Timer
 # Path tiles removed by this run's last Clear, restorable until the path changes.
 var _cleared_path: Array[Vector2i] = []
 var _cleared_path_key: String = ""
+var _cleared_msec: int = 0
 var tower_status: TowerStatusStrip
 var banner: MatchBanner
 var health_feedback: BaseHealthFeedback
@@ -1582,11 +1583,14 @@ func _clear() -> void:
 		return
 	var slot: int = planning.local_slot()
 	if can_undo_clear():
-		_undo_clear(slot)
+		# A double-clicked Clear must not restore the path it just removed.
+		if Time.get_ticks_msec() - _cleared_msec >= SELL_CONFIRM_GUARD_MSEC:
+			_undo_clear(slot)
 		return
 	# Recorded before the request: solo applies it synchronously.
 	_cleared_path = planning.layouts[slot].tiles()
 	_cleared_path_key = _clear_undo_key()
+	_cleared_msec = Time.get_ticks_msec()
 	planning.request_clear(slot)
 
 

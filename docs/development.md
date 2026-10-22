@@ -148,10 +148,10 @@ Isolated import/save-isolation gates, native repeat-placement coverage, existing
 ### Planning safeguards
 
 - **Two-press Sell.** Purchased upgrade buttons vanish and slide Sell under the pointer, so a double-clicked upgrade could liquidate a tower. In matches, Sell and Backspace first arm the inspected tower (**Confirm · +refund**); a second press after `SELL_CONFIRM_GUARD_MSEC` (350 ms) and within `SELL_CONFIRM_SECONDS` (3 s) submits the ordinary sale. Changing or closing inspection, Ready commitment, or expiry disarms it. Sandbox sales stay one press because its towers are free.
-- **Undo clear.** Clear sits beside Ready. The screen records the local path tiles before submitting Clear; while that path stays empty (or the host has not yet applied the Clear) the button reads **Undo clear** and replays the tiles as ordinary `request_edit` commands, skipping cells now under towers. Drawing, leaving the strategy break, or a new run/round discards the record. No planning command or host validation changed.
+- **Undo clear.** Clear sits beside Ready. The screen records the local path tiles before submitting Clear; while that path stays empty (or the host has not yet applied the Clear) the button reads **Undo clear** and replays the tiles as ordinary `request_edit` commands, skipping cells now under towers. A press within `SELL_CONFIRM_GUARD_MSEC` of the Clear is ignored, so a double-click does not undo itself. Drawing, leaving the strategy break, or a new run/round discards the record. No planning command or host validation changed.
 - **Send unlock rounds.** The send list is ordered by `send_first_wave` (catalog order breaks ties). Disabled entries read `Title · round N` from the snapshot's `send_first_wave`, with the same `Available from round N.` tooltip line; unlocked entries show only the title.
 
-`tests/match_safeguards_test.gd` covers arming, the double-click guard, expiry, disarming on selection/close/Ready, the mirrored sale, Undo clear around a tower and its discard rules, and the selector labels; `tests/repeat_placement_test.gd` covers the native two-press Backspace sale.
+`tests/match_safeguards_test.gd` covers arming, the double-click guard, expiry, disarming on selection/close/Ready, the mirrored sale, Undo clear (double-click guard, restoring around a tower) and its discard rules, and the selector labels; `tests/repeat_placement_test.gd` covers the native two-press Backspace sale.
 
 ### Numbered tower palette
 
