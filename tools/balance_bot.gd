@@ -7,10 +7,13 @@ extends SceneTree
 ## upgrade or tower that buys the most estimated damage per Coin. Every third
 ## Arrow, Ballista and Lightning tower targets Strongest to focus bosses.
 ##
-## Usage: godot --headless --path . -s tools/balance_bot.gd -- <seeds> [first_seed] [max_round] [log] [start_round start_coins]
+## Usage: godot --headless --path . -s tools/balance_bot.gd -- <seeds> [first_seed] [max_round] [log] [start_round start_coins] [send_share send_policy]
 ## Prints one line per seed: the round the match ended and both players' state.
 ## A start round fast-forwards: the board grows to that round and each player
 ## spends `start_coins` at once, approximating an economy built up to it.
+## A positive `send_share` makes player 0 alone spend that share of its Coins
+## on sends before building each round: `income` buys the unlocked send that
+## repays its price soonest, any other policy names one enemy type.
 
 const STEP: float = 0.1
 const WAVE_LIMIT: float = 1500.0
@@ -35,6 +38,8 @@ var routing: Array[Dictionary] = []
 # Route cells within range of a cell, per (cell, range); reset with the path.
 var _coverage_cache: Dictionary = {}
 var log_file: FileAccess
+var send_share: float = 0.0
+var send_policy: String = "income"
 
 
 func _initialize() -> void:
@@ -46,6 +51,8 @@ func _initialize() -> void:
 		log_file = FileAccess.open(args[3], FileAccess.WRITE)
 	var start_round: int = int(args[4]) if args.size() > 4 else 1
 	var start_coins: int = int(args[5]) if args.size() > 5 else 0
+	send_share = float(args[6]) if args.size() > 6 else 0.0
+	send_policy = args[7] if args.size() > 7 else "income"
 	for seed_index: int in range(first, first + seeds):
 		_play(seed_index, max_round, start_round, start_coins)
 	quit()
@@ -75,6 +82,7 @@ func _play(seed_index: int, max_round: int, start_round: int = 1, start_coins: i
 	for round_number: int in range(start_round, max_round + 1):
 		while expansions < maxi(0, round_number / main_interval - 1):
 			_expand()
+		var sent: int = _send(0) if send_share > 0.0 else 0
 		for slot: int in range(2):
 			_spend(slot, round_number)
 		if not combat.start_wave(routing):
@@ -86,7 +94,7 @@ func _play(seed_index: int, max_round: int, start_round: int = 1, start_coins: i
 			combat.advance(STEP)
 			elapsed += STEP
 			_track_bosses(bosses)
-		_log("seed %d round %d hp %s coins %s towers %d/%d invested %d/%d path %d wave_s %.0f wall_s %.0f%s" % [seed_index, round_number, str(combat.base_health), str(combat.coins), combat.towers[0].size(), combat.towers[1].size(), _invested(0), _invested(1), route.size(), elapsed, (Time.get_ticks_msec() - started) / 1000.0, _boss_report(bosses)])
+		_log("seed %d round %d hp %s coins %s towers %d/%d invested %d/%d path %d wave_s %.0f wall_s %.0f%s%s" % [seed_index, round_number, str(combat.base_health), str(combat.coins), combat.towers[0].size(), combat.towers[1].size(), _invested(0), _invested(1), route.size(), elapsed, (Time.get_ticks_msec() - started) / 1000.0, _boss_report(bosses), " sent %d income %d" % [sent, combat.income[0]] if send_share > 0.0 else ""])
 		if combat.phase == MatchCombat.Phase.FINISHED or elapsed >= WAVE_LIMIT:
 			break
 	print("RESULT seed %d ended_round %d hp %s towers %d/%d invested %d/%d path %d wall_s %.0f" % [seed_index, combat.wave, str(combat.base_health), combat.towers[0].size(), combat.towers[1].size(), _invested(0), _invested(1), route.size(), (Time.get_ticks_msec() - started) / 1000.0])
@@ -215,6 +223,32 @@ func _best_cell(slot: int, range_cells: float, prefer_far: bool = false) -> Vect
 				best_score = score
 				best = cell
 	return best
+
+
+# Spends `send_share` of the slot's Coins on sends; returns the Coins spent.
+func _send(slot: int) -> int:
+	var budget: int = floori(float(combat.coins[slot]) * send_share)
+	var spent: int = 0
+	var buying: bool = true
+	while buying:
+		var type_id: String = send_policy
+		if send_policy == "income":
+			type_id = ""
+			var best_payback: float = INF
+			for candidate: String in combat._enemy_types:
+				var definition: Dictionary = combat._enemy_types[candidate]
+				var gain: int = int(definition["send_income"])
+				if gain <= 0 or int(definition["send_cost"]) > budget - spent or not combat._can_send_enemy(slot, StringName(candidate)):
+					continue
+				var payback: float = float(definition["send_cost"]) / float(gain)
+				if payback < best_payback:
+					best_payback = payback
+					type_id = candidate
+		var cost: int = int(combat._enemy_types[type_id]["send_cost"]) if combat._enemy_types.has(type_id) else 0
+		buying = cost > 0 and cost <= budget - spent and combat.send_enemy(slot, StringName(type_id))
+		if buying:
+			spent += cost
+	return spent
 
 
 func _spend(slot: int, round_number: int) -> void:

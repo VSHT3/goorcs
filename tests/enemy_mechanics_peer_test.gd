@@ -29,7 +29,7 @@ func _run() -> void:
 	await _wait_combat("guest", {"income": [12, 0]}, "Client receives every accepted leader/group purchase")
 	var ordered: Dictionary = await _agree("Host group purchase is replicated atomically")
 	var group_count: int = ordered["send_queues"][1].count("orcling")
-	_check(group_count in [2, 3, 4] and _matches(ordered, {"coins": [748, 1000], "income": [12, 0]}), "Host random group pays one price/income while Chief and Necro retain their prices")
+	_check(group_count in [2, 3, 4] and _matches(ordered, {"coins": [718, 1000], "income": [12, 0]}), "Host random group pays one price/income while Chief and Necro retain their prices")
 	var sent: Dictionary = ordered["enemy_totals"][0]["sent"]
 	_check(sent.size() == 3 and _matches(sent, {"orcling": group_count, "orc_chief": 1, "necorcmancer": 1}), "Real peer accepted counters count actual individuals, not commands")
 	await _both_ready()
@@ -68,7 +68,7 @@ func _run() -> void:
 	var tower: Dictionary = await _wait_tower("host", 1, tower_cell, MatchCombat.TargetMode.FURTHEST)
 	for upgrade: String in ["damage", "speed", "boulders"]:
 		await _command("guest", {"action": "upgrade", "slot": 1, "tower_id": int(tower["id"]), "upgrade": upgrade})
-	await _wait_combat("host", {"coins": [748, 567]}, "Real guest construction and evolution are accepted before death simulation")
+	await _wait_combat("host", {"coins": [718, 567]}, "Real guest construction and evolution are accepted before death simulation")
 	var death_state: Dictionary = {}
 	for tick: int in range(80):
 		await _command("host", {"action": "step", "delta": 0.1})

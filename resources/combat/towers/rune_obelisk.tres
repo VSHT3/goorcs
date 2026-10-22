@@ -41,7 +41,7 @@ evolutions = {
 "damage": 6,
 "interval": 0.75,
 "continuous": false,
-"upgrades": [{"id": "twin_rings", "title": "Twin Rings", "cost": 350, "damage_multiplier": 1.4, "orbit_bonus": 3, "description": "A second onyx ring orbits the obelisk: +40% damage."}, {"id": "obsidian_crown", "title": "Obsidian Crown", "cost": 550, "attack_rate_multiplier": 1.25, "orbit_bonus": 2, "description": "A crown of obsidian quickens the pulse: 25% faster pulses."}, {"id": "eclipse", "title": "Eclipse", "cost": 1600, "damage_multiplier": 2.2, "orbit_bonus": 3, "description": "Endgame. The rings eclipse the sky: +120% damage."}]
+"upgrades": [{"id": "twin_rings", "title": "Twin Rings", "cost": 350, "damage_multiplier": 1.4, "orbit_bonus": 3, "description": "A second onyx ring orbits the obelisk: +40% damage."}, {"id": "obsidian_crown", "title": "Obsidian Crown", "cost": 550, "attack_rate_multiplier": 1.5, "orbit_bonus": 2, "description": "A crown of obsidian quickens the pulse: 50% faster pulses."}, {"id": "eclipse", "title": "Eclipse", "cost": 1600, "damage_multiplier": 2.2, "orbit_bonus": 3, "description": "Endgame. The rings eclipse the sky: +120% damage."}]
 },
 "storm_sigil": {
 "title": "Storm Sigil",
