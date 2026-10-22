@@ -12,15 +12,21 @@ class CurrencyIcon extends Control:
 	var shard: bool = false
 
 	func _draw() -> void:
-		if shard:
-			draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(17, 8), Vector2(12, 21), Vector2(4, 15), Vector2(3, 7)]), Color("76cbd8"))
-			draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(10, 15), Vector2(4, 15), Vector2(3, 7)]), Color("c1eff0"))
-			draw_line(Vector2(10, 15), Vector2(12, 21), Color("398397"), 2)
+		paint(self, Vector2.ZERO, shard)
+
+	## The 20x22 HUD Coin/Shard emblem, shared with other HUD surfaces.
+	static func paint(surface: CanvasItem, origin: Vector2, is_shard: bool, alpha: float = 1.0) -> void:
+		surface.draw_set_transform(origin)
+		if is_shard:
+			surface.draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(17, 8), Vector2(12, 21), Vector2(4, 15), Vector2(3, 7)]), Color(Color("76cbd8"), alpha))
+			surface.draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(10, 15), Vector2(4, 15), Vector2(3, 7)]), Color(Color("c1eff0"), alpha))
+			surface.draw_line(Vector2(10, 15), Vector2(12, 21), Color(Color("398397"), alpha), 2)
 		else:
-			draw_circle(Vector2(10, 11), 9, Color("9d743b"))
-			draw_circle(Vector2(10, 9), 8, Color("e0bc77"))
-			draw_arc(Vector2(10, 9), 5, PI * 0.8, PI * 1.8, 8, Color("f5dca5"), 2)
-			draw_line(Vector2(10, 5), Vector2(10, 13), Color("9d743b"), 2)
+			surface.draw_circle(Vector2(10, 11), 9, Color(Color("9d743b"), alpha))
+			surface.draw_circle(Vector2(10, 9), 8, Color(Color("e0bc77"), alpha))
+			surface.draw_arc(Vector2(10, 9), 5, PI * 0.8, PI * 1.8, 8, Color(Color("f5dca5"), alpha), 2)
+			surface.draw_line(Vector2(10, 5), Vector2(10, 13), Color(Color("9d743b"), alpha), 2)
+		surface.draw_set_transform(Vector2.ZERO)
 
 var planning: MatchPlanning
 var selected_tower_id: int = -1
@@ -51,6 +57,8 @@ var _queued_rarity_tower: Dictionary = {}
 var _boss_rewards := BossRewardPresenter.new()
 var boss_bars: BossHealthBars
 var tower_status: TowerStatusStrip
+var banner: MatchBanner
+var health_feedback: BaseHealthFeedback
 var _boss_bar_run: String = ""
 
 @onready var world: MatchWorld = $World
@@ -117,6 +125,7 @@ func _ready() -> void:
 	_build_health()
 	_build_tower_management()
 	_build_boss_bars()
+	_build_match_feedback()
 	_cancel_placement.pressed.connect(cancel_interaction)
 	close_button.pressed.connect(cancel_interaction)
 	_enemy_inspector.close_requested.connect(cancel_interaction)
@@ -239,6 +248,29 @@ func _build_boss_bars() -> void:
 		if planning != null:
 			_enemy_clicked(enemy_id, planning.local_slot())
 	)
+
+
+# Both overlays draw above the HUD panels but take no input; the banner keeps
+# itself clear of the right-side panels and notices it is given.
+func _build_match_feedback() -> void:
+	health_feedback = BaseHealthFeedback.new()
+	health_feedback.bar = _health_bar
+	health_feedback.value_label = _health_value
+	$HUD.add_child(health_feedback)
+	health_feedback.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	banner = MatchBanner.new()
+	banner.avoid = [_management, _enemy_inspector, _feedback]
+	$HUD.add_child(banner)
+	banner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+
+func _refresh_match_feedback(state: Dictionary, own_slot: int, health: int, maximum: int) -> void:
+	health_feedback.observe(String(state.get("statistics_id", "")), health, maximum)
+	if not planning.active or not is_visible_in_tree():
+		banner.clear()
+		return
+	banner.catalog = planning.combat_rules.catalog
+	banner.observe(state, own_slot)
 
 
 func _refresh_boss_bars(state: Dictionary, own_slot: int, finished: bool) -> void:
@@ -472,6 +504,8 @@ func _visibility_changed() -> void:
 		selected_enemy_slot = -1
 		_enemy_inspector.hide()
 		boss_bars.clear()
+		banner.clear()
+		health_feedback.reset()
 		for board: PathBoard in boards:
 			board.selected_enemy_id = -1
 		_clear_feedback()
@@ -1512,6 +1546,8 @@ func _refresh() -> void:
 		selected_enemy_slot = -1
 		_enemy_inspector.hide()
 		boss_bars.clear()
+		banner.clear()
+		health_feedback.reset()
 		_status.text = "Planning unavailable"
 		return
 	var own_slot: int = planning.local_slot()
@@ -1539,7 +1575,9 @@ func _refresh() -> void:
 	var all_towers: Array = state.get("towers", [[], []])
 	var health: Array = state.get("health", [0, 0])
 	var rules: Dictionary = state.get("rules", {})
-	_refresh_health(int(health[own_slot]), int(state.get("max_health", [rules.get("base_health", 0), rules.get("base_health", 0)])[own_slot]))
+	var maximum_health: int = int(state.get("max_health", [rules.get("base_health", 0), rules.get("base_health", 0)])[own_slot])
+	_refresh_health(int(health[own_slot]), maximum_health)
+	_refresh_match_feedback(state, own_slot, int(health[own_slot]), maximum_health)
 	if _pending_tower_cell != Vector2i(-1, -1):
 		for tower: Dictionary in all_towers[own_slot]:
 			if tower["cell"] == _pending_tower_cell:
