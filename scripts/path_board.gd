@@ -841,12 +841,21 @@ func _sync_drag_preview() -> void:
 
 
 func _placement_is_legal(cell: Vector2i, type_id: String) -> bool:
-	if not placement_enabled or not tower_types.has(type_id) or not layout.contains(cell) or layout.has_path(cell) or terrain_blocks(cell):
+	if not placement_enabled or not tower_types.has(type_id):
 		return false
-	if solo_mirror_placement and not _counterpart_commander_state.is_empty() and (_counterpart_commander_state.get("landmark") == cell or _counterpart_commander_state.get("obstacles", []).has(cell)):
+	var footprint: Vector2i = tower_types[type_id].get("footprint", Vector2i.ONE)
+	var occupied := Rect2i(cell, footprint)
+	if not Rect2i(Vector2i.ZERO, layout.dimensions).encloses(occupied):
 		return false
+	for y: int in range(occupied.position.y, occupied.end.y):
+		for x: int in range(occupied.position.x, occupied.end.x):
+			var covered := Vector2i(x, y)
+			if layout.has_path(covered) or layout.is_endpoint(covered) or terrain_blocks(covered):
+				return false
+			if solo_mirror_placement and not _counterpart_commander_state.is_empty() and (_counterpart_commander_state.get("landmark") == covered or _counterpart_commander_state.get("obstacles", []).has(covered)):
+				return false
 	for tower: Dictionary in combat_towers:
-		if tower["cell"] == cell:
+		if occupied.intersects(Rect2i(tower["cell"], tower.get("footprint", Vector2i.ONE))):
 			return false
 	return true
 
@@ -941,9 +950,9 @@ func _paint(cell: Vector2i) -> void:
 				cell_clicked.emit(cell, _paint_button)
 			return
 		for tower: Dictionary in combat_towers:
-			if tower["cell"] == cell:
+			if Rect2i(tower["cell"], tower.get("footprint", Vector2i.ONE)).has_point(cell):
 				if _paint_button == MOUSE_BUTTON_LEFT:
-					cell_clicked.emit(cell, _paint_button)
+					cell_clicked.emit(tower["cell"], _paint_button)
 				return
 		edit_requested.emit(cell, _paint_button == MOUSE_BUTTON_LEFT)
 		return
@@ -1126,11 +1135,18 @@ func _draw_hover() -> void:
 		return
 	var legal: bool = _placement_is_legal(_hover, String(type_id))
 	var color := Color(0.68, 0.85, 0.62, 0.85) if legal else Color(0.87, 0.43, 0.35, 0.9)
-	draw_rect(rect, Color(color, 0.10))
-	draw_rect(rect, color, false, 2.0)
-	if not legal:
-		draw_line(rect.position + rect.size * 0.28, rect.position + rect.size * 0.72, color, 2.0)
-		draw_line(rect.position + rect.size * Vector2(0.28, 0.72), rect.position + rect.size * Vector2(0.72, 0.28), color, 2.0)
+	var footprint: Vector2i = tower_types.get(String(type_id), {}).get("footprint", Vector2i.ONE)
+	for y: int in range(_hover.y, _hover.y + footprint.y):
+		for x: int in range(_hover.x, _hover.x + footprint.x):
+			var covered := Vector2i(x, y)
+			if not layout.contains(covered):
+				continue
+			rect.position = cell_center(covered) - Vector2.ONE * (cell_size * 0.5 - 3.0)
+			draw_rect(rect, Color(color, 0.10))
+			draw_rect(rect, color, false, 2.0)
+			if not legal:
+				draw_line(rect.position + rect.size * 0.28, rect.position + rect.size * 0.72, color, 2.0)
+				draw_line(rect.position + rect.size * Vector2(0.28, 0.72), rect.position + rect.size * Vector2(0.72, 0.28), color, 2.0)
 
 
 func _cache_texture_bounds(texture: Texture2D) -> void:
@@ -1205,9 +1221,10 @@ func _directional_weapon_index(tower: Dictionary, released: bool = false) -> int
 	return posmod(floori((direction.angle() + PI * 0.5 + PI * 0.125) / (PI * 0.25)), 8)
 
 
-func _tower_foot(cell: Vector2i) -> Vector2:
-	# Put the front foundation edge near the tile's bottom, without a floating pad.
-	return cell_center(cell) + Vector2(0, _cell_size() * 0.45)
+func _tower_foot(cell: Vector2i, footprint: Vector2i = Vector2i.ONE) -> Vector2:
+	# Centre the artwork over occupied cells; gameplay range remains at the anchor.
+	var center: Vector2 = _position_center(Vector2(cell) + Vector2(footprint - Vector2i.ONE) * 0.5)
+	return center + Vector2(0, _cell_size() * (0.45 + float(footprint.y - 1) * 0.5))
 
 
 func visual_headroom() -> float:
@@ -1286,10 +1303,9 @@ func _rebuild_draw_order() -> void:
 	var next_items: Dictionary[Vector2i, Dictionary] = {}
 	if not commander_state.is_empty():
 		_append_draw_item(4, {"id": 0, "cell": commander_state["landmark"], "landmark": true}, next_items)
-		var terrain_id: int = 1
-		for cell: Vector2i in commander_state.get("obstacles", []):
-			_append_draw_item(4, {"id": terrain_id, "cell": cell, "landmark": false}, next_items)
-			terrain_id += 1
+		var obstacle_variants: Array = commander_state["obstacle_variants"]
+		for index: int in range(commander_state["obstacles"].size()):
+			_append_draw_item(4, {"id": index + 1, "cell": commander_state["obstacles"][index], "landmark": false, "variant": obstacle_variants[index]}, next_items)
 	for tower: Dictionary in combat_towers:
 		_append_draw_item(1, tower, next_items)
 	for enemy: Dictionary in combat_enemies:
@@ -1344,7 +1360,7 @@ func _update_draw_order() -> void:
 				item["cell"] = layout.entrance if bool(item["entrance"]) else layout.base
 				center = cell_center(item["cell"])
 			1:
-				center = _tower_foot(item["data"]["cell"])
+				center = _tower_foot(item["data"]["cell"], item["data"].get("footprint", Vector2i.ONE))
 			2:
 				var enemy: Dictionary = item["data"]
 				progress = _enemy_route_progress(enemy)
@@ -1433,7 +1449,7 @@ func _draw_combat() -> void:
 				if bool(item["data"]["landmark"]):
 					CommanderVisuals.draw_landmark(self, item["foot"], cell_size, StringName(commander_state["id"]), float(commander_state.get("ability_remaining", 0.0)) > 0.0)
 				else:
-					CommanderVisuals.draw_obstacle(self, item["foot"], cell_size)
+					CommanderVisuals.draw_obstacle(self, item["foot"], cell_size, int(item["data"]["variant"]))
 				if item["data"]["cell"] == selected_terrain:
 					draw_rect(Rect2(cell_center(selected_terrain) - Vector2.ONE * cell_size * 0.43, Vector2.ONE * cell_size * 0.86), Color("e0bc77"), false, 2.0)
 	_draw_flights()
@@ -1649,12 +1665,12 @@ func _catapult_geometry(tower: Dictionary) -> Dictionary:
 		return {}
 	var variant: Dictionary = _tower_variant(tower, artwork)
 	var flip: bool = artwork.mirror_board and mirror_horizontal
-	var rect: Rect2 = _sprite_rect(artwork.icon_texture, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), _tower_foot(tower["cell"]), flip)
+	var rect: Rect2 = _sprite_rect(artwork.icon_texture, float(variant.get("board_height", artwork.board_height)), variant.get("board_anchor", artwork.board_anchor), _tower_foot(tower["cell"], tower.get("footprint", Vector2i.ONE)), flip)
 	return _catapult_frame(artwork, variant, rect, flip)
 
 
 func _catapult_frame(artwork: TowerReward, variant: Dictionary, rect: Rect2, flip: bool) -> Dictionary:
-	var scale: float = rect.size.y / artwork.icon_texture.get_height()
+	var scale: Vector2 = rect.size / artwork.icon_texture.get_size()
 	var local: Vector2 = artwork.catapult_pivot
 	if flip:
 		local.x = artwork.icon_texture.get_width() - local.x
@@ -1667,18 +1683,19 @@ func _catapult_frame(artwork: TowerReward, variant: Dictionary, rect: Rect2, fli
 func _catapult_cup(geometry: Dictionary, angle_degrees: float) -> Vector2:
 	var arm: Texture2D = geometry["arm"]
 	var arm_pivot: Vector2 = geometry["arm_pivot"]
-	var local := Vector2(-3.0, _texture_bounds[arm].position.y + 9.0 - arm_pivot.y) * float(geometry["scale"])
+	var local := Vector2(-3.0, _texture_bounds[arm].position.y + 9.0 - arm_pivot.y)
 	var sign: float = -1.0 if bool(geometry["flip"]) else 1.0
 	local.x *= sign
-	return Vector2(geometry["pivot"]) + local.rotated(deg_to_rad(angle_degrees) * sign)
+	return Vector2(geometry["pivot"]) + local.rotated(deg_to_rad(angle_degrees) * sign) * Vector2(geometry["scale"])
 
 
 func _draw_catapult_arm(tower: Dictionary, artwork: TowerReward, variant: Dictionary, rect: Rect2, flip: bool) -> void:
 	var geometry: Dictionary = _catapult_frame(artwork, variant, rect, flip)
-	var scale: float = geometry["scale"]
+	var scale: Vector2 = geometry["scale"]
 	var sign: float = -1.0 if flip else 1.0
 	var angle: float = deg_to_rad(_catapult_angle(int(tower.get("id", -1)))) * sign
-	draw_set_transform(geometry["pivot"], angle, Vector2(scale * sign, scale))
+	var transform := Transform2D(Vector2(scale.x, 0), Vector2(0, scale.y), geometry["pivot"])
+	draw_set_transform_matrix(transform.rotated_local(angle).scaled_local(Vector2(sign, 1.0)))
 	draw_texture(geometry["arm"], -Vector2(geometry["arm_pivot"]))
 	draw_set_transform(Vector2.ZERO)
 
@@ -1695,10 +1712,23 @@ func _capture_flights(state: Dictionary, slot: int, clock: float) -> void:
 		var enemy: Dictionary = flight["enemy"]
 		if not _enemy_art.has(enemy["type_id"]):
 			continue
+		# Retain accepted framing if the source is sold while its enemy is airborne.
+		var source_tower: Dictionary = {}
+		if outgoing:
+			for tower: Dictionary in state.get("towers", [[], []])[slot]:
+				if int(tower["id"]) == int(flight["tower_id"]):
+					source_tower = tower
+					break
+			if source_tower.is_empty():
+				for tower: Dictionary in combat_towers:
+					if int(tower["id"]) == int(flight["tower_id"]):
+						source_tower = tower
+						break
 		_flight_traces.append({
 			"id": id, "type_id": enemy["type_id"], "out": outgoing, "in": incoming,
 			"from": flight["from"], "to": flight["to"], "tower_id": int(flight["tower_id"]),
 			"tower_cell": Vector2i(Vector2(flight["tower_cell"]).round()),
+			"tower": source_tower,
 			"age": maxf(0.0, clock - float(flight["clock"])),
 		})
 
@@ -1713,11 +1743,7 @@ func _draw_flights() -> void:
 		var artwork: EnemyDefinition = _enemy_art[trace["type_id"]]
 		var spin_sign: float = 1.0 if mirror_horizontal else -1.0
 		if bool(trace["out"]) and age < half:
-			var tower: Dictionary = {}
-			for candidate: Dictionary in combat_towers:
-				if int(candidate["id"]) == int(trace["tower_id"]):
-					tower = candidate
-					break
+			var tower: Dictionary = trace["tower"]
 			var geometry: Dictionary = _catapult_geometry(tower) if not tower.is_empty() else {}
 			var release: Vector2 = _catapult_cup(geometry, CATAPULT_FIRED) if not geometry.is_empty() else _tower_foot(trace["tower_cell"]) - Vector2(0, cell_size)
 			if age < CATAPULT_SWING_TIME and not geometry.is_empty():
@@ -2352,6 +2378,8 @@ func _projectile_origin(trace: Dictionary) -> Vector2:
 func _tower_muzzle(tower: Dictionary, archer_index: int, released: bool = false) -> Vector2:
 	var cell_size: float = _cell_size()
 	var artwork: TowerReward = _tower_art.get(tower["type_id"])
+	if artwork != null and artwork.catapult_arm_texture != null:
+		return _catapult_cup(_catapult_geometry(tower), CATAPULT_FIRED if released else _catapult_angle(int(tower.get("id", -1))))
 	if artwork != null and not artwork.directional_weapon_textures.is_empty():
 		var rect: Rect2 = _directional_weapon_rect(artwork, _tower_foot(tower["cell"]))
 		var origin: Vector2 = artwork.directional_projectile_origins[_directional_weapon_index(tower, released)]

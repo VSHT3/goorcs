@@ -41,6 +41,7 @@ func _check(condition: bool, description: String) -> void:
 
 func _run() -> void:
 	_generation()
+	_clear_cosmetic_variants()
 	_capture_clear_growth()
 	_landmarks()
 	_rally()
@@ -75,7 +76,7 @@ func _rules(speed: float = 0.0) -> CombatRules:
 
 
 func _state(id: String = "knight", landmark: Vector2i = Vector2i(5, 3)) -> Dictionary:
-	return {"id": id, "landmark": landmark, "obstacles": [Vector2i(7, 1), Vector2i(8, 1), Vector2i(9, 1)] as Array[Vector2i], "ability_remaining": 0.0, "cooldown_remaining": 0.0, "ability_target": -1}
+	return {"id": id, "landmark": landmark, "obstacles": [Vector2i(7, 1), Vector2i(8, 1), Vector2i(9, 1)] as Array[Vector2i], "obstacle_variants": [0, 1, 2] as Array[int], "ability_remaining": 0.0, "cooldown_remaining": 0.0, "ability_target": -1}
 
 
 func _routes() -> Array[Dictionary]:
@@ -110,9 +111,13 @@ func _generation() -> void:
 			var generated: Dictionary = CommanderRules.generate(id, layout, random)
 			random.seed = seed_value
 			_check(generated == CommanderRules.generate(id, layout, random), "Identical seed and commander replay identical generated terrain")
-			_check(generated.get("id", "") == String(id) and generated.get("obstacles", []).size() == 3, "Every supported generated board has its chosen landmark and three obstacles")
+			_check(generated.get("id", "") == String(id) and generated.get("obstacles", []).size() == 9, "Every standard generated board has its chosen permanent landmark and nine removable obstacles")
 			if generated.is_empty():
 				continue
+			var variants: Array = generated["obstacle_variants"]
+			_check(variants.size() == generated["obstacles"].size() and variants.has(0) and variants.has(1) and variants.has(2) and variants.has(3), "Each standard board carries all four accepted cosmetic identities alongside its occupied cells")
+			for variant: int in variants:
+				_check(variant >= 0 and variant < 4, "Every accepted obstacle appearance resolves to an authored local renderer")
 			var blocked: Array = generated["obstacles"].duplicate()
 			blocked.append(generated["landmark"])
 			var unique: Dictionary = {}
@@ -129,8 +134,57 @@ func _generation() -> void:
 					if not layout.has_path(cell) and not unique.has(cell):
 						buildable += 1
 			_check(buildable >= 8, "Every seed retains at least eight genuinely buildable off-route cells")
+			_check(_has_build_pair(layout, unique), "Every generated board retains a real unblocked horizontal Orcapult footprint")
+			var counterpart: Dictionary = CommanderRules.generate(&"priestess" if id == &"knight" else &"knight", layout, random)
+			for obstacle: Vector2i in counterpart["obstacles"]:
+				unique[obstacle] = true
+			unique[counterpart["landmark"]] = true
+			_check(_has_build_pair(layout, unique), "Both independently generated standard boards share usable two-cell ground for a mirrored Orcapult purchase")
 			arrangements[str(blocked)] = true
 		_check(arrangements.size() > 1, "Independent seeds produce actual terrain variation rather than a fixed template")
+	# Compact fixtures keep real terrain without inheriting standard-board density.
+	for dimensions: Vector2i in [Vector2i(6, 5), Vector2i(8, 5), Vector2i(5, 3)]:
+		for seed_value: int in range(16):
+			var row: int = dimensions.y / 2
+			var layout := PathLayout.new(dimensions, 30, Vector2i(0, row), Vector2i(dimensions.x - 1, row))
+			var random := RandomNumberGenerator.new()
+			random.seed = seed_value
+			var generated: Dictionary = CommanderRules.generate(&"knight", layout, random)
+			_check(not generated.is_empty() and generated["obstacles"].size() == dimensions.x * dimensions.y / 14, "Compact generation scales removable terrain to usable board area")
+			if generated.is_empty():
+				continue
+			var blocked: Dictionary = {}
+			blocked[generated["landmark"]] = true
+			for cell: Vector2i in generated["obstacles"]:
+				blocked[cell] = true
+			for x: int in range(1, dimensions.x - 1):
+				_check(not blocked.has(Vector2i(x, row)) and layout.place(Vector2i(x, row)), "Compact terrain preserves the actual legal corridor")
+			_check(layout.is_ready() and _has_build_pair(layout, blocked), "Compact boards retain both the real route and a two-cell building footprint")
+
+
+func _has_build_pair(layout: PathLayout, blocked: Dictionary) -> bool:
+	for y: int in range(layout.dimensions.y):
+		for x: int in range(layout.dimensions.x - 1):
+			var cell := Vector2i(x, y)
+			if not layout.has_path(cell) and not layout.has_path(cell + Vector2i.RIGHT) and not blocked.has(cell) and not blocked.has(cell + Vector2i.RIGHT):
+				return true
+	return false
+
+
+func _clear_cosmetic_variants() -> void:
+	var random := RandomNumberGenerator.new()
+	random.seed = 8472
+	var state: Dictionary = CommanderRules.generate(&"knight", PathLayout.new(), random)
+	var core := MatchCombat.new(_rules())
+	core.configure_commanders([state, state])
+	core.coins = [225, 225]
+	var expected_variants: Array = state["obstacle_variants"].duplicate()
+	for index: int in range(state["obstacles"].size() - 1, -1, -1):
+		var cell: Vector2i = state["obstacles"][index]
+		var price_before: int = core.coins[0]
+		_check(core.terrain_blocks(0, cell) and core.clear_obstacle(0, cell) and not core.terrain_blocks(0, cell) and core.coins[0] == price_before - 25, "Every obstacle look obeys the same real blocking rule and exact 25-Coin clear transaction")
+		expected_variants.remove_at(index)
+		_check(core.commanders[0]["obstacle_variants"] == expected_variants and core.commanders[1] == state, "Clearing any look preserves every remaining accepted identity and never mirrors terrain removal")
 
 
 func _capture_clear_growth() -> void:
@@ -138,8 +192,10 @@ func _capture_clear_growth() -> void:
 	var source: Array = [_state(), _state("priestess")]
 	core.configure_commanders(source)
 	source[0]["obstacles"].clear()
+	source[0]["obstacle_variants"][0] = 3
 	source[1]["landmark"] = Vector2i.ZERO
 	_check(core.commanders[0]["obstacles"].size() == 3 and core.commanders[1]["landmark"] == Vector2i(5, 3), "Admission deep-captures mutable terrain from its caller")
+	_check(core.commanders[0]["obstacle_variants"] == [0, 1, 2], "Admission deep-captures host-assigned obstacle appearances")
 	for cell: Vector2i in [Vector2i(5, 3), Vector2i(7, 1)]:
 		var before: Dictionary = core.snapshot()
 		_check(not core.build(0, cell, &"arrow_tower", 0) and core.snapshot() == before, "Landmarks and obstacles reject tower placement atomically")
@@ -151,14 +207,18 @@ func _capture_clear_growth() -> void:
 	_check(not core.clear_obstacle(0, Vector2i(7, 1)) and core.snapshot() == initial, "Insufficient Coins preserve the obstacle and all other accepted state")
 	core.coins[0] = 25
 	_check(core.clear_obstacle(0, Vector2i(7, 1)) and core.coins[0] == 0 and not core.commanders[0]["obstacles"].has(Vector2i(7, 1)) and core.commanders[1]["obstacles"].size() == 3, "Clearing spends exactly 25 on the owning board and removes exactly one obstacle")
+	_check(core.commanders[0]["obstacle_variants"] == [1, 2] and core.commanders[1]["obstacle_variants"] == [0, 1, 2], "Clearing removes only the chosen cell's cosmetic identity without rerolling either board")
 	initial = core.snapshot()
 	_check(not core.clear_obstacle(0, Vector2i(7, 1)) and core.snapshot() == initial, "Repeated clearing cannot spend again")
 	var detached: Dictionary = core.snapshot(false)
 	detached["commanders"][0]["obstacles"].clear()
+	detached["commanders"][0]["obstacle_variants"].clear()
 	detached["commanders"][1]["cooldown_remaining"] = 1000.0
 	_check(core.commanders[0]["obstacles"].size() == 2 and core.commanders[1]["cooldown_remaining"] == 0.0, "Ordinary combat frames expose deeply detached commander state")
+	_check(core.commanders[0]["obstacle_variants"] == [1, 2], "Combat snapshots cannot mutate accepted cosmetic identity arrays")
 	core.grow_for_main_round()
 	_check(core.commanders[0]["landmark"] == Vector2i(5, 4) and core.commanders[0]["obstacles"] == [Vector2i(8, 2), Vector2i(9, 2)], "Map growth shifts permanent terrain exactly one logical row and never restores cleared obstacles")
+	_check(core.commanders[0]["obstacle_variants"] == [1, 2], "Growth moves cells without changing the surviving obstacle appearances")
 	_start(core)
 	initial = core.snapshot()
 	_check(not core.clear_obstacle(0, Vector2i(8, 2)) and core.snapshot() == initial, "Combat clearing is rejected without charging or altering terrain")
@@ -287,11 +347,39 @@ func _draft() -> void:
 	planning.session = session
 	planning.combat_rules = _rules()
 	root.add_child(planning)
+	planning._draft_rng.seed = 670031
+	var previous: int = -1
+	var eligible: int = 0
+	var favoured: int = 0
+	var seen: Dictionary = {}
+	for roll: int in range(8192):
+		planning._begin_commander_draft()
+		var result: int = planning._host_draft_target
+		_check(result >= 0 and result <= 100 and not (previous == 67 and result == 67), "Draft targets stay in range and never repeat 67 consecutively")
+		if previous != 67:
+			eligible += 1
+			if result == 67:
+				favoured += 1
+		seen[result] = true
+		previous = result
+	_check(float(favoured) / eligible > 0.30 and float(favoured) / eligible < 0.37, "Eligible host rolls favour 67 approximately one third of the time")
+	_check(seen.size() == 101 and seen.has(0) and seen.has(100), "Biased rolls retain every other value and both inclusive endpoints")
+	var found_67: bool = false
+	for seed_value: int in range(256):
+		planning.begin(seed_value)
+		if planning._host_draft_target != 67:
+			continue
+		found_67 = true
+		planning.begin(seed_value)
+		_check(planning._host_draft_target != 67, "Replaying the same favourable seed cannot repeat 67 across a match reset")
+		break
+	_check(found_67, "A real draft can choose the favoured target")
+	previous = planning._host_draft_target
 	for seed_value: int in range(32):
 		planning.begin(seed_value)
-		var expected := RandomNumberGenerator.new()
-		expected.seed = seed_value
-		var target: int = expected.randi_range(0, 100)
+		var target: int = planning._host_draft_target
+		_check(not (previous == 67 and target == 67), "Match reset preserves the no-consecutive-67 rule")
+		previous = target
 		var hidden: Dictionary = planning._snapshot(1)["commander_draft"]
 		_check(hidden["target"] == -1 and hidden["guesses"] == [-1, -1] and hidden["picker"] == -1, "Admission never exposes the secret target or either unlocked guess")
 		_check(not planning.select_loadout([&"arrow_tower"]) and not planning.select_commander(&"knight"), "Tower selection and premature hero picks cannot bypass guessing")
@@ -304,7 +392,7 @@ func _draft() -> void:
 		_check(not planning.submit_commander_guess(100) and planning._snapshot(1)["commander_draft"] == locked, "A locked guess cannot be revised while waiting for the opponent")
 		_check(planning._apply_loadout_command(2, "guess", [100], []), "One hundred is valid and completes both commitments")
 		var draft: Dictionary = planning.commander_draft
-		var first: int = expected.randi_range(0, 1) if target == 50 else (0 if target < 50 else 1)
+		var first: int = int(draft["first_picker"]) if target == 50 else (0 if target < 50 else 1)
 		_check(draft["target"] == target and draft["guesses"] == [0, 100] and draft["first_picker"] == first and draft["picker"] == first, "Both locked values reveal the real host target and the strictly closer player picks first")
 		_check(not planning.select_loadout([&"arrow_tower"]), "Revealing the number still cannot expose tower selection before both picks")
 		_check(not planning._apply_loadout_command(2 if first == 0 else 1, "commander", [], [], "knight"), "The player who lost priority cannot pick out of turn")
@@ -317,30 +405,14 @@ func _draft() -> void:
 		detached["commander_draft"]["guesses"][0] = 101
 		detached["commander_draft"]["picks"][0] = "unknown"
 		_check(planning.commander_draft["guesses"] == [0, 100] and not planning._snapshot()["commander_draft"]["picks"].has("unknown"), "Draft snapshots cannot mutate accepted guesses or picked heroes")
-	for endpoint: int in [0, 100]:
-		var found: bool = false
-		var candidate := RandomNumberGenerator.new()
-		for seed_value: int in range(100000):
-			candidate.seed = seed_value
-			if candidate.randi_range(0, 100) != endpoint:
-				continue
-			planning.begin(seed_value)
-			planning.submit_commander_guess(0)
-			planning._apply_loadout_command(2, "guess", [100], [])
-			_check(planning.commander_draft["target"] == endpoint, "The secret random number can genuinely reach either inclusive endpoint")
-			found = true
-			break
-		_check(found, "Find a deterministic inclusive-endpoint draft fixture")
 	var winners: Dictionary = {}
 	for seed_value: int in range(32):
 		planning.begin(seed_value)
-		var expected := RandomNumberGenerator.new()
-		expected.seed = seed_value
-		expected.randi_range(0, 100)
-		var winner: int = expected.randi_range(0, 1)
+		var before_tie: Dictionary = planning._commander_draft_snapshot()
 		planning.submit_commander_guess(50)
 		planning._apply_loadout_command(2, "guess", [50], [])
-		_check(planning.commander_draft["first_picker"] == winner and planning._draft_rng.state == expected.state, "Equal-distance guesses consume exactly one host-owned coin flip after both commitments")
+		var winner: int = planning.commander_draft["first_picker"]
+		_check(winner in [0, 1] and before_tie["first_picker"] == -1, "Equal-distance guesses award a host-owned winner only after both commitments")
 		winners[winner] = true
 	_check(winners.size() == 2, "Host tie rolls can award either player, not a fixed role")
 	planning.queue_free()
@@ -355,18 +427,16 @@ func _planning() -> void:
 	planning.session = session
 	planning.combat_rules = _rules(0.1)
 	root.add_child(planning)
-	var seed_value: int = 0
-	var target: int = 0
-	var expected := RandomNumberGenerator.new()
-	while true:
-		expected.seed = seed_value
-		target = expected.randi_range(0, 100)
-		if target != expected.randi_range(0, 100):
-			break
-		seed_value += 1
+	var target: int = -1
 	for id: StringName in [&"knight", &"priestess"]:
-		planning._draft_rng.seed = seed_value
-		planning.start_singleplayer()
+		for seed_value: int in range(256):
+			planning._draft_rng.seed = seed_value
+			planning.start_singleplayer()
+			target = planning._host_draft_target
+			if target != planning._host_commander_guesses[1]:
+				break
+			planning.stop_singleplayer()
+		_check(target != planning._host_commander_guesses[1], "Find a real solo draft with distinct target and opponent guess")
 		_check(planning.commander_draft["guess_locked"] == [false, true] and planning.commander_draft["target"] == -1 and planning.commander_draft["guesses"] == [-1, -1], "Solo locks one host-generated opponent guess without revealing it or the target")
 		_check(planning.submit_commander_guess(target) and planning.commander_draft["picker"] == 0, "A deterministic closer local guess grants the real first pick")
 		var draft_rng_state: int = planning._draft_rng.state
@@ -411,31 +481,30 @@ func _planning() -> void:
 		_check(not planning.request_commander_ability(0) and planning.combat == before, "Repeat activation cannot refresh the owned cooldown")
 		planning.stop_singleplayer()
 		_check(not planning.active and planning.combat["commanders"] == [{}, {}], "Leaving removes both prior commander states")
-	var opponent_seed: int = 0
-	var opponent_target: int = 0
 	var far: int = 0
-	while true:
-		expected.seed = opponent_seed
-		opponent_target = expected.randi_range(0, 100)
-		var opponent_guess: int = expected.randi_range(0, 100)
+	var opponent_closer: bool = false
+	for opponent_seed: int in range(256):
+		planning._draft_rng.seed = opponent_seed
+		planning.start_singleplayer()
+		var opponent_target: int = planning._host_draft_target
+		var opponent_guess: int = planning._host_commander_guesses[1]
 		far = 100 if opponent_target < 50 else 0
-		if absi(opponent_guess - opponent_target) < absi(far - opponent_target):
+		opponent_closer = absi(opponent_guess - opponent_target) < absi(far - opponent_target)
+		if opponent_closer:
 			break
-		opponent_seed += 1
-	planning._draft_rng.seed = opponent_seed
-	planning.start_singleplayer()
+		planning.stop_singleplayer()
+	_check(opponent_closer, "Find a real solo draft where the opponent is closer")
 	_check(planning.submit_commander_guess(far) and planning.commander_draft["first_picker"] == 1 and planning.commander_draft["picker"] == 0 and planning.commander_draft["picks"][0] == "" and planning.commander_draft["picks"][1] in ["knight", "priestess"], "A closer host-generated solo guess picks a real hero first and leaves the local player second")
 	var opponent_pick := StringName(planning.commander_draft["picks"][1])
 	var after_auto_pick: int = planning._draft_rng.state
 	_check(not planning.select_commander(opponent_pick), "The local second pick cannot duplicate the opponent's already frozen hero")
 	_check(planning.select_commander(&"priestess" if opponent_pick == &"knight" else &"knight") and planning.commander_draft["phase"] == "loadout" and planning._draft_rng.state == after_auto_pick, "The local second pick takes the remaining hero without rerolling the opponent")
 	planning.stop_singleplayer()
-	expected.state = planning._draft_rng.state
-	var replay_target: int = expected.randi_range(0, 100)
-	expected.randi_range(0, 100)
+	var before_replay: int = planning._previous_draft_target
 	planning.start_singleplayer()
-	_check(planning.commander_draft["phase"] == "guessing" and planning.chosen_commander_id == &"" and planning.commander_draft["picks"] == ["", ""] and planning.commander_draft["target"] == -1 and planning._draft_rng.state == expected.state, "Replay draws fresh host target/opponent guess and clears both picks instead of replaying the previous draft")
-	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning) and planning.commander_draft["target"] == replay_target and planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout() and planning.combat["commanders"][0]["obstacles"].size() == 3 and planning.combat["commanders"][0]["cooldown_remaining"] == 0.0, "A completed replay draft reveals its newly drawn target, regenerates terrain and resets all run-only cooldowns")
+	var replay_target: int = planning._host_draft_target
+	_check(planning.commander_draft["phase"] == "guessing" and planning.chosen_commander_id == &"" and planning.commander_draft["picks"] == ["", ""] and planning.commander_draft["target"] == -1 and not (before_replay == 67 and replay_target == 67), "Replay clears picks and rolls a hidden target without repeating 67")
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning) and planning.commander_draft["target"] == replay_target and planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout() and planning.combat["commanders"][0]["obstacles"].size() == 9 and planning.combat["commanders"][0]["cooldown_remaining"] == 0.0, "A completed replay draft reveals its newly drawn target, regenerates terrain and resets all run-only cooldowns")
 	planning.queue_free()
 	session.queue_free()
 	await process_frame

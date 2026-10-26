@@ -31,6 +31,7 @@ window/size/viewport_height=720
 window/size/min_width=1000
 window/size/min_height=720
 window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [discord]
 
@@ -43,7 +44,7 @@ auto_enabled_plugin=true
 
 [gui]
 
-theme/custom_font="res://assets/fonts/PixelifySans.ttf"
+theme/custom_font="res://resources/ui/text_font.tres"
 theme/custom_font.editor_hint=""
 
 [rendering]

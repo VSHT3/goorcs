@@ -25,9 +25,7 @@ func _run() -> void:
 	await _command("guest", {"action": "forge_deck"})
 	await _settle()
 	_check(_snapshot("host")["commander_draft"] == hidden and _snapshot("guest")["chosen_deck"].is_empty(), "The host rejects noninteger raw guesses and authenticated tower-phase bypass attempts")
-	var draft_random := RandomNumberGenerator.new()
-	draft_random.seed = 9182
-	var target: int = draft_random.randi_range(0, 100)
+	var target: int = int(_snapshot("host")["authority_target"])
 	var far_guess: int = 100 if target < 50 else 0
 	await _command("host", {"action": "guess", "value": target})
 	await _settle()
@@ -81,14 +79,13 @@ func _run() -> void:
 	await _settle()
 	var replay: Dictionary = _snapshot("guest")["commander_draft"]
 	_check(_snapshot("host")["combat"]["commanders"] == [{}, {}] and _matches(replay, {"phase": "guessing", "picks": ["", ""], "target": -1, "guesses": [-1, -1]}), "Rejoin retains neither the prior reveal, hero choices, terrain nor cooldowns")
-	draft_random.seed = 127
-	var replay_target: int = draft_random.randi_range(0, 100)
-	var tie_winner: int = draft_random.randi_range(0, 1)
+	var replay_target: int = int(_snapshot("host")["authority_target"])
+	_check(not (target == 67 and replay_target == 67), "Rejoining preserves the host's no-consecutive-67 rule")
 	await _command("host", {"action": "guess", "value": 50})
 	await _command("guest", {"action": "guess", "value": 50})
 	await _settle()
 	var tied: Dictionary = _snapshot("guest")["commander_draft"]
-	_check(tied == _snapshot("host")["commander_draft"] and tied["target"] == replay_target and tied["first_picker"] == tie_winner and tied["picker"] == tie_winner, "A real-peer equal-distance replay reveals exactly the host's fresh coin-flip winner")
+	_check(tied == _snapshot("host")["commander_draft"] and tied["target"] == replay_target and int(tied["first_picker"]) in [0, 1] and tied["picker"] == tied["first_picker"], "A real-peer equal-distance replay reveals the host's fresh target and shared coin-flip winner")
 	await _finish()
 
 
@@ -112,7 +109,9 @@ func _terrain_and_clears(initial: Dictionary) -> void:
 	await _command("guest", {"action": "obstacle", "x": clear_cell.x, "y": clear_cell.y})
 	await _wait_combat("host", {"coins": [1000, 975]}, "Accepted clear charges the host's 25-Coin price rather than guest-local starting funds")
 	var cleared: Dictionary = await _settle()
-	_check(cleared["commanders"][0] == host_state and cleared["commanders"][1]["obstacles"].size() == 2 and not cleared["commanders"][1]["obstacles"].has(str(clear_cell)), "Only the authenticated guest's chosen obstacle disappears on both peers")
+	var expected_variants: Array = guest_state["obstacle_variants"].duplicate()
+	expected_variants.remove_at(0)
+	_check(cleared["commanders"][0] == host_state and cleared["commanders"][1]["obstacles"].size() == 8 and not cleared["commanders"][1]["obstacles"].has(str(clear_cell)) and cleared["commanders"][1]["obstacle_variants"] == expected_variants, "Only the authenticated guest's chosen obstacle and its aligned appearance disappear on both peers")
 	await _command("guest", {"action": "obstacle", "x": clear_cell.x, "y": clear_cell.y})
 	_check(await _settle() == cleared, "A repeated network clear cannot double-charge or remove another obstacle")
 	await _build("guest", 1, clear_cell.x, clear_cell.y, 0)
@@ -123,10 +122,22 @@ func _terrain_and_clears(initial: Dictionary) -> void:
 	await _command("guest", {"action": "tamper", "x": second.x, "y": second.y})
 	await _command("guest", {"action": "obstacle", "x": second.x, "y": second.y})
 	_check(await _settle() == poor, "Fake local Coins and terrain cannot turn an unaffordable clear into an accepted host purchase")
+	await _command("host", {"action": "grow"})
+	var grown: Dictionary = await _settle()
+	for slot: int in range(2):
+		var previous: Dictionary = poor["commanders"][slot]
+		var shifted: Dictionary = grown["commanders"][slot]
+		_check(shifted["obstacle_variants"] == previous["obstacle_variants"] and shifted["landmark"] == str(_cell(previous["landmark"]) + Vector2i.DOWN), "Both real peers preserve accepted appearances while actual host growth moves the landmark")
+		for index: int in range(previous["obstacles"].size()):
+			_check(shifted["obstacles"][index] == str(_cell(previous["obstacles"][index]) + Vector2i.DOWN), "Network growth shifts each surviving occupied obstacle without replacing its identity")
+	host_state = grown["commanders"][0]
+	guest_state = grown["commanders"][1]
+	second += Vector2i.DOWN
+	foreign += Vector2i.DOWN
 	await _command("host", {"action": "balance", "slot": 1, "coins": 1000})
 	for lane: String in ["host", "guest"]:
 		for x: int in range(1, 13):
-			await _edit(lane, 0 if lane == "host" else 1, x, 4)
+			await _edit(lane, 0 if lane == "host" else 1, x, 5)
 	await _wait_board("host", 1, 12, true)
 	await _wait_board("guest", 0, 12, true)
 	var build_cell: Vector2i = _open_attack_cell(host_state)
@@ -214,14 +225,12 @@ func _cell(raw: Variant) -> Vector2i:
 
 
 func _open_attack_cell(state: Dictionary) -> Vector2i:
-	for x: int in range(1, 4):
-		var cell := Vector2i(x, 3)
-		if state["landmark"] != str(cell) and not state["obstacles"].has(str(cell)):
-			return cell
-	# Four blocked cells cannot occupy all six candidates.
-	for x: int in range(1, 4):
-		var cell := Vector2i(x, 5)
-		if state["landmark"] != str(cell) and not state["obstacles"].has(str(cell)):
-			return cell
+	# Scan every ground cell within the real tower's range of the route.
+	# Nine independent blockers may occupy the old six-cell fixture window.
+	for y: int in [4, 6, 3, 7]:
+		for x: int in range(1, 13):
+			var cell := Vector2i(x, y)
+			if state["landmark"] != str(cell) and not state["obstacles"].has(str(cell)):
+				return cell
 	_check(false, "Generated terrain retains a reachable real attack consumer")
 	return Vector2i.ZERO

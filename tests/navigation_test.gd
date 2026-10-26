@@ -42,6 +42,7 @@ func _run() -> void:
 	await process_frame
 	await process_frame
 	_check(main.menu.visible and main.sandbox_screen == null and main.orcieary_screen == null and main.towerieary_screen == null, "Startup shows menu without constructing inactive playgrounds or guides")
+	await _check_window_fill()
 	await _check_menu_focus()
 	_check(menu_audio.actions == 0, "Native arrows, Tab and focus changes remain silent")
 	await _key(KEY_ENTER)
@@ -128,6 +129,12 @@ func _check_match_music() -> void:
 	_check(main.planning.selecting_loadout and not main.planning.loadout_committed and main.play_screen.loadout_panel.visible, "A cancelled loadout can reopen as a fresh selection")
 	var loadout: LoadoutPanel = main.play_screen.loadout_panel
 	var draft_cues: int = menu_audio.actions
+	loadout.guess_input.grab_focus()
+	var guess_key := InputEventKey.new()
+	guess_key.pressed = true
+	guess_key.unicode = "5".unicode_at(0)
+	Input.parse_input_event(guess_key)
+	await process_frame
 	await _click(loadout.guess_button.get_global_rect().get_center())
 	_check(main.planning.commander_draft.get("phase", "") == "picking" and not music.playing and menu_audio.actions == draft_cues + 1, "Native guess lock advances the silent draft with exactly one action clack")
 	var picks: Array = main.planning.commander_draft.get("picks", ["", ""])
@@ -162,6 +169,23 @@ func _check_match_music() -> void:
 	await _key(KEY_ESCAPE)
 	await _key(KEY_S)
 	_check(main.sandbox_screen.visible and not music.playing, "Sandbox return does not restart match music")
+
+func _check_window_fill() -> void:
+	var original_size: Vector2i = root.size
+	var original_scale: Vector2i = root.content_scale_size
+	root.content_scale_size = Vector2i(1280, 720)
+	for window_size: Vector2i in [Vector2i(1568, 1019), Vector2i(1920, 1080), Vector2i(1920, 800)]:
+		root.size = window_size
+		await process_frame
+		await process_frame
+		var rendered: Rect2 = root.get_final_transform() * root.get_visible_rect()
+		_check(rendered.position.is_equal_approx(Vector2.ZERO) and rendered.size.is_equal_approx(Vector2(root.size)), "Game content fills tall, standard and ultrawide windows without letterboxing")
+		_check(main.get_global_rect().size.is_equal_approx(root.get_visible_rect().size), "The anchored game surface fills the expanded logical viewport")
+	root.size = original_size
+	root.content_scale_size = original_scale
+	await process_frame
+	await process_frame
+
 
 func _check_menu_focus() -> void:
 	var buttons: Array[Button] = []

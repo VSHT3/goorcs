@@ -69,6 +69,8 @@ var _host_commander_ids: Array[StringName] = [&"", &""]
 var _commander_rng := RandomNumberGenerator.new()
 var _draft_rng := RandomNumberGenerator.new()
 var _host_draft_target: int = -1
+# Survives match resets so replay/rejoin cannot roll consecutive 67s.
+var _previous_draft_target: int = -1
 var _host_commander_guesses: Array[int] = [-1, -1]
 var _host_first_picker: int = -1
 var _host_commander_picker: int = -1
@@ -295,7 +297,14 @@ func _apply_loadout_command(sender: int, command: String, ids: Array, owned: Arr
 
 
 func _begin_commander_draft() -> void:
-	_host_draft_target = _draft_rng.randi_range(0, 100)
+	if _previous_draft_target != 67 and _draft_rng.randi_range(0, 2) == 0:
+		_host_draft_target = 67
+	else:
+		# Uniformly choose among the other 100 integers without a retry loop.
+		_host_draft_target = _draft_rng.randi_range(0, 99)
+		if _host_draft_target >= 67:
+			_host_draft_target += 1
+	_previous_draft_target = _host_draft_target
 	if singleplayer:
 		_host_commander_guesses[1] = _draft_rng.randi_range(0, 100)
 
@@ -667,13 +676,11 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 			if not _host_loadout_committed[slot] or not _host_loadouts[slot].has(StringName(argument)):
 				_reject(sender, "This tower is not in your committed run loadout.")
 				return false
-			var layout: PathLayout = _host_layouts[slot]
-			if not layout.contains(cell) or layout.has_path(cell) or _terrain_blocks(slot, cell):
+			var footprint: Vector2i = _host_combat.tower_footprint(StringName(argument))
+			if not _build_layout_clear(slot, cell, footprint) or (mirrored and not _build_layout_clear(1 - slot, cell, footprint)):
 				_reject(sender, "Build towers on empty ground, never on paths, endpoints, or terrain.")
 				return false
 			if mirrored:
-				if _host_layouts[1].has_path(cell) or _terrain_blocks(1, cell):
-					return false
 				accepted = _host_combat.build_mirrored(slot, cell, StringName(argument), mode)
 			else:
 				accepted = _host_combat.build(slot, cell, StringName(argument), mode)
@@ -693,6 +700,19 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 		_apply_tower_command(2, command, 1, cell, mirror_id, mode, argument)
 	else:
 		_publish_snapshot()
+	return true
+
+
+func _build_layout_clear(slot: int, cell: Vector2i, footprint: Vector2i) -> bool:
+	if footprint.x <= 0 or footprint.y <= 0:
+		return false
+	var layout: PathLayout = _host_layouts[slot]
+	var occupied: Rect2i = TowerDefinition.footprint_rect(cell, footprint)
+	for y: int in range(occupied.position.y, occupied.end.y):
+		for x: int in range(occupied.position.x, occupied.end.x):
+			var covered := Vector2i(x, y)
+			if not layout.contains(covered) or layout.has_path(covered) or _terrain_blocks(slot, covered):
+				return false
 	return true
 
 

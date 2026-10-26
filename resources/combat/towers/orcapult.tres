@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_definition")
 reward = ExtResource("2_reward")
+footprint = Vector2i(2, 1)
 ; Provisional playtest balance, not creator-approved final stats or identity.
 ; Damage is the bucket slam on enemies next to each grabbed victim.
 damage = 4

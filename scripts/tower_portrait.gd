@@ -55,12 +55,21 @@ func _fit_artwork(tower: Dictionary, reward: TowerReward) -> void:
 			var layer_bounds: Rect2 = _texture_bounds[layer]
 			_frame = _frame.merge(Rect2((layer_bounds.position - texture.get_size() * anchor) * units, layer_bounds.size * units))
 	if reward.catapult_arm_texture != null:
-		# The resting arm leans back past the base; longer branch arms reach further.
+		var base: Texture2D = variant.get("texture", reward.board_texture)
+		if base != null:
+			_cache_texture_bounds(base)
+			var base_bounds: Rect2 = _texture_bounds[base]
+			_frame = _frame.merge(Rect2((base_bounds.position - texture.get_size() * anchor) * units, base_bounds.size * units))
+		# Reserve the rotating arm envelope, including the longer branch layers.
 		var arm: Texture2D = variant.get("catapult_arm_texture", reward.catapult_arm_texture)
 		_cache_texture_bounds(arm)
-		var reach := Vector2(0.0, _texture_bounds[arm].position.y - reward.catapult_arm_pivot.y).rotated(deg_to_rad(CATAPULT_COCKED))
-		var cup: Vector2 = reward.catapult_pivot + reach
-		_frame = _frame.merge(Rect2((cup - Vector2.ONE * 12.0 - texture.get_size() * anchor) * units, Vector2.ONE * 24.0 * units))
+		var arm_bounds: Rect2 = _texture_bounds[arm]
+		var pivot: Vector2 = reward.catapult_arm_pivot
+		var corners: Array[Vector2] = [arm_bounds.position, Vector2(arm_bounds.end.x, arm_bounds.position.y), arm_bounds.end, Vector2(arm_bounds.position.x, arm_bounds.end.y)]
+		for degrees: int in range(int(CATAPULT_FIRED), int(CATAPULT_COCKED) + 1, 4):
+			for corner: Vector2 in corners:
+				var point: Vector2 = reward.catapult_pivot + (corner - pivot).rotated(deg_to_rad(float(degrees)))
+				_frame = _frame.expand((point - texture.get_size() * anchor) * units)
 	# Reserve the battlefield's orbit envelope, even as stones pass behind it.
 	_frame = _frame.merge(Rect2(-0.7, -0.85, 1.4, 0.65))
 	_reserve_effects(tower)
@@ -106,11 +115,11 @@ func _cell_size() -> float:
 	return maxf(1.0, floorf(minf(size.x / _frame.size.x, size.y / _frame.size.y)))
 
 
-func _tower_foot(_cell: Vector2i) -> Vector2:
+func _tower_foot(_cell: Vector2i, _footprint: Vector2i = Vector2i.ONE) -> Vector2:
 	return ((size - _frame.size * _cell_size()) * 0.5 - _frame.position * _cell_size()).floor()
 
 
 func _draw() -> void:
 	if not combat_towers.is_empty():
 		var tower: Dictionary = combat_towers[0]
-		_draw_tower(tower, _tower_foot(tower["cell"]))
+		_draw_tower(tower, _tower_foot(tower["cell"], tower.get("footprint", Vector2i.ONE)))

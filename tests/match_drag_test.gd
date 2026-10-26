@@ -150,6 +150,7 @@ func _counterpart_terrain_gestures() -> void:
 	main.planning._publish_combat()
 	var rubble: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(main.planning, center + Vector2i(-1, 0))
 	main.planning._host_combat.commanders[1]["obstacles"].append(rubble)
+	main.planning._host_combat.commanders[1]["obstacle_variants"].append(3)
 	main.planning._publish_combat()
 	await _settle()
 	_check(board.solo_mirror_placement, "The real solo screen enables mirrored placement validation")

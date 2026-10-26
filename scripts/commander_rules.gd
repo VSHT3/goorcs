@@ -12,7 +12,8 @@ const STASIS_SLOW: float = 0.40
 const STASIS_DURATION: float = 6.0
 const ABILITY_COOLDOWN: float = 45.0
 const CLEAR_COST: int = 25
-const OBSTACLE_COUNT: int = 3
+const OBSTACLE_COUNT: int = 9
+const OBSTACLE_VARIANT_COUNT: int = 4
 
 
 static func valid(id: StringName) -> bool:
@@ -59,20 +60,38 @@ static func generate(id: StringName, layout: PathLayout, rng: RandomNumberGenera
 			cell = Vector2i(x, y)
 			if not reserved.has(cell) and not layout.has_path(cell):
 				candidates.append(cell)
-	# Keep at least eight build cells on ordinary boards; tiny custom boards
-	# still need one quarter of their ground free in addition to the route.
-	var minimum_build_cells: int = mini(8, maxi(1, layout.dimensions.x * layout.dimensions.y / 4))
-	if candidates.size() < OBSTACLE_COUNT + 1 + minimum_build_cells:
+	# Reserve one real horizontal building footprint before choosing terrain.
+	# Each independently generated board must have room for an Orcapult.
+	var build_pairs: Array[Vector2i] = []
+	for candidate: Vector2i in candidates:
+		var neighbor: Vector2i = candidate + Vector2i.RIGHT
+		if layout.contains(neighbor) and not reserved.has(neighbor) and not layout.has_path(neighbor):
+			build_pairs.append(candidate)
+	if build_pairs.is_empty():
 		return {}
-	for index: int in range(OBSTACLE_COUNT + 1):
+	var build_anchor: Vector2i = build_pairs[rng.randi_range(0, build_pairs.size() - 1)]
+	var minimum_build_cells: int = mini(8, maxi(2, layout.dimensions.x * layout.dimensions.y / 4))
+	var obstacle_count: int = mini(OBSTACLE_COUNT, layout.dimensions.x * layout.dimensions.y / 14)
+	obstacle_count = mini(obstacle_count, candidates.size() - minimum_build_cells - 1)
+	if obstacle_count < 0:
+		return {}
+	candidates.erase(build_anchor)
+	candidates.erase(build_anchor + Vector2i.RIGHT)
+	for index: int in range(obstacle_count + 1):
 		var other: int = rng.randi_range(index, candidates.size() - 1)
 		var swap: Vector2i = candidates[index]
 		candidates[index] = candidates[other]
 		candidates[other] = swap
 	var obstacles: Array[Vector2i] = []
-	for index: int in range(1, OBSTACLE_COUNT + 1):
-		obstacles.append(candidates[index])
+	# A host-rolled rotation guarantees all four looks on ordinary boards.
+	# Parallel metadata follows its occupied cell through removals and growth.
+	var obstacle_variants: Array[int] = []
+	var variant_offset: int = rng.randi_range(0, OBSTACLE_VARIANT_COUNT - 1)
+	for index: int in range(obstacle_count):
+		obstacles.append(candidates[index + 1])
+		obstacle_variants.append((index + variant_offset) % OBSTACLE_VARIANT_COUNT)
 	return {
 		"id": String(id), "landmark": candidates[0], "obstacles": obstacles,
+		"obstacle_variants": obstacle_variants,
 		"ability_remaining": 0.0, "cooldown_remaining": 0.0, "ability_target": -1,
 	}

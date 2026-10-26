@@ -18,6 +18,7 @@ func _init() -> void:
 	_test_wave_clear_waits_for_flights()
 	_test_sandbox_self_throw()
 	_test_renderer_capture()
+	_test_art_geometry()
 	if failures == 0:
 		print("PASS: Orcapult grabs the nearest throwable enemies, slams their neighbours, lands them on the opponent's board after the flight, respects lift/boss/re-throw limits, upgrades through Double Scoop, Siege Arm and Long Toss, holds wave clear while airborne, self-throws in Sandbox and renders flights")
 	quit(1 if failures else 0)
@@ -231,3 +232,52 @@ func _test_renderer_capture() -> void:
 	_check(boards[0]._flight_traces.size() == 1, "A republished flight is not duplicated")
 	for board: PathBoard in boards:
 		board.free()
+
+
+func _test_art_geometry() -> void:
+	var rules := _rules()
+	var guide := TowerGuide.new()
+	guide.configure(rules.catalog, rules)
+	var board := PathBoard.new()
+	board.layout = PathLayout.new(Vector2i(14, 9), 40, Vector2i(13, 4), Vector2i(0, 4))
+	board.size = Vector2(14, 9) * 48.0
+	var portrait := TowerPortrait.new()
+	portrait.size = Vector2(108, 128)
+	for record: Dictionary in guide.entries:
+		if record["id"] != &"orcapult":
+			continue
+		for stage: Dictionary in record["stages"]:
+			var preview: Dictionary = guide.preview(&"orcapult", stage["id"])
+			var tower: Dictionary = preview["tower"]
+			var reward: TowerReward = preview["reward"]
+			board._tower_art["orcapult"] = reward
+			var variant: Dictionary = board._tower_variant(tower, reward)
+			var base: Texture2D = variant.get("texture", reward.board_texture)
+			_check(base.get_size() == reward.icon_texture.get_size() and base.get_width() > base.get_height(), "Every Orcapult stage uses the same native wide base canvas: %s" % stage["id"])
+			var cups: Array[Vector2] = []
+			for mirrored: bool in [false, true]:
+				board.mirror_horizontal = mirrored
+				var geometry: Dictionary = board._catapult_geometry(tower)
+				var scale: Vector2 = geometry["scale"]
+				_check(is_equal_approx(scale.x, scale.y), "Orcapult pixels stay square on both board orientations: %s" % stage["id"])
+				var foot: Vector2 = board._tower_foot(tower["cell"], tower["footprint"])
+				for angle: float in [PathBoard.CATAPULT_FIRED, 22.0, PathBoard.CATAPULT_COCKED]:
+					var cup: Vector2 = board._catapult_cup(geometry, angle) - foot
+					if not mirrored:
+						cups.append(cup)
+					else:
+						var original: Vector2 = cups.pop_front()
+						_check(cup.is_equal_approx(Vector2(-original.x, original.y)), "The launch cup follows the same reflected arm arc: %s" % stage["id"])
+			portrait.configure(preview)
+			var portrait_geometry: Dictionary = portrait._catapult_geometry(tower)
+			var portrait_scale: Vector2 = portrait_geometry["scale"]
+			_check(is_equal_approx(portrait_scale.x, portrait_scale.y), "Shared guide renderer never widens the Orcapult arm: %s" % stage["id"])
+			var arm: Texture2D = portrait_geometry["arm"]
+			var arm_bounds: Rect2 = portrait._texture_bounds[arm]
+			var foot: Vector2 = portrait._tower_foot(tower["cell"], tower["footprint"])
+			for angle: int in range(int(PathBoard.CATAPULT_FIRED), int(PathBoard.CATAPULT_COCKED) + 1, 4):
+				for corner: Vector2 in [arm_bounds.position, Vector2(arm_bounds.end.x, arm_bounds.position.y), arm_bounds.end, Vector2(arm_bounds.position.x, arm_bounds.end.y)]:
+					var point: Vector2 = Vector2(portrait_geometry["pivot"]) + (corner - reward.catapult_arm_pivot).rotated(deg_to_rad(float(angle))) * portrait_scale
+					_check(portrait._frame.has_point((point - foot) / portrait._cell_size()), "Guide framing contains the whole arm swing: %s" % stage["id"])
+	portrait.free()
+	board.free()

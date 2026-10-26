@@ -13,8 +13,13 @@ func _on_planning_changed() -> void:
 		_update_ballista_boards()
 
 func _fixture_reserved_cells() -> Array[Vector2i]:
-	# Keep authored routes and legal build sites unchanged. Reserve the aura
-	# footprint too: these scenarios assert tower behavior without landmark buffs.
+	var reserved: Array[Vector2i] = _fixture_builds()
+	for x: int in range(planning._dimensions.x):
+		reserved.append(Vector2i(x, 4))
+	return reserved
+
+
+func _fixture_builds() -> Array[Vector2i]:
 	var builds: Array[Vector2i] = []
 	match _scenario:
 		"rolls":
@@ -29,13 +34,17 @@ func _fixture_reserved_cells() -> Array[Vector2i]:
 			builds = [Vector2i(0, 3), Vector2i(1, 3), Vector2i(2, 3), Vector2i(1, 2), Vector2i(0, 2)]
 		"ballista":
 			builds = [Vector2i(4, 3)]
+	return builds
+
+
+func _fixture_landmark_exclusions() -> Array[Vector2i]:
+	# Only landmarks have a buff radius; ordinary obstacles need not be kept
+	# out of the entire aura footprint to preserve exact tower-only stats.
+	var builds: Array[Vector2i] = _fixture_builds()
 	var reserved: Array[Vector2i] = []
 	for y: int in range(planning._dimensions.y):
 		for x: int in range(planning._dimensions.x):
 			var cell := Vector2i(x, y)
-			if y == 4:
-				reserved.append(cell)
-				continue
 			for build: Vector2i in builds:
 				if Vector2(cell).distance_to(Vector2(build)) <= CommanderRules.RADIUS:
 					reserved.append(cell)

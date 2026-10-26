@@ -21,12 +21,12 @@ title = "Orcapult"
 description = "A siege mangonel that grabs the nearest enemies and hurls them onto your opponent's board."
 icon_texture = ExtResource("2_icon")
 accent = Color(0.72, 0.5, 0.3, 1)
-board_height = 0.86
-board_anchor = Vector2(0.516, 0.9375)
+board_height = 0.92
+board_anchor = Vector2(0.5, 0.9375)
 board_texture = ExtResource("3_base")
 mirror_board = true
 catapult_arm_texture = ExtResource("4_arm")
-catapult_pivot = Vector2(70, 92)
+catapult_pivot = Vector2(104, 92)
 catapult_arm_pivot = Vector2(16, 70)
 board_variants = {
 "double_scoop": {"texture": ExtResource("3_base"), "catapult_arm_texture": ExtResource("13_scoop_arm")},

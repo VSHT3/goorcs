@@ -40,6 +40,8 @@ func validation_errors() -> PackedStringArray:
 		if id == &"" or tower_ids.has(id):
 			errors.append("Tower catalog contains an empty or duplicate ID '%s'." % id)
 		tower_ids[id] = true
+		if tower.footprint.x <= 0 or tower.footprint.y <= 0:
+			errors.append("Tower '%s' requires a positive rectangular footprint." % id)
 		if tower.damage_type not in [&"physical", &"fire", &"magic", &"lightning", &"explosive", &"ice"]:
 			errors.append("Tower '%s' has an unknown damage type." % id)
 		if tower.reward.title.is_empty() or tower.damage < 0 or (tower.behavior_kind in ["attack", "chain", "catapult"] and tower.damage == 0) or not is_finite(tower.range_cells) or tower.range_cells <= 0.0 or not is_finite(tower.interval) or tower.interval <= 0.0 or tower.cost <= 0 or tower.upgrade_base_cost <= 0 or tower.damage_upgrade_bonus <= 0 or not is_finite(tower.speed_upgrade_multiplier) or tower.speed_upgrade_multiplier <= 0.0 or tower.speed_upgrade_multiplier >= 1.0:

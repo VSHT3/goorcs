@@ -146,14 +146,14 @@ func _wait_tower(lane: String, slot: int, cell: Vector2i, mode: int) -> Dictiona
 	return {}
 
 
-func _assert_reserved_terrain_cells(reserved: Array[Vector2i]) -> void:
+func _assert_reserved_terrain_cells(reserved: Array[Vector2i], expected_obstacles: int = 9) -> void:
 	var commanders: Array = _snapshot("guest").get("combat", {}).get("commanders", [])
 	_check(commanders.size() == 2, "Fixture admission retains both real commander boards")
 	if commanders.size() != 2:
 		return
 	_check(commanders[0].get("id") != commanders[1].get("id") and commanders.all(func(state: Dictionary) -> bool: return state.get("id") in ["knight", "priestess"]), "Fixture admission retains two distinct legally drafted heroes")
 	for state: Dictionary in commanders:
-		_check(state.get("obstacles", []).size() == CommanderRules.OBSTACLE_COUNT and state.has("landmark"), "Each fixture retains its actual generated landmark and all obstacles")
+		_check(state.get("obstacles", []).size() == expected_obstacles and state.get("obstacle_variants", []).size() == expected_obstacles and state.has("landmark"), "Each fixture retains its area-scaled real obstacles, aligned appearances and permanent landmark")
 		for cell: Vector2i in reserved:
 			_check(state.get("landmark") != str(cell) and not state.get("obstacles", []).has(str(cell)), "Real commander terrain leaves authored fixture cell %s available" % cell)
 

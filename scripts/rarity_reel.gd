@@ -49,7 +49,7 @@ class ReelStrip extends Control:
 	const CARD_WIDTH: float = 136.0
 	const STRIDE: float = CARD_WIDTH
 	const CARD_HEIGHT: float = 184.0
-	const FONT: Font = preload("res://assets/fonts/PixelifySans.ttf")
+	const FONT: Font = preload("res://resources/ui/text_font.tres")
 	const NUMBERS: Font = preload("res://assets/fonts/silkscreen/Silkscreen-Regular.ttf")
 	const MARKER := Color("e0bc77")
 
@@ -467,7 +467,9 @@ func _layout() -> void:
 func _draw() -> void:
 	if not _busy or _panel == null:
 		return
-	draw_rect(Rect2(Vector2.ZERO, size), Color(0.015, 0.025, 0.020, 0.76))
+	# Accepted stats, traits and prices update immediately underneath this modal.
+	# Keep the full viewport opaque through the reveal hold, not only the spin.
+	draw_rect(Rect2(Vector2.ZERO, size), Color("040605"))
 	var panel := Rect2(_panel.position, _panel.size)
 	draw_rect(panel, Color("17251f"))
 	draw_rect(panel, FRAME, false, 2.0)

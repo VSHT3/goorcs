@@ -39,6 +39,13 @@ func _check_validation() -> void:
 	_check(not catalog.validation_errors().is_empty(), "A guaranteed starter must resolve within its injected catalog")
 	catalog.starter_tower_id = &""
 	_check(catalog.validation_errors().is_empty(), "Injected catalogs may omit a guaranteed starter")
+	var original_footprint: Vector2i = catalog.towers[0].footprint
+	for invalid: Vector2i in [Vector2i.ZERO, Vector2i(0, 1), Vector2i(2, -1)]:
+		catalog.towers[0].footprint = invalid
+		_check(not catalog.validation_errors().is_empty(), "Zero and negative tower footprint dimensions are rejected")
+	catalog.towers[0].footprint = Vector2i(2, 2)
+	_check(catalog.validation_errors().is_empty(), "Positive rectangular footprints are resource-owned, not limited to shipped tower IDs")
+	catalog.towers[0].footprint = original_footprint
 	catalog.towers.append(catalog.towers[0])
 	_check(not catalog.validation_errors().is_empty(), "Duplicate tower IDs are rejected")
 	catalog.towers.pop_back()

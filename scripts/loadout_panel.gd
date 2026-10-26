@@ -14,7 +14,7 @@ var _status: Label
 var _notice: Label
 var _pending_selection: Array[StringName] = []
 var _pending_commit: bool = false
-var guess_input: SpinBox
+var guess_input: LineEdit
 var guess_button: Button
 var _pending_guess: bool = false
 var _title: Label
@@ -66,13 +66,12 @@ func _ready() -> void:
 	_guess_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_guess_row.add_theme_constant_override("separation", 12)
 	column.add_child(_guess_row)
-	guess_input = SpinBox.new()
+	guess_input = LineEdit.new()
 	guess_input.name = "CommanderGuess"
-	guess_input.min_value = 0
-	guess_input.max_value = 100
-	guess_input.step = 1
-	guess_input.rounded = true
-	guess_input.value = 50
+	guess_input.max_length = 3
+	guess_input.add_theme_font_override("font", preload("res://assets/fonts/silkscreen/Silkscreen-Regular.ttf"))
+	guess_input.text_changed.connect(func(_text: String) -> void: _refresh())
+	guess_input.text_submitted.connect(func(_text: String) -> void: _submit_guess())
 	guess_input.custom_minimum_size = Vector2(140, 48)
 	_guess_row.add_child(guess_input)
 	guess_button = _button("LockCommanderGuess")
@@ -148,12 +147,22 @@ func _button(control_name: String) -> GameMenuButton:
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	return button
 
+func _valid_guess() -> bool:
+	var text: String = guess_input.text
+	if text.is_empty():
+		return false
+	for character: String in text:
+		if character < "0" or character > "9":
+			return false
+	return text.to_int() <= 100
+
+
 func _submit_guess() -> void:
-	if guess_button.disabled:
+	if guess_button.disabled or not _valid_guess():
 		return
 	_pending_guess = true
 	_notice.text = ""
-	if not planning.submit_commander_guess(int(guess_input.value)):
+	if not planning.submit_commander_guess(guess_input.text.to_int()):
 		_pending_guess = false
 	_refresh()
 
@@ -228,8 +237,8 @@ func _focus_phase() -> void:
 	var focus: Control = get_viewport().gui_get_focus_owner()
 	if focus != null and focus.is_visible_in_tree() and is_ancestor_of(focus):
 		return
-	if planning.commander_draft.get("phase", "") == "guessing" and not guess_button.disabled:
-		guess_input.get_line_edit().grab_focus()
+	if planning.commander_draft.get("phase", "") == "guessing" and guess_input.editable:
+		guess_input.grab_focus()
 	elif planning.commander_draft.get("phase", "") == "picking":
 		for button: Button in commander_buttons.values():
 			if not button.disabled:
@@ -250,6 +259,7 @@ func _refresh() -> void:
 	var picks: Array = draft.get("picks", ["", ""])
 	if not planning.selecting_loadout or planning.loadout_committed:
 		_clear_pending()
+		guess_input.clear()
 	elif planning.chosen_tower_ids == _pending_selection:
 		_pending_selection.clear()
 	if locked:
@@ -263,7 +273,7 @@ func _refresh() -> void:
 	_hint.visible = not loadout
 	_guess_row.visible = phase == "guessing"
 	guess_input.editable = not locked and not waiting
-	guess_button.disabled = locked or waiting or phase != "guessing" or not planning.selecting_loadout
+	guess_button.disabled = locked or waiting or phase != "guessing" or not planning.selecting_loadout or not _valid_guess()
 	guess_button.text = "Locked" if locked else ("Waiting…" if _pending_guess else "Lock guess")
 	_draft_reveal.visible = phase != "guessing"
 	if phase != "guessing":

@@ -119,12 +119,64 @@ func _run() -> void:
 	_solo_typed_sends(planning)
 	_solo_specials(planning)
 	_solo_last_targeting(planning)
+	_solo_footprints(planning)
 	planning.queue_free()
 	session.queue_free()
 	await process_frame
 	if failures == 0:
 		print("PASS: offline mirrored commands, enemy sends/income/delivery, ownership, transactions, waves, results, and fresh restart")
 	quit(1 if failures > 0 else 0)
+
+
+func _solo_footprints(planning: MatchPlanning) -> void:
+	var rules: CombatRules = _classic_rules()
+	rules.roll_rules = preload("res://resources/combat/tower_rolls.tres")
+	rules.starting_coins = 10000
+	rules.catalog.towers.append(preload("res://resources/combat/towers/orcapult.tres").duplicate(true) as TowerDefinition)
+	planning.combat_rules = rules
+	planning.start_singleplayer()
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"orcapult", &"arrow_tower"]) and planning.commit_loadout(), "Footprint fixture admits the real commander terrain and Orcapult loadout")
+	var cell := Vector2i(-1, -1)
+	for y: int in range(planning.layouts[0].dimensions.y):
+		for x: int in range(planning.layouts[0].dimensions.x - 1):
+			var candidate := Vector2i(x, y)
+			if planning._build_layout_clear(0, candidate, Vector2i(2, 1)) and planning._build_layout_clear(1, candidate, Vector2i(2, 1)):
+				cell = candidate
+				break
+		if cell.x >= 0:
+			break
+	_check(cell.x >= 0, "Generated terrain leaves common legal two-tile building ground")
+	if cell.x < 0:
+		planning.stop_singleplayer()
+		return
+	var second: Vector2i = cell + Vector2i.RIGHT
+	_check(planning._host_layouts[1].place(second), "Counterpart-only second-tile path fixture places")
+	planning._publish_snapshot()
+	var before: Dictionary = planning._host_combat.snapshot()
+	var random_state: int = planning._host_combat._roll_random.state
+	_check(not planning._apply_tower_command(1, "build", 0, cell, -1, 0, "orcapult") and planning._host_combat.snapshot() == before and planning._host_combat._roll_random.state == random_state, "Solo prevalidates every mirrored path cell before either purchase or RNG draw")
+	_check(not planning._apply_tower_command(2, "build", 1, cell, -1, 0, "orcapult") and planning._host_combat.snapshot() == before and planning._host_combat._roll_random.state == random_state, "The ordinary authoritative command consumer rejects a non-anchor path cell too")
+	planning._host_layouts[1].erase(second)
+	# A smaller counterpart board exercises its own bounds rather than assuming symmetry.
+	var original_dimensions: Vector2i = planning._host_layouts[1].dimensions
+	planning._host_layouts[1].dimensions.x = second.x
+	_check(not planning._apply_tower_command(1, "build", 0, cell, -1, 0, "orcapult") and planning._host_combat.snapshot() == before and planning._host_combat._roll_random.state == random_state, "Mirrored layout bounds reject a footprint before the first board mutates")
+	planning._host_layouts[1].dimensions = original_dimensions
+	_check(not planning._apply_tower_command(1, "build", 0, Vector2i(original_dimensions.x - 1, 0), -1, 0, "orcapult") and planning._host_combat.snapshot() == before and planning._host_combat._roll_random.state == random_state, "The host rejects a partial two-tile footprint at the outer board edge")
+	_check(planning._apply_tower_command(1, "build", 0, cell, -1, 0, "orcapult"), "Both clear footprints admit one atomic mirrored purchase")
+	for slot: int in range(2):
+		_check(planning.combat["towers"][slot].size() == 1 and planning.combat["towers"][slot][0]["footprint"] == Vector2i(2, 1) and planning._host_combat.has_tower(slot, second), "Published solo towers retain the full occupied rectangle on each board")
+	before = planning._host_combat.snapshot()
+	random_state = planning._host_combat._roll_random.state
+	planning.request_edit(0, second, true)
+	_check(not planning.layouts[0].has_path(second) and not planning.layouts[1].has_path(second) and planning._host_combat.snapshot() == before, "Path editing cannot cross either tower's non-anchor tile")
+	_check(not planning._apply_tower_command(1, "build", 0, second, -1, 0, "arrow_tower") and planning._host_combat.snapshot() == before and planning._host_combat._roll_random.state == random_state, "Solo overlap rejection neither spends nor rerolls on either board")
+	var tower_id: int = planning.combat["towers"][0][0]["id"]
+	planning.sell_tower(0, tower_id)
+	_check(planning.combat["towers"] == [[], []] and not planning._host_combat.has_tower(0, second) and not planning._host_combat.has_tower(1, second), "One tower-ID sale frees both full mirrored footprints")
+	planning.request_edit(0, second, true)
+	_check(planning.layouts[0].has_path(second) and planning.layouts[1].has_path(second), "Former second tiles become editable after mirrored sale")
+	planning.stop_singleplayer()
 
 
 func _solo_last_targeting(planning: MatchPlanning) -> void:

@@ -5,6 +5,7 @@ var failures: int = 0
 
 func _init() -> void:
 	_test_commands_and_snapshots()
+	_test_rectangular_footprints()
 	_test_targeting_policies()
 	_test_last_captured_route_targeting()
 	_test_range_and_ties()
@@ -134,6 +135,41 @@ func _run_wave(combat: MatchCombat, ticks: int = 2400) -> void:
 			return
 		combat.advance(1.0 / 60.0)
 	_check(combat.phase != MatchCombat.Phase.WAVE, "Wave completes within its deterministic simulation deadline")
+
+
+func _test_rectangular_footprints() -> void:
+	var rules := _catalog_rules()
+	rules.roll_rules = preload("res://resources/combat/tower_rolls.tres")
+	rules.starting_coins = 10000
+	var catapult := preload("res://resources/combat/towers/orcapult.tres").duplicate(true) as TowerDefinition
+	rules.catalog.towers.append(catapult)
+	var combat := MatchCombat.new(rules)
+	catapult.footprint = Vector2i.ONE
+	_check(combat.tower_footprint(&"orcapult") == Vector2i(2, 1) and combat.tower_footprint(&"arrow_tower") == Vector2i.ONE and combat.tower_footprint(&"missing") == Vector2i.ZERO, "Admitted footprint is detached from source edits; unknown types cannot silently become one-cell towers")
+	_check(combat.build(1, Vector2i(3, 1), &"arrow_tower", 0), "Counterpart obstruction fixture builds")
+	var before: Dictionary = combat.snapshot()
+	var random_state: int = combat._roll_random.state
+	_check(not combat.build_mirrored(0, Vector2i(2, 1), &"orcapult", 0) and combat.snapshot() == before and combat._roll_random.state == random_state, "A counterpart tower under only the second tile rejects both purchases without spending or rolling")
+	combat.sell_tower(1, combat.towers[1][0]["id"])
+	for terrain: Dictionary in [{"landmark": Vector2i(3, 1), "obstacles": [], "obstacle_variants": []}, {"landmark": Vector2i(9, 9), "obstacles": [Vector2i(3, 1)], "obstacle_variants": [0]}]:
+		combat.commanders[1] = terrain
+		before = combat.snapshot()
+		random_state = combat._roll_random.state
+		_check(not combat.build(1, Vector2i(2, 1), &"orcapult", 0) and not combat.build_mirrored(0, Vector2i(2, 1), &"orcapult", 0) and combat.snapshot() == before and combat._roll_random.state == random_state, "Landmarks and rubble under a non-anchor cell reject direct and mirrored transactions atomically")
+	combat.commanders[1] = {}
+	_check(combat.build_mirrored(0, Vector2i(2, 1), &"orcapult", 0), "Clear two-tile construction admits both boards")
+	var tower: Dictionary = combat.towers[0][0]
+	var counterpart: Dictionary = combat.towers[1][0]
+	_check(tower["footprint"] == Vector2i(2, 1) and tower["attributes"] == counterpart["attributes"] and tower["rarity"] == counterpart["rarity"], "Both occupied cells belong to one accepted tower and one shared placement roll")
+	_check(combat.has_tower(0, Vector2i(2, 1)) and combat.has_tower(0, Vector2i(3, 1)) and not combat.has_tower(0, Vector2i(4, 1)) and not combat.has_tower(0, Vector2i(2, 2)), "Occupancy covers the full half-open rectangle without growing range or adjacent rows")
+	before = combat.snapshot()
+	random_state = combat._roll_random.state
+	_check(not combat.build(0, Vector2i(3, 1), &"arrow_tower", 0) and not combat.build(0, Vector2i(1, 1), &"orcapult", 0) and combat.snapshot() == before and combat._roll_random.state == random_state, "One-cell and multi-cell towers reject any rectangle intersection without spending or rolling")
+	var decoded: Dictionary = CombatSnapshotCodec.decode_combat(CombatSnapshotCodec.encode_combat(before))
+	_check(decoded["tower_types"]["orcapult"]["footprint"] == Vector2i(2, 1) and decoded["towers"][0][0]["footprint"] == Vector2i(2, 1), "The reliable combat codec preserves Vector2i footprint metadata and accepted tower state")
+	combat.grow_for_main_round()
+	_check(tower["cell"] == Vector2i(2, 2) and tower["footprint"] == Vector2i(2, 1) and combat.has_tower(0, Vector2i(3, 2)) and not combat.has_tower(0, Vector2i(3, 1)), "Growth translates the anchor once and keeps both occupied cells together")
+	_check(combat.sell_tower(0, tower["id"]) and not combat.has_tower(0, Vector2i(2, 2)) and not combat.has_tower(0, Vector2i(3, 2)), "Selling one instance frees its entire footprint")
 
 
 func _test_commands_and_snapshots() -> void:

@@ -20,9 +20,10 @@ func configure(board: PathBoard) -> void:
 	_directional_canvas_sizes = board._directional_canvas_sizes
 	_tower["type_id"] = String(board._drag_placement_id)
 	_tower["cell"] = board._hover
+	_tower["footprint"] = tower_types[_tower["type_id"]].get("footprint", Vector2i.ONE)
 	modulate = Color(1.0, 1.0, 1.0, 0.48) if board._placement_is_legal(board._hover, _tower["type_id"]) else Color(1.0, 0.32, 0.25, 0.48)
 	queue_redraw()
 
 
 func _draw() -> void:
-	_draw_tower(_tower, _tower_foot(_tower["cell"]))
+	_draw_tower(_tower, _tower_foot(_tower["cell"], _tower["footprint"]))

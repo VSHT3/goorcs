@@ -278,8 +278,8 @@ func _build_boss_bars() -> void:
 	)
 
 
-# Both overlays draw above the HUD panels but take no input; the banner keeps
-# itself clear of the right-side panels and notices it is given.
+# Both overlays draw above the HUD without taking input. Only boss announcements
+# avoid inspection panels and notices; round rewards keep their viewport centre.
 func _build_match_feedback() -> void:
 	health_feedback = BaseHealthFeedback.new()
 	health_feedback.bar = _health_bar
@@ -415,7 +415,7 @@ func _refresh_commander() -> void:
 	var id := StringName(state["id"])
 	var remaining: float = state.get("ability_remaining", 0.0)
 	var cooldown: float = state.get("cooldown_remaining", 0.0)
-	_commander_title.text = "Rubble" if obstacle and not combat else CommanderRules.title(id)
+	_commander_title.text = "Obstacle" if obstacle and not combat else CommanderRules.title(id)
 	if landmark and not combat:
 		_commander_title.text = "Bastion · Physical +15%" if id == &"knight" else "Sanctuary · Rate +15%"
 	elif combat and remaining > 0.0:
@@ -788,7 +788,7 @@ func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
 		_refresh()
 		return
 	for tower: Dictionary in boards[slot].combat_towers:
-		if tower["cell"] == cell:
+		if Rect2i(tower["cell"], tower.get("footprint", Vector2i.ONE)).has_point(cell):
 			cancel_strokes()
 			_placement_id = &""
 			selected_tower_id = int(tower["id"])
@@ -1760,7 +1760,10 @@ func _undo_clear(slot: int) -> void:
 	_cleared_path.clear()
 	var occupied: Dictionary[Vector2i, bool] = {}
 	for tower: Dictionary in planning.combat.get("towers", [[], []])[slot]:
-		occupied[tower["cell"]] = true
+		var footprint := Rect2i(tower["cell"], tower.get("footprint", Vector2i.ONE))
+		for y: int in range(footprint.position.y, footprint.end.y):
+			for x: int in range(footprint.position.x, footprint.end.x):
+				occupied[Vector2i(x, y)] = true
 	for cell: Vector2i in cells:
 		if not occupied.has(cell):
 			planning.request_edit(slot, cell, true)

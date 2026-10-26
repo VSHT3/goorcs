@@ -75,7 +75,7 @@ The current wave's routing graph and each enemy's assigned shortest route are pr
 
 Buildings also use square-grid placement. Building, upgrading, and selling remain available during combat, but must not invalidate the current route. The intended future relocation system preserves upgrades and traits and is free during breaks only; relocation is not implemented.
 
-Future major upgrades may expand their occupied footprint. Such an upgrade would require surrounding space and could not overlap another building or obstruct the route. Current branches retain one-cell footprints; expanding footprints are not implemented.
+Orcapult occupies two horizontal tiles from initial placement through every upgrade; other towers occupy one tile. All occupied cells must avoid paths, terrain, board edges, and other buildings. Future upgrades that change an existing tower's footprint would require surrounding-space validation; upgrade-time expansion is not implemented.
 
 ### Implemented sandbox
 
@@ -97,9 +97,11 @@ Sandbox uses the actual `MatchCombat`, `PathLayout`, sprite/inspector, and camer
 
 **Confirmed:** the starting hero is an off-board commander, not a controllable character or a defender placed on the battlefield. Normal defenses are mostly physical structures. Commanders can provide identity and special rules without adding character movement to the camera-controlled game.
 
-**Confirmed and implemented:** commander choice determines the board, not an independent map selection. Each board is generated independently after both loadouts commit. It receives one permanent signature landmark at a randomized valid location and three random rubble obstacles. Landmarks and uncleared rubble block both construction and path placement. Generation reserves a shortest legal entrance-to-crystal corridor within the tile budget and at least eight ordinary-board build cells; terrain does not spend path budget. Sandbox remains unchanged and has no commander draft/terrain/abilities.
+**Confirmed and implemented:** commander choice determines the board, not an independent map selection. Each board is generated independently after both loadouts commit. Standard boards receive one permanent signature landmark and nine removable obstacles with four host-assigned looks: split boulder, broken masonry, stump/log, and ruined barricade. Compact configurations reduce density. Landmarks and uncleared obstacles block construction and path placement. Generation reserves a shortest legal corridor within the path budget, a horizontal two-cell building space, and at least eight ordinary-board build cells; terrain does not spend path budget. Sandbox remains unchanged and has no commander draft/terrain/abilities.
 
 **Mandatory draft on every fresh match/replay/admission:** the host rolls one hidden integer **0–100 inclusive**. Both players lock one immutable integer guess in that range; neither guess nor the target is revealed until both are locked. Closest to the target picks first; equal distances use one host-owned coin flip. Picks are ordered, irreversible, and exclusive: one **Knight**, one **Priestess**. Tower selection/commitment unlocks only after both picks, and board planning still waits for both loadout commitments.
+
+The hidden target favours **67 with probability 1/3 when the preceding target was not 67**. After 67, the next target cannot be 67. Every non-67 result is uniform over the remaining 100 integers, including 0 and 100. The host retains the previous target across replay/rejoin/match resets for the running application's lifetime; restarting the application clears that memory. Solo opponent guesses remain unbiased integers from 0 through 100.
 
 - **Knight:** the permanent **Bastion** gives own Physical attacking towers **+15% damage within 2.5 cells**. **Rally** gives all own attacking towers **+30% attack rate for 8 simulation seconds**, not just those near the landmark.
 - **Priestess:** the permanent **Sanctuary** gives own attacking towers **+15% attack rate within 2.5 cells**. **Stasis** targets either the own or opposing board, slowing its enemies by **40% for 6 simulation seconds**, including enemies arriving during the effect. It does not disable or destroy towers.
@@ -166,7 +168,7 @@ Random upgrade/reward offers and gambling beyond these two tower rerolls remain 
 
 ### Implemented tower progression branches
 
-Purchased upgrades and permanent per-tower branch choices replace duplicate merging. The current branches retain one-cell footprints; relocation and larger occupied footprints remain future work.
+Purchased upgrades and permanent per-tower branch choices replace duplicate merging. Orcapult retains a two-by-one footprint through its branches; other towers retain one cell. Relocation and upgrade-time footprint expansion remain future work.
 
 - **Arrow:** damage/speed → Second Archer → one exclusive branch: Four → Eight Archers → three-crew Arrow Minigun; Fire Arrows → Molotov Cocktails → Quick Pitch → single-operator Flamethrower; or Bomb Arrows → Bigger Explosions → Anti-Orc Grenades → A.O.M. → two 10% Rapid Reload upgrades. See [prices, fuel rules, and verification](archer-advancements.md).
 - **Ballista:** upgrades → permanent Pierce 2 (then Bigger Wood I–II and The Biggest Wood I–III) or Bounce 1 (then Magic Ballista, Double Magic, Stronger Magic and S.U.M.G.G.M.); compatible rolled extra hits add to purchased mechanics. The host continuously acquires/reacquires tracking targets independently of reload and released-shot aim; the shared renderer follows only accepted targets using the authored eight weapon views over fixed masonry.

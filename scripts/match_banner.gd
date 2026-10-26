@@ -23,7 +23,7 @@ const VALUE_TEXT := Color(0.90, 0.88, 0.81)
 const MAX_QUEUE: int = 3
 
 var catalog: ContentCatalog
-## Visible HUD panels the banner keeps clear of (inspection, notices).
+## Visible HUD panels boss announcements keep clear of.
 var avoid: Array[Control] = []
 var _run: String = ""
 var _clears: int = -1
@@ -192,10 +192,11 @@ func _gains_width() -> float:
 	return maxf(0.0, width - 14.0)
 
 
-## Centered over the free span of the world, below the header and clear of any
-## visible right-side panel or notice.
+## Round rewards stay viewport-centered; boss announcements avoid other panels.
 func panel_rect() -> Rect2:
 	var panel_size: Vector2 = _panel_size()
+	if _current.get("kind", "") == "round":
+		return Rect2(Vector2(floorf((size.x - panel_size.x) * 0.5), TOP), panel_size)
 	var left: float = MARGIN
 	var right: float = size.x - MARGIN
 	for control: Control in avoid:

@@ -267,6 +267,7 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 		_tower_types[type_id] = {
 			"title": definition.reward.title, "damage": definition.damage,
 			"damage_type": definition.damage_type,
+			"footprint": definition.footprint,
 			"range": definition.range_cells, "interval": definition.interval,
 			"cost": definition.cost, "upgrade_base_cost": definition.upgrade_base_cost,
 			"damage_upgrade_bonus": definition.damage_upgrade_bonus,
@@ -325,7 +326,9 @@ func clear_obstacle(slot: int, cell: Vector2i) -> bool:
 
 func _clear_obstacle_accepted(slot: int, cell: Vector2i) -> void:
 	coins[slot] -= CommanderRules.CLEAR_COST
-	commanders[slot]["obstacles"].erase(cell)
+	var obstacle_index: int = commanders[slot]["obstacles"].find(cell)
+	commanders[slot]["obstacles"].remove_at(obstacle_index)
+	commanders[slot]["obstacle_variants"].remove_at(obstacle_index)
 	_recap.add(slot, "spent", "terrain", CommanderRules.CLEAR_COST)
 	_sound_events.record(CombatSoundEvents.Cue.PURCHASE, slot, Vector2(cell), _death_time)
 
@@ -400,8 +403,26 @@ func _refresh_commander_motion(slot: int) -> void:
 		_prepare_motion(enemy)
 
 
+func tower_footprint(type_id: StringName) -> Vector2i:
+	var definition: Dictionary = _tower_types.get(String(type_id), {})
+	return Vector2i.ZERO if definition.is_empty() else definition.get("footprint", Vector2i.ONE)
+
+
 func _can_build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
-	return _roster_configuration_valid and phase != Phase.FINISHED and _valid_slot(slot) and _valid_mode(mode) and _tower_types.has(String(type_id)) and not has_tower(slot, cell) and not terrain_blocks(slot, cell) and (_sandbox_mode or coins[slot] >= int(_tower_types[String(type_id)]["cost"]))
+	if not _roster_configuration_valid or phase == Phase.FINISHED or not _valid_slot(slot) or not _valid_mode(mode) or not _tower_types.has(String(type_id)):
+		return false
+	var definition: Dictionary = _tower_types[String(type_id)]
+	if not _sandbox_mode and coins[slot] < int(definition["cost"]):
+		return false
+	var occupied: Rect2i = TowerDefinition.footprint_rect(cell, definition.get("footprint", Vector2i.ONE))
+	for tower: Dictionary in towers[slot]:
+		if occupied.intersects(TowerDefinition.footprint_rect(tower["cell"], tower.get("footprint", Vector2i.ONE))):
+			return false
+	for y: int in range(occupied.position.y, occupied.end.y):
+		for x: int in range(occupied.position.x, occupied.end.x):
+			if terrain_blocks(slot, Vector2i(x, y)):
+				return false
+	return true
 
 
 func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
@@ -431,6 +452,7 @@ func _build_accepted(slot: int, cell: Vector2i, type_id: StringName, mode: int, 
 	var cost: int = definition["cost"]
 	towers[slot].append({
 		"id": _next_tower_id, "cell": cell, "type_id": String(type_id), "mode": mode, "cooldown": 0.0,
+		"footprint": definition.get("footprint", Vector2i.ONE),
 		"target_id": -1, "shot": 0, "aim": Vector2(cell),
 		"stunned_remaining": 0.0, "stun_count": 0, "stun_source": "", "stun_position": Vector2(cell),
 		"tracking_target_id": -1, "tracking_aim": Vector2(cell),
@@ -944,7 +966,7 @@ func has_tower(slot: int, cell: Vector2i) -> bool:
 	if not _valid_slot(slot):
 		return false
 	for tower: Dictionary in towers[slot]:
-		if tower["cell"] == cell:
+		if TowerDefinition.footprint_rect(tower["cell"], tower.get("footprint", Vector2i.ONE)).has_point(cell):
 			return true
 	return false
 

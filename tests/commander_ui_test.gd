@@ -33,6 +33,20 @@ func _run() -> void:
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
 	planning = main.planning
+	await _settle()
+	var panel: LoadoutPanel = main.play_screen.loadout_panel
+	_check(panel.guess_input.text.is_empty() and panel.guess_button.disabled, "A fresh draft starts empty and cannot submit an implicit guess")
+	for text: String in ["", "-1", "101", "1.5", "abc"]:
+		panel.guess_input.text = text
+		panel.guess_input.text_changed.emit(text)
+		panel.guess_input.text_submitted.emit(text)
+		_check(not planning.commander_draft["guess_locked"][0] and panel.guess_button.disabled, "Invalid guess cannot lock: " + text)
+	for text: String in ["0", "100"]:
+		panel.guess_input.text = text
+		panel.guess_input.text_changed.emit(text)
+		_check(not panel.guess_button.disabled, "Inclusive guess boundary can be submitted: " + text)
+	panel.guess_input.text_submitted.emit("100")
+	_check(planning.commander_draft["guess_locked"][0] and int(planning.commander_draft["guesses"][0]) == 100, "Enter locks the explicitly entered guess without clamping")
 	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Native commander UI fixture completes the real solo draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Native commander UI fixture starts an accepted run")
 	screen = main.play_screen.planning_screen
@@ -69,6 +83,7 @@ func _run() -> void:
 	_grow(2)
 	await _settle()
 	_check(planning.combat["board_origin_y"] == -1 and planning._host_combat.commanders[0]["obstacles"] == [UPPER + Vector2i.DOWN, LOWER + Vector2i.DOWN], "Real host growth shifts both adjacent obstacles while the upper enters the old lower coordinate")
+	_check(planning.combat["commanders"][0]["obstacle_variants"] == [2, 3], "Accepted UI growth retains each neighboring obstacle's distinct appearance")
 	_check(_selected(NO_CELL) and not screen._commander_panel.is_visible_in_tree(), "Growth invalidates rubble selection before the old coordinate can retarget its upper neighbor")
 	_assert_stale_clear_inert("Stale rubble Clear cannot remove its different upper neighbor or charge Coins after growth")
 
@@ -90,6 +105,7 @@ func _run() -> void:
 	var coins: int = planning._host_combat.coins[0]
 	await _click(screen.obstacle_clear_button.get_global_rect().get_center())
 	_check(planning._host_combat.coins[0] == coins - CommanderRules.CLEAR_COST and planning._host_combat.commanders[0]["obstacles"] == [UPPER + Vector2i.DOWN * 2], "A fresh native Clear click charges exactly once and removes only the newly selected lower rubble")
+	_check(planning.combat["commanders"][0]["obstacle_variants"] == [2], "Native Clear removes only the selected obstacle's appearance and keeps its neighbor unchanged")
 
 	planning.stop_singleplayer()
 	await create_timer(MenuAudio.CLACK.get_length() + 0.5).timeout
@@ -105,7 +121,7 @@ func _run() -> void:
 func _seed_terrain() -> void:
 	var states: Array[Dictionary] = []
 	for id: StringName in planning._host_commander_ids:
-		states.append({"id": String(id), "landmark": LANDMARK, "obstacles": [UPPER, LOWER] as Array[Vector2i], "ability_remaining": 0.0, "cooldown_remaining": 0.0, "ability_target": -1})
+		states.append({"id": String(id), "landmark": LANDMARK, "obstacles": [UPPER, LOWER] as Array[Vector2i], "obstacle_variants": [2, 3] as Array[int], "ability_remaining": 0.0, "cooldown_remaining": 0.0, "ability_target": -1})
 	planning._host_combat.configure_commanders(states)
 	planning._host_combat.coins = [100, 100]
 	planning._publish_snapshot()

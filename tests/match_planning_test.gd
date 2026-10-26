@@ -62,11 +62,14 @@ func _run() -> void:
 	await _wait_for("guest", {"active": true, "locked": false, "flags": [false, false]}, "Rejoin begins fresh planning")
 	await _wait_board("host", 0, 0, false)
 	await _wait_board("guest", 1, 0, false)
-	# Fill the host budget with disconnected cells: host rejects the 31st tile.
+	# Fill the host budget with genuinely unblocked disconnected cells, then
+	# probe one additional legal ground cell so terrain cannot mask the cap.
 	var placed: int = 0
+	var state: Dictionary = _snapshot("host")["combat"]["commanders"][0]
 	for y: int in range(3):
 		for x: int in range(14):
-			if placed < 31:
+			var cell := Vector2i(x, y)
+			if placed < 31 and state["landmark"] != str(cell) and not state["obstacles"].has(str(cell)):
 				await _edit("host", 0, x, y)
 				placed += 1
 	await _wait_board("guest", 0, 30, false)

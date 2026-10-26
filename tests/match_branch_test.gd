@@ -71,7 +71,7 @@ func _assert_fixture_terrain(combat: Dictionary) -> void:
 	var choices: Array[String] = []
 	for commander: Dictionary in combat["commanders"]:
 		choices.append(String(commander["id"]))
-		_check(commander["obstacles"].size() == CommanderRules.OBSTACLE_COUNT, "Each branch board retains its full real generated obstacle set")
+		_check(commander["obstacles"].size() == 2 and commander["obstacle_variants"].size() == 2, "Each compact branch board retains its area-scaled real obstacles and host-owned appearances")
 		var terrain: Array = commander["obstacles"].duplicate()
 		terrain.append(commander["landmark"])
 		for cell: Variant in terrain:

@@ -98,9 +98,30 @@ func _run() -> void:
 	_restart_exact_test()
 	_restart_weighted_test()
 	_restart_editing_test()
+	_footprint_test()
 	if failures == 0:
 		print("PASS: sandbox isolation, content, free evolution, maps, playback, invincible lives and combat-owned last-test restart")
 	quit(1 if failures > 0 else 0)
+
+
+func _footprint_test() -> void:
+	var sandbox := SandboxController.new()
+	sandbox.configure(catalog, CombatRules.new())
+	var before: Dictionary = sandbox.combat.snapshot()
+	var random_state: int = sandbox.combat._roll_random.state
+	_check(not sandbox.build(Vector2i(13, 0), &"orcapult") and not sandbox.build(Vector2i(-1, 0), &"orcapult") and sandbox.combat.snapshot() == before and sandbox.combat._roll_random.state == random_state, "Sandbox rejects partial footprints beyond either board edge without rolling")
+	_check(sandbox.edit_path(Vector2i(3, 1), true), "Footprint path fixture places")
+	before = sandbox.combat.snapshot()
+	_check(not sandbox.build(Vector2i(2, 1), &"orcapult") and sandbox.combat.snapshot() == before and sandbox.combat._roll_random.state == random_state, "A path under only the second tile rejects the whole Sandbox build")
+	_check(not sandbox.build(Vector2i(12, 4), &"orcapult"), "A base endpoint under only the second tile rejects Sandbox construction")
+	sandbox.edit_path(Vector2i(3, 1), false)
+	_check(sandbox.build(Vector2i(12, 0), &"orcapult"), "Sandbox permits a footprint ending exactly at the board edge")
+	var tower: Dictionary = sandbox.combat.towers[0][0]
+	_check(tower["footprint"] == Vector2i(2, 1) and sandbox.combat.has_tower(0, Vector2i(13, 0)), "Sandbox uses actual admitted Orcapult footprint")
+	before = sandbox.combat.snapshot()
+	random_state = sandbox.combat._roll_random.state
+	_check(not sandbox.build(Vector2i(13, 0), &"arrow_tower") and not sandbox.edit_path(Vector2i(13, 0), true) and sandbox.combat.snapshot() == before and sandbox.combat._roll_random.state == random_state, "Sandbox cannot build or paint paths over the second occupied tile")
+	_check(sandbox.sell(tower["id"]) and sandbox.edit_path(Vector2i(13, 0), true), "A Sandbox sale frees the second tile for path editing")
 
 
 func _replay_sandbox(summoning_wave: bool = false) -> SandboxController:

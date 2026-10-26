@@ -85,6 +85,10 @@ func _execute_command(command: Dictionary) -> void:
 			_last_result = planning.request_commander_ability(int(command["target"]))
 		"obstacle":
 			_last_result = planning.request_clear_obstacle(Vector2i(int(command["x"]), int(command["y"])))
+		"grow":
+			if _session.is_host:
+				planning._grow_to_round(20)
+				planning._publish_snapshot()
 		"forged":
 			var cell := Vector2i(int(command.get("x", 0)), int(command.get("y", 0)))
 			var action: String = command["command"]
@@ -120,7 +124,11 @@ func _execute_command(command: Dictionary) -> void:
 func _publish() -> void:
 	if planning != null and not _directory.is_empty() and not _executing_command:
 		var file := FileAccess.open(_path("commander") + ".tmp", FileAccess.WRITE)
-		file.store_string(JSON.stringify({"selecting": planning.selecting_loadout, "chosen_commander": String(planning.chosen_commander_id), "commander_ids": planning.commander_ids, "commander_draft": planning.commander_draft, "committed": planning.loadout_committed, "chosen_deck": planning.chosen_tower_ids, "fence": (planning as CommanderPlanning).fence_id}))
+		# Local test observation only; never included in a gameplay peer snapshot.
+		var observed: Dictionary = {"selecting": planning.selecting_loadout, "chosen_commander": String(planning.chosen_commander_id), "commander_ids": planning.commander_ids, "commander_draft": planning.commander_draft, "committed": planning.loadout_committed, "chosen_deck": planning.chosen_tower_ids, "fence": (planning as CommanderPlanning).fence_id}
+		if _session.is_host:
+			observed["authority_target"] = planning._host_draft_target
+		file.store_string(JSON.stringify(observed))
 		file.close()
 		DirAccess.rename_absolute(_path("commander") + ".tmp", _path("commander"))
 	super._publish()

@@ -47,8 +47,17 @@ func _fixture_reserved_cells() -> Array[Vector2i]:
 		Vector2i(2, 2), Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 2),
 		Vector2i(0, 3), Vector2i(2, 3), Vector2i(4, 3), Vector2i(6, 3),
 	]
-	# These legacy scenarios assert exact tower-only stats and attack timing.
-	# Keep real landmarks outside their aura radius, not outside the match.
+	reserved.append_array(builds)
+	return reserved
+
+
+func _fixture_landmark_exclusions() -> Array[Vector2i]:
+	var reserved: Array[Vector2i] = []
+	var builds: Array[Vector2i] = [
+		Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 3),
+		Vector2i(2, 2), Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 2),
+		Vector2i(0, 3), Vector2i(2, 3), Vector2i(4, 3), Vector2i(6, 3),
+	]
 	for cell: Vector2i in builds:
 		for y: int in range(cell.y - 2, cell.y + 3):
 			for x: int in range(cell.x - 2, cell.x + 3):

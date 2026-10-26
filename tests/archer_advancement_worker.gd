@@ -5,6 +5,13 @@ func _fixture_reserved_cells() -> Array[Vector2i]:
 	var reserved: Array[Vector2i] = []
 	for x: int in range(planning.layouts[0].dimensions.x):
 		reserved.append(Vector2i(x, planning.layouts[0].entrance.y))
+	for x: int in [0, 2, 4, 6, 8]:
+		reserved.append(Vector2i(x, 3))
+	return reserved
+
+
+func _fixture_landmark_exclusions() -> Array[Vector2i]:
+	var reserved: Array[Vector2i] = []
 	# This fixture observes the baseline first volley after all six spawns.
 	# Sanctuary enables event-boundary attacks on both boards, before that
 	# observation; keep real landmarks outside every authored tower's aura.

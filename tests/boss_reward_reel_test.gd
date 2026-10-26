@@ -22,6 +22,7 @@ func _run() -> void:
 	_test_floor()
 	_test_history_cursor()
 	await _test_planning_consumer()
+	await _test_sandbox_consumer()
 	main.queue_free()
 	await create_timer(0.25).timeout
 	for file: String in DirAccess.get_files_at(directory):
@@ -176,8 +177,10 @@ func _test_planning_consumer() -> void:
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Reward fixture enters an admitted real solo match")
 	planning.set_physics_process(false)
 	await _settle()
-	planning.build_tower(0, Vector2i(3, 3), &"arrow_tower", MatchCombat.TargetMode.CLOSEST)
-	screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+	var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(3, 3))
+	planning.build_tower(0, cell, &"arrow_tower", MatchCombat.TargetMode.CLOSEST)
+	_check(planning._host_combat.has_tower(0, cell) and planning._host_combat.has_tower(1, cell), "Reward fixture builds on ground legal for both commander boards")
+	screen._cell_clicked(cell, MOUSE_BUTTON_LEFT, 0)
 	await _settle()
 	var reel: RarityReel = screen._rarity_reel
 	var reels: int = 0
@@ -203,6 +206,7 @@ func _test_planning_consumer() -> void:
 	var random_before: Dictionary = _random_states(planning._host_combat)
 	_publish_rewards(history)
 	_check(reel.is_busy() and reel._winner_payout.is_empty() and screen._boss_rewards.pending_count() == 2 and screen._pending_rarity_id == -1, "Accepted rarity response presents first while both boss awards remain queued")
+	_check(reel.get_global_rect().encloses(screen.get_global_rect()) and screen._selected_tower()["rarity"] == planning._host_combat.towers[0][0]["rarity"], "Match concealment covers the screen without deferring the host-accepted inspected rarity")
 	reel.cancel()
 	await _settle()
 	_check(reel.is_busy() and reel._winner_name == first["rarity_title"] and screen._boss_rewards.pending_count() == 1 and not paused, "Finishing the rarity reel starts only the first boss award without pausing simulation")
@@ -277,6 +281,28 @@ func _test_modal_results_and_replay(history: Array[Dictionary]) -> void:
 	screen._quit_match()
 	await _settle()
 	_check(main.menu.visible and not planning.active and not reel.is_busy() and screen._boss_rewards.pending_count() == 0 and not paused, "Leaving discards active and queued presentation without trapping menu navigation or tree pause")
+
+
+func _test_sandbox_consumer() -> void:
+	await _key(KEY_S)
+	var sandbox: SandboxScreen = main.sandbox_screen
+	_check(sandbox.controller.build(Vector2i(3, 3), &"arrow_tower"), "Sandbox fixture builds an actual rolled tower")
+	sandbox._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT)
+	await _settle()
+	var before: Dictionary = sandbox.controller.state["towers"][0][0].duplicate(true)
+	sandbox.rarity_reroll.pressed.emit()
+	var reel: RarityReel = sandbox._rarity_reel
+	reel.set_process(false)
+	var accepted: Dictionary = sandbox.controller.combat.snapshot()
+	var random_before: Dictionary = _random_states(sandbox.controller.combat)
+	var tower: Dictionary = accepted["towers"][0][0]
+	_check(reel.is_busy() and not reel._revealed and tower["rarity"] != before["rarity"] and tower["rarity_rerolls"] == int(before["rarity_rerolls"]) + 1, "Sandbox applies the real reroll before the unrevealed cosmetic spin")
+	_check(reel.get_global_rect().encloses(sandbox.get_global_rect()) and sandbox.controller.state["towers"][0][0]["rarity"] == tower["rarity"], "Sandbox concealment covers the screen without retaining stale gameplay")
+	await _key(KEY_ENTER)
+	_check(reel.is_busy() and reel._revealed and reel._winner_rank == RarityReel.RARITIES.find(tower["rarity"]), "Sandbox skip reveals the accepted actual rarity without closing")
+	await _key(KEY_ESCAPE)
+	_check(not reel.is_busy() and sandbox.controller.combat.snapshot() == accepted and _random_states(sandbox.controller.combat) == random_before, "Sandbox skip and dismissal do not defer, undo or reroll authoritative combat state")
+	sandbox.prepare_to_leave()
 
 
 func _publish_rewards(history: Array[Dictionary]) -> void:

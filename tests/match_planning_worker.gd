@@ -86,15 +86,17 @@ func _advance_commander_draft() -> bool:
 
 
 func _fixture_reserved_cells() -> Array[Vector2i]:
-	# Shared default fixtures author the straight/detour routes, disconnected
-	# budget + 1 attempts, and combat-stream towers throughout these five rows.
-	# The stream's reliable live purchase uses the opposite corner at (12, 8).
+	# Reserve the authored detour and the stream's live purchase, not broad
+	# unused rows. Budget-overflow probes choose actual unblocked ground.
 	var reserved: Array[Vector2i] = [Vector2i(12, 8)]
 	var layout: PathLayout = planning.layouts[0]
-	for y: int in range(mini(5, layout.dimensions.y)):
-		for x: int in range(layout.dimensions.x):
-			reserved.append(Vector2i(x, y))
+	for x: int in range(layout.dimensions.x):
+		reserved.append(Vector2i(x, layout.entrance.y - 1))
 	return reserved
+
+
+func _fixture_landmark_exclusions() -> Array[Vector2i]:
+	return []
 
 
 func _seed_fixture_terrain() -> bool:
@@ -102,7 +104,7 @@ func _seed_fixture_terrain() -> bool:
 		return true
 	if planning.commander_draft.get("phase", "") != "loadout":
 		return false
-	_fixture_terrain_seeded = preload("res://tests/commander_fixture_worker.gd").seed_terrain(planning, _fixture_reserved_cells())
+	_fixture_terrain_seeded = preload("res://tests/commander_fixture_worker.gd").seed_terrain(planning, _fixture_reserved_cells(), _fixture_landmark_exclusions())
 	if not _fixture_terrain_seeded:
 		push_error("Peer fixture could not reserve authored route/build cells in real commander terrain")
 	return _fixture_terrain_seeded

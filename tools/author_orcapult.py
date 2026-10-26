@@ -10,9 +10,9 @@ Outputs native hard-alpha RGBA PNGs into assets/towers/:
   Warlord's Trebuchet, Long Toss and Over the Wall looks, plus the Double
   Scoop arm (orcapult_scoop_arm.png), which reuses the plain base.
 
-Every base shares the 128x128 canvas with the arm pivot at BASE_PIVOT; every
-arm shares a 32x84 canvas with its pivot at ARM_PIVOT. The unflipped art
-throws to the left; boards mirror it toward the opponent.
+Every base shares a natively drawn 192x128 canvas with the arm pivot at
+BASE_PIVOT. Arms use a 32x88 canvas with their pivot at ARM_PIVOT. The
+unflipped art throws to the left; boards mirror it toward the opponent.
 """
 import math
 import random
@@ -21,9 +21,9 @@ from pathlib import Path
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 OUT = Path(__file__).resolve().parent.parent / "assets" / "towers"
-CANVAS = (128, 128)
-BASE_PIVOT = (70, 92)
-ARM_CANVAS = (32, 84)
+CANVAS = (192, 128)
+BASE_PIVOT = (104, 92)
+ARM_CANVAS = (32, 88)
 ARM_PIVOT = (16, 70)
 COCKED_DEGREES = 62.0
 LENGTHS = {"plain": 44, "scoop": 44, "siege": 46, "trebuchet": 48, "long": 54, "wall": 60}
@@ -120,7 +120,7 @@ def band(image, center, along, width, length, palette, rivet=True):
 def stone_platform(base, look):
     part = layer()
     draw = ImageDraw.Draw(part)
-    left, right, top, front, bottom, depth = 32, 100, 98, 106, 120, 5
+    left, right, top, front, bottom, depth = 24, 166, 98, 106, 120, 5
     rng = random.Random(7)
     # Right side face (shadowed).
     draw.polygon([(right, front), (right + depth, top), (right + depth, bottom - 7), (right, bottom)], fill=rgba(STONE[1]))
@@ -192,7 +192,7 @@ def flag(base, pole_x, pole_bottom, pole_top, cloth, length=16, height=9, emblem
         if i % 5 == 2:
             draw.line([(x, y + 2), (x, y + height - 3)], fill=rgba(cloth[1]))
     for (x, y) in lower:
-        if 0 <= y < 128:
+        if 0 <= y < CANVAS[1]:
             part.putpixel((x, y), rgba(cloth[1]))
     if emblem == "skull":
         ex, ey = pole_x + length // 2 + 1, top + height // 2
@@ -204,12 +204,19 @@ def flag(base, pole_x, pole_bottom, pole_top, cloth, length=16, height=9, emblem
 
 def frame(base, look):
     heavy = look in ("siege", "trebuchet")
-    # Rear A-frame and rail, set back for depth.
+    # A long chassis is built from native-width timbers, not stretched art.
+    # Rear rail and splayed rear support leave room for the loading deck.
     part = layer()
-    off = (5, -5)
-    beam(part, (48 + off[0], 101 + off[1]), (61 + off[0], 57 + off[1]), 5, DARK_WOOD, 11)
-    beam(part, (84 + off[0], 101 + off[1]), (65 + off[0], 57 + off[1]), 5, DARK_WOOD, 12)
-    beam(part, (38, 97), (98, 97), 5, DARK_WOOD, 13)
+    beam(part, (66, 96), (99, 52), 5, DARK_WOOD, 11)
+    beam(part, (142, 96), (105, 52), 5, DARK_WOOD, 12)
+    beam(part, (32, 96), (166, 96), 5, DARK_WOOD, 13)
+    outlined(base, part)
+    part = layer()
+    # Repeating deck planks retain the original square-pixel grain scale.
+    for x in range(35, 162, 12):
+        beam(part, (x + 4, 96), (x, 103), 7, WOOD, x)
+    beam(part, (30, 101), (82, 76), 4, DARK_WOOD, 14)
+    beam(part, (160, 101), (120, 77), 4, DARK_WOOD, 15)
     outlined(base, part)
     # Torsion bundle around the axle.
     part = layer()
@@ -227,29 +234,29 @@ def frame(base, look):
     outlined(base, part)
     # Front rail with brackets.
     part = layer()
-    beam(part, (34, 102), (96, 102), 6, WOOD, 21)
+    beam(part, (28, 102), (164, 102), 6, WOOD, 21)
     draw = ImageDraw.Draw(part)
-    for x in (37, 64, 92):
+    for x in (32, 60, 96, 132, 160):
         palette = IRON
         draw.rectangle([x - 2, 99, x + 2, 104], fill=rgba(palette[2]))
         draw.point([(x, 100), (x, 103)], fill=rgba(palette[4]))
     if heavy:
-        for x in range(42, 90, 6):
+        for x in range(38, 157, 6):
             draw.point([(x, 101)], fill=rgba(IRON[3]))
-        draw.line([(36, 104), (94, 104)], fill=rgba(IRON[1]))
+        draw.line([(30, 104), (162, 104)], fill=rgba(IRON[1]))
     outlined(base, part)
     # Front A-frame with the padded stop beam the arm slams into.
     part = layer()
-    beam(part, (46, 101), (60, 56), 6, WOOD, 31)
-    beam(part, (82, 101), (65, 56), 6, WOOD, 32)
-    beam(part, (52, 75), (76, 75), 4, WOOD, 33)
-    beam(part, (53, 56), (72, 56), 6, WOOD, 34)
+    beam(part, (56, 101), (94, 56), 6, WOOD, 31)
+    beam(part, (130, 101), (101, 56), 6, WOOD, 32)
+    beam(part, (76, 75), (114, 75), 4, WOOD, 33)
+    beam(part, (87, 56), (108, 56), 6, WOOD, 34)
     draw = ImageDraw.Draw(part)
-    draw.rounded_rectangle([52, 52, 60, 60], radius=2, fill=rgba(ROPE[2]))
-    for k in range(52, 61, 2):
+    draw.rounded_rectangle([86, 52, 94, 60], radius=2, fill=rgba(ROPE[2]))
+    for k in range(86, 95, 2):
         draw.line([(k, 52), (k + 1, 60)], fill=rgba(ROPE[1]))
     if heavy:
-        for x, y in ((60, 56), (66, 56), (55, 89), (77, 89)):
+        for x, y in ((94, 56), (102, 56), (66, 89), (122, 89)):
             draw.rectangle([x - 1, y - 2, x + 1, y + 2], fill=rgba(IRON[2]))
             draw.point([(x, y)], fill=rgba(IRON[4]))
     outlined(base, part)
@@ -258,7 +265,7 @@ def frame(base, look):
 def winch(base):
     part = layer()
     draw = ImageDraw.Draw(part)
-    cx, cy, r = 88, 88, 9
+    cx, cy, r = 145, 88, 9
     draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=rgba(BRASS[1]), width=2)
     for k in range(6):
         a = k * math.pi / 3
@@ -283,26 +290,26 @@ def skull(base, cx, cy):
 def draw_base(look):
     base = layer()
     if look == "trebuchet":
-        flag(base, 104, 100, 40, RED, length=18, height=13, emblem="skull", seed=1)
+        flag(base, 158, 100, 40, RED, length=18, height=13, emblem="skull", seed=1)
     elif look == "siege":
-        flag(base, 102, 98, 58, RED, length=14, height=8, seed=2)
+        flag(base, 158, 98, 58, RED, length=14, height=8, seed=2)
     elif look == "wall":
-        flag(base, 104, 100, 42, GREEN, length=18, height=12, seed=4)
-        flag(base, 36, 100, 54, GREEN, length=12, height=8, seed=5)
+        flag(base, 158, 100, 42, GREEN, length=18, height=12, seed=4)
+        flag(base, 32, 100, 54, GREEN, length=12, height=8, seed=5)
     elif look == "long":
-        flag(base, 102, 98, 52, GREEN, length=15, height=8, seed=6)
+        flag(base, 158, 98, 52, GREEN, length=15, height=8, seed=6)
     else:
-        flag(base, 101, 98, 64, GREEN, length=11, height=6, seed=8)
+        flag(base, 158, 98, 64, GREEN, length=11, height=6, seed=8)
     stone_platform(base, look)
     if look == "trebuchet":
-        boulders(base, [(40, 96, 4), (47, 98, 3), (36, 99, 3), (43, 92, 3)])
+        boulders(base, [(40, 96, 4), (49, 98, 3), (34, 99, 3), (43, 90, 3)])
     else:
-        boulders(base, [(40, 97, 3), (46, 99, 2), (36, 100, 2)])
+        boulders(base, [(39, 97, 3), (47, 99, 2), (33, 100, 2)])
     frame(base, look)
     if look == "wall":
         winch(base)
     if look in ("siege", "trebuchet"):
-        skull(base, 64, 102)
+        skull(base, 96, 102)
     return base
 
 

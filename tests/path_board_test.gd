@@ -462,6 +462,8 @@ func _check_native_drag_art(board: PathBoard, viewport: SubViewport) -> void:
 			var range_difference: Dictionary = _changed_geometry(underlay, range_reference, Rect2i(0, 0, 400, 400))
 			var footprint := Rect2i(Vector2i(board.cell_center(cell) - Vector2.ONE * board._cell_size() * 0.5),
 				Vector2i.ONE * ceili(board._cell_size()))
+			footprint = footprint.merge(Rect2i(Vector2i(board.cell_center(cell + definition.footprint - Vector2i.ONE) - Vector2.ONE * board._cell_size() * 0.5),
+				Vector2i.ONE * ceili(board._cell_size())))
 			_check(footprint.encloses(range_difference["bounds"]),
 				"Native range exactly matches selected-tower accepted tile highlighting: %s mirrored=%s" % [type_id, mirrored])
 			for y: int in range(board.layout.dimensions.y):
@@ -473,6 +475,7 @@ func _check_native_drag_art(board: PathBoard, viewport: SubViewport) -> void:
 					_check(_pixels_changed_near(idle, underlay, board.cell_center(target)) == in_range,
 						"Drag range follows accepted cell_in_range, %s %s mirrored=%s" % [type_id, target, mirrored])
 			var tower: Dictionary = _tower(201, cell, type_id)
+			tower["footprint"] = definition.footprint
 			var unchanged: Dictionary = tower.duplicate(true)
 			board.combat_towers = [tower]
 			var actual: Image = await _board_image(board, viewport)

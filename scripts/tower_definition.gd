@@ -24,6 +24,8 @@ const ELEMENTS: Array[StringName] = [&"physical", &"fire", &"ice", &"lightning",
 const MAX_CRIT_CHANCE: float = 0.75
 
 @export var reward: TowerReward
+# Logical anchor is the top-left occupied cell; targeting keeps that anchor.
+@export var footprint: Vector2i = Vector2i.ONE
 @export var damage: int = 2
 @export var damage_type: StringName = &"physical"
 @export var range_cells: float = 3.0
@@ -53,6 +55,10 @@ const MAX_CRIT_CHANCE: float = 0.75
 @export var special_upgrade_config: Dictionary = {}
 @export var evolutions: Dictionary = {}
 @export var advancements: Dictionary = {}
+
+
+static func footprint_rect(cell: Vector2i, size: Vector2i) -> Rect2i:
+	return Rect2i(cell, size)
 
 
 static func freeze_duration(max_hp: int) -> float:

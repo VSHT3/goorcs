@@ -155,8 +155,15 @@ func reset_build() -> void:
 
 
 func build(cell: Vector2i, type_id: StringName, mode: int = MatchCombat.TargetMode.FURTHEST) -> bool:
-	if not layout.contains(cell) or layout.has_path(cell):
+	var footprint: Vector2i = combat.tower_footprint(type_id)
+	if footprint.x <= 0 or footprint.y <= 0:
 		return false
+	var occupied: Rect2i = TowerDefinition.footprint_rect(cell, footprint)
+	for y: int in range(occupied.position.y, occupied.end.y):
+		for x: int in range(occupied.position.x, occupied.end.x):
+			var covered := Vector2i(x, y)
+			if not layout.contains(covered) or layout.has_path(covered):
+				return false
 	var accepted: bool = combat.build(0, cell, type_id, mode)
 	if accepted:
 		_publish()

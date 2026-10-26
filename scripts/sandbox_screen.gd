@@ -513,7 +513,7 @@ func _cell_clicked(cell: Vector2i, button: MouseButton) -> void:
 		return
 	selected_enemy_id = -1
 	for tower: Dictionary in controller.state["towers"][0]:
-		if tower["cell"] == cell:
+		if Rect2i(tower["cell"], tower.get("footprint", Vector2i.ONE)).has_point(cell):
 			selected_tower_id = int(tower["id"])
 			placement_id = &""
 			world.boards[0].cancel_stroke()

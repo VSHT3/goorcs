@@ -119,6 +119,19 @@ func _test_banner_rules() -> void:
 	banner.clear()
 	banner.observe(_state("a", [], 1, MatchCombat.Phase.PLANNING, [[42, 3], [10, 0]]), 0)
 	_check(banner.current_kind() == "round" and int(banner.current()["round"]) == 7 and int(banner.current()["coins"]) == 42 and int(banner.current()["shards"]) == 3, "A counted clear shows the round and your own accepted gains")
+	var inspector := Control.new()
+	root.add_child(inspector)
+	banner.avoid = [inspector]
+	for width: int in [1000, 1280, 1568]:
+		banner.size.x = width
+		inspector.position = Vector2(width * 0.55, 76)
+		inspector.size = Vector2(width * 0.45, 450)
+		inspector.hide()
+		var centered: Rect2 = banner.panel_rect()
+		inspector.show()
+		_check(banner.panel_rect() == centered and absf(centered.get_center().x - width * 0.5) <= 0.5, "Opening inspection cannot move the round reward away from the viewport centre")
+	banner.avoid.clear()
+	inspector.queue_free()
 	banner.observe(_state("a", [], 1, MatchCombat.Phase.PLANNING), 0)
 	_check(banner.queued().is_empty(), "The same clear count does not repeat")
 	banner.observe(_state("a", [{"id": 5, "type_id": "troll"}], 1), 0)

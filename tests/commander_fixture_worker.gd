@@ -18,17 +18,17 @@ static func complete_solo(planning: MatchPlanning) -> bool:
 		draft = planning.commander_draft
 	if draft.get("phase", "") != "loadout" or draft.get("picks", ["", ""])[0] == "" or draft["picks"][1] == "" or draft["picks"][0] == draft["picks"][1]:
 		return false
-	# Legacy solo scenarios author builds and paths in the upper five rows.
-	# Keep real terrain deterministic elsewhere; commander suites generate freely.
+	# Reserve only the small region used by shared legacy builds, not whole
+	# board rows: denser real terrain still has plentiful random legal sites.
 	var reserved: Array[Vector2i] = []
-	for y: int in range(mini(5, planning.layouts[0].dimensions.y - 3)):
-		for x: int in range(planning.layouts[0].dimensions.x):
+	for y: int in range(mini(4, planning.layouts[0].dimensions.y - 3)):
+		for x: int in range(mini(10, planning.layouts[0].dimensions.x)):
 			reserved.append(Vector2i(x, y))
 	return seed_terrain(planning, reserved)
 
 
 # Choose only the RNG seed: final admission still generates both real boards.
-static func seed_terrain(planning: MatchPlanning, reserved: Array[Vector2i]) -> bool:
+static func seed_terrain(planning: MatchPlanning, reserved: Array[Vector2i], landmark_exclusions: Array[Vector2i] = []) -> bool:
 	if planning == null or planning._host_layouts.size() != 2:
 		return false
 	for id: StringName in planning._host_commander_ids:
@@ -42,7 +42,7 @@ static func seed_terrain(planning: MatchPlanning, reserved: Array[Vector2i]) -> 
 			var terrain: Dictionary = CommanderRules.generate(planning._host_commander_ids[slot], planning._host_layouts[slot], random)
 			if terrain.is_empty():
 				return false
-			if reserved.has(terrain["landmark"]):
+			if reserved.has(terrain["landmark"]) or landmark_exclusions.has(terrain["landmark"]):
 				accepted = false
 				break
 			for obstacle: Vector2i in terrain["obstacles"]:
