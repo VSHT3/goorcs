@@ -97,12 +97,9 @@ Sandbox uses the actual `MatchCombat`, `PathLayout`, sprite/inspector, and camer
 
 **Confirmed:** the starting hero is an off-board commander, not a controllable character or a defender placed on the battlefield. Normal defenses are mostly physical structures. Commanders can provide identity and special rules without adding character movement to the camera-controlled game.
 
-Mechanically meaningful board variety is desired, not just cosmetic recoloring. The relationship between commander and map remains open, with both possibilities retained:
+**Confirmed:** commander choice determines the board. Each player's layout is generated independently, with commander-specific visuals and gameplay terrain. Special terrain is unbuildable by default; pathability and effects are defined per feature. Some obstacles can be cleared for Coins, while others are permanent.
 
-- **Commander-linked boards:** the chosen commander determines or modifies terrain, special zones, expansion behavior, or other board mechanics.
-- **Independent commander and map choices:** a map has its own mechanical identity, while the commander supplies a separate set of rules or abilities. Different combinations are possible rather than each commander being tied to one map.
-
-Matching starting boards with different player-authored paths also remains an available direction. No final symmetry rule or commander/map coupling has been chosen. Concrete commander abilities, selection rules, and board differences still need examples before this system is specified.
+Each board guarantees its commander's signature landmark, with a fixed mechanic and a randomized valid location. Generation must preserve a legal route and sufficient buildable ground. The first commanders are the **Knight** and **Priestess**, each with an activatable ability. Their concrete terrain, abilities, and balance remain open.
 
 ## Active play during combat
 
