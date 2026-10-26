@@ -27,6 +27,8 @@ Item rarities are owned by `ItemRarity`, separate from tower rarities and their 
 
 An isolated actual-main-scene rendered walkthrough passed on macOS Compatibility/OpenGL (Apple M2), using an offscreen world to keep desktop input separate. Captures at **1000×720 / 1280×720** were inspected. Pointer/keyboard entry, X/Escape return, restored menu focus, inactive match state, steady Mythic/Legendary pixels, animated Orcfeccion pixels, and hidden animation shutdown passed. Audio used the dummy driver; this is not sound or gameplay-item verification. Captures and output remain under ignored `.verify-logs/itemiery-smoke/`.
 
+The final isolated `python3 tools/verify.py headless` run passed **82/82 checks**, including fresh imports, save isolation, startup, separate-peer suites, and the expanded Itemiery navigation/lifecycle regression. The focused rendered menu-wordmark suite also passed. Full headless logs: `.verify-logs/20261026T135547Z-headless-5082043c/`. The full rendered suite was not run for this change.
+
 ### Single-command verification
 
 Install **Python 3.10 or newer** for development verification; its standard library is sufficient. Python is not a game/runtime dependency. The runner supports macOS and Linux and requires the exact official standard-engine build `4.7.2.stable.official.ed1daf0bf`; `godot --version` reports that string. A different release or custom build fails the version gate rather than silently changing test behavior.
