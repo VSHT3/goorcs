@@ -1,6 +1,6 @@
 class_name ItemDisplayButton
 extends Button
-## An unframed exhibit; corners mark selection without covering the artwork.
+## An unframed exhibit with a crisp, continuous hover and selection perimeter.
 
 var accent: Color = Color.WHITE
 
@@ -12,11 +12,10 @@ func _ready() -> void:
 	icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	var empty := StyleBoxEmpty.new()
+	empty.set_content_margin_all(3)
 	for state: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 		add_theme_stylebox_override(state, empty)
-	mouse_entered.connect(func() -> void:
-		grab_focus()
-		queue_redraw())
+	mouse_entered.connect(queue_redraw)
 	mouse_exited.connect(queue_redraw)
 	focus_entered.connect(queue_redraw)
 	focus_exited.connect(queue_redraw)
@@ -26,9 +25,9 @@ func _ready() -> void:
 func _draw() -> void:
 	if not button_pressed and not has_focus() and not is_hovered():
 		return
-	var tint: Color = accent if button_pressed else Color(accent, 0.55)
-	var reach: float = 5.0
-	for point: Vector2 in [Vector2(1, 1), Vector2(size.x - 2, 1), Vector2(1, size.y - 2), size - Vector2(2, 2)]:
-		var direction := Vector2(1 if point.x < size.x * 0.5 else -1, 1 if point.y < size.y * 0.5 else -1)
-		draw_line(point, point + Vector2(direction.x * reach, 0), tint)
-		draw_line(point, point + Vector2(0, direction.y * reach), tint)
+	var tint: Color = accent if button_pressed else accent.lightened(0.2)
+	var bounds := Rect2(Vector2(1, 1), size - Vector2(2, 2))
+	draw_rect(bounds, Color(tint, 0.08))
+	draw_rect(bounds, tint, false, 2.0)
+	if has_focus():
+		draw_rect(bounds.grow(-3), Color("f0f6dc"), false, 1.0)

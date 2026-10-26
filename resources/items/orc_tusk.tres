@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/items/orc_tusk.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/orc_tusk_detail.png" id="3"]
 
 [resource]
 script = ExtResource("1")
@@ -11,3 +12,5 @@ rarity = 0
 effect_text = "Enemies summoned on your side have 10% less HP."
 flavor_text = "A long forgotten tusk of a defeated Orc."
 icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Enemies summoned on your side have their maximum HP multiplied by 0.90 (10% less HP).")

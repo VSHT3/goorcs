@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/items/samurai_sword.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/samurai_sword_detail.png" id="3"]
 
 [resource]
 script = ExtResource("1")
@@ -11,3 +12,5 @@ rarity = 2
 effect_text = "Your towers attack 10% slower but deal 35% more damage."
 flavor_text = "SHOGUN yokosoo sushi anime."
 icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Your towers deal 35% more damage: damage is multiplied by 1.35.", "Your towers attack 10% slower: attack rate is multiplied by 0.90, so attack interval is divided by 0.90.")

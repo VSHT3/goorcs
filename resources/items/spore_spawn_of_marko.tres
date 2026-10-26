@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/spore_spawn_of_marko.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/spore_spawn_of_marko_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"spore_spawn_of_marko"
+title = "Spore, Spawn of Marko"
+rarity = 4
+effect_text = "A crystal-side mushroom pet infects arriving enemies. Feed it Shards to grow its infection quota; infected deaths spread spores."
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Starts with 1 infection per wave. Feeding 5 Shards permanently adds 1 infection per wave.", "At wave start, infect the next eligible arriving enemies until that wave's quota is used.", "Infection deals 2% of the infected enemy's maximum HP per second for 4 simulation seconds.", "When an infected enemy dies, spread a fresh infection to enemies within 1.5 cells. Each enemy can be infected only once per wave.")
