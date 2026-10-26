@@ -24,6 +24,17 @@ func _new_session() -> void:
 	_main.add_child(planning)
 
 
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	# Preserve both complete equal-length branches without removing real terrain.
+	var cells: Array[Vector2i] = []
+	for x: int in range(6):
+		cells.append(Vector2i(x, 2))
+	for y: int in [1, 3]:
+		for x: int in range(1, 6):
+			cells.append(Vector2i(x, y))
+	return cells
+
+
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
 	rules.catalog.enemies = [preload("res://resources/combat/enemies/grunt.tres").duplicate() as EnemyDefinition]

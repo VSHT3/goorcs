@@ -55,6 +55,7 @@ func _run() -> void:
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
 	_check(main.planning.selecting_loadout and not main.planning.active, "Native drag fixture first opens loadout selection")
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
 	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "Native drag fixture commits its owned tested towers")
 	await _settle()
 	screen = main.play_screen.planning_screen
@@ -106,11 +107,13 @@ func _run() -> void:
 	_check(screen._placement_type() == &"" and screen.selected_tower_id > 0, "An ordinary drop still selects the newly purchased tower after releasing Shift")
 	await _rejected(world.cell_screen_position(0, transformed_cell), "Native drop onto occupied ground is rejected without changing accepted state")
 
+	path_cell = preload("res://tests/commander_fixture_worker.gd").free_cell(main.planning, path_cell)
 	main.planning.request_edit(0, path_cell, true)
 	await _settle()
 	_check(main.planning.layouts[0].has_path(path_cell), "Real planning command supplies a visible owned path tile")
 	await _rejected(world.cell_screen_position(0, path_cell), "Native drop onto an owned path is rejected without changing accepted state")
 	await _rejected(world.cell_screen_position(0, Vector2i(-1, transformed_cell.y)), "Native drop outside board bounds is rejected without changing accepted state")
+	await _counterpart_terrain_gestures()
 
 	world.pan(100.0, Vector2.RIGHT)
 	world.camera.force_update_scroll()
@@ -139,11 +142,68 @@ func _run() -> void:
 	await _finish()
 
 
-func _purchase(cell: Vector2i, description: String) -> void:
+func _counterpart_terrain_gestures() -> void:
+	var board: PathBoard = world.boards[0]
+	var center: Vector2i = main.planning.layouts[0].dimensions / 2
+	var landmark: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(main.planning, center + Vector2i(-2, 0))
+	main.planning._host_combat.commanders[1]["landmark"] = landmark
+	main.planning._publish_combat()
+	var rubble: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(main.planning, center + Vector2i(-1, 0))
+	main.planning._host_combat.commanders[1]["obstacles"].append(rubble)
+	main.planning._publish_combat()
+	await _settle()
+	_check(board.solo_mirror_placement, "The real solo screen enables mirrored placement validation")
+	for cell: Vector2i in [landmark, rubble]:
+		_check(board.layout.contains(cell) and not board.layout.has_path(cell) and not board.terrain_blocks(cell), "Counterpart terrain fixture leaves the visible owned cell clear")
+		_check(not board._placement_is_legal(cell, String(TOWER_TYPE)), "Solo click preview rejects counterpart landmark and rubble")
+		screen._select_placement(TOWER_TYPE)
+		var accepted: Dictionary = _accepted_state()
+		var random_before: Array[int] = _random_state()
+		var point: Vector2 = world.cell_screen_position(0, cell)
+		# Non-drag GUI input belongs to the nested world's native viewport.
+		# The outer standalone fixture owns drag dispatch but not its mouse target.
+		var viewport_point: Vector2 = board.get_global_transform_with_canvas() * board.cell_center(cell)
+		var motion := InputEventMouseMotion.new()
+		motion.position = viewport_point
+		world._world_viewport.push_input(motion, true)
+		await process_frame
+		_check(board.placement_id == TOWER_TYPE and board._hover == cell and not board._placement_is_legal(board._hover, String(board.placement_id)), "Native click-placement hover marks counterpart terrain invalid")
+		for pressed: bool in [true, false]:
+			var click := InputEventMouseButton.new()
+			click.position = viewport_point
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = pressed
+			world._world_viewport.push_input(click, true)
+			await process_frame
+		await _settle()
+		_check(_accepted_state() == accepted and _random_state() == random_before, "Rejected native click on counterpart terrain preserves purchases, currency and RNG")
+		screen.cancel_interaction()
+		await _rejected(point, "Native drop on counterpart terrain preserves purchases, currency and accepted state", true, cell)
+
+	# An ordinary board consumes the identical accepted commanders without the
+	# solo-only restriction; multiplayer never mirrors purchases.
+	var multiplayer_board := PathBoard.new()
+	multiplayer_board.layout = board.layout
+	multiplayer_board.size = board.size
+	multiplayer_board.input_enabled = true
+	multiplayer_board.placement_enabled = true
+	multiplayer_board.apply_combat(main.planning.combat, 0)
+	for cell: Vector2i in [landmark, rubble]:
+		_check(not multiplayer_board.solo_mirror_placement and multiplayer_board._can_drop_data(multiplayer_board.cell_center(cell), {"tower_type": String(TOWER_TYPE)}), "Multiplayer-default board accepts local ground despite counterpart terrain")
+	multiplayer_board.free()
+
+	_check(main.planning._host_combat.clear_obstacle(1, rubble), "Authoritative counterpart obstacle can actually be cleared")
+	main.planning._publish_combat()
+	await _settle()
+	_check(board._placement_is_legal(rubble, String(TOWER_TYPE)), "Accepted counterpart clearing immediately restores solo placement legality")
+	await _purchase(rubble, "Native solo drop purchases formerly blocked ground after counterpart clearing", true)
+
+
+func _purchase(cell: Vector2i, description: String, check_preview: bool = false) -> void:
 	var before: Dictionary = main.planning._snapshot().duplicate(true)
 	var before_combat: Dictionary = before["combat"]
 	var cost: int = shop.cost
-	await _gesture(world.cell_screen_position(0, cell), true)
+	await _gesture(world.cell_screen_position(0, cell), true, true, false, cell if check_preview else Vector2i(-1, -1))
 	var after: Dictionary = main.planning._snapshot()
 	var after_combat: Dictionary = after["combat"]
 	var bought: bool = false
@@ -156,19 +216,19 @@ func _purchase(cell: Vector2i, description: String) -> void:
 	_check(after["tiles"] == before["tiles"], "A shop drag does not accidentally paint a world path")
 
 
-func _rejected(point: Vector2, description: String, in_world: bool = true) -> void:
+func _rejected(point: Vector2, description: String, in_world: bool = true, preview_cell: Vector2i = Vector2i(-1, -1)) -> void:
 	var inspected: Dictionary = main.planning.combat["towers"][0][0]
 	screen._cell_clicked(inspected["cell"], MOUSE_BUTTON_LEFT, 0)
 	_check(screen._management.visible, "Rejected or cancelled native drag begins with an owned inspector open")
 	var accepted: Dictionary = main.planning._snapshot().duplicate(true)
 	var presentation: Dictionary = main.planning.combat.duplicate(true)
 	var random_before: Array[int] = _random_state()
-	await _gesture(point, false, in_world)
+	await _gesture(point, false, in_world, false, preview_cell)
 	_check(_random_state() == random_before, "Rejected or cancelled native drag consumes no random rolls")
 	_check(main.planning._snapshot() == accepted and main.planning.combat == presentation, description)
 
 
-func _gesture(destination: Vector2, accepted: bool, in_world: bool = true, cancel_with_escape: bool = false) -> void:
+func _gesture(destination: Vector2, accepted: bool, in_world: bool = true, cancel_with_escape: bool = false, preview_cell: Vector2i = Vector2i(-1, -1)) -> void:
 	if in_world:
 		_check(world.get_global_rect().has_point(destination), "Native gesture destination is visible inside the world viewport")
 	_check(not fixture_viewport.gui_is_dragging(), "Previous native gesture has ended before starting another")
@@ -191,6 +251,12 @@ func _gesture(destination: Vector2, accepted: bool, in_world: bool = true, cance
 	_check(fixture_viewport.gui_is_dragging(), "Native tower drag survives crossing the HUD into the world viewport")
 	_assert_drag_cleared()
 	_check(_accepted_state() == state_before and _random_state() == random_before, "Native hover changes neither accepted state nor RNG before release")
+	if preview_cell != Vector2i(-1, -1):
+		await _settle()
+		var board: PathBoard = world.boards[0]
+		var tint := Color(1.0, 1.0, 1.0, 0.48) if accepted else Color(1.0, 0.32, 0.25, 0.48)
+		_check(board._hover == preview_cell and board._has_drag_preview() and board._placement_is_legal(preview_cell, String(TOWER_TYPE)) == accepted, "Native drag previews the exact counterpart-sensitive cell with the expected legality")
+		_check(is_instance_valid(board._drag_clip) and board._drag_clip.visible and is_instance_valid(board._drag_ghost) and board._drag_ghost.modulate.is_equal_approx(tint), "Native tower ghost is visibly invalid on counterpart terrain and valid after clearing")
 	if cancel_with_escape:
 		var escape := InputEventKey.new()
 		escape.keycode = KEY_ESCAPE
@@ -248,6 +314,7 @@ func _sandbox_gestures() -> void:
 	shop = sandbox.shop_buttons[TOWER_TYPE]
 	shop.drag_started.connect(_drag_started)
 	_check(sandbox.is_visible_in_tree() and not shop.disabled, "Real main-menu navigation opens the native Sandbox fixture")
+	_check(not world.boards[0].solo_mirror_placement, "Sandbox does not inherit solo mirrored-terrain restrictions")
 	var first := Vector2i(5, 2)
 	var second := Vector2i(6, 2)
 	_check(sandbox.controller.build(first, TOWER_TYPE), "Sandbox fixture creates a real owned tower for inspection")

@@ -19,11 +19,16 @@ func _run() -> void:
 		for x: int in range(1, 5):
 			await _edit(lane, slot, x, 2)
 		await _build(lane, slot, 5, 0, MatchCombat.TargetMode.FURTHEST, "arrow_tower")
+		await _wait_tower("guest" if lane == "host" else "host", slot, Vector2i(5, 0), MatchCombat.TargetMode.FURTHEST)
 	await _command("host", {"action": "late_round"})
 	var setup: Dictionary = await _agree("Both peers receive late-round host data")
 	var row: int = int(_snapshot("host")["boards"][0]["route"][0][1])
 	for lane: String in ["host", "guest"]:
 		await _build(lane, 0 if lane == "host" else 1, 2, row - 1, MatchCombat.TargetMode.FURTHEST, "arrow_tower")
+		await _wait_tower("guest" if lane == "host" else "host", 0 if lane == "host" else 1, Vector2i(2, row - 1), MatchCombat.TargetMode.FURTHEST)
+	var placed: Dictionary = await _agree("Both real near/far tower pairs are accepted before late births")
+	for slot: int in range(2):
+		_check(placed["towers"][slot].size() == 2, "Each board retains both legally built near/far stun targets")
 	await _both_ready()
 	await _command("host", {"action": "late_births"})
 	var initial: Dictionary = await _agree("Real host publishes the accepted new identities")

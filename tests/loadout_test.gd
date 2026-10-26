@@ -16,9 +16,16 @@ class DualPlanning extends MatchPlanning:
 	func begin_selection() -> void:
 		_reset_match()
 		selecting_loadout = true
+		_begin_commander_draft()
 		_publish_snapshot()
-	func _request_loadout_command(command: String, ids: Array, owned: Array) -> bool:
-		return _apply_loadout_command(1, command, ids, owned)
+
+	func complete_draft() -> bool:
+		if not _apply_loadout_command(1, "guess", [0], []) or not _apply_loadout_command(2, "guess", [100], []):
+			return false
+		var first: int = int(commander_draft["picker"])
+		return _apply_loadout_command(1 if first == 0 else 2, "commander", [], [], "knight") and _apply_loadout_command(2 if first == 0 else 1, "commander", [], [], "priestess")
+	func _request_loadout_command(command: String, ids: Array, owned: Array, commander_id: String = "") -> bool:
+		return _apply_loadout_command(1, command, ids, owned, commander_id)
 
 	func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> bool:
 		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
@@ -35,14 +42,14 @@ class DelayedPlanning extends DualPlanning:
 	func _reject(_sender: int, message: String) -> void:
 		feedback.emit(message)
 
-	func _request_loadout_command(command: String, ids: Array, owned: Array) -> bool:
-		pending_commands.append({"command": command, "ids": ids.duplicate(), "owned": owned.duplicate()})
+	func _request_loadout_command(command: String, ids: Array, owned: Array, commander_id: String = "") -> bool:
+		pending_commands.append({"command": command, "ids": ids.duplicate(), "owned": owned.duplicate(), "commander": commander_id})
 		return true
 
 	func deliver_next(reject_ownership: bool = false) -> void:
 		var request: Dictionary = pending_commands.pop_front()
 		var owned: Array = ["arrow_tower"] if reject_ownership else request["owned"]
-		_apply_loadout_command(2, request["command"], request["ids"], owned)
+		_apply_loadout_command(2, request["command"], request["ids"], owned, request["commander"])
 
 
 var failures: int = 0
@@ -83,6 +90,7 @@ func _run() -> void:
 	planning._apply_tower_command(1, "build", 0, Vector2i(2, 3), -1, 0, "arrow_tower")
 	planning._apply_command(1, "edit", 0, Vector2i(1, 4), true)
 	_check(planning.combat == before and planning.layouts[0].used_tiles() == 0, "Selection cannot build or edit before both commits")
+	_check(planning.complete_draft(), "Tower validation fixture first completes the real guess and ordered distinct hero draft")
 	_check(not planning.commit_loadout(), "An empty deck cannot commit")
 	_check(planning.select_loadout([&"arrow_tower"]), "The starter alone is a valid loadout with three empty slots")
 	for invalid: Array in [[], [""], [42], ["arrow_tower", "arrow_tower"], ["unknown"], ["war_drums"], ["arrow_tower", "orc_ballista", "rune_obelisk", "lightning", "gold_mine"]]:
@@ -107,8 +115,9 @@ func _run() -> void:
 	planning._apply_tower_command(2, "build", 1, Vector2i(2, 3), -1, 0, "arrow_tower")
 	_check(planning.combat == before and planning._host_combat._roll_random.state == roll_state, "Host and remote authority reject purchases outside their frozen deck without consuming a roll")
 	_check(planning.rejections.back() == {"sender": 2, "message": "This tower is not in your committed run loadout."}, "An unequipped remote purchase returns targeted rejection feedback")
-	_check(planning._apply_tower_command(1, "build", 0, Vector2i(2, 3), -1, 0, "arrow_tower"), "Host can buy an admitted tower")
-	_check(planning._apply_tower_command(2, "build", 1, Vector2i(2, 3), -1, 0, "orc_ballista"), "Remote can buy its own admitted tower")
+	var build_cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(2, 3), 3)
+	_check(planning._apply_tower_command(1, "build", 0, build_cell, -1, 0, "arrow_tower"), "Host can buy an admitted tower")
+	_check(planning._apply_tower_command(2, "build", 1, build_cell, -1, 0, "orc_ballista"), "Remote can buy its own admitted tower")
 	var id: int = planning.combat["towers"][0][0]["id"]
 	_check(planning.reroll_tower(0, id, "attributes"), "Authenticated host reroll publishes its accepted counter and attributes")
 	before = planning.combat.duplicate(true)
@@ -144,6 +153,7 @@ func _delayed_panel(session: MultiplayerSession, rules: CombatRules) -> void:
 	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.begin_selection()
+	_check(planning.complete_draft(), "Delayed tower UI begins only after both real hero picks")
 	planning._apply_loadout_command(2, "select", ["arrow_tower"], ["arrow_tower"])
 	var panel := LoadoutPanel.new()
 	panel.planning = planning
@@ -190,6 +200,7 @@ func _delayed_panel(session: MultiplayerSession, rules: CombatRules) -> void:
 	_check(planning.loadout_committed and planning.chosen_tower_ids.size() == 4 and panel.commit_button.text == "Committed" and panel.commit_button.disabled, "Commit freezes the latest visible accepted deck after its acknowledgment")
 
 	planning.begin_selection()
+	_check(planning.complete_draft(), "A fresh delayed tower selection completes another draft")
 	panel.tower_buttons[&"arrow_tower"].pressed.emit()
 	planning.deliver_next()
 	_check(panel.tower_buttons[&"arrow_tower"].button_pressed and not panel.commit_button.disabled, "A new selection clears transient commit state")
@@ -198,6 +209,7 @@ func _delayed_panel(session: MultiplayerSession, rules: CombatRules) -> void:
 	planning._reset_match()
 	planning.changed.emit()
 	planning.begin_selection()
+	_check(planning.complete_draft(), "A reset fixture completes its new draft before editing towers")
 	_check(panel._pending_selection.is_empty() and not panel._pending_commit and not panel.tower_buttons[&"arrow_tower"].disabled, "Disconnect/reset clears an unacknowledged selection instead of leaving the panel locked")
 	panel.tower_buttons[&"arrow_tower"].pressed.emit()
 	panel.leave_button.pressed.emit()
@@ -214,8 +226,9 @@ func _solo(session: MultiplayerSession, rules: CombatRules) -> void:
 	root.add_child(planning)
 	planning.start_singleplayer()
 	_check(planning.selecting_loadout and not planning.active, "Singleplayer also requires explicit loadout selection")
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Solo first completes the real secret-number hero draft")
 	_check(planning.select_loadout(["arrow_tower"]) and planning.commit_loadout() and planning.active, "Solo commit admits the same selected deck to both mirrored boards")
-	planning.build_tower(0, Vector2i(2, 3), &"arrow_tower", 0)
+	planning.build_tower(0, preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(2, 3), 3), &"arrow_tower", 0)
 	var own: Dictionary = planning.combat["towers"][0][0]
 	var other: Dictionary = planning.combat["towers"][1][0]
 	_check(own["id"] != other["id"] and own["rarity"] == other["rarity"] and own["attributes"] == other["attributes"], "Solo placement mirrors one accepted roll while retaining distinct tower identities")

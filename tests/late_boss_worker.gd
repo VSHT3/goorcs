@@ -1,5 +1,17 @@
 extends "res://tests/match_branch_worker.gd"
 
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for x: int in range(14):
+		cells.append(Vector2i(x, 0))
+	cells.append(Vector2i(0, 1))
+	cells.append(Vector2i(13, 1))
+	cells.append(Vector2i(1, 3))
+	cells.append(Vector2i(7, 3))
+	cells.append(Vector2i(10, 3))
+	cells.append(Vector2i(12, 4))
+	return cells
+
 
 func _new_session() -> void:
 	_session = MultiplayerSession.new()

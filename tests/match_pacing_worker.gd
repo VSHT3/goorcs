@@ -10,6 +10,18 @@ func _new_session() -> void:
 	planning.changed.connect(_record_snapshot)
 
 
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	# Keep both the straight host route and the longer guest clearance route.
+	var reserved: Array[Vector2i] = []
+	for x: int in range(14):
+		reserved.append(Vector2i(x, 4))
+		reserved.append(Vector2i(x, 1))
+	for y: int in [2, 3]:
+		reserved.append(Vector2i(0, y))
+		reserved.append(Vector2i(13, y))
+	return reserved
+
+
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
 	rules.base_health = 100

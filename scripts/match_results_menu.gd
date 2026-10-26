@@ -144,7 +144,7 @@ func open_result(state: Dictionary, slot: int, solo: bool) -> void:
 	for entry: Array in [["kill_coins", "Kill rewards, including mark/aura bonuses"], ["wave_coins", "Wave-clear rewards"], ["income_coins", "Send income paid"], ["production_coins", "Mine production"], ["boss_coins", "First-boss bonuses"], ["sale_coins", "Tower sale refunds"]]:
 		_flow(entry, own, other, "earned")
 	_heading("Economy · Spending")
-	for entry: Array in [["towers", "Tower purchases"], ["upgrades", "Upgrades and evolutions"], ["sends", "Enemy orders"], ["attribute_rerolls", "Attribute rerolls"], ["rarity_shards", "Rarity rerolls · Shards"]]:
+	for entry: Array in [["towers", "Tower purchases"], ["upgrades", "Upgrades and evolutions"], ["sends", "Enemy orders"], ["terrain", "Obstacle clearing"], ["attribute_rerolls", "Attribute rerolls"], ["rarity_shards", "Rarity rerolls · Shards"]]:
 		_flow(entry, own, other, "spent")
 	_heading("Shard income")
 	for entry: Array in [["drop_shards", "Enemy drops"], ["clear_shards", "Round-clear Shards"], ["production_shards", "Tower production"], ["boss_shards", "First-boss bonuses"]]:

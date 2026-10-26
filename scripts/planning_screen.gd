@@ -72,6 +72,15 @@ var tower_status: TowerStatusStrip
 var banner: MatchBanner
 var health_feedback: BaseHealthFeedback
 var _boss_bar_run: String = ""
+var commander_ability_button: Button
+var commander_target: OptionButton
+var obstacle_clear_button: Button
+var _commander_panel: PanelContainer
+var _commander_title: Label
+var _terrain_close: Button
+var _selected_terrain := Vector2i(-1, -1)
+var _terrain_run: String = ""
+var _terrain_board_origin_y: int = 0
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -136,6 +145,7 @@ func _ready() -> void:
 	_build_currencies()
 	_build_health()
 	_build_tower_management()
+	_build_commander_controls()
 	_build_boss_bars()
 	_build_match_feedback()
 	_cancel_placement.pressed.connect(cancel_interaction)
@@ -277,7 +287,7 @@ func _build_match_feedback() -> void:
 	$HUD.add_child(health_feedback)
 	health_feedback.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	banner = MatchBanner.new()
-	banner.avoid = [_management, _enemy_inspector, _feedback]
+	banner.avoid = [_management, _enemy_inspector, _feedback, _commander_panel]
 	$HUD.add_child(banner)
 	banner.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
@@ -304,6 +314,123 @@ func _refresh_boss_bars(state: Dictionary, own_slot: int, finished: bool) -> voi
 	boss_bars.refresh(enemies[own_slot], state.get("enemy_types", {}), deaths[own_slot] if own_slot < deaths.size() else [])
 	boss_bars.selected_id = selected_enemy_id if selected_enemy_slot == own_slot else -1
 
+
+
+func _build_commander_controls() -> void:
+	_commander_panel = PanelContainer.new()
+	_commander_panel.name = "Commander"
+	_commander_panel.offset_left = 14
+	_commander_panel.offset_top = 84
+	_commander_panel.offset_right = 354
+	_commander_panel.offset_bottom = 158
+	_commander_panel.add_theme_stylebox_override("panel", $HUD/Header.get_theme_stylebox("panel"))
+	$HUD.add_child(_commander_panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 4)
+	_commander_panel.add_child(column)
+	var heading := HBoxContainer.new()
+	column.add_child(heading)
+	_commander_title = Label.new()
+	_commander_title.add_theme_font_size_override("font_size", 18)
+	_commander_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(_commander_title)
+	_terrain_close = Button.new()
+	CloseButtonStyle.apply(_terrain_close)
+	_terrain_close.pressed.connect(cancel_interaction)
+	MenuAudio.bind_action(_terrain_close)
+	heading.add_child(_terrain_close)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 6)
+	column.add_child(actions)
+	commander_ability_button = Button.new()
+	commander_ability_button.name = "CommanderAbility"
+	commander_ability_button.custom_minimum_size = Vector2(140, 36)
+	commander_ability_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	commander_ability_button.pressed.connect(_activate_commander)
+	MenuAudio.bind_action(commander_ability_button)
+	actions.add_child(commander_ability_button)
+	commander_target = OptionButton.new()
+	commander_target.name = "CommanderTarget"
+	commander_target.custom_minimum_size = Vector2(144, 36)
+	commander_target.add_item("Own board", 0)
+	commander_target.add_item("Opponent", 1)
+	actions.add_child(commander_target)
+	world._hud_popups.append(commander_target.get_popup())
+	commander_target.get_popup().about_to_popup.connect(func() -> void: _focus_commander_target.call_deferred())
+	obstacle_clear_button = Button.new()
+	obstacle_clear_button.name = "ClearObstacle"
+	obstacle_clear_button.custom_minimum_size.y = 36
+	obstacle_clear_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	obstacle_clear_button.pressed.connect(_clear_obstacle)
+	MenuAudio.bind_action(obstacle_clear_button)
+	actions.add_child(obstacle_clear_button)
+	_commander_panel.hide()
+
+
+func _commander_input_available() -> bool:
+	return planning != null and planning.active and is_visible_in_tree() and not pause_menu.visible and not debug_popup.visible and not results_menu.visible and not _rarity_reel.is_busy()
+
+
+func _focus_commander_target() -> void:
+	var popup: PopupMenu = commander_target.get_popup()
+	if popup.visible and commander_target.selected >= 0:
+		popup.set_focused_item(commander_target.selected)
+
+
+func _activate_commander() -> void:
+	if not _commander_input_available() or commander_ability_button.disabled:
+		return
+	var slot: int = planning.local_slot()
+	var state: Dictionary = planning.combat.get("commanders", [{}, {}])[slot]
+	var target: int = 1 - slot if state.get("id", "") == "priestess" and commander_target.selected == 1 else slot
+	planning.request_commander_ability(target)
+
+
+func _clear_obstacle() -> void:
+	if _commander_input_available() and not obstacle_clear_button.disabled:
+		planning.request_clear_obstacle(_selected_terrain)
+
+
+func _refresh_commander() -> void:
+	var slot: int = planning.local_slot() if planning != null else 0
+	var state: Dictionary = planning.combat.get("commanders", [{}, {}])[slot] if planning != null else {}
+	var phase: int = int(planning.combat.get("phase", -1)) if planning != null else -1
+	var combat: bool = phase == MatchCombat.Phase.WAVE
+	var run: String = String(planning.combat.get("statistics_id", "")) if planning != null else ""
+	var origin_y: int = int(planning.combat.get("board_origin_y", 0)) if planning != null else 0
+	# Growth rebases terrain cells; matching the old coordinate could select its neighbor.
+	if run != _terrain_run or origin_y != _terrain_board_origin_y:
+		_selected_terrain = Vector2i(-1, -1)
+	_terrain_run = run
+	_terrain_board_origin_y = origin_y
+	var obstacle: bool = not state.is_empty() and state.get("obstacles", []).has(_selected_terrain)
+	var landmark: bool = not state.is_empty() and state.get("landmark") == _selected_terrain
+	if not obstacle and not landmark:
+		_selected_terrain = Vector2i(-1, -1)
+	_commander_panel.visible = planning != null and planning.active and not state.is_empty() and phase != MatchCombat.Phase.FINISHED and (combat or obstacle or landmark)
+	_feedback.offset_top = 174 if _commander_panel.visible else 84
+	_feedback.offset_bottom = _feedback.offset_top + 54
+	if not _commander_panel.visible:
+		return
+	var id := StringName(state["id"])
+	var remaining: float = state.get("ability_remaining", 0.0)
+	var cooldown: float = state.get("cooldown_remaining", 0.0)
+	_commander_title.text = "Rubble" if obstacle and not combat else CommanderRules.title(id)
+	if landmark and not combat:
+		_commander_title.text = "Bastion · Physical +15%" if id == &"knight" else "Sanctuary · Rate +15%"
+	elif combat and remaining > 0.0:
+		_commander_title.text += " · %.1fs active" % remaining
+	_terrain_close.visible = not combat
+	commander_ability_button.visible = combat
+	commander_ability_button.text = CommanderRules.ability_title(id) + (" · %ds" % ceili(cooldown) if cooldown > 0.0 else "")
+	commander_ability_button.disabled = not _commander_input_available() or cooldown > 0.0 or remaining > 0.0
+	commander_target.visible = combat and id == &"priestess"
+	commander_target.disabled = not _commander_input_available() or remaining > 0.0
+	if id == &"priestess" and remaining > 0.0:
+		commander_target.select(0 if int(state.get("ability_target", -1)) == slot else 1)
+	obstacle_clear_button.visible = obstacle and not combat
+	obstacle_clear_button.text = "Clear · %d Coins" % CommanderRules.CLEAR_COST
+	obstacle_clear_button.disabled = not _commander_input_available() or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[slot] or _own_coins() < CommanderRules.CLEAR_COST
 
 
 func _build_health() -> void:
@@ -447,6 +574,7 @@ func _present_pending_reel() -> void:
 	if _rarity_reel.is_busy():
 		cancel_strokes()
 		enemy_selector.get_popup().hide()
+		commander_target.get_popup().hide()
 	world.set_input_blocked(blocked or _rarity_reel.is_busy())
 
 
@@ -467,6 +595,7 @@ func open_pause_menu() -> void:
 	cancel_interaction()
 	cancel_strokes()
 	enemy_selector.get_popup().hide()
+	commander_target.get_popup().hide()
 	world.set_input_blocked(true)
 	$HUD.process_mode = Node.PROCESS_MODE_DISABLED
 	pause_menu.open_menu(not planning.singleplayer)
@@ -537,6 +666,7 @@ func _open_debug() -> void:
 	cancel_interaction()
 	cancel_strokes()
 	enemy_selector.get_popup().hide()
+	commander_target.get_popup().hide()
 	var state: Dictionary = planning.combat
 	debug_round.value = int(state.get("wave", 0)) + (1 if int(state.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.PLANNING else 0)
 	debug_money.value = _own_coins()
@@ -570,7 +700,7 @@ func _debug_window_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if _rarity_reel.is_busy():
 		return
-	if not is_visible_in_tree() or pause_menu.visible or debug_popup.visible or (_placement_id == &"" and selected_enemy_id < 0 and selected_tower_id < 0):
+	if not is_visible_in_tree() or pause_menu.visible or debug_popup.visible or (_placement_id == &"" and selected_enemy_id < 0 and selected_tower_id < 0 and _selected_terrain == Vector2i(-1, -1)):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		cancel_interaction()
@@ -611,13 +741,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func cancel_interaction() -> bool:
-	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0 and _pending_tower_cell == Vector2i(-1, -1):
+	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0 and _pending_tower_cell == Vector2i(-1, -1) and _selected_terrain == Vector2i(-1, -1):
 		return false
 	cancel_strokes()
 	_placement_id = &""
 	selected_tower_id = -1
 	selected_enemy_id = -1
 	selected_enemy_slot = -1
+	_selected_terrain = Vector2i(-1, -1)
 	_pending_tower_cell = Vector2i(-1, -1)
 	_repeat_placement = false
 	_refresh()
@@ -648,6 +779,14 @@ func _cell_clicked(cell: Vector2i, button: MouseButton, slot: int) -> void:
 	if button != MOUSE_BUTTON_LEFT:
 		return
 	_pending_tower_cell = Vector2i(-1, -1)
+	_selected_terrain = Vector2i(-1, -1)
+	var commander: Dictionary = planning.combat.get("commanders", [{}, {}])[slot]
+	if _placement_id == &"" and not commander.is_empty() and (commander.get("landmark") == cell or commander.get("obstacles", []).has(cell)):
+		cancel_strokes()
+		selected_tower_id = -1
+		_selected_terrain = cell
+		_refresh()
+		return
 	for tower: Dictionary in boards[slot].combat_towers:
 		if tower["cell"] == cell:
 			cancel_strokes()
@@ -710,6 +849,7 @@ func _select_placement(type_id: StringName) -> void:
 	selected_tower_id = -1
 	selected_enemy_id = -1
 	selected_enemy_slot = -1
+	_selected_terrain = Vector2i(-1, -1)
 	_placement_id = type_id
 	_refresh()
 
@@ -1638,6 +1778,7 @@ func _refresh() -> void:
 	if not is_node_ready():
 		return
 	debug_button.visible = planning != null and planning.can_debug()
+	_refresh_commander()
 	if not debug_button.visible:
 		debug_popup.hide()
 	if planning == null:
@@ -1708,10 +1849,12 @@ func _refresh() -> void:
 		board.cell_click_mode = _placement_id != &"" or not editable
 		board.input_enabled = planning.active and not finished and slot == own_slot
 		board.placement_enabled = slot == own_slot and planning.can_manage_towers(slot)
+		board.solo_mirror_placement = planning.singleplayer
 		board.enemy_inspection_enabled = planning.active and in_wave and _placement_id == &""
 		board.selected_enemy_id = selected_enemy_id if slot == selected_enemy_slot else -1
 		board.placement_id = _placement_id if slot == own_slot else &""
 		board.selected_tower_id = selected_tower_id if slot == own_slot else -1
+		board.selected_terrain = _selected_terrain if slot == own_slot else Vector2i(-1, -1)
 		board.apply_combat(state, slot, float(state.get("speed_multiplier", 1.0)))
 		var role: String = "Local testing · mirrors your actions" if planning.singleplayer else ("Host" if slot == 0 else "Guest")
 		_titles[slot].text = "You" if slot == own_slot else ("Mirror" if planning.singleplayer else "Opponent")
@@ -1784,6 +1927,7 @@ func open_results() -> void:
 	debug_popup.hide()
 	cancel_strokes()
 	enemy_selector.get_popup().hide()
+	commander_target.get_popup().hide()
 	selected_tower_id = -1
 	_placement_id = &""
 	_management.hide()

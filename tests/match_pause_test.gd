@@ -43,6 +43,7 @@ func _run() -> void:
 	await _settle()
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
 	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "Pause fixture commits its owned starter")
 	await _settle()
 	screen = main.play_screen.planning_screen
@@ -125,6 +126,7 @@ func _run() -> void:
 	_check(not paused and main.menu.visible and not main.planning.active, "Quit returns to title and releases pause")
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
 	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "New pause run requires a fresh committed deck")
 	await _settle()
 	_check(main.planning.active and not screen.pause_menu.visible and not paused, "New run cannot inherit the previous pause")

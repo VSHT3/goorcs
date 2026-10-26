@@ -7,9 +7,41 @@ var _ballista_probe: Dictionary = {}
 
 func _on_planning_changed() -> void:
 	# Only explicit host step commands may advance these real peer matches.
+	super._on_planning_changed()
 	planning.set_physics_process(false)
 	if _scenario == "ballista" and planning.active:
 		_update_ballista_boards()
+
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	# Keep authored routes and legal build sites unchanged. Reserve the aura
+	# footprint too: these scenarios assert tower behavior without landmark buffs.
+	var builds: Array[Vector2i] = []
+	match _scenario:
+		"rolls":
+			builds = [Vector2i(1, 3), Vector2i(2, 3)]
+		"chain":
+			builds = [Vector2i(0, 3)]
+		"support":
+			builds = [Vector2i(4, 3), Vector2i(3, 3), Vector2i(5, 3), Vector2i(3, 2), Vector2i(5, 2), Vector2i(4, 2)]
+		"economy":
+			builds = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 3)]
+		"bounty":
+			builds = [Vector2i(0, 3), Vector2i(1, 3), Vector2i(2, 3), Vector2i(1, 2), Vector2i(0, 2)]
+		"ballista":
+			builds = [Vector2i(4, 3)]
+	var reserved: Array[Vector2i] = []
+	for y: int in range(planning._dimensions.y):
+		for x: int in range(planning._dimensions.x):
+			var cell := Vector2i(x, y)
+			if y == 4:
+				reserved.append(cell)
+				continue
+			for build: Vector2i in builds:
+				if Vector2(cell).distance_to(Vector2(build)) <= CommanderRules.RADIUS:
+					reserved.append(cell)
+					break
+	return reserved
+
 
 
 func _planning_rules() -> CombatRules:
@@ -208,7 +240,6 @@ func _execute_command(command: Dictionary) -> void:
 
 
 func _publish() -> void:
-	super._publish()
 	if planning == null or _directory.is_empty() or _executing_command:
 		return
 	var extra: Dictionary = {}
@@ -245,6 +276,8 @@ func _publish() -> void:
 	file.store_string(JSON.stringify(extra))
 	file.close()
 	DirAccess.rename_absolute(_path("scenario") + ".tmp", _path("scenario"))
+	# A command acknowledgement must never precede its scenario/renderer data.
+	super._publish()
 
 
 func _deck_paths(value: Variant, registered_ids: Dictionary, prefix: String = "") -> Dictionary:

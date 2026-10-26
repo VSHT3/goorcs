@@ -1,5 +1,7 @@
 extends SceneTree
 
+const DRAFT_FIXTURE = preload("res://tests/commander_fixture_worker.gd")
+
 var failures: int = 0
 
 
@@ -39,7 +41,7 @@ func _run() -> void:
 	root.add_child(planning)
 	planning.start_singleplayer()
 	_check(planning.selecting_loadout and not planning.active, "Singleplayer opens explicit loadout selection before board admission")
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Solo fixture commits its three tested identities")
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Solo fixture completes a fresh hero draft and commits its three tested identities")
 	_check(planning.active and planning.local_slot() == 0 and session.state == MultiplayerSession.State.IDLE and not root.multiplayer.multiplayer_peer is ENetMultiplayerPeer, "Singleplayer starts locally without installing a network peer")
 	var notices: Array[String] = []
 	planning.feedback.connect(func(message: String) -> void: notices.append(message))
@@ -66,7 +68,7 @@ func _run() -> void:
 	var initial_coins: Array = planning.combat["coins"].duplicate()
 	planning.build_tower(0, Vector2i(1, 4), &"arrow_tower", 0)
 	_check(planning.combat["coins"] == initial_coins and planning.combat["towers"] == [[], []], "Rejected purchases spend nothing on either board")
-	planning.build_tower(0, Vector2i(2, 3), &"arrow_tower", 0)
+	planning.build_tower(0, DRAFT_FIXTURE.free_cell(planning, Vector2i(2, 3), 3), &"arrow_tower", 0)
 	var own_id: int = planning.combat["towers"][0][0]["id"]
 	var other_id: int = planning.combat["towers"][1][0]["id"]
 	_check(own_id != other_id and planning.combat["coins"][0] == planning.combat["coins"][1] and planning.combat["coins"][0] < initial_coins[0], "Mirrored towers retain independent IDs and pay the same price")
@@ -87,7 +89,7 @@ func _run() -> void:
 	_check(planning.locked and planning.combat["phase"] == MatchCombat.Phase.WAVE, "One Ready starts both boards")
 	planning.request_clear(0)
 	_check(planning.layouts[0].is_ready() and planning.layouts[1].is_ready(), "Wave routes remain locked")
-	planning.build_tower(0, Vector2i(0, 0), &"arrow_tower", 0)
+	planning.build_tower(0, DRAFT_FIXTURE.free_cell(planning, Vector2i(0, 0), 0), &"arrow_tower", 0)
 	_check(planning.combat["towers"][0].size() == 1 and planning.combat["towers"][1].size() == 1, "Live construction mirrors during combat")
 	for tick: int in range(2400):
 		planning._physics_process(1.0 / 60.0)
@@ -110,7 +112,7 @@ func _run() -> void:
 	planning.stop_singleplayer()
 	_check(not planning.active and not planning.singleplayer and not planning.is_physics_processing(), "Leaving clears solo mode and stops simulation")
 	planning.start_singleplayer()
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Reopening requires a fresh chosen loadout")
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Reopening requires a fresh hero draft and chosen loadout")
 	_check(planning.layouts[0].used_tiles() == 0 and planning.combat["wave"] == 0 and planning.combat["towers"] == [[], []] and planning.combat["coins"] == initial_coins and planning.combat["income"] == [0, 0] and planning.combat["queued_sends"] == [0, 0], "Reopening starts a fresh match")
 	planning.stop_singleplayer()
 	_solo_sends(planning)
@@ -144,8 +146,8 @@ func _solo_last_targeting(planning: MatchPlanning) -> void:
 		rules.catalog.towers[0].interval = 10.0
 		planning.combat_rules = rules
 		planning.start_singleplayer()
-		_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Shared-targeting fixture commits its tested identities")
-		planning.build_tower(0, Vector2i(2, 3), &"arrow_tower", MatchCombat.TargetMode.LAST)
+		_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Shared-targeting fixture completes its draft and commits its tested identities")
+		planning.build_tower(0, DRAFT_FIXTURE.free_cell(planning, Vector2i(2, 3), 3), &"arrow_tower", MatchCombat.TargetMode.LAST)
 		var id: int = planning.combat["towers"][0][0]["id"]
 		var opponent_id: int = planning.combat["towers"][1][0]["id"]
 		_check(id != opponent_id, "Accepted Last build mirrors by cell to independent tower IDs")
@@ -178,6 +180,11 @@ func _solo_last_targeting(planning: MatchPlanning) -> void:
 			planning.request_edit(0, Vector2i(x, 4), true)
 		planning.submit_ready(true)
 		_check(planning.locked and planning.combat["phase"] == MatchCombat.Phase.WAVE and planning.combat["wave_roster"] == ["grunt", "grunt", "grunt"], "Shared-targeting fixture admits exactly three real grunts on both legal routes")
+		# Stage the ordinary first volley after all real births; keep the rotary
+		# gun's due-at-start case separate so targeting, not spawn cadence, is tested.
+		if count > 1:
+			for board: Array in planning._host_combat.towers:
+				board[0]["cooldown"] = 0.1
 		planning._physics_process(0.1)
 		for slot: int in range(2):
 			var tower: Dictionary = planning.combat["towers"][slot][0]
@@ -215,7 +222,7 @@ func _solo_specials(planning: MatchPlanning) -> void:
 	rules.starting_coins = 3000
 	planning.combat_rules = rules
 	planning.start_singleplayer()
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Special-upgrade fixture commits its tested identities")
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Special-upgrade fixture completes its draft and commits its tested identities")
 	var x: int = 2
 	for choice: Dictionary in [
 		{"type": &"arrow_tower", "upgrade": "special"},
@@ -226,7 +233,7 @@ func _solo_specials(planning: MatchPlanning) -> void:
 	]:
 		var type_id: StringName = choice["type"]
 		var upgrade: String = choice["upgrade"]
-		planning.build_tower(0, Vector2i(x, 3), type_id, 0)
+		planning.build_tower(0, DRAFT_FIXTURE.free_cell(planning, Vector2i(x, 3), 3), type_id, 0)
 		var id: int = planning.combat["towers"][0].back()["id"]
 		var before: Dictionary = planning.combat.duplicate(true)
 		planning.upgrade_tower(0, id, upgrade)
@@ -293,7 +300,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	rules.send_spawn_interval = 0.35
 	planning.combat_rules = rules
 	planning.start_singleplayer()
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Send fixture commits its loadout before board commands")
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Send fixture completes its hero draft and commits its loadout before board commands")
 	var before: Dictionary = planning.combat.duplicate(true)
 	for slot: int in [1, -1, 2]:
 		planning.send_enemy(slot, &"grunt")
@@ -340,7 +347,7 @@ func _solo_sends(planning: MatchPlanning) -> void:
 	_check(planning.combat == before, "Finished solo sends cannot spend remaining affordable Coins, gain income, create enemies or reroll")
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Send restart commits a fresh deck")
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Send restart completes a fresh draft and commits a fresh deck")
 	_check(planning.combat["wave"] == 0 and planning.combat["health"] == [7, 7] and planning.combat["coins"] == [45, 45] and planning.combat["income"] == [0, 0] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []] and planning.layouts[0].used_tiles() == 0 and planning.layouts[1].used_tiles() == 0, "Restart clears mirrored send income, deliveries, enemies, health, routes and currency")
 	planning.stop_singleplayer()
 
@@ -373,7 +380,7 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	rules.catalog.enemies = definitions
 	planning.combat_rules = rules
 	planning.start_singleplayer()
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Typed-send fixture commits its tested identities")
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Typed-send fixture completes its draft and commits its tested identities")
 	var before: Dictionary = planning.combat.duplicate(true)
 	for type_id: StringName in [&"runner", &"brute"]:
 		for slot: int in [1, -1, 2]:
@@ -427,7 +434,7 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	_check(planning.combat == before, "Terminal typed sends cannot spend affordable Coins, create enemies, grow income or mirror")
 	planning.stop_singleplayer()
 	planning.start_singleplayer()
-	_check(planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Typed-send restart commits a fresh deck")
+	_check(DRAFT_FIXTURE.complete_solo(planning) and planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and planning.commit_loadout(), "Typed-send restart completes a fresh draft and commits a fresh deck")
 	_check(planning.combat["phase"] == MatchCombat.Phase.PLANNING and planning.combat["wave"] == 0 and planning.combat["health"] == [16, 16] and planning.combat["coins"] == [200, 200] and planning.combat["income"] == [0, 0] and planning.combat["send_queues"] == [[], []] and planning.combat["queued_sends"] == [0, 0] and planning.combat["enemies"] == [[], []], "Solo restart clears both typed queues, income, enemies and health")
 	for type_id: StringName in [&"brute", &"brute", &"brute", &"brute", &"runner"]:
 		planning.send_enemy(0, type_id)

@@ -172,6 +172,7 @@ func _test_planning_consumer() -> void:
 	main.play_screen.singleplayer_button.pressed.emit()
 	planning = main.planning
 	screen = main.play_screen.planning_screen
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Reward fixture enters an admitted real solo match")
 	planning.set_physics_process(false)
 	await _settle()
@@ -268,6 +269,7 @@ func _test_modal_results_and_replay(history: Array[Dictionary]) -> void:
 	_check(model.snapshot() == frozen and _random_states(model) == random_before, "Result modal deferral does not modify accepted rewards, terminal state or RNG")
 	await _key(KEY_ENTER)
 	_check(planning.selecting_loadout and not planning.active and not screen.results_menu.visible and not reel.is_busy() and screen._boss_rewards.pending_count() == 0, "Keyboard Play again safely clears old presentation and returns to fresh loadout selection")
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Replay admits a fresh run explicitly")
 	planning.set_physics_process(false)
 	_publish_rewards([_award(1), _award(2)])

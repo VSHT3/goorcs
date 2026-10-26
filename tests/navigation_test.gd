@@ -115,8 +115,17 @@ func _check_match_music() -> void:
 	await _key(KEY_P)
 	await _click(main.play_screen.singleplayer_button.get_global_rect().get_center())
 	_check(main.planning.selecting_loadout and not main.planning.loadout_committed and main.play_screen.loadout_panel.visible, "A cancelled loadout can reopen as a fresh selection")
-	var browsing_cues: int = menu_audio.actions
 	var loadout: LoadoutPanel = main.play_screen.loadout_panel
+	var draft_cues: int = menu_audio.actions
+	await _click(loadout.guess_button.get_global_rect().get_center())
+	_check(main.planning.commander_draft.get("phase", "") == "picking" and not music.playing and menu_audio.actions == draft_cues + 1, "Native guess lock advances the silent draft with exactly one action clack")
+	var picks: Array = main.planning.commander_draft.get("picks", ["", ""])
+	var commander_id: StringName = &"priestess" if picks.has("knight") else &"knight"
+	loadout.commander_buttons[commander_id].grab_focus()
+	await process_frame
+	await _key(KEY_ENTER)
+	_check(main.planning.commander_draft.get("phase", "") == "loadout" and main.planning.chosen_commander_id == commander_id and not music.playing and menu_audio.actions == draft_cues + 2, "Native hero pick completes the actual draft with one additional clack and no match music")
+	var browsing_cues: int = menu_audio.actions
 	await _click(loadout.tower_buttons[&"arrow_tower"].get_global_rect().get_center())
 	_check(menu_audio.actions == browsing_cues, "Actual loadout tower-card activation remains silent")
 	_check(main.planning.select_loadout([&"arrow_tower"]), "Navigation fixture selects its owned starter")

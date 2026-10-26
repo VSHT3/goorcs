@@ -50,6 +50,7 @@ func _new_model(with_route: bool = true, with_rolls: bool = false) -> MatchPlann
 	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.start_singleplayer()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Debug fixture explicitly admits its authored tower")
 	planning.set_physics_process(false)
 	if with_route:
@@ -73,7 +74,8 @@ func _make_host(planning: MatchPlanning) -> void:
 
 
 func _build_upgraded(planning: MatchPlanning) -> void:
-	planning.build_tower(0, Vector2i(0, 0), &"arrow_tower", MatchCombat.TargetMode.CLOSEST)
+	var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i.ZERO)
+	planning.build_tower(0, cell, &"arrow_tower", MatchCombat.TargetMode.CLOSEST)
 	var tower_id: int = planning.combat["towers"][0][0]["id"]
 	for upgrade: String in ["damage", "speed", "special"]:
 		planning.upgrade_tower(0, tower_id, upgrade)
@@ -159,7 +161,8 @@ func _random_states(planning: MatchPlanning) -> PackedInt64Array:
 
 func _test_currency_only() -> void:
 	var planning: MatchPlanning = _new_model(true, true)
-	planning.build_tower(0, Vector2i.ZERO, &"arrow_tower", MatchCombat.TargetMode.CLOSEST)
+	var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i.ZERO)
+	planning.build_tower(0, cell, &"arrow_tower", MatchCombat.TargetMode.CLOSEST)
 	var tower_id: int = planning.combat["towers"][0][0]["id"]
 	_check(planning.reroll_tower(0, tower_id, "rarity") and planning.reroll_tower(0, tower_id, "attributes"), "Currency-only fixture owns accepted rolls and both reroll counters")
 	_check(planning.debug_set_values(2, 1000, int(planning.combat["reroll_currency"][0])), "Currency-only fixture advances to ordinary planning without changing Shards")

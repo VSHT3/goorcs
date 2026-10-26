@@ -208,6 +208,7 @@ func _test_match(main) -> void:
 	main.play_screen.singleplayer_button.pressed.emit()
 	var planning: MatchPlanning = main.planning
 	planning.set_physics_process(false)
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Feedback fixture commits a deck")
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
 	var layout: PathLayout = planning.layouts[0]

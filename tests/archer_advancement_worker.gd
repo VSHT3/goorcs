@@ -1,4 +1,23 @@
 extends "res://tests/match_multiplayer_worker.gd"
+
+
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	var reserved: Array[Vector2i] = []
+	for x: int in range(planning.layouts[0].dimensions.x):
+		reserved.append(Vector2i(x, planning.layouts[0].entrance.y))
+	# This fixture observes the baseline first volley after all six spawns.
+	# Sanctuary enables event-boundary attacks on both boards, before that
+	# observation; keep real landmarks outside every authored tower's aura.
+	for x: int in [0, 2, 4, 6, 8]:
+		var build := Vector2i(x, 3)
+		for y: int in range(planning.layouts[0].dimensions.y):
+			for column: int in range(planning.layouts[0].dimensions.x):
+				var cell := Vector2i(column, y)
+				if Vector2(cell).distance_squared_to(Vector2(build)) <= CommanderRules.RADIUS * CommanderRules.RADIUS and not reserved.has(cell):
+					reserved.append(cell)
+	return reserved
+
+
 func _planning_rules() -> CombatRules:
 	_manual_simulation = true
 	var rules := CombatRules.new()

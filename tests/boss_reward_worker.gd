@@ -1,5 +1,12 @@
 extends "res://tests/match_branch_worker.gd"
 
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for x: int in range(6):
+		cells.append(Vector2i(x, 2))
+	cells.append(Vector2i(1, 0))
+	return cells
+
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
 	rules.boss_reward_rules = load("res://resources/combat/boss_rewards.tres").duplicate(true) as BossRewardRules

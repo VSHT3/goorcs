@@ -19,6 +19,7 @@ func _run() -> void:
 	var planning: MatchPlanning = main.planning
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
 	check(planning.selecting_loadout and not planning.active and not screen.is_visible_in_tree(),"Singleplayer presents loadout selection before the battlefield")
+	check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning),"Fixture completes the hero draft")
 	check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(),"Result fixture commits its owned starter")
 	var run_id: String = planning.combat["statistics_id"]
 	planning.build_tower(0, Vector2i(1, 1), &"arrow_tower", 0)
@@ -62,6 +63,7 @@ func _run() -> void:
 	check(screen.results_menu.visible,"Results HUD action reopens terminal details")
 	screen.results_menu.replay_button.pressed.emit()
 	check(planning.selecting_loadout and not planning.active and not screen.results_menu.visible,"Play again returns to fresh loadout selection instead of bypassing admission")
+	check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning),"Fixture completes the hero draft")
 	check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(),"Replay explicitly chooses and commits again")
 	check(planning.singleplayer and planning.active and planning.combat["phase"]==MatchCombat.Phase.PLANNING and planning.combat["wave"]==0 and planning.combat["statistics_id"]!=run_id and not screen.results_menu.visible,"Play again creates a fresh solo model and clears results lifecycle")
 	check(planning.combat["speed_multiplier"]==1.0 and planning.layouts[0].used_tiles()==0,"Replay resets speed and maze rather than restarting the finished instance")

@@ -37,6 +37,8 @@ func _run() -> void:
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
 	_check(main.planning.selecting_loadout and not main.planning.active, "World navigation first enters explicit selection")
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
+	_check(_reserve_fixture_terrain(), "Real commander terrain leaves the authored native input cells legal on both boards")
 	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "World fixture commits its owned tested towers")
 	await _settle()
 	screen = main.play_screen.planning_screen
@@ -67,6 +69,13 @@ func _run() -> void:
 	await _check_camera_and_input(1)
 	await _check_top_row_visibility(1)
 	await _finish(saved_bytes)
+
+
+func _reserve_fixture_terrain() -> bool:
+	var cells: Array[Vector2i] = [TOWER_CELL, DROP_CELL]
+	for x: int in range(4, 12):
+		cells.append(Vector2i(x, 5))
+	return preload("res://tests/commander_fixture_worker.gd").seed_terrain(main.planning, cells)
 
 
 func _check_top_row_visibility(own_slot: int) -> void:
@@ -354,6 +363,8 @@ func _check_leave_and_reopen() -> void:
 	main.play_button.pressed.emit()
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
+	_check(_reserve_fixture_terrain(), "Reopened real terrain preserves the same owned and guest input geometry")
 	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "Reopened world requires a fresh deck commitment")
 	await _settle()
 	world.set_process(false)

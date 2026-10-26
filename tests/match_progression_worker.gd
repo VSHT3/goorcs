@@ -7,6 +7,15 @@ func _new_session() -> void:
 	planning.changed.connect(_freeze_clock)
 
 
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	# Growth preserves the original route and the authored corner tower.
+	# The adjacent build probe must fail from commitment, not blocked terrain.
+	var reserved: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0)]
+	for x: int in range(14):
+		reserved.append(Vector2i(x, 4))
+	return reserved
+
+
 func _freeze_clock() -> void:
 	planning.set_physics_process(false)
 

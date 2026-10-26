@@ -40,6 +40,24 @@ func _new_session() -> void:
 	)
 
 
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	var reserved: Array[Vector2i] = super._fixture_reserved_cells()
+	var builds: Array[Vector2i] = [
+		Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 3),
+		Vector2i(2, 2), Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 2),
+		Vector2i(0, 3), Vector2i(2, 3), Vector2i(4, 3), Vector2i(6, 3),
+	]
+	# These legacy scenarios assert exact tower-only stats and attack timing.
+	# Keep real landmarks outside their aura radius, not outside the match.
+	for cell: Vector2i in builds:
+		for y: int in range(cell.y - 2, cell.y + 3):
+			for x: int in range(cell.x - 2, cell.x + 3):
+				var neighbor := Vector2i(x, y)
+				if Vector2(cell).distance_squared_to(Vector2(neighbor)) <= CommanderRules.RADIUS * CommanderRules.RADIUS and not reserved.has(neighbor):
+					reserved.append(neighbor)
+	return reserved
+
+
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
 	rules.roll_rules = null
@@ -97,6 +115,12 @@ func _planning_rules() -> CombatRules:
 	return rules
 
 
+func _defers_command(command: Dictionary) -> bool:
+	if String(command.get("action", "")) == "fence":
+		return planning != null and _session.state == MultiplayerSession.State.CONNECTED and not planning.active
+	return super._defers_command(command)
+
+
 func _execute_command(command: Dictionary) -> void:
 	var action: String = String(command.get("action", ""))
 	if action == "special_scenario":
@@ -136,11 +160,11 @@ func _execute_command(command: Dictionary) -> void:
 		if _lane == "host":
 			planning._physics_process(float(command["delta"]))
 			planning._publish_snapshot()
-	else:
+	elif action != "fence":
 		super._execute_command(command)
 	# Publish the observing peer's captured state before acknowledging this fence;
 	# transport ordering alone does not order that process's next disk write.
-	if action in ["build", "target", "upgrade", "sell", "send", "debug", "step", "edit", "clear", "ready"] and planning.active and _session.state == MultiplayerSession.State.CONNECTED:
+	if action in ["fence", "build", "target", "upgrade", "sell", "send", "debug", "step", "edit", "clear", "ready"] and planning.active and _session.state == MultiplayerSession.State.CONNECTED:
 		_pending_fence = _command_id
 		var peer_id: int = planning._active_peer_id
 		_command_fence.request.rpc_id(peer_id, _pending_fence)

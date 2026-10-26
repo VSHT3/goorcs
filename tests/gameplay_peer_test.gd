@@ -59,8 +59,36 @@ func _choose(lane: String, ids: Array) -> void:
 	await _command(lane, {"action": "select", "ids": ids})
 	await _wait_for(lane, {"chosen_tower_ids": ids}, "Only the owner's accepted deck returns to its process")
 
+func _draft_heroes() -> bool:
+	if _snapshot("host").get("draft_phase", "") != "loadout":
+		for lane: String in ["host", "guest"]:
+			await _wait_for(lane, {"selecting_loadout": true, "draft_phase": "guessing"}, "Both peers receive the new normal commander draft")
+			var guessed: Dictionary = await _command(lane, {"action": "draft_guess", "value": 50})
+			_check(guessed.get("result", false), "The %s submits its own legal commander guess" % lane)
+		var first: Dictionary = await _wait_for("host", {"draft_phase": "picking"}, "Both accepted guesses reveal the host-authoritative first picker")
+		var picker: int = int(first.get("draft_picker", -1))
+		if picker not in [0, 1]:
+			_check(false, "A normal draft identifies one of the two admitted pickers")
+			return false
+		for hero: String in ["knight", "priestess"]:
+			for lane: String in ["host", "guest"]:
+				await _wait_for(lane, {"draft_phase": "picking", "draft_picker": picker}, "Both peers observe the next legal ordered hero pick")
+			var picked: Dictionary = await _command("host" if picker == 0 else "guest", {"action": "draft_pick", "commander": hero})
+			_check(picked.get("result", false), "The active picker normally drafts the distinct %s" % hero)
+			picker = 1 - picker
+	for lane: String in ["host", "guest"]:
+		var drafted: Dictionary = await _wait_for(lane, {"draft_phase": "loadout", "active": false}, "Both real hero picks finish before private-deck admission")
+		var heroes: Array = drafted.get("commander_ids", [])
+		_check(heroes.size() == 2 and heroes.has("knight") and heroes.has("priestess"), "The %s retains both normally drafted distinct heroes" % lane)
+	var seeded: Dictionary = await _command("host", {"action": "seed_terrain"})
+	_check(seeded.get("result", false), "Real generated commander terrain preserves this scenario's authored route and legal builds")
+	return failures == 0
+
+
 
 func _commit_decks(host_ids: Array, guest_ids: Array) -> void:
+	if not await _draft_heroes():
+		return
 	await _choose("host", host_ids)
 	await _choose("guest", guest_ids)
 	await _command("host", {"action": "commit"})
@@ -159,6 +187,8 @@ func _reroll(lane: String, slot: int, id: int, kind: String) -> void:
 
 
 func _admission_and_rolls() -> void:
+	if not await _draft_heroes():
+		return
 	await _wait_for("guest", {"selecting_loadout": true, "active": false}, "Transport connection enters loadout selection, not planning")
 	var before: Dictionary = _snapshot("host").get("combat", {}).duplicate(true)
 	for lane: String in ["host", "guest"]:

@@ -77,6 +77,11 @@ static var _stun_star_shape := PackedVector2Array([
 ])
 
 var layout: PathLayout
+var commander_state: Dictionary = {}
+var solo_mirror_placement: bool = false
+var _counterpart_commander_state: Dictionary = {}
+var selected_terrain := Vector2i(-1, -1)
+var _commander_slow_remaining: float = 0.0
 var command_mode: bool = false
 var mirror_horizontal: bool = false
 var cell_click_mode: bool = false:
@@ -358,6 +363,13 @@ func _process(delta: float) -> void:
 ## capturing fresh enemies/attacks. Independent setters also remain usable by guides.
 func apply_combat(state: Dictionary, slot: int, speed: float = 1.0, paused: bool = false) -> void:
 	tower_types = state.get("tower_types", {})
+	var commanders: Array = state.get("commanders", [{}, {}])
+	commander_state = commanders[slot]
+	_counterpart_commander_state = commanders[1 - slot]
+	_commander_slow_remaining = 0.0
+	for commander: Dictionary in commanders:
+		if commander.get("id", "") == "priestess" and int(commander.get("ability_target", -1)) == slot:
+			_commander_slow_remaining = maxf(_commander_slow_remaining, float(commander.get("ability_remaining", 0.0)))
 	apply_deaths(state, slot, speed, paused)
 	_observe_base_health(state, slot)
 	combat_enemies = state.get("enemies", [[], []])[slot]
@@ -829,7 +841,9 @@ func _sync_drag_preview() -> void:
 
 
 func _placement_is_legal(cell: Vector2i, type_id: String) -> bool:
-	if not placement_enabled or not tower_types.has(type_id) or not layout.contains(cell) or layout.has_path(cell):
+	if not placement_enabled or not tower_types.has(type_id) or not layout.contains(cell) or layout.has_path(cell) or terrain_blocks(cell):
+		return false
+	if solo_mirror_placement and not _counterpart_commander_state.is_empty() and (_counterpart_commander_state.get("landmark") == cell or _counterpart_commander_state.get("obstacles", []).has(cell)):
 		return false
 	for tower: Dictionary in combat_towers:
 		if tower["cell"] == cell:
@@ -913,11 +927,19 @@ func cancel_stroke() -> void:
 	queue_redraw()
 
 
+func terrain_blocks(cell: Vector2i) -> bool:
+	return not commander_state.is_empty() and (commander_state.get("landmark") == cell or commander_state.get("obstacles", []).has(cell))
+
+
 func _paint(cell: Vector2i) -> void:
 	if cell == _last_painted or not layout.contains(cell):
 		return
 	_last_painted = cell
 	if command_mode:
+		if terrain_blocks(cell):
+			if _paint_button == MOUSE_BUTTON_LEFT:
+				cell_clicked.emit(cell, _paint_button)
+			return
 		for tower: Dictionary in combat_towers:
 			if tower["cell"] == cell:
 				if _paint_button == MOUSE_BUTTON_LEFT:
@@ -954,6 +976,8 @@ func _draw() -> void:
 		return
 	_update_ground()
 	_draw_ranges()
+	if not commander_state.is_empty() and selected_terrain == commander_state.get("landmark"):
+		_draw_tile_range(selected_terrain, CommanderRules.RADIUS)
 	_draw_hover()
 	_draw_boss_telegraphs()
 	_draw_attacks()
@@ -962,6 +986,8 @@ func _draw() -> void:
 	_draw_boss_effects()
 	_draw_feedback()
 	_draw_arena_nullify()
+	if _commander_slow_remaining > 0.0:
+		draw_rect(Rect2(_board_origin(), Vector2(layout.dimensions) * _cell_size()).grow(-2.0), Color("83cfe3"), false, 2.0)
 
 
 func _update_ground() -> void:
@@ -1096,7 +1122,7 @@ func _draw_hover() -> void:
 	var cell_size: float = _cell_size()
 	var rect := Rect2(cell_center(_hover) - Vector2.ONE * (cell_size * 0.5 - 3.0), Vector2.ONE * (cell_size - 6.0))
 	if type_id == &"":
-		draw_rect(rect, Color(0.84, 0.88, 0.75, 0.6), false, 1.5)
+		draw_rect(rect, Color("d99d6b") if terrain_blocks(_hover) else Color(0.84, 0.88, 0.75, 0.6), false, 1.5)
 		return
 	var legal: bool = _placement_is_legal(_hover, String(type_id))
 	var color := Color(0.68, 0.85, 0.62, 0.85) if legal else Color(0.87, 0.43, 0.35, 0.9)
@@ -1258,6 +1284,12 @@ func _rebuild_draw_order() -> void:
 	_draw_order.clear()
 	_draw_order.append_array(_endpoint_draw_items)
 	var next_items: Dictionary[Vector2i, Dictionary] = {}
+	if not commander_state.is_empty():
+		_append_draw_item(4, {"id": 0, "cell": commander_state["landmark"], "landmark": true}, next_items)
+		var terrain_id: int = 1
+		for cell: Vector2i in commander_state.get("obstacles", []):
+			_append_draw_item(4, {"id": terrain_id, "cell": cell, "landmark": false}, next_items)
+			terrain_id += 1
 	for tower: Dictionary in combat_towers:
 		_append_draw_item(1, tower, next_items)
 	for enemy: Dictionary in combat_enemies:
@@ -1319,6 +1351,8 @@ func _update_draw_order() -> void:
 				center = _position_center(_enemy_visual_position(enemy))
 			3:
 				center = _position_center(item["data"]["pos"])
+			4:
+				center = cell_center(item["data"]["cell"])
 		var foot: Vector2 = center if kind == 1 else center + Vector2(0, cell_size * 0.28)
 		var geometry_changed: bool = foot != item["foot"]
 		moved = moved or geometry_changed
@@ -1365,7 +1399,7 @@ func _draw_combat() -> void:
 		_draw_death_blood(trace, _position_center(trace["pos"]) + Vector2(0, cell_size * 0.28))
 	# Only units and corpses cast ovals; structures sit on their foundations.
 	for item: Dictionary in _draw_order:
-		if int(item["kind"]) < 2 or (int(item["kind"]) == 2 and not bool(item["visible"])):
+		if int(item["kind"]) not in [2, 3] or (int(item["kind"]) == 2 and not bool(item["visible"])):
 			continue
 		var artwork: EnemyDefinition = _enemy_art[item["data"]["type_id"]]
 		var width: float = cell_size * artwork.board_height * 0.26
@@ -1395,6 +1429,13 @@ func _draw_combat() -> void:
 				_draw_enemy(item)
 			3:
 				_draw_enemy_death(item)
+			4:
+				if bool(item["data"]["landmark"]):
+					CommanderVisuals.draw_landmark(self, item["foot"], cell_size, StringName(commander_state["id"]), float(commander_state.get("ability_remaining", 0.0)) > 0.0)
+				else:
+					CommanderVisuals.draw_obstacle(self, item["foot"], cell_size)
+				if item["data"]["cell"] == selected_terrain:
+					draw_rect(Rect2(cell_center(selected_terrain) - Vector2.ONE * cell_size * 0.43, Vector2.ONE * cell_size * 0.86), Color("e0bc77"), false, 2.0)
 	_draw_flights()
 	_draw_ground_bombs()
 	# Bars are an information overlay; foreground bodies must not cover them.

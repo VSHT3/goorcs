@@ -37,6 +37,9 @@ var winner: int = -1
 var coin_flip: bool = false
 var towers: Array[Array] = [[], []]
 var enemies: Array[Array] = [[], []]
+var commanders: Array[Dictionary] = [{}, {}]
+# Refreshed with accepted tower stats, not by scanning consumers each frame.
+var _commander_rate_timing: Array[bool] = [false, false]
 # Enemies thrown by an Orcapult, airborne until they land on the target board.
 var flights: Array[Dictionary] = []
 var bombs: Array[Dictionary] = []
@@ -292,8 +295,113 @@ func _init(rules: CombatRules, random: RandomNumberGenerator = null, wave_random
 
 
 
+func configure_commanders(states: Array) -> void:
+	if _sandbox_mode or states.size() != 2:
+		return
+	for slot: int in range(2):
+		commanders[slot] = states[slot].duplicate(true)
+	for slot: int in range(2):
+		_refresh_board(slot)
+		_refresh_commander_motion(slot)
+
+
+func terrain_blocks(slot: int, cell: Vector2i) -> bool:
+	if not _valid_slot(slot) or commanders[slot].is_empty():
+		return false
+	var state: Dictionary = commanders[slot]
+	return state["landmark"] == cell or state["obstacles"].has(cell)
+
+
+func _can_clear_obstacle(slot: int, cell: Vector2i) -> bool:
+	return not _sandbox_mode and phase == Phase.PLANNING and _valid_slot(slot) and not commanders[slot].is_empty() and commanders[slot]["landmark"] != cell and commanders[slot]["obstacles"].has(cell) and coins[slot] >= CommanderRules.CLEAR_COST
+
+
+func clear_obstacle(slot: int, cell: Vector2i) -> bool:
+	if not _can_clear_obstacle(slot, cell):
+		return false
+	_clear_obstacle_accepted(slot, cell)
+	return true
+
+
+func _clear_obstacle_accepted(slot: int, cell: Vector2i) -> void:
+	coins[slot] -= CommanderRules.CLEAR_COST
+	commanders[slot]["obstacles"].erase(cell)
+	_recap.add(slot, "spent", "terrain", CommanderRules.CLEAR_COST)
+	_sound_events.record(CombatSoundEvents.Cue.PURCHASE, slot, Vector2(cell), _death_time)
+
+
+func _can_activate_commander(slot: int, target: int) -> bool:
+	if _sandbox_mode or phase != Phase.WAVE or not _valid_slot(slot) or not _valid_slot(target) or commanders[slot].is_empty():
+		return false
+	var state: Dictionary = commanders[slot]
+	if float(state["cooldown_remaining"]) > 0.000000001 or float(state["ability_remaining"]) > 0.000000001:
+		return false
+	return state["id"] == "priestess" or (state["id"] == "knight" and target == slot)
+
+
+func activate_commander(slot: int, target: int) -> bool:
+	if not _can_activate_commander(slot, target):
+		return false
+	_activate_commander_accepted(slot, target)
+	return true
+
+
+func _activate_commander_accepted(slot: int, target: int) -> void:
+	var state: Dictionary = commanders[slot]
+	state["ability_remaining"] = CommanderRules.RALLY_DURATION if state["id"] == "knight" else CommanderRules.STASIS_DURATION
+	state["cooldown_remaining"] = CommanderRules.ABILITY_COOLDOWN
+	state["ability_target"] = target
+	if state["id"] == "knight":
+		_refresh_board(slot)
+	else:
+		_refresh_commander_motion(target)
+
+
+func _commander_events_required() -> bool:
+	if _commander_rate_timing[0] or _commander_rate_timing[1]:
+		return true
+	for state: Dictionary in commanders:
+		if not state.is_empty() and float(state["ability_remaining"]) > 0.000000001:
+			return true
+	return false
+
+
+func _advance_commanders(delta: float) -> void:
+	for slot: int in range(2):
+		var state: Dictionary = commanders[slot]
+		if state.is_empty():
+			continue
+		state["cooldown_remaining"] = maxf(0.0, float(state["cooldown_remaining"]) - delta)
+		if float(state["cooldown_remaining"]) <= 0.000000001:
+			state["cooldown_remaining"] = 0.0
+		var previous: float = state["ability_remaining"]
+		state["ability_remaining"] = maxf(0.0, previous - delta)
+		if previous > 0.000000001 and float(state["ability_remaining"]) <= 0.000000001:
+			state["ability_remaining"] = 0.0
+			var target: int = state["ability_target"]
+			state["ability_target"] = -1
+			if state["id"] == "knight":
+				_refresh_board(slot)
+			elif _valid_slot(target):
+				_refresh_commander_motion(target)
+
+
+func _stasis_multiplier(slot: int) -> float:
+	for state: Dictionary in commanders:
+		if not state.is_empty() and state["id"] == "priestess" and int(state["ability_target"]) == slot and float(state["ability_remaining"]) > 0.000000001:
+			return 1.0 - CommanderRules.STASIS_SLOW
+	return 1.0
+
+
+func _refresh_commander_motion(slot: int) -> void:
+	var multiplier: float = _stasis_multiplier(slot)
+	for enemy: Dictionary in enemies[slot]:
+		enemy["commander_speed_multiplier"] = multiplier
+		_prepare_motion(enemy)
+
+
 func _can_build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
-	return _roster_configuration_valid and phase != Phase.FINISHED and _valid_slot(slot) and _valid_mode(mode) and _tower_types.has(String(type_id)) and not has_tower(slot, cell) and (_sandbox_mode or coins[slot] >= int(_tower_types[String(type_id)]["cost"]))
+	return _roster_configuration_valid and phase != Phase.FINISHED and _valid_slot(slot) and _valid_mode(mode) and _tower_types.has(String(type_id)) and not has_tower(slot, cell) and not terrain_blocks(slot, cell) and (_sandbox_mode or coins[slot] >= int(_tower_types[String(type_id)]["cost"]))
 
 
 func build(slot: int, cell: Vector2i, type_id: StringName, mode: int) -> bool:
@@ -431,6 +539,7 @@ func _apply_reroll(slot: int, tower: Dictionary, kind: String, rolled: Dictionar
 # Derive effective values from purchased baselines, never from prior rolled stats.
 # Recompute only when the board changes, not for each target/attack.
 func _refresh_board(slot: int) -> void:
+	_commander_rate_timing[slot] = false
 	for tower: Dictionary in towers[slot]:
 		var definition: Dictionary = _tower_types[tower["type_id"]]
 		var branch: Dictionary = definition["evolutions"].get(tower["evolution"], {})
@@ -500,6 +609,7 @@ func _refresh_board(slot: int) -> void:
 		tower["range"] = maxf(minf(1.0, base_range), base_range * (1.0 + range_bonus)) if range_bonus < 0.0 else base_range * (1.0 + range_bonus)
 		tower["behavior_config"] = behavior
 		tower["support_damage_bonus"] = 0.0
+		tower["commander_damage_bonus"] = 0.0
 		tower["support_speed_bonus"] = 0.0
 		tower["support_range_bonus"] = 0.0
 		tower["crit_chance"] = 0.0
@@ -562,6 +672,18 @@ func _refresh_board(slot: int) -> void:
 			tower["support_damage_bonus"] += bonus
 		for bonus: float in speed_groups.values():
 			tower["support_speed_bonus"] += bonus
+		var commander: Dictionary = commanders[slot]
+		if not commander.is_empty() and tower["behavior_kind"] in ["attack", "chain", "catapult"]:
+			if cell_in_range(commander["landmark"], tower["cell"], CommanderRules.RADIUS):
+				if commander["id"] == "knight" and _tower_damage_type(tower) == &"physical":
+					tower["support_damage_bonus"] += CommanderRules.BASTION_DAMAGE_BONUS
+					tower["commander_damage_bonus"] = CommanderRules.BASTION_DAMAGE_BONUS
+				elif commander["id"] == "priestess":
+					tower["support_speed_bonus"] += CommanderRules.SANCTUARY_ATTACK_RATE_BONUS
+					_commander_rate_timing[slot] = true
+			if commander["id"] == "knight" and float(commander["ability_remaining"]) > 0.000000001:
+				tower["support_speed_bonus"] += CommanderRules.RALLY_ATTACK_RATE_BONUS
+				_commander_rate_timing[slot] = true
 		# Reach and crits only help towers that attack; auras never extend auras.
 		if tower["behavior_kind"] in ["attack", "chain", "catapult"]:
 			for bonus: float in range_groups.values():
@@ -830,6 +952,12 @@ func has_tower(slot: int, cell: Vector2i) -> bool:
 func grow_for_main_round() -> void:
 	assert(phase == Phase.PLANNING)
 	_reset_death_events()
+	for state: Dictionary in commanders:
+		if state.is_empty():
+			continue
+		state["landmark"] += Vector2i.DOWN
+		for index: int in range(state["obstacles"].size()):
+			state["obstacles"][index] += Vector2i.DOWN
 	for board: Array in towers:
 		for tower: Dictionary in board:
 			tower["cell"] += Vector2i.DOWN
@@ -1182,16 +1310,18 @@ func advance(delta: float) -> bool:
 		return false
 	var remaining: float = delta
 	var periodic: bool = _has_periodic_production()
-	if _special_stream or _boss_stream or periodic:
+	var commander_events: bool = _commander_events_required()
+	if _special_stream or _boss_stream or periodic or commander_events:
 		for slot: int in range(2):
 			_spawn_enemies(slot)
 	while remaining > 0.000000001:
-		if _boss_stream:
+		commander_events = _commander_events_required()
+		if _boss_stream or commander_events:
 			for slot: int in range(2):
 				_prepare_boss_motion(slot)
 				_update_bounties(slot)
 				_attack(slot, 0.0)
-		var step: float = _next_event_step(remaining, periodic) if _special_stream or _boss_stream or periodic else remaining
+		var step: float = _next_event_step(remaining, periodic) if _special_stream or _boss_stream or periodic or commander_events else remaining
 		_step_start_time = _elapsed
 		_elapsed += step
 		_death_time += step
@@ -1208,7 +1338,7 @@ func advance(delta: float) -> bool:
 			# A dead caster never resolves its due ritual.
 			_enemy_abilities(slot)
 			_apply_leaks(slot)
-			if _boss_stream:
+			if _boss_stream or commander_events:
 				_prepare_boss_motion(slot)
 				_attack(slot, 0.0)
 			for tower: Dictionary in towers[slot]:
@@ -1216,8 +1346,9 @@ func advance(delta: float) -> bool:
 		_land_flights()
 		if base_health[0] > 0 and base_health[1] > 0:
 			_advance_bombs()
+		_advance_commanders(step)
 		remaining -= step
-		if (periodic or _boss_stream) and (base_health[0] == 0 or base_health[1] == 0 or _wave_cleared()):
+		if (periodic or _boss_stream or commander_events) and (base_health[0] == 0 or base_health[1] == 0 or _wave_cleared()):
 			break
 	for index: int in range(_bomb_explosions.size() - 1, -1, -1):
 		if _death_time - float(_bomb_explosions[index]["time"]) >= DEATH_EVENT_LIFETIME - 0.000000001:
@@ -1255,7 +1386,7 @@ func advance(delta: float) -> bool:
 			for enemy: Dictionary in board:
 				enemy["stunned_remaining"] = 0.0
 				enemy["stun_source"] = ""
-				BossMechanics.prepare(enemy)
+				_prepare_motion(enemy)
 	elif _wave_cleared():
 		var reward: int = _rules.wave_reward + wave * _rules.wave_reward_growth
 		_recap.rounds_cleared += 1
@@ -1296,6 +1427,10 @@ func advance(delta: float) -> bool:
 
 func _next_event_step(maximum: float, periodic: bool = false) -> float:
 	var duration: float = maximum
+	var commander_events: bool = _commander_events_required()
+	for state: Dictionary in commanders:
+		if not state.is_empty() and float(state["ability_remaining"]) > 0.000000001:
+			duration = minf(duration, float(state["ability_remaining"]))
 	for bomb: Dictionary in bombs:
 		duration = minf(duration, float(bomb["fuse_remaining"]))
 	for flight: Dictionary in flights:
@@ -1308,7 +1443,7 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 		# One pass: a minimum does not depend on the order it is taken in.
 		var nullifying: bool = _magic_nullified_until[slot] > _elapsed + 0.000000001
 		for tower: Dictionary in towers[slot]:
-			if _boss_stream:
+			if _boss_stream or commander_events:
 				var stunned: float = tower["stunned_remaining"]
 				if stunned > 0.000000001:
 					duration = minf(duration, stunned)
@@ -1333,10 +1468,11 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 			if float(enemy["stunned_remaining"]) > 0.000000001:
 				duration = minf(duration, float(enemy["stunned_remaining"]))
 				continue
-			if _boss_stream:
+			if _boss_stream or commander_events:
 				if float(enemy["slow_remaining"]) > 0.000000001:
 					duration = minf(duration, float(enemy["slow_remaining"]))
-				duration = minf(duration, BossMechanics.event_step(enemy, definition))
+				var motion_scale: float = float(enemy.get("commander_speed_multiplier", 1.0)) if enemy["locomotion"] == "jump" else 1.0
+				duration = minf(duration, BossMechanics.event_step(enemy, definition) / motion_scale)
 				if float(enemy["speed"]) > 0.0:
 					duration = minf(duration, _next_attack_entry(slot, enemy, definition, duration))
 				if float(enemy["tower_attack_remaining"]) > 0.000000001:
@@ -1345,7 +1481,7 @@ func _next_event_step(maximum: float, periodic: bool = false) -> float:
 					duration = minf(duration, maxf(0.000000001, float(enemy["next_tower_attack"]) - float(enemy["age"])))
 				if float(definition["stomp_interval"]) > 0.0:
 					duration = minf(duration, maxf(0.000000001, float(enemy["next_stomp"]) - float(enemy["age"])))
-			if periodic and float(enemy["speed"]) > 0.0:
+			if (periodic or commander_events) and float(enemy["speed"]) > 0.0:
 				duration = minf(duration, maxf(0.0, float(enemy["route"].size() - 1) - float(enemy["progress"])) / float(enemy["speed"]))
 			if float(enemy["cast_remaining"]) > 0.0:
 				duration = minf(duration, float(enemy["cast_remaining"]))
@@ -1511,7 +1647,7 @@ func _resolve_spell(slot: int, mage: Dictionary, book: Dictionary) -> void:
 	mage["animation"] = "walk"
 	mage["animation_elapsed"] = 0.0
 	mage["next_spell"] = float(mage["age"]) + float(book["glide"])
-	BossMechanics.prepare(mage)
+	_prepare_motion(mage)
 
 
 # The tower cell with the most towers within the radius; ties keep the oldest tower.
@@ -1559,6 +1695,10 @@ func _portal_passengers(slot: int, mage: Dictionary, count: int) -> Array[Dictio
 # Stunned orcs stay put whatever their base speed becomes.
 func _prepare_motion(enemy: Dictionary) -> void:
 	BossMechanics.prepare(enemy)
+	var commander_multiplier: float = float(enemy.get("commander_speed_multiplier", 1.0))
+	if commander_multiplier < 1.0:
+		var freeze_multiplier: float = TowerDefinition.FREEZE_SPEED_MULTIPLIER if enemy["slowed"] and BossMechanics.can_act(enemy) else 1.0
+		enemy["speed"] = float(enemy["speed"]) * minf(commander_multiplier, freeze_multiplier) / freeze_multiplier
 	if float(enemy["stunned_remaining"]) > 0.000000001:
 		enemy["speed"] = 0.0
 
@@ -1961,7 +2101,7 @@ func _enemy_abilities(slot: int) -> void:
 				_finish_summon(slot, enemy, definition)
 				enemy["animation"] = "walk"
 				enemy["animation_elapsed"] = 0.0
-				enemy["speed"] = float(enemy["base_speed"]) * (TowerDefinition.FREEZE_SPEED_MULTIPLIER if enemy["slowed"] else 1.0)
+				_prepare_motion(enemy)
 		elif float(enemy["age"]) + 0.000000001 >= float(enemy["next_summon"]) and float(enemy["tower_attack_remaining"]) <= 0.000000001 and BossMechanics.can_act(enemy):
 			enemy["next_summon"] += float(definition["summon_interval"])
 			enemy["cast_remaining"] = definition["summon_cast_duration"]
@@ -2008,7 +2148,7 @@ func _summon_type(definition: Dictionary) -> String:
 func _prepare_boss_motion(slot: int) -> void:
 	for enemy: Dictionary in enemies[slot]:
 		if float(enemy["stunned_remaining"]) <= 0.000000001 and BossMechanics.has_abilities(_enemy_types[enemy["type_id"]]):
-			BossMechanics.prepare(enemy)
+			_prepare_motion(enemy)
 
 
 func _jump_phase(enemy: Dictionary, phase_name: String, duration: float) -> void:
@@ -2016,7 +2156,7 @@ func _jump_phase(enemy: Dictionary, phase_name: String, duration: float) -> void
 	enemy["animation"] = "walk" if phase_name == "wheels" else phase_name
 	enemy["animation_elapsed"] = 0.0
 	enemy["jump_remaining"] = duration
-	BossMechanics.prepare(enemy)
+	_prepare_motion(enemy)
 
 
 func _begin_jump(slot: int, enemy: Dictionary, definition: Dictionary) -> void:
@@ -2074,7 +2214,7 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 		_update_bounties(slot)
 		enemy["animation"] = "walk"
 		enemy["animation_elapsed"] = 0.0
-		BossMechanics.prepare(enemy)
+		_prepare_motion(enemy)
 	if float(definition["jump_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_jump"]) and BossMechanics.can_act(enemy) and enemy["animation"] not in ["cast", "attack"]:
 		_begin_jump(slot, enemy, definition)
 	if float(definition["stomp_interval"]) > 0.0 and float(enemy["age"]) + 0.000000001 >= float(enemy["next_stomp"]):
@@ -2091,6 +2231,8 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 					continue
 				victim["hp"] = maxi(0, int(victim["hp"]) - maxi(1, ceili(float(victim["max_hp"]) * float(definition["stomp_health_fraction"]))))
 				EnemyMechanics.after_damage(victim, _enemy_types[victim["type_id"]])
+				if float(victim.get("commander_speed_multiplier", 1.0)) < 1.0:
+					_prepare_motion(victim)
 				if int(victim["hp"]) == 0:
 					_record_death(slot, victim)
 					_retire_enemy(int(victim["id"]))
@@ -2144,6 +2286,7 @@ func snapshot(include_metadata: bool = true) -> Dictionary:
 		"income": income.duplicate(), "queued_sends": queued_sends, "queued_send_orders": queued_send_orders,
 		"send_queues": [_send_queues[0].slice(_send_heads[0]), _send_queues[1].slice(_send_heads[1])],
 		"towers": towers.duplicate(true), "enemies": enemies.duplicate(true),
+		"commanders": commanders.duplicate(true),
 		"flights": flights.duplicate(true), "flight_duration": FLIGHT_DURATION,
 		"bombs": bombs.duplicate(true), "bomb_explosions": _bomb_explosions.duplicate(true),
 		"magic_nullified": [maxf(0.0, _magic_nullified_until[0] - _elapsed), maxf(0.0, _magic_nullified_until[1] - _elapsed)],
@@ -2332,6 +2475,7 @@ func _enemies_relocated(slot: int) -> void:
 func _move_enemies(slot: int, delta: float) -> void:
 	# Targeting buckets and empty-range memos depend only on rounded cells.
 	var relocated: bool = false
+	var commander_multiplier: float = _stasis_multiplier(slot)
 	for enemy: Dictionary in enemies[slot]:
 		if float(enemy["stunned_remaining"]) > 0.000000001:
 			if not _slow_motion.has(enemy["id"]):
@@ -2348,7 +2492,7 @@ func _move_enemies(slot: int, delta: float) -> void:
 			if float(enemy["stunned_remaining"]) <= 0.000000001:
 				enemy["stunned_remaining"] = 0.0
 				enemy["stun_source"] = ""
-				BossMechanics.prepare(enemy)
+				_prepare_motion(enemy)
 			continue
 		enemy["age"] += delta
 		enemy["animation_elapsed"] += delta
@@ -2356,7 +2500,7 @@ func _move_enemies(slot: int, delta: float) -> void:
 		var casting: bool = float(enemy["cast_remaining"]) > 0.0 or float(enemy["tower_attack_remaining"]) > 0.0
 		enemy["tower_attack_remaining"] = maxf(0.0, float(enemy["tower_attack_remaining"]) - delta)
 		enemy["cast_remaining"] = maxf(0.0, float(enemy["cast_remaining"]) - delta)
-		var base_speed: float = enemy["base_speed"]
+		var base_speed: float = float(enemy["base_speed"]) * commander_multiplier
 		var slowed_seconds: float = minf(delta, float(enemy["slow_remaining"]))
 		if not BossMechanics.can_act(enemy):
 			if not _slow_motion.has(enemy["id"]):
@@ -2370,7 +2514,8 @@ func _move_enemies(slot: int, delta: float) -> void:
 				enemy["progress"] = minf(float(enemy["jump_target_progress"]), previous_progress + float(enemy["speed"]) * delta)
 			enemy["slow_remaining"] = maxf(0.0, float(enemy["slow_remaining"]) - delta)
 			enemy["slowed"] = float(enemy["slow_remaining"]) > 0.000000001
-			enemy["jump_remaining"] = maxf(0.0, float(enemy["jump_remaining"]) - delta)
+			var motion_scale: float = commander_multiplier if enemy["locomotion"] == "jump" else 1.0
+			enemy["jump_remaining"] = maxf(0.0, float(enemy["jump_remaining"]) - delta * motion_scale)
 		elif casting:
 			if not _slow_motion.has(enemy["id"]):
 				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
@@ -2383,7 +2528,7 @@ func _move_enemies(slot: int, delta: float) -> void:
 			enemy["slowed"] = float(enemy["slow_remaining"]) > 0.000000001
 			enemy["speed"] = 0.0
 		elif slowed_seconds > 0.0:
-			var slow_speed: float = base_speed * TowerDefinition.FREEZE_SPEED_MULTIPLIER
+			var slow_speed: float = float(enemy["base_speed"]) * minf(TowerDefinition.FREEZE_SPEED_MULTIPLIER, commander_multiplier)
 			if not _slow_motion.has(enemy["id"]):
 				_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
 			var motion: Array = _slow_motion[enemy["id"]]
@@ -2398,7 +2543,7 @@ func _move_enemies(slot: int, delta: float) -> void:
 				enemy["slow_remaining"] = 0.0
 			enemy["speed"] = slow_speed if enemy["slowed"] else base_speed
 		else:
-			if float(_enemy_types[enemy["type_id"]]["enrage_health_fraction"]) > 0.0:
+			if commander_multiplier < 1.0 or float(_enemy_types[enemy["type_id"]]["enrage_health_fraction"]) > 0.0:
 				if not _slow_motion.has(enemy["id"]):
 					_slow_motion[enemy["id"]] = [0.0, 0.0, 0.0, 0.0]
 				var motion: Array = _slow_motion[enemy["id"]]
@@ -2409,6 +2554,7 @@ func _move_enemies(slot: int, delta: float) -> void:
 			else:
 				_slow_motion.erase(enemy["id"])
 			enemy["progress"] += base_speed * delta
+			enemy["speed"] = base_speed
 		var previous_cell: Vector2 = Vector2(enemy["pos"]).round()
 		enemy["pos"] = _position(enemy["route"], enemy["progress"])
 		relocated = relocated or Vector2(enemy["pos"]).round() != previous_cell
@@ -2430,14 +2576,14 @@ func _spawn_enemies(slot: int) -> void:
 			_spawn_send(slot)
 		else:
 			var type_id: String = wave_roster[_spawned[slot]]
-			var progress: float = (_elapsed - regular_time) * _enemy_speed(type_id, wave)
+			var progress: float = (_elapsed - regular_time) * _enemy_speed(type_id, wave) * _stasis_multiplier(slot)
 			_spawn_enemy(slot, type_id, progress, regular_time)
 			_spawned[slot] += 1
 
 
 func _spawn_send(slot: int) -> void:
 	var type_id: String = _send_queues[slot][_send_heads[slot]]
-	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave)
+	var progress: float = (_elapsed - _next_send_times[slot]) * _enemy_speed(type_id, wave) * _stasis_multiplier(slot)
 	_spawn_enemy(slot, type_id, progress, _next_send_times[slot])
 	_sound_events.record(CombatSoundEvents.Cue.PORTAL, slot, Vector2(_routes[slot][0]), _death_time)
 	_next_send_times[slot] += send_order_gap(_active_send_spawn_interval, int(_enemy_types[type_id]["spawn_weight"])) if _send_group_ends[slot][_send_heads[slot]] else float(_enemy_types[type_id]["group_interval"])
@@ -2468,6 +2614,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 		"id": _next_enemy_id, "hp": hp, "max_hp": hp, "void_drained": 0.0,
 		"type_id": type_id, "base_speed": speed, "speed": speed,
 		"slowed": false, "slow_remaining": 0.0,
+		"commander_speed_multiplier": _stasis_multiplier(slot),
 		"fire_immune": _enemy_types[type_id]["fire_immune"], "ice_immune": _enemy_types[type_id]["ice_immune"],
 		"nonphysical_damage_multiplier": _enemy_types[type_id]["nonphysical_damage_multiplier"],
 		"fire_damage_multiplier": definition["fire_damage_multiplier"],
@@ -2501,6 +2648,7 @@ func _spawn_enemy(slot: int, type_id: String, progress: float, spawn_time: float
 			"next_spell": float(definition["spellbook"]["glide"]), "spell_duration": 0.0,
 			"spell_aim": Vector2.ZERO, "spell_shielded": false, "spell_effect": {},
 		})
+	_prepare_motion(enemies[slot].back())
 	_enemy_spawn_times[_next_enemy_id] = spawn_time
 	_next_enemy_id += 1
 
@@ -2907,7 +3055,12 @@ func _ignite(enemy: Dictionary, tower: Dictionary, config: Dictionary, time: flo
 	if bool(enemy["fire_immune"]) or int(enemy["shield_hits"]) > 0:
 		return
 	var id: int = enemy["id"]
-	var dps: float = float(config["burn_dps"]) * float(tower["damage_multiplier"])
+	var multiplier: float = tower["damage_multiplier"]
+	var commander_bonus: float = tower.get("commander_damage_bonus", 0.0)
+	if commander_bonus > 0.0:
+		var support_multiplier: float = 1.0 + float(tower["support_damage_bonus"])
+		multiplier *= (support_multiplier - commander_bonus) / support_multiplier
+	var dps: float = float(config["burn_dps"]) * multiplier
 	var burn: Dictionary
 	if _burns.has(id):
 		burn = _burns[id]
@@ -3188,9 +3341,10 @@ func _land_flights() -> void:
 		var enemy: Dictionary = flight["enemy"]
 		var target: int = flight["to_slot"]
 		enemy["base_speed"] = float(enemy["base_speed"]) * float(flight["haste"])
-		enemy["speed"] = enemy["base_speed"]
+		enemy["commander_speed_multiplier"] = _stasis_multiplier(target)
+		_prepare_motion(enemy)
 		enemy["route"] = flight["route"]
-		enemy["progress"] = float(flight["progress"]) + (_elapsed - float(flight["land_time"])) * float(enemy["base_speed"])
+		enemy["progress"] = float(flight["progress"]) + (_elapsed - float(flight["land_time"])) * float(enemy["speed"])
 		enemy["pos"] = _position(enemy["route"], enemy["progress"])
 		enemy["jump_from"] = enemy["pos"]
 		enemy["jump_to"] = enemy["pos"]
@@ -3290,9 +3444,7 @@ func _attack_continuous(slot: int, tower: Dictionary, range_cells: float, delta:
 		if bool(tower["freeze_upgraded"]) and not bool(enemy["ice_immune"]):
 			enemy["slowed"] = true
 			enemy["slow_remaining"] = TowerDefinition.freeze_duration(int(enemy["max_hp"]))
-			BossMechanics.prepare(enemy)
-			if float(enemy["stunned_remaining"]) > 0.000000001:
-				enemy["speed"] = 0.0
+			_prepare_motion(enemy)
 		var drained: float = minf(drain_rate * exposure, _drain_budget(tower, enemy))
 		enemy["void_drained"] = float(enemy.get("void_drained", 0.0)) + drained
 		var base_damage: float = flat_rate * exposure + drained
@@ -3608,6 +3760,8 @@ func _hit(slot: int, tower: Dictionary, enemy_index: int, damage: int = -1, boun
 	enemy["hp"] -= hit_damage
 	if hit_damage > 0:
 		EnemyMechanics.after_damage(enemy, _enemy_types[enemy["type_id"]])
+		if float(enemy.get("commander_speed_multiplier", 1.0)) < 1.0:
+			_prepare_motion(enemy)
 		_sound_events.record(CombatSoundEvents.Cue.HIT, slot, enemy["pos"], _death_time)
 	if enemy["hp"] <= 0:
 		tower["kills"] += 1

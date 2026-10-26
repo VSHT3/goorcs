@@ -22,6 +22,7 @@ func _run() -> void:
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
 	_check(main.planning.selecting_loadout and not main.planning.active, "Tower UI starts with explicit collection-backed selection")
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
 	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista"]) and main.planning.commit_loadout(), "Tower UI commits the migrated starter and saved Ballista")
 	var palette_funds: int = 0
 	for tower_definition: TowerDefinition in main.collection_store.content_catalog.towers:
@@ -51,6 +52,7 @@ func _run() -> void:
 	main.planning.changed.emit()
 	_check(not screen.shop_buttons[opened.rewards[0].id].visible and screen.shop_buttons[opened.rewards[0].id].disabled, "Chest ownership cannot change an already committed run deck")
 	main.planning.start_singleplayer()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
 	_check(main.planning.select_loadout([starter_id, &"orc_ballista", opened.rewards[0].id]) and main.planning.commit_loadout(), "A fresh run can explicitly equip the earned reward")
 	main.planning._host_combat.coins[0] = palette_funds
 	main.planning._host_combat.coins[1] = palette_funds
@@ -177,12 +179,14 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 	planning.collection_store = CollectionStore.new(save_path)
 	for evolution: String in ["pierce", "bounce"]:
 		planning.start_singleplayer()
+		_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 		_check(planning.select_loadout([&"arrow_tower", &"orc_ballista"]) and planning.commit_loadout(), "Ballista UI fixture commits only its owned towers")
 		planning.set_physics_process(false)
 		await create_timer(0.05).timeout
 		var model: MatchCombat = planning._host_combat
 		model.coins = [2000, 2000]
-		planning.build_tower(0, Vector2i(3, 3), &"orc_ballista", MatchCombat.TargetMode.FURTHEST)
+		var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(3, 3))
+		planning.build_tower(0, cell, &"orc_ballista", MatchCombat.TargetMode.FURTHEST)
 		_check(model.towers[0].size() == 1 and model.towers[1].size() == 1, "Real planning command creates mirrored Ballista fixtures")
 		if model.towers[0].is_empty():
 			planning.stop_singleplayer()
@@ -193,7 +197,7 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 		var choices: Dictionary = planning.combat["tower_types"]["orc_ballista"]["evolutions"]
 		var price: int = int(choices[evolution]["cost"])
 		var cheapest: int = mini(int(choices["pierce"]["cost"]), int(choices["bounce"]["cost"]))
-		screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+		screen._cell_clicked(cell, MOUSE_BUTTON_LEFT, 0)
 		_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible, "Ballista choices stay hidden before stat upgrades")
 		var frozen: Dictionary = planning.combat.duplicate(true)
 		screen.special_upgrade.pressed.emit()
@@ -246,13 +250,17 @@ func _check_ballista_evolutions(main: Control, screen: MatchPlanningScreen) -> v
 		planning._host_ready[0] = false
 		planning._publish_snapshot()
 		var stats_before: String = screen._tower_stats.text
-		var damage_before: int = int(tower["damage"])
-		var interval_before: float = float(tower["interval"])
+		var damage_before: Array[int] = []
+		var interval_before: Array[float] = []
+		for slot: int in range(2):
+			var tower_before: Dictionary = model.towers[slot][0]
+			damage_before.append(int(tower_before["damage"]))
+			interval_before.append(float(tower_before["interval"]))
 		chosen.pressed.emit()
 		for slot: int in range(2):
 			var evolved: Dictionary = model.towers[slot][0]
 			_check(evolved.get("evolution", "") == evolution and evolved["special_upgraded"] and MatchCombat.tower_level(evolved) == 4 and model.coins[slot] == 0, "Each native Ballista button buys its own branch with exact funds on both solo boards")
-			_check(evolved["damage"] == damage_before and is_equal_approx(float(evolved["interval"]), interval_before), "Ballista branches preserve current upgraded attack stats")
+			_check(evolved["damage"] == damage_before[slot] and is_equal_approx(float(evolved["interval"]), interval_before[slot]), "Ballista branches preserve current upgraded attack stats")
 		_check(screen._special_upgrade_command != evolution and screen._alternate_upgrade_command != evolution, "Purchased Ballista branch is absent from remaining controls")
 		_check(screen._tower_stats.text == stats_before, "Ballista evolutions preserve ordinary attack-stat presentation")
 		model.coins = [2000, 2000]
@@ -279,12 +287,14 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 	planning.collection_store = CollectionStore.new(save_path)
 	for evolution: String in ["boulders", "onyx_ring"]:
 		planning.start_singleplayer()
+		_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 		_check(planning.select_loadout([&"arrow_tower", &"rune_obelisk"]) and planning.commit_loadout(), "Rune UI fixture commits only its owned towers")
 		planning.set_physics_process(false)
 		await create_timer(0.05).timeout
 		var model: MatchCombat = planning._host_combat
 		model.coins = [2000, 2000]
-		planning.build_tower(0, Vector2i(3, 3), &"rune_obelisk", MatchCombat.TargetMode.FURTHEST)
+		var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(3, 3))
+		planning.build_tower(0, cell, &"rune_obelisk", MatchCombat.TargetMode.FURTHEST)
 		_check(model.towers[0].size() == 1 and model.towers[1].size() == 1, "Real planning command creates mirrored Rune fixtures")
 		if model.towers[0].is_empty():
 			planning.stop_singleplayer()
@@ -293,7 +303,7 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 		var tower: Dictionary = model.towers[0][0]
 		var id: int = int(tower["id"])
 		var price: int = int(planning.combat["tower_types"]["rune_obelisk"]["evolutions"][evolution]["cost"])
-		screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+		screen._cell_clicked(cell, MOUSE_BUTTON_LEFT, 0)
 		_check(not screen.special_upgrade.visible and not screen.alternate_upgrade.visible, "Both evolution buttons stay hidden at level I")
 		var frozen: Dictionary = planning.combat.duplicate(true)
 		screen.special_upgrade.pressed.emit()
@@ -375,7 +385,6 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			planning.changed.emit()
 			_check(screen.special_upgrade.disabled, "Follow-up control follows a changed accepted catalog cost")
 			planning._publish_snapshot()
-			var stats_before: String = screen._tower_stats.text
 			planning._host_ready[0] = true
 			planning._publish_snapshot()
 			frozen = planning.combat.duplicate(true)
@@ -383,10 +392,16 @@ func _check_rune_evolutions(main: Control, screen: MatchPlanningScreen) -> void:
 			_check(screen.special_upgrade.disabled and planning.combat == frozen, "Ready also commits the follow-up purchase")
 			planning._host_ready[0] = false
 			planning._publish_snapshot()
+			var before_followup: Dictionary = planning.combat.duplicate(true)
 			screen.special_upgrade.pressed.emit()
 			for slot: int in range(2):
-				_check(model.towers[slot][0].get("freeze_upgraded", false) and MatchCombat.tower_level(model.towers[slot][0]) == 5 and model.coins[slot] == 0, "Follow-up button dispatches its real command and reaches level V on both solo boards")
-			_check(screen._special_upgrade_command == "rolling_stones" and not screen.alternate_upgrade.visible and screen._tower_stats.text == stats_before.replace("Physical element", "Ice element"), "Purchased follow-up disappears, leaving only the branch upgrade, without changing continuous damage stats or reviving Onyx; only the element turns to Ice")
+				var accepted: Dictionary = planning.combat["towers"][slot][0]
+				var previous: Dictionary = before_followup["towers"][slot][0]
+				_check(accepted["evolution"] == "boulders" and accepted["freeze_upgraded"] and accepted["element"] == "ice" and MatchCombat.tower_level(accepted) == 5 and planning.combat["coins"][slot] == 0, "Follow-up button buys Ice Boulders and reaches level V with exact funds on each solo board")
+				for key: String in ["id", "type_id", "cell", "mode", "damage_upgraded", "speed_upgraded", "special_upgraded", "branch_upgrades", "rarity", "attributes", "rarity_rerolls", "attribute_rerolls", "base_damage", "base_interval"]:
+					_check(accepted[key] == previous[key], "Freeze preserves each board's owned tower, purchased upgrades and rolls: %s" % key)
+				_check(is_equal_approx(float(accepted["interval"]), float(previous["interval"])), "Freeze preserves each board's own attack timing")
+			_check(screen._special_upgrade_command == "rolling_stones" and not screen.alternate_upgrade.visible, "Purchased follow-up disappears, leaving only the branch upgrade without reviving Onyx")
 			frozen = planning.combat.duplicate(true)
 			screen.special_upgrade.pressed.emit()
 			planning.upgrade_tower(0, id, "freeze_runes")
@@ -411,15 +426,17 @@ func _check_archer_advancements(main: Control, screen: MatchPlanningScreen) -> v
 	var original_size: Vector2i = root.size
 	for branch: String in ["four_archers", "fire_arrows", "bomb_arrows"]:
 		planning.start_singleplayer()
+		_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 		_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Archer UI fixture commits its owned starter")
 		planning.set_physics_process(false)
 		await create_timer(0.05).timeout
 		var model: MatchCombat = planning._host_combat
 		model.coins = [10000, 10000]
-		planning.build_tower(0, Vector2i(3, 3), &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
+		var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(3, 3))
+		planning.build_tower(0, cell, &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
 		var tower: Dictionary = model.towers[0][0]
 		var id: int = int(tower["id"])
-		screen._cell_clicked(Vector2i(3, 3), MOUSE_BUTTON_LEFT, 0)
+		screen._cell_clicked(cell, MOUSE_BUTTON_LEFT, 0)
 		await _check_upgrade_order(screen, 2)
 		var frozen: Dictionary = planning.combat.duplicate(true)
 		for button: Button in screen.advancement_buttons.values():
@@ -603,6 +620,7 @@ func _check_upgrade_order(screen: MatchPlanningScreen, expected_choices: int = -
 func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	var planning: MatchPlanning = main.planning
 	planning.start_singleplayer()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Debug UI fixture commits its owned starter")
 	planning.set_physics_process(false)
 	_check(planning.debug_set_values(1, int(planning.combat["coins"][0]), 71), "Debug UI fixture starts with an explicitly accepted non-default Shard balance")
@@ -695,6 +713,7 @@ func _check_debug_popup(main: Control, screen: MatchPlanningScreen) -> void:
 	_check(not screen.debug_popup.visible, "Leaving the play screen closes the debug window")
 	main.play_screen.show()
 	planning.start_singleplayer()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Reopened debug UI fixture commits a fresh deck")
 	planning.set_physics_process(false)
 	await create_timer(0.05).timeout

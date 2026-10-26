@@ -109,6 +109,7 @@ func _test_match_clock() -> void:
 	_check(presence.activity()["start_timestamp"] == 0, "Menus and unstarted matches have no match timer")
 	planning.start_singleplayer()
 	_check(presence.activity()["start_timestamp"] == 0, "Loadout selection does not start the run clock")
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Clock fixture admits an actual solo match")
 	var started_at: int = presence.activity()["start_timestamp"]
 	_check(started_at > 0, "The run clock starts when board planning is admitted, even with sharing disabled")
@@ -127,6 +128,7 @@ func _test_match_clock() -> void:
 	planning.stop_singleplayer()
 	_check(presence.activity()["start_timestamp"] == 0, "Leaving removes the old run timer")
 	planning.start_singleplayer()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "A second run is admitted through normal loadout selection")
 	_check(presence.activity()["start_timestamp"] > started_at, "A new run cannot reuse the previous run's elapsed timer")
 	presence.free()

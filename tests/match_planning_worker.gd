@@ -4,6 +4,9 @@ var planning: MatchPlanning
 var _loadout_select_sent: bool = false
 var _loadout_commit_sent: bool = false
 var _requested_loadout: Array[StringName] = []
+var _draft_guess_sent: bool = false
+var _draft_pick_sent: bool = false
+var _fixture_terrain_seeded: bool = false
 
 
 func _new_session() -> void:
@@ -36,6 +39,13 @@ func _on_planning_changed() -> void:
 		_loadout_select_sent = false
 		_loadout_commit_sent = false
 		_requested_loadout.clear()
+		_draft_guess_sent = false
+		_draft_pick_sent = false
+		_fixture_terrain_seeded = false
+		return
+	if not _advance_commander_draft():
+		return
+	if not _seed_fixture_terrain():
 		return
 	if planning.loadout_committed:
 		return
@@ -54,6 +64,49 @@ func _on_planning_changed() -> void:
 		_loadout_commit_sent = true
 		if not planning.commit_loadout():
 			push_error("Peer fixture could not commit its accepted deck")
+
+func _advance_commander_draft() -> bool:
+	var draft: Dictionary = planning.commander_draft
+	var phase: String = draft.get("phase", "")
+	var slot: int = planning.local_slot()
+	if phase == "guessing":
+		if not bool(draft.get("guess_locked", [false, false])[slot]) and not _draft_guess_sent:
+			_draft_guess_sent = true
+			if not planning.submit_commander_guess(50):
+				push_error("Peer fixture could not lock its real commander guess")
+		return false
+	if phase == "picking":
+		if int(draft.get("picker", -1)) == slot and not _draft_pick_sent:
+			_draft_pick_sent = true
+			var picks: Array = draft.get("picks", ["", ""])
+			if not planning.select_commander(&"priestess" if picks.has("knight") else &"knight"):
+				push_error("Peer fixture could not submit its legal ordered hero pick")
+		return false
+	return phase == "loadout"
+
+
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	# Shared default fixtures author the straight/detour routes, disconnected
+	# budget + 1 attempts, and combat-stream towers throughout these five rows.
+	# The stream's reliable live purchase uses the opposite corner at (12, 8).
+	var reserved: Array[Vector2i] = [Vector2i(12, 8)]
+	var layout: PathLayout = planning.layouts[0]
+	for y: int in range(mini(5, layout.dimensions.y)):
+		for x: int in range(layout.dimensions.x):
+			reserved.append(Vector2i(x, y))
+	return reserved
+
+
+func _seed_fixture_terrain() -> bool:
+	if not _session.is_host or _fixture_terrain_seeded:
+		return true
+	if planning.commander_draft.get("phase", "") != "loadout":
+		return false
+	_fixture_terrain_seeded = preload("res://tests/commander_fixture_worker.gd").seed_terrain(planning, _fixture_reserved_cells())
+	if not _fixture_terrain_seeded:
+		push_error("Peer fixture could not reserve authored route/build cells in real commander terrain")
+	return _fixture_terrain_seeded
+
 
 
 func _execute_command(command: Dictionary) -> void:
@@ -97,7 +150,7 @@ func _publish() -> void:
 	for route: Array in planning.locked_routes:
 		routes.append(_cells(route))
 	var file := FileAccess.open(_path("planning") + ".tmp", FileAccess.WRITE)
-	file.store_string(JSON.stringify({"active": planning.active, "locked": planning.locked, "flags": planning.ready_flags, "boards": boards, "routes": routes, "combat": planning.combat}))
+	file.store_string(JSON.stringify({"active": planning.active, "locked": planning.locked, "flags": planning.ready_flags, "boards": boards, "routes": routes, "combat": planning.combat, "commander_draft": planning.commander_draft}))
 	file.close()
 	DirAccess.rename_absolute(_path("planning") + ".tmp", _path("planning"))
 	# Publish accepted planning state before exposing the command acknowledgement.

@@ -135,6 +135,7 @@ func _test_match(main) -> void:
 	main.play_screen.singleplayer_button.pressed.emit()
 	var planning: MatchPlanning = main.planning
 	planning.set_physics_process(false)
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower", &"lightning", &"war_drums", &"rune_obelisk"]) and planning.commit_loadout(), "HUD fixture commits a four-tower deck")
 	_check(planning.debug_set_values(60, 50000, 50), "Solo debug selects the Trollorc debut round")
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
@@ -145,9 +146,9 @@ func _test_match(main) -> void:
 		planning.request_edit(0, Vector2i(x, layout.entrance.y), true)
 		x += step
 	_check(planning.layouts[0].is_ready(), "Straight fixture route is legal")
-	var drums_cell := Vector2i(layout.entrance.x + step * 4, layout.entrance.y + 1)
-	var arrow_cell := Vector2i(layout.entrance.x + step * 2, layout.entrance.y - 1)
+	var drums_cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(layout.entrance.x + step * 4, layout.entrance.y + 1))
 	planning.build_tower(0, drums_cell, &"war_drums", 0)
+	var arrow_cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(layout.entrance.x + step * 2, layout.entrance.y - 1))
 	planning.build_tower(0, arrow_cell, &"arrow_tower", 0)
 	var drums_id: int = -1
 	var arrow_id: int = -1

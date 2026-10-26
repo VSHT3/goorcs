@@ -12,6 +12,7 @@ func _run() -> void:
 	var hosted: Dictionary = await _command("host",{"action":"host","port":port})
 	await _connect_guest("guest","host",hosted["code"])
 	await _paths()
+	_assert_reserved_terrain_cells([Vector2i(0, 3), Vector2i(2, 3), Vector2i(4, 3), Vector2i(6, 3), Vector2i(8, 3)])
 	var commands: Array[String] = ["four_archers","fire_arrows","bomb_arrows"]
 	for lane: String in ["host","guest"]:
 		var slot: int = 0 if lane=="host" else 1
@@ -74,6 +75,7 @@ func _run() -> void:
 	accepted=await _agree("Full archer chains and shared policies agree")
 	for slot: int in range(2):
 		var board: Array=accepted["towers"][slot]
+		_check(board.all(func(tower: Dictionary) -> bool: return is_zero_approx(float(tower["support_speed_bonus"])) and is_zero_approx(float(tower["support_damage_bonus"]))), "Real landmarks leave every baseline archer stream outside commander auras")
 		_check(board[0]["extra_archers"].size()==6 and board[0]["advancement_path"]==["four_archers","eight_archers"] and board[0]["mode"]==MatchCombat.TargetMode.LAST,"Eight-archer history, six extra firing streams and the one policy replicate")
 		_check(board[1]["advancement_path"]==["fire_arrows","molotov","quick_pitch","flamethrower"] and board[2]["advancement_path"]==["bomb_arrows","bigger_bombs","anti_orc_grenades","aom","aom_speed_1","aom_speed_2"] and board[3]["advancement_path"]==["four_archers","eight_archers","arrow_minigun"],"Accepted real peers retain every exact prerequisite purchase")
 	await _command("host",{"action":"ready","value":true})

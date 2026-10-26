@@ -15,6 +15,11 @@ func _run() -> void:
 	var code: String = hosted["code"]
 	await _connect_guest("guest", "host", code)
 	await _paths()
+	_assert_reserved_terrain_cells([
+		Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 3),
+		Vector2i(2, 2), Vector2i(4, 2), Vector2i(5, 2), Vector2i(6, 2),
+		Vector2i(0, 3), Vector2i(2, 3), Vector2i(4, 3), Vector2i(6, 3),
+	])
 	await _wait_combat("guest", {"phase": 0, "health": [2, 2], "coins": [200, 200]}, "Guest uses the host's base and starting Coins configuration")
 	await _build("host", 0, 1, 1, 0)
 	var tower: Dictionary = await _wait_tower("guest", 0, Vector2i(1, 1), 0)
@@ -139,6 +144,18 @@ func _wait_tower(lane: String, slot: int, cell: Vector2i, mode: int) -> Dictiona
 		await create_timer(0.02).timeout
 	_check(false, "Tower at %s on %s uses authoritative mode %d" % [cell, lane, mode])
 	return {}
+
+
+func _assert_reserved_terrain_cells(reserved: Array[Vector2i]) -> void:
+	var commanders: Array = _snapshot("guest").get("combat", {}).get("commanders", [])
+	_check(commanders.size() == 2, "Fixture admission retains both real commander boards")
+	if commanders.size() != 2:
+		return
+	_check(commanders[0].get("id") != commanders[1].get("id") and commanders.all(func(state: Dictionary) -> bool: return state.get("id") in ["knight", "priestess"]), "Fixture admission retains two distinct legally drafted heroes")
+	for state: Dictionary in commanders:
+		_check(state.get("obstacles", []).size() == CommanderRules.OBSTACLE_COUNT and state.has("landmark"), "Each fixture retains its actual generated landmark and all obstacles")
+		for cell: Vector2i in reserved:
+			_check(state.get("landmark") != str(cell) and not state.get("obstacles", []).has(str(cell)), "Real commander terrain leaves authored fixture cell %s available" % cell)
 
 
 func _assert_terminal(tower_id: int) -> void:
@@ -372,6 +389,10 @@ func _peer_sends(code: String) -> void:
 	for lane: String in ["host", "guest"]:
 		await _command(lane, {"action": "send_scenario"})
 	await _connect_guest("guest", "host", code)
+	# Reset economy is visible during draft too; fence actual gameplay admission
+	# before capturing the state that rejected commands must leave untouched.
+	await _command("host", {"action": "fence"})
+	_check(_snapshot("host")["active"] and _snapshot("guest")["active"] and _snapshot("host")["combat"] == _snapshot("guest")["combat"], "Send rejection baseline includes both peers' admitted commander state")
 	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0]}, "Fresh send scenario uses host resources and zero income")
 	_check(fresh["enemy_types"]["grunt"]["send_cost"] == 20 and fresh["enemy_types"]["grunt"]["send_income"] == 2 and fresh["rules"]["send_spawn_interval"] == 0.25, "Guest receives host prices and send cadence instead of its cheap/high-income/slow local rules")
 	var before: Dictionary = _snapshot("host")["combat"]
@@ -379,7 +400,6 @@ func _peer_sends(code: String) -> void:
 	await _command("host", {"action": "send", "slot": 1, "type_id": "grunt"})
 	await _command("guest", {"action": "send", "slot": -1, "type_id": "grunt"})
 	await _command("host", {"action": "send", "slot": 2, "type_id": "grunt"})
-	await create_timer(0.15).timeout
 	_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Authenticated remote/host payers cannot spoof the other slot or use invalid slots")
 	await _command("host", {"action": "send", "slot": 0, "type_id": "grunt"})
 	await _wait_combat("guest", {"coins": [25, 45], "income": [2, 0], "queued_sends": [0, 1], "enemies": [[], []]}, "Host pays exactly once and queues only on the opponent before any route exists")
@@ -455,6 +475,8 @@ func _peer_typed_sends(code: String) -> void:
 	for lane: String in ["host", "guest"]:
 		await _command(lane, {"action": "typed_send_scenario"})
 	await _connect_guest("guest", "host", code)
+	await _command("host", {"action": "fence"})
+	_check(_snapshot("host")["active"] and _snapshot("guest")["active"] and _snapshot("host")["combat"] == _snapshot("guest")["combat"], "Typed rejection baseline includes both peers' admitted commander state")
 	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "health": [12, 12], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []]}, "Typed scenario starts with empty ordered queues")
 	for type_id: String in ["runner", "brute"]:
 		var definition: Dictionary = fresh["enemy_types"][type_id]
@@ -466,7 +488,6 @@ func _peer_typed_sends(code: String) -> void:
 		await _command("host", {"action": "send", "slot": 1, "type_id": type_id})
 	for lane: String in ["host", "guest"]:
 		await _command(lane, {"action": "send", "slot": 0 if lane == "host" else 1, "type_id": "missing_enemy"})
-	await create_timer(0.15).timeout
 	_check(_snapshot("host")["combat"] == before and _snapshot("guest")["combat"] == before, "Typed ownership and unknown-ID rejection leave Coins, income, enemies and queues untouched")
 	for lane: String in ["host", "guest"]:
 		for type_id: String in ["runner", "brute"]:

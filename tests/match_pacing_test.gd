@@ -41,6 +41,7 @@ func _new_solo(rules: CombatRules) -> MatchPlanning:
 	planning.combat_rules = rules
 	root.add_child(planning)
 	planning.start_singleplayer()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Pacing fixture commits its loadout before planning")
 	planning.set_physics_process(false)
 	return planning
@@ -157,6 +158,7 @@ func _test_solo_autoplay() -> void:
 	planning.request_pacing("autoplay", true)
 	_check(not planning.active and planning.combat["autoplay_votes"] == [false, false], "Inactive runs cannot accumulate consent")
 	planning.start_singleplayer()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Restart requires a fresh committed loadout")
 	_check(planning.combat["wave"] == 0 and planning.combat["speed_votes"] == [false, false] and planning.combat["autoplay_votes"] == [false, false] and planning.layouts[0].used_tiles() == 0, "Fresh solo matches reset all consent and routes")
 	_dispose_model(planning)

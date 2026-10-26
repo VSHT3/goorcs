@@ -13,6 +13,7 @@ func _run() -> void:
 	var hosted: Dictionary=await _command("host",{"action":"host","port":port})
 	await _connect_guest("guest","host",hosted["code"])
 	await _wait_for("guest",{"active":true},"Sound peers synchronize")
+	_assert_reserved_terrain_cells([Vector2i(1, 1), Vector2i(1, 3)])
 	for lane: String in ["host","guest"]:
 		var slot: int=0 if lane=="host" else 1
 		for x: int in range(1,5): await _edit(lane,slot,x,2)

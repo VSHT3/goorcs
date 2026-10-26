@@ -8,7 +8,7 @@ var _towers: Array[Array] = [[], []]
 
 func _init() -> void:
 	for _slot: int in range(2):
-		_sides.append({"spent": {"towers": 0, "upgrades": 0, "sends": 0, "attribute_rerolls": 0, "rarity_shards": 0}, "earned": {"kill_coins": 0, "wave_coins": 0, "income_coins": 0, "production_coins": 0, "boss_coins": 0, "sale_coins": 0, "drop_shards": 0, "clear_shards": 0, "production_shards": 0, "boss_shards": 0}, "leaks": {}, "base_damage": {}, "defeated_by": ""})
+		_sides.append({"spent": {"towers": 0, "upgrades": 0, "sends": 0, "terrain": 0, "attribute_rerolls": 0, "rarity_shards": 0}, "earned": {"kill_coins": 0, "wave_coins": 0, "income_coins": 0, "production_coins": 0, "boss_coins": 0, "sale_coins": 0, "drop_shards": 0, "clear_shards": 0, "production_shards": 0, "boss_shards": 0}, "leaks": {}, "base_damage": {}, "defeated_by": ""})
 
 func add(slot: int, bucket: String, key: String, amount: int) -> void:
 	_sides[slot][bucket][key] += amount

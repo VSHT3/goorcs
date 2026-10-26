@@ -36,6 +36,7 @@ func _run() -> void:
 	main.play_button.pressed.emit()
 	main.play_screen.singleplayer_button.pressed.emit()
 	var planning: MatchPlanning = main.planning
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "A run starts")
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
 	var button: Button = screen.speed_button

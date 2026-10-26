@@ -6,8 +6,10 @@ func _planning_rules() -> CombatRules:
 
 
 func _on_planning_changed() -> void:
-	# This worker's callers exercise selection/commit explicitly.
-	pass
+	# This worker leaves guesses, ordered hero picks and private decks to the
+	# test driver; no changed callback may silently commit a loadout.
+	if not planning.selecting_loadout:
+		_fixture_terrain_seeded = false
 
 
 func _new_session() -> void:
@@ -28,6 +30,12 @@ func _set_owned(ids: Array) -> void:
 
 func _execute_command(command: Dictionary) -> void:
 	match String(command.get("action", "")):
+		"draft_guess":
+			_last_result = planning.submit_commander_guess(int(command["value"]))
+		"draft_pick":
+			_last_result = planning.select_commander(StringName(command["commander"]))
+		"seed_terrain":
+			_last_result = _seed_fixture_terrain()
 		"select":
 			_last_result = planning.select_loadout(command.get("ids", []))
 		"commit":
@@ -57,7 +65,6 @@ func _execute_command(command: Dictionary) -> void:
 
 
 func _publish() -> void:
-	super._publish()
 	if planning == null or _directory.is_empty() or _executing_command:
 		return
 	var file := FileAccess.open(_path("gameplay") + ".tmp", FileAccess.WRITE)
@@ -67,7 +74,13 @@ func _publish() -> void:
 		"chosen_tower_ids": planning.chosen_tower_ids,
 		"loadout_committed": planning.loadout_committed,
 		"opponent_committed": planning.opponent_committed,
+		"commander_draft": planning.commander_draft,
 		"combat": planning.combat,
+		"draft_phase": planning.commander_draft.get("phase", ""),
+		"draft_picker": planning.commander_draft.get("picker", -1),
+		"commander_ids": planning.commander_ids,
 	}))
 	file.close()
 	DirAccess.rename_absolute(_path("gameplay") + ".tmp", _path("gameplay"))
+	# The status command ID is the fence for every gameplay snapshot above.
+	super._publish()

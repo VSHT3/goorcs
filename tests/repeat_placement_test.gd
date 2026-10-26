@@ -56,6 +56,7 @@ func _run() -> void:
 	await _key(KEY_ESCAPE)
 	await _key(KEY_P)
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
 	_check(main.planning.select_loadout([&"arrow_tower"]) and main.planning.commit_loadout(), "Real solo run admits the starter loadout")
 	main.planning.debug_set_values(1, 200, 8)
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen

@@ -18,6 +18,9 @@ var active: bool = false
 var singleplayer: bool = false
 var selecting_loadout: bool = false
 var chosen_tower_ids: Array[StringName] = []
+var chosen_commander_id: StringName = &""
+var commander_ids: Array[StringName] = [&"", &""]
+var commander_draft: Dictionary = {}
 var loadout_committed: bool = false
 var opponent_committed: bool = false
 var combat: Dictionary = {}
@@ -62,6 +65,14 @@ var _combat_baseline: Dictionary = {}
 var _host_loadouts: Array[Array] = [[], []]
 var _host_loadout_committed: Array[bool] = [false, false]
 var _host_owned_claims: Array[Array] = [[], []]
+var _host_commander_ids: Array[StringName] = [&"", &""]
+var _commander_rng := RandomNumberGenerator.new()
+var _draft_rng := RandomNumberGenerator.new()
+var _host_draft_target: int = -1
+var _host_commander_guesses: Array[int] = [-1, -1]
+var _host_first_picker: int = -1
+var _host_commander_picker: int = -1
+var _host_draft_phase: String = "guessing"
 
 var _ready_seconds_left: float = -1.0
 var _expansion_count: int = 0
@@ -122,6 +133,7 @@ func _ready() -> void:
 	assert(session != null)
 	set_multiplayer_authority(1)
 	session.changed.connect(_on_session_changed)
+	_draft_rng.randomize()
 	_reset_match()
 	_on_session_changed()
 
@@ -131,6 +143,7 @@ func start_singleplayer() -> void:
 	_reset_match()
 	singleplayer = true
 	selecting_loadout = true
+	_begin_commander_draft()
 	_publish_snapshot()
 
 
@@ -145,7 +158,7 @@ func is_equipped(type_id: StringName) -> bool:
 
 
 func select_loadout(ids: Array) -> bool:
-	if not selecting_loadout or loadout_committed:
+	if not selecting_loadout or loadout_committed or commander_draft.get("phase", "") != "loadout":
 		return false
 	var owned: Array = _local_owned_ids()
 	var validated: Array[StringName] = _validated_loadout(ids, owned)
@@ -155,8 +168,20 @@ func select_loadout(ids: Array) -> bool:
 	return _request_loadout_command("select", validated, owned)
 
 
+func select_commander(id: StringName) -> bool:
+	if not selecting_loadout or loadout_committed or not CommanderRules.valid(id) or commander_draft.get("phase", "") != "picking" or int(commander_draft.get("picker", -1)) != local_slot() or chosen_commander_id != &"":
+		return false
+	return _request_loadout_command("commander", [], [], String(id))
+
+
+func submit_commander_guess(value: int) -> bool:
+	if not selecting_loadout or value < 0 or value > 100 or commander_draft.get("phase", "") != "guessing" or commander_draft.get("guess_locked", [false, false])[local_slot()]:
+		return false
+	return _request_loadout_command("guess", [value], [])
+
+
 func commit_loadout() -> bool:
-	if not selecting_loadout or loadout_committed or chosen_tower_ids.is_empty():
+	if not selecting_loadout or loadout_committed or chosen_tower_ids.is_empty() or commander_draft.get("phase", "") != "loadout":
 		return false
 	return _request_loadout_command("commit", [], [])
 
@@ -190,28 +215,31 @@ func _validated_loadout(ids: Array, owned: Array) -> Array[StringName]:
 	return result
 
 
-func _request_loadout_command(command: String, ids: Array, owned: Array) -> bool:
+func _request_loadout_command(command: String, ids: Array, owned: Array, commander_id: String = "") -> bool:
 	if singleplayer:
-		return _apply_loadout_command(1, command, ids, owned)
+		return _apply_loadout_command(1, command, ids, owned, commander_id)
 	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
 		return false
 	if session.is_host:
-		return _apply_loadout_command(1, command, ids, owned)
-	_receive_loadout_command.rpc_id(1, command, ids, owned)
+		return _apply_loadout_command(1, command, ids, owned, commander_id)
+	_receive_loadout_command.rpc_id(1, command, ids, owned, commander_id)
 	return true
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _receive_loadout_command(command: String, ids: Array, owned: Array) -> void:
-	_apply_loadout_command(multiplayer.get_remote_sender_id(), command, ids, owned)
+func _receive_loadout_command(command: String, ids: Array, owned: Array, commander_id: String = "") -> void:
+	_apply_loadout_command(multiplayer.get_remote_sender_id(), command, ids, owned, commander_id)
 
 
-func _apply_loadout_command(sender: int, command: String, ids: Array, owned: Array) -> bool:
+func _apply_loadout_command(sender: int, command: String, ids: Array, owned: Array, commander_id: String = "") -> bool:
 	if not _can_accept(sender) or not selecting_loadout:
 		return false
 	var slot: int = 0 if sender == 1 else 1
 	if _host_loadout_committed[slot]:
 		_reject(sender, "Your run loadout is already committed.")
+		return false
+	if command not in ["guess", "commander"] and _host_draft_phase != "loadout":
+		_reject(sender, "Finish the commander draft before choosing towers.")
 		return false
 	if command == "select":
 		# There are no accounts: remote ownership is a trusted local-save claim.
@@ -231,10 +259,26 @@ func _apply_loadout_command(sender: int, command: String, ids: Array, owned: Arr
 			return false
 		_host_loadouts[slot] = validated
 		_host_owned_claims[slot] = known
+	elif command == "guess":
+		if ids.size() != 1 or not ids[0] is int or not _apply_commander_guess(slot, int(ids[0])):
+			_reject(sender, "Lock one integer guess from 0 to 100.")
+			return false
+		_auto_pick_solo_commander()
+	elif command == "commander":
+		if not _pick_commander(slot, StringName(commander_id)):
+			_reject(sender, "Wait for your pick and choose an available commander.")
+			return false
+		_auto_pick_solo_commander()
 	elif command == "commit":
 		var claim: Array = _local_owned_ids() if slot == 0 else _host_owned_claims[slot]
 		if _validated_loadout(_host_loadouts[slot], claim).is_empty():
 			_reject(sender, "Select your unlocked tower types before committing.")
+			return false
+		if not CommanderRules.valid(_host_commander_ids[slot]):
+			return false
+		var both_committed: bool = singleplayer or _host_loadout_committed[1 - slot]
+		if both_committed and not _configure_commander_boards():
+			_reject(sender, "This board cannot fit commander terrain and a legal route.")
 			return false
 		_host_loadout_committed[slot] = true
 		if singleplayer:
@@ -247,6 +291,71 @@ func _apply_loadout_command(sender: int, command: String, ids: Array, owned: Arr
 	else:
 		return false
 	_publish_snapshot()
+	return true
+
+
+func _begin_commander_draft() -> void:
+	_host_draft_target = _draft_rng.randi_range(0, 100)
+	if singleplayer:
+		_host_commander_guesses[1] = _draft_rng.randi_range(0, 100)
+
+
+func _apply_commander_guess(slot: int, value: int) -> bool:
+	if _host_draft_phase != "guessing" or _host_draft_target < 0 or _host_commander_guesses[slot] >= 0 or value < 0 or value > 100:
+		return false
+	_host_commander_guesses[slot] = value
+	if _host_commander_guesses[0] >= 0 and _host_commander_guesses[1] >= 0:
+		var first_distance: int = absi(_host_commander_guesses[0] - _host_draft_target)
+		var second_distance: int = absi(_host_commander_guesses[1] - _host_draft_target)
+		_host_first_picker = _draft_rng.randi_range(0, 1) if first_distance == second_distance else (0 if first_distance < second_distance else 1)
+		_host_commander_picker = _host_first_picker
+		_host_draft_phase = "picking"
+	return true
+
+
+func _pick_commander(slot: int, id: StringName) -> bool:
+	if _host_draft_phase != "picking" or slot != _host_commander_picker or _host_commander_ids[slot] != &"" or not CommanderRules.valid(id) or _host_commander_ids.has(id):
+		return false
+	_host_commander_ids[slot] = id
+	if _host_commander_ids[0] != &"" and _host_commander_ids[1] != &"":
+		_host_draft_phase = "loadout"
+		_host_commander_picker = -1
+	else:
+		_host_commander_picker = 1 - slot
+	return true
+
+
+func _auto_pick_solo_commander() -> void:
+	if not singleplayer or _host_draft_phase != "picking" or _host_commander_picker != 1:
+		return
+	var available: Array[StringName] = []
+	for id: StringName in [CommanderRules.KNIGHT, CommanderRules.PRIESTESS]:
+		if not _host_commander_ids.has(id):
+			available.append(id)
+	var index: int = _draft_rng.randi_range(0, available.size() - 1) if available.size() > 1 else 0
+	_pick_commander(1, available[index])
+
+
+func _commander_draft_snapshot() -> Dictionary:
+	var revealed: bool = _host_commander_guesses[0] >= 0 and _host_commander_guesses[1] >= 0
+	return {
+		"phase": _host_draft_phase,
+		"guess_locked": [_host_commander_guesses[0] >= 0, _host_commander_guesses[1] >= 0],
+		"guesses": _host_commander_guesses.duplicate() if revealed else [-1, -1],
+		"target": _host_draft_target if revealed else -1,
+		"first_picker": _host_first_picker, "picker": _host_commander_picker,
+		"picks": [String(_host_commander_ids[0]), String(_host_commander_ids[1])],
+	}
+
+
+func _configure_commander_boards() -> bool:
+	var previous_rng_state: int = _commander_rng.state
+	var first: Dictionary = CommanderRules.generate(_host_commander_ids[0], _host_layouts[0], _commander_rng)
+	var second: Dictionary = CommanderRules.generate(_host_commander_ids[1], _host_layouts[1], _commander_rng)
+	if first.is_empty() or second.is_empty():
+		_commander_rng.state = previous_rng_state
+		return false
+	_host_combat.configure_commanders([first, second])
 	return true
 
 
@@ -357,6 +466,16 @@ func reroll_tower(slot: int, tower_id: int, kind: String) -> bool:
 	return _request_tower_command("reroll", slot, Vector2i.ZERO, tower_id, -1, kind)
 
 
+func request_commander_ability(target: int) -> bool:
+	if target not in [0, 1]:
+		return false
+	return _request_tower_command("ability", local_slot(), Vector2i.ZERO, -1, target, "")
+
+
+func request_clear_obstacle(cell: Vector2i) -> bool:
+	return _request_tower_command("clear_obstacle", local_slot(), cell, -1, -1, "")
+
+
 
 
 func send_enemy(slot: int, type_id: StringName) -> void:
@@ -405,6 +524,7 @@ func _on_session_changed() -> void:
 		_reset_match()
 		_active_peer_id = guest_id
 		selecting_loadout = true
+		_begin_commander_draft()
 		_publish_snapshot()
 		if requested_snapshot:
 			_sync_guest(guest_id)
@@ -438,11 +558,21 @@ func _reset_match() -> void:
 	singleplayer = false
 	selecting_loadout = false
 	chosen_tower_ids = []
+	chosen_commander_id = &""
+	commander_ids = [&"", &""]
+	commander_draft = {}
 	loadout_committed = false
 	opponent_committed = false
 	_host_loadouts = [[], []]
 	_host_loadout_committed = [false, false]
 	_host_owned_claims = [[], []]
+	_host_commander_ids = [&"", &""]
+	_host_draft_target = -1
+	_host_commander_guesses = [-1, -1]
+	_host_first_picker = -1
+	_host_commander_picker = -1
+	_host_draft_phase = "guessing"
+	_commander_rng.randomize()
 	_active_peer_id = 0
 	_synced_guest_id = 0
 	_pending_snapshot_peer = 0
@@ -506,10 +636,18 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 	if not _host_can_manage_towers(slot):
 		_reject(sender, "Ready commits your planning actions until combat starts.")
 		return false
+	if command == "clear_obstacle" and _host_combat.phase != MatchCombat.Phase.PLANNING:
+		_reject(sender, "Obstacles can only be cleared during planning before Ready.")
+		return false
+	if command == "ability" and (_host_combat.phase != MatchCombat.Phase.WAVE or mode not in [0, 1]):
+		_reject(sender, "Use your commander ability during combat on a valid board.")
+		return false
 	var mirrored: bool = singleplayer and sender == 1
+	if singleplayer and sender != 1 and command in ["ability", "clear_obstacle"]:
+		return false
 	# IDs are globally unique, so resolve the counterpart by cell before a sale.
 	var mirror_id: int = -1
-	if mirrored and command not in ["build", "send", "reroll", "upgrade"]:
+	if mirrored and command not in ["build", "send", "reroll", "upgrade", "ability", "clear_obstacle"]:
 		for tower: Dictionary in _host_combat.towers[0]:
 			if tower["id"] == tower_id:
 				for opponent: Dictionary in _host_combat.towers[1]:
@@ -519,6 +657,10 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 				break
 	var accepted: bool = false
 	match command:
+		"ability":
+			accepted = _host_combat.activate_commander(slot, mode)
+		"clear_obstacle":
+			accepted = _host_combat.clear_obstacle(slot, cell)
 		"send":
 			accepted = _host_combat.send_enemy_mirrored(slot, StringName(argument)) if mirrored else _host_combat.send_enemy(slot, StringName(argument))
 		"build":
@@ -526,11 +668,11 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 				_reject(sender, "This tower is not in your committed run loadout.")
 				return false
 			var layout: PathLayout = _host_layouts[slot]
-			if not layout.contains(cell) or layout.has_path(cell):
-				_reject(sender, "Build towers on empty ground, never on a path or endpoint.")
+			if not layout.contains(cell) or layout.has_path(cell) or _terrain_blocks(slot, cell):
+				_reject(sender, "Build towers on empty ground, never on paths, endpoints, or terrain.")
 				return false
 			if mirrored:
-				if _host_layouts[1].has_path(cell):
+				if _host_layouts[1].has_path(cell) or _terrain_blocks(1, cell):
 					return false
 				accepted = _host_combat.build_mirrored(slot, cell, StringName(argument), mode)
 			else:
@@ -547,11 +689,16 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 		_reject(sender, "Action unavailable: check your tower, currency, prerequisites, and command.")
 		return false
 	# Paid commands atomically mirror in the model before publishing either board.
-	if mirrored and command not in ["build", "reroll", "upgrade", "send"]:
+	if mirrored and command not in ["build", "reroll", "upgrade", "send", "ability", "clear_obstacle"]:
 		_apply_tower_command(2, command, 1, cell, mirror_id, mode, argument)
 	else:
 		_publish_snapshot()
 	return true
+
+
+func _terrain_blocks(slot: int, cell: Vector2i) -> bool:
+	var state: Dictionary = _host_combat.commanders[slot]
+	return not state.is_empty() and (state["landmark"] == cell or state["obstacles"].has(cell))
 
 
 func _can_accept(sender: int) -> bool:
@@ -595,8 +742,11 @@ func _apply_command(sender: int, command: String, slot: int, cell: Vector2i, val
 		"edit":
 			if not layout.contains(cell) or layout.is_endpoint(cell):
 				return
-			if value and _host_combat.has_tower(permitted_slot, cell):
-				_reject(sender, "A path cannot overlap an existing tower.")
+			if value and (_host_combat.has_tower(permitted_slot, cell) or _terrain_blocks(permitted_slot, cell)):
+				_reject(sender, "A path cannot overlap an existing tower or commander terrain.")
+				return
+			if singleplayer and sender == 1 and value and (_host_combat.has_tower(1, cell) or _terrain_blocks(1, cell)):
+				_reject(sender, "The mirrored path must avoid terrain on both boards.")
 				return
 			if layout.has_path(cell) == value:
 				return
@@ -796,6 +946,9 @@ func _snapshot(recipient_slot: int = 0) -> Dictionary:
 		"active": active,
 		"selecting_loadout": selecting_loadout,
 		"chosen_tower_ids": _host_loadouts[recipient_slot].duplicate(),
+		"chosen_commander_id": String(_host_commander_ids[recipient_slot]),
+		"commander_ids": [String(_host_commander_ids[0]), String(_host_commander_ids[1])],
+		"commander_draft": _commander_draft_snapshot(),
 		"loadout_committed": _host_loadout_committed[recipient_slot],
 		"opponent_committed": _host_loadout_committed[1 - recipient_slot],
 		"dimensions": _host_layouts[0].dimensions,
@@ -822,6 +975,7 @@ func _publish_snapshot() -> void:
 		# local listeners can synchronously submit another accepted command.
 		var remote: Dictionary = snapshot.duplicate()
 		remote["chosen_tower_ids"] = _host_loadouts[1].duplicate()
+		remote["chosen_commander_id"] = String(_host_commander_ids[1])
 		remote["loadout_committed"] = _host_loadout_committed[1]
 		remote["opponent_committed"] = _host_loadout_committed[0]
 		_receive_snapshot.rpc_id(_synced_guest_id, SNAPSHOT_CODEC.encode_snapshot(remote), _snapshot_revision, _snapshot_sequence)
@@ -941,6 +1095,10 @@ func _mirror_snapshot(snapshot: Dictionary) -> void:
 	active = snapshot["active"]
 	selecting_loadout = snapshot["selecting_loadout"]
 	chosen_tower_ids.assign(snapshot["chosen_tower_ids"])
+	chosen_commander_id = StringName(snapshot["chosen_commander_id"])
+	commander_draft = snapshot["commander_draft"]
+	var accepted_ids: Array = snapshot["commander_ids"]
+	commander_ids = [StringName(accepted_ids[0]), StringName(accepted_ids[1])]
 	loadout_committed = snapshot["loadout_committed"]
 	opponent_committed = snapshot["opponent_committed"]
 	var next_layouts: Array[PathLayout] = []

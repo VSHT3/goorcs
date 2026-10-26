@@ -283,6 +283,7 @@ func _run() -> void:
 	var loadout: Array[StringName] = []
 	for definition: TowerDefinition in catalog.towers.slice(0, 4):
 		loadout.append(definition.reward.id)
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Fixture completes the hero draft")
 	_check(planning.select_loadout(loadout) and planning.commit_loadout(), "Injected six-type catalog admits an owned first-four deck")
 	var screen: MatchPlanningScreen = main.play_screen.planning_screen
 	_check(screen.shop_buttons.size() == catalog.towers.size() and screen.shop_buttons.has(&"catalog_tower_0") and screen.shop_buttons[&"catalog_tower_0"].visible, "Actual placement palette uses the injected catalog and committed deck, not default rewards")

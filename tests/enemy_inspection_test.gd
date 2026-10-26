@@ -1,5 +1,7 @@
 extends SceneTree
 
+const LIFECYCLE_TOWER_CELL := Vector2i(7, 3)
+
 var failures: int = 0
 var main: Control
 var screen: MatchPlanningScreen
@@ -70,6 +72,11 @@ func _open_match() -> void:
 	main.play_button.pressed.emit()
 	await _settle()
 	main.play_screen.singleplayer_button.pressed.emit()
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(main.planning), "Fixture completes the hero draft")
+	var reserved: Array[Vector2i] = [LIFECYCLE_TOWER_CELL]
+	for x: int in range(1, 13):
+		reserved.append(Vector2i(x, 4))
+	_check(preload("res://tests/commander_fixture_worker.gd").seed_terrain(main.planning, reserved), "Real commander terrain preserves the authored lifecycle tower and wave route on both boards")
 	_check(main.planning.select_loadout([&"arrow_tower", &"orc_ballista", &"rune_obelisk"]) and main.planning.commit_loadout(), "Inspection fixture commits its owned tested identities")
 	screen = main.play_screen.planning_screen
 	world = screen.world
@@ -242,7 +249,7 @@ func _check_lifecycle() -> void:
 	var victim_id: int = int(main.planning.combat["enemies"][1][0]["id"])
 	await _click_enemy(1, victim_id)
 	_check_selected(1, victim_id, "Select enemy before real tower kill")
-	main.planning.build_tower(0, Vector2i(7, 3), &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
+	main.planning.build_tower(0, LIFECYCLE_TOWER_CELL, &"arrow_tower", MatchCombat.TargetMode.FURTHEST)
 	_freeze()
 	_host_enemy(1, victim_id)["hp"] = 1
 	_publish()

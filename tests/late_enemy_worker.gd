@@ -1,6 +1,13 @@
 extends "res://tests/match_branch_worker.gd"
 
 
+func _fixture_reserved_cells() -> Array[Vector2i]:
+	var cells: Array[Vector2i] = super._fixture_reserved_cells()
+	# These original-board cells move with the normal late-round expansion.
+	cells.append_array([Vector2i(5, 0), Vector2i(2, 1)])
+	return cells
+
+
 func _planning_rules() -> CombatRules:
 	var rules: CombatRules = preload("res://resources/combat/prototype.tres").duplicate(true)
 	rules.roll_rules = null

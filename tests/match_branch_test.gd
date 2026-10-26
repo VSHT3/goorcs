@@ -14,6 +14,7 @@ func _run() -> void:
 	var hosted: Dictionary = await _command("host", {"action": "host", "port": port})
 	await _connect_guest("guest", "host", hosted["code"])
 	await _wait_for("guest", {"active": true}, "Branch peers synchronize")
+	_assert_fixture_terrain(await _agree("Branch peers agree on both accepted commander terrains"))
 	for lane: String in ["host", "guest"]:
 		var slot: int = 0 if lane == "host" else 1
 		await _edit(lane, slot, 1, 2)
@@ -59,6 +60,23 @@ func _run() -> void:
 	await _wait_combat("guest", {"phase": 0, "wave": 2, "health": [90, 92]}, "Second wave completes with matching persistent health")
 	await _agree("Both waves finish identically on real peers")
 	await _finish()
+
+
+func _assert_fixture_terrain(combat: Dictionary) -> void:
+	var legal_ground: Array[String] = []
+	for y: int in range(5):
+		for x: int in range(6):
+			if y in [0, 4] or (x == 0 and y in [1, 3]):
+				legal_ground.append(str(Vector2i(x, y)))
+	var choices: Array[String] = []
+	for commander: Dictionary in combat["commanders"]:
+		choices.append(String(commander["id"]))
+		_check(commander["obstacles"].size() == CommanderRules.OBSTACLE_COUNT, "Each branch board retains its full real generated obstacle set")
+		var terrain: Array = commander["obstacles"].duplicate()
+		terrain.append(commander["landmark"])
+		for cell: Variant in terrain:
+			_check(legal_ground.has(String(cell)), "Generated terrain occupies legal leftover ground without reducing either authored fork")
+	_check(choices.has("knight") and choices.has("priestess"), "Normal ordered draft retains both distinct commander choices")
 
 
 func _agree(description: String) -> Dictionary:
