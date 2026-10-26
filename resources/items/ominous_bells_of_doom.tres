@@ -9,4 +9,5 @@ id = &"ominous_bells_of_doom"
 title = "Ominous Bells of Doom"
 rarity = 6
 effect_text = "Rounds advance by 10 instead of 1: 10, 20, 30, 40, 50…"
+flavor_text = "do you hear them? the bells"
 icon_texture = ExtResource("2")

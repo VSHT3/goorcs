@@ -33,6 +33,8 @@ The subsequent rarity-text fix passed clean isolated import, the native navigati
 
 The illustrated collection adds eight catalog-owned guide entries with original 32×32 hard-alpha icons. Common/Uncommon alcoves hold multiple separately selectable items; native-resolution details show the selected effect and any supplied flavor text. An isolated actual-main-scene rendered walkthrough passed every item through pointer and Tab selection at **1000×720 / 1280×720 / 1568×921**, including nonoverlapping same-rarity controls, wrapped effect/flavor bounds, Escape/resume, and unchanged inactive match state while browsing. Representative captures were inspected. A one-pixel overlap from independently rounding adjacent icon bounds was fixed by giving each exhibit a four-art-pixel gap. Logs and captures: `.verify-logs/items-guide/`. This is guide/UI verification, not active item effects or acquisition.
 
+The item-catalog integration passed **82/82** isolated headless checks, including content-catalog consumers and navigation. Logs: `.verify-logs/20261026T155331Z-headless-002d2d07/`. The final spacing adjustment was exercised by the rendered walkthrough above; the full rendered suite was not run.
+
 ### Single-command verification
 
 Install **Python 3.10 or newer** for development verification; its standard library is sufficient. Python is not a game/runtime dependency. The runner supports macOS and Linux and requires the exact official standard-engine build `4.7.2.stable.official.ed1daf0bf`; `godot --version` reports that string. A different release or custom build fails the version gate rather than silently changing test behavior.
