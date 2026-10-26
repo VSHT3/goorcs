@@ -6,6 +6,8 @@ signal back_requested
 var back_button: Button
 var _viewport: SubViewport
 var _lights: Node2D
+var _room: TextureRect
+var _rarity_labels: Array[Label] = []
 
 
 func _ready() -> void:
@@ -45,17 +47,43 @@ func _ready() -> void:
 	_viewport.add_child(ItemieryRoom.new())
 	_lights = preload("res://scripts/itemiery_lights.gd").new()
 	_viewport.add_child(_lights)
-	var room := TextureRect.new()
-	room.name = "Room"
-	room.texture = _viewport.get_texture()
-	room.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	room.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	room.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	room.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	room.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	shell.add_child(room)
+	_room = TextureRect.new()
+	_room.name = "Room"
+	_room.texture = _viewport.get_texture()
+	_room.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_room.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_room.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_room.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_room.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shell.add_child(_room)
+	# Text stays in the main viewport, never enlarged from the room's 640×360 image.
+	for index: int in range(ItemRarity.NAMES.size()):
+		var label := Label.new()
+		label.text = ItemRarity.NAMES[index]
+		label.add_theme_color_override("font_color", ItemRarity.COLORS[index])
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_room.add_child(label)
+		_rarity_labels.append(label)
+	_room.resized.connect(_layout_rarity_labels)
+	_layout_rarity_labels()
 	visibility_changed.connect(_sync_visibility)
 	_sync_visibility()
+
+
+func _layout_rarity_labels() -> void:
+	if _room.size.x <= 0.0 or _room.size.y <= 0.0:
+		return
+	var art_size := Vector2(_viewport.size)
+	var art_scale: float = minf(_room.size.x / art_size.x, _room.size.y / art_size.y)
+	var art_origin: Vector2 = (_room.size - art_size * art_scale) * 0.5
+	for index: int in range(_rarity_labels.size()):
+		var label: Label = _rarity_labels[index]
+		var plaque: Rect2 = ItemieryRoom.plaque_rect(index)
+		label.add_theme_font_size_override("font_size", maxi(16, roundi(12.0 * art_scale)))
+		label.position = (art_origin + plaque.position * art_scale).round()
+		label.size = (plaque.size * art_scale).round()
 
 
 func open() -> void:

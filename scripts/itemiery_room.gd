@@ -2,13 +2,16 @@ class_name ItemieryRoom
 extends Node2D
 ## Authored at 640×360; the screen scales the viewport with nearest filtering.
 
-const FONT: Font = preload("res://assets/fonts/PixelifySans.ttf")
 const MORTAR := Color("151e1b")
 const STONE := Color("303d35")
 const EDGE := Color("465244")
 const LIGHT := Color("64705a")
 const DARK := Color("101915")
 const CENTERS: PackedInt32Array = [68, 152, 236, 320, 404, 488, 572]
+
+
+static func plaque_rect(index: int) -> Rect2:
+	return Rect2(CENTERS[index] - 38, 253, 76, 20)
 
 
 func _draw() -> void:
@@ -106,11 +109,8 @@ func _draw_niche(index: int) -> void:
 			draw_rect(Rect2(x + side * 19 - 1, 78, 3, 4), tint.darkened(0.25))
 	if index == ItemRarity.Tier.ORCFECCION:
 		_draw_crest(Vector2(x, 62), 0.45)
-	draw_rect(Rect2(x - 38, 253, 76, 20), MORTAR)
+	draw_rect(plaque_rect(index), MORTAR)
 	draw_line(Vector2(x - 35, 254), Vector2(x + 35, 254), EDGE)
-	var text: String = ItemRarity.NAMES[index]
-	var text_width: float = FONT.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x
-	draw_string(FONT, Vector2(x - floorf(text_width * 0.5), 267), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, tint)
 
 
 func draw_ellipse_shadow(center: Vector2) -> void:

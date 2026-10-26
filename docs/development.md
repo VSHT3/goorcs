@@ -23,11 +23,13 @@ The stale-cache repair passed all **51/51** isolated headless/rendered checks wi
 
 ### Itemiery room
 
-Item rarities are owned by `ItemRarity`, separate from tower rarities and their roll odds. `ItemieryRoom` draws the empty stone gallery at 640×360; the screen scales its isolated viewport with nearest filtering. Static room geometry stays retained while `itemiery_lights.gd` redraws only the rarity effects. Mythic and Legendary glows are steady; only Orcfeccion shines and animates. Leaving disables both viewport updates and effect processing.
+Item rarities are owned by `ItemRarity`, separate from tower rarities and their roll odds. `ItemieryRoom` draws the empty stone gallery at 640×360; the screen scales its isolated viewport with nearest filtering. Rarity names are native UI labels outside that low-resolution viewport, with integer font sizes and pixel-aligned positions derived from the shared stone-plaque bounds. Resizing keeps text sharp without resampling glyphs from the room image. Static room geometry stays retained while `itemiery_lights.gd` redraws only the rarity effects. Mythic and Legendary glows are steady; only Orcfeccion shines and animates. Leaving disables both viewport updates and effect processing.
 
 An isolated actual-main-scene rendered walkthrough passed on macOS Compatibility/OpenGL (Apple M2), using an offscreen world to keep desktop input separate. Captures at **1000×720 / 1280×720** were inspected. Pointer/keyboard entry, X/Escape return, restored menu focus, inactive match state, steady Mythic/Legendary pixels, animated Orcfeccion pixels, and hidden animation shutdown passed. Audio used the dummy driver; this is not sound or gameplay-item verification. Captures and output remain under ignored `.verify-logs/itemiery-smoke/`.
 
 The final isolated `python3 tools/verify.py headless` run passed **82/82 checks**, including fresh imports, save isolation, startup, separate-peer suites, and the expanded Itemiery navigation/lifecycle regression. The focused rendered menu-wordmark suite also passed. Full headless logs: `.verify-logs/20261026T135547Z-headless-5082043c/`. The full rendered suite was not run for this change.
+
+The subsequent rarity-text fix passed clean isolated import, the native navigation suite, and an actual-main-scene rendered resize walkthrough at **1000×720 / 1280×720 / 1568×921 / 1920×1080**. Every label fit its plaque at whole-pixel UI positions; Escape/resume passed. Captures at the compact and reported window sizes were inspected. Logs and captures: `.verify-logs/itemiery-text/`. The full suite was not rerun for this text-only fix.
 
 ### Single-command verification
 
