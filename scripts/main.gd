@@ -143,6 +143,7 @@ func _open_itemiery() -> void:
 	_hide_activities()
 	if itemiery_screen == null:
 		itemiery_screen = preload("res://scenes/itemiery_screen.tscn").instantiate()
+		itemiery_screen.catalog = combat_rules.catalog
 		itemiery_screen.hide()
 		add_child(itemiery_screen)
 		itemiery_screen.back_requested.connect(_show_menu)

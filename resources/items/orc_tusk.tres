@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/orc_tusk.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"orc_tusk"
+title = "Orc Tusk"
+rarity = 0
+effect_text = "Enemies summoned on your side have 10% less HP."
+flavor_text = "A long forgotten tusk of a defeated Orc."
+icon_texture = ExtResource("2")

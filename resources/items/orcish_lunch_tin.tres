@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/orcish_lunch_tin.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"orcish_lunch_tin"
+title = "Orcish Lunch Tin"
+rarity = 1
+effect_text = "Clear a wave without leaks: +10 + wave ÷ 5 Coins, plus +1 per 2 consecutive leak-free clears. A leak resets the streak."
+icon_texture = ExtResource("2")

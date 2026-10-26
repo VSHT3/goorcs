@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/samurai_sword.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"samurai_sword"
+title = "Samurai Sword"
+rarity = 2
+effect_text = "Your towers attack 10% slower but deal 35% more damage."
+flavor_text = "SHOGUN yokosoo sushi anime."
+icon_texture = ExtResource("2")
