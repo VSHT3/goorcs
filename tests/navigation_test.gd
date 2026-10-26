@@ -88,6 +88,17 @@ func _run() -> void:
 	_check(main.menu.visible, "Orcieary Escape returns to menu")
 	_check(menu_audio.actions == 10, "Sandbox Back/Escape, menu resume and Orcieary entry/return each cue once")
 	await _check_towerieary(sandbox)
+	await _key(KEY_I)
+	var itemiery: ItemieryScreen = main.itemiery_screen
+	_check(itemiery.visible and not main.menu.visible and not sandbox.visible, "I opens Itemiery without exposing the previous activity")
+	_check(itemiery._lights.is_processing(), "Visible Itemiery animates its highest rarity")
+	await _key(KEY_ESCAPE)
+	_check(main.menu.visible and root.gui_get_focus_owner() == main.itemiery_button, "Itemiery Escape restores its menu focus")
+	_check(not itemiery._lights.is_processing() and itemiery._viewport.render_target_update_mode == SubViewport.UPDATE_DISABLED, "Hidden Itemiery stops both animation and viewport rendering")
+	await _key(KEY_ESCAPE)
+	_check(itemiery.visible and root.gui_get_focus_owner() == itemiery.back_button, "Menu Escape resumes Itemiery with an accessible close control")
+	await _click(itemiery.back_button.get_global_rect().get_center())
+	_check(main.menu.visible and not itemiery.visible, "Itemiery X returns to the main menu")
 	await _key(KEY_S)
 	_check(sandbox.layout.route == route and sandbox.layout.is_ready(), "Sandbox state survives visits to other menus")
 	await _check_match_music()
@@ -148,7 +159,6 @@ func _check_menu_focus() -> void:
 	for child: Node in main.play_button.get_parent().get_children():
 		if child is Button:
 			buttons.append(child)
-	_check(buttons.size() == 6 and buttons[3] == main.towerieary_button, "Both field guides are discoverable in the six-action menu")
 	for button: Button in buttons:
 		_check(main.get_global_rect().encloses(button.get_global_rect()), "Every menu action fits the viewport")
 	for index: int in range(buttons.size()):

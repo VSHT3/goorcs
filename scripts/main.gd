@@ -12,6 +12,7 @@ var collection_screen: CollectionScreen
 var sandbox_screen: SandboxScreen
 var orcieary_screen: OrciearyScreen
 var towerieary_screen: ToweriearyScreen
+var itemiery_screen: ItemieryScreen
 var session: MultiplayerSession
 var planning: MatchPlanning
 var play_screen: MultiplayerLobby
@@ -23,6 +24,7 @@ var _discord_presence: DiscordPresence
 @onready var sandbox_button: Button = $Menu/Center/Panel/Sandbox
 @onready var orcieary_button: Button = $Menu/Center/Panel/Orcieary
 @onready var towerieary_button: Button = $Menu/Center/Panel/Towerieary
+@onready var itemiery_button: Button = $Menu/Center/Panel/Itemiery
 @onready var collection_button: Button = $Menu/Center/Panel/Collection
 @onready var play_button: Button = $Menu/Center/Panel/Play
 @onready var _match_music: AudioStreamPlayer = $MatchMusic
@@ -34,6 +36,7 @@ func _ready() -> void:
 	sandbox_button.pressed.connect(_open_sandbox)
 	orcieary_button.pressed.connect(_open_orcieary)
 	towerieary_button.pressed.connect(_open_towerieary)
+	itemiery_button.pressed.connect(_open_itemiery)
 	collection_button.pressed.connect(_open_collection)
 	play_button.pressed.connect(_open_play)
 	$Menu/Center/Panel/Quit.pressed.connect(_quit)
@@ -87,6 +90,9 @@ func _hide_activities(keep_menu: bool = false) -> void:
 	if towerieary_screen != null:
 		towerieary_screen.prepare_to_leave()
 		towerieary_screen.hide()
+	if itemiery_screen != null:
+		itemiery_screen.prepare_to_leave()
+		itemiery_screen.hide()
 	if not keep_menu:
 		menu.hide()
 
@@ -133,6 +139,19 @@ func _open_towerieary() -> void:
 	_discord_presence.screen = "Towerieary"
 
 
+func _open_itemiery() -> void:
+	_hide_activities()
+	if itemiery_screen == null:
+		itemiery_screen = preload("res://scenes/itemiery_screen.tscn").instantiate()
+		itemiery_screen.hide()
+		add_child(itemiery_screen)
+		itemiery_screen.back_requested.connect(_show_menu)
+	_last_activity = itemiery_screen
+	itemiery_screen.open()
+	_discord_presence.screen = "Itemiery"
+
+
+
 func _open_collection() -> void:
 	_hide_activities()
 	_last_activity = collection_screen
@@ -160,6 +179,8 @@ func _show_menu() -> void:
 		orcieary_button.grab_focus()
 	elif towerieary_screen != null and _last_activity == towerieary_screen:
 		towerieary_button.grab_focus()
+	elif itemiery_screen != null and _last_activity == itemiery_screen:
+		itemiery_button.grab_focus()
 	elif _last_activity == collection_screen:
 		collection_button.grab_focus()
 	else:
@@ -237,6 +258,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				MenuAudio.activate(orcieary_button)
 			KEY_T:
 				MenuAudio.activate(towerieary_button)
+			KEY_I:
+				MenuAudio.activate(itemiery_button)
 			KEY_C:
 				MenuAudio.activate(collection_button)
 			KEY_ESCAPE:
@@ -246,6 +269,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					MenuAudio.activate(orcieary_button)
 				elif towerieary_screen != null and _last_activity == towerieary_screen:
 					MenuAudio.activate(towerieary_button)
+				elif itemiery_screen != null and _last_activity == itemiery_screen:
+					MenuAudio.activate(itemiery_button)
 				elif _last_activity == collection_screen:
 					MenuAudio.activate(collection_button)
 				elif _last_activity == play_screen:

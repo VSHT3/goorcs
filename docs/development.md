@@ -21,6 +21,12 @@ Direct `godot --path .` does not perform the editor's project scan. A stale cach
 
 The stale-cache repair passed all **51/51** isolated headless/rendered checks with Mesa software rendering. A separate isolated Wayland main-scene smoke launched through `tools/run.sh`, clicked Play/Sandbox/Orcieary/Collection, returned with Escape, and exited through Quit. A rendered hover capture confirmed the main menu keeps its highlights without descriptive popups. This does not establish native NVIDIA driver behavior.
 
+### Itemiery room
+
+Item rarities are owned by `ItemRarity`, separate from tower rarities and their roll odds. `ItemieryRoom` draws the empty stone gallery at 640×360; the screen scales its isolated viewport with nearest filtering. Static room geometry stays retained while `itemiery_lights.gd` redraws only the rarity effects. Mythic and Legendary glows are steady; only Orcfeccion shines and animates. Leaving disables both viewport updates and effect processing.
+
+An isolated actual-main-scene rendered walkthrough passed on macOS Compatibility/OpenGL (Apple M2), using an offscreen world to keep desktop input separate. Captures at **1000×720 / 1280×720** were inspected. Pointer/keyboard entry, X/Escape return, restored menu focus, inactive match state, steady Mythic/Legendary pixels, animated Orcfeccion pixels, and hidden animation shutdown passed. Audio used the dummy driver; this is not sound or gameplay-item verification. Captures and output remain under ignored `.verify-logs/itemiery-smoke/`.
+
 ### Single-command verification
 
 Install **Python 3.10 or newer** for development verification; its standard library is sufficient. Python is not a game/runtime dependency. The runner supports macOS and Linux and requires the exact official standard-engine build `4.7.2.stable.official.ed1daf0bf`; `godot --version` reports that string. A different release or custom build fails the version gate rather than silently changing test behavior.
