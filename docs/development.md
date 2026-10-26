@@ -21,6 +21,24 @@ Direct `godot --path .` does not perform the editor's project scan. A stale cach
 
 The stale-cache repair passed all **51/51** isolated headless/rendered checks with Mesa software rendering. A separate isolated Wayland main-scene smoke launched through `tools/run.sh`, clicked Play/Sandbox/Orcieary/Collection, returned with Escape, and exited through Quit. A rendered hover capture confirmed the main menu keeps its highlights without descriptive popups. This does not establish native NVIDIA driver behavior.
 
+### Itemiery room
+
+Item rarities are owned by `ItemRarity`, separate from tower rarities and their roll odds. `ItemieryRoom` draws the stone gallery at 640×360; the screen scales its isolated viewport with nearest filtering. Rarity names are native UI labels outside that low-resolution viewport, with integer font sizes and pixel-aligned positions derived from the shared stone-plaque bounds. Resizing keeps text sharp without resampling glyphs from the room image. Static room geometry stays retained while `itemiery_lights.gd` redraws only the rarity effects. Mythic and Legendary glows are steady; only Orcfeccion shines and animates. Leaving disables both viewport updates and effect processing.
+
+An isolated actual-main-scene rendered walkthrough passed on macOS Compatibility/OpenGL (Apple M2), using an offscreen world to keep desktop input separate. Captures at **1000×720 / 1280×720** were inspected. Pointer/keyboard entry, X/Escape return, restored menu focus, inactive match state, steady Mythic/Legendary pixels, animated Orcfeccion pixels, and hidden animation shutdown passed. Audio used the dummy driver; this is not sound or gameplay-item verification. Captures and output remain under ignored `.verify-logs/itemiery-smoke/`.
+
+The final isolated `python3 tools/verify.py headless` run passed **82/82 checks**, including fresh imports, save isolation, startup, separate-peer suites, and the expanded Itemiery navigation/lifecycle regression. The focused rendered menu-wordmark suite also passed. Full headless logs: `.verify-logs/20261026T135547Z-headless-5082043c/`. The full rendered suite was not run for this change.
+
+The subsequent rarity-text fix passed clean isolated import, the native navigation suite, and an actual-main-scene rendered resize walkthrough at **1000×720 / 1280×720 / 1568×921 / 1920×1080**. Every label fit its plaque at whole-pixel UI positions; Escape/resume passed. Captures at the compact and reported window sizes were inspected. Logs and captures: `.verify-logs/itemiery-text/`. The full suite was not rerun for this text-only fix.
+
+The illustrated collection adds eight catalog-owned guide entries with original 32×32 hard-alpha icons. Common/Uncommon alcoves hold multiple separately selectable items; native-resolution details show the selected effect and any supplied flavor text. An isolated actual-main-scene rendered walkthrough passed every item through pointer and Tab selection at **1000×720 / 1280×720 / 1568×921**, including nonoverlapping same-rarity controls, wrapped effect/flavor bounds, Escape/resume, and unchanged inactive match state while browsing. Representative captures were inspected. A one-pixel overlap from independently rounding adjacent icon bounds was fixed by giving each exhibit a four-art-pixel gap. Logs and captures: `.verify-logs/items-guide/`. This is guide/UI verification, not active item effects or acquisition.
+
+The item-catalog integration passed **82/82** isolated headless checks, including content-catalog consumers and navigation. Logs: `.verify-logs/20261026T155331Z-headless-002d2d07/`. The final spacing adjustment was exercised by the rendered walkthrough above; the full rendered suite was not run.
+
+### Commander and Itemiery integration
+
+The integration of `feat/commanders` (`f70b442`) and `Items-round-variability` (`2cd6401`) into `main`, including `origin/main` at `df05c66`, merged without textual conflicts. The isolated `python3 tools/verify.py headless` run passed **85/85 checks**, including clean imports, save isolation, actual main-scene headless startup, commander draft/terrain/abilities, Itemiery navigation, and separate localhost host/client scenarios. Logs: `.verify-logs/20261026T202553Z-headless-12ff29ea/`. No rendered or desktop-window verification was run, as requested; this provides no new pixel, physical-input, audio, or separate-network evidence.
+
 ### Single-command verification
 
 Install **Python 3.10 or newer** for development verification; its standard library is sufficient. Python is not a game/runtime dependency. The runner supports macOS and Linux and requires the exact official standard-engine build `4.7.2.stable.official.ed1daf0bf`; `godot --version` reports that string. A different release or custom build fails the version gate rather than silently changing test behavior.

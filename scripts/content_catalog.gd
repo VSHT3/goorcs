@@ -4,6 +4,7 @@ extends Resource
 
 @export var towers: Array[TowerDefinition] = []
 @export var enemies: Array[EnemyDefinition] = []
+@export var items: Array[ItemDefinition] = []
 # Empty preserves collection-only/custom catalogs with no guaranteed starter.
 @export var starter_tower_id: StringName = &""
 
@@ -18,6 +19,18 @@ func tower_rewards() -> Array[TowerReward]:
 
 func validation_errors() -> PackedStringArray:
 	var errors := PackedStringArray()
+	var item_ids: Dictionary[StringName, bool] = {}
+	for item: ItemDefinition in items:
+		if item == null:
+			errors.append("Item catalog contains a missing definition.")
+			continue
+		if item.id == &"" or item_ids.has(item.id):
+			errors.append("Item catalog contains an empty or duplicate ID '%s'." % item.id)
+		item_ids[item.id] = true
+		if item.title.is_empty() or item.effect_text.is_empty() or item.icon_texture == null:
+			errors.append("Item '%s' requires a title, effect description, and icon." % item.id)
+		if item.rarity < ItemRarity.Tier.COMMON or item.rarity > ItemRarity.Tier.ORCFECCION:
+			errors.append("Item '%s' has an unknown rarity." % item.id)
 	var tower_ids: Dictionary[StringName, bool] = {}
 	for tower: TowerDefinition in towers:
 		if tower == null or tower.reward == null:

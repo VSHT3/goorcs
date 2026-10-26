@@ -1,12 +1,18 @@
-# Tower and enemy content pipeline
+# Tower, enemy, and item content pipeline
 
 ## One registration owner
 
-`resources/content_catalog.tres` is the explicit, typed `ContentCatalog` registration resource. Its `towers` and `enemies` arrays are the only shipped content lists. Array order is presentation order. `CombatRules.catalog` references it; custom rules may reference another catalog.
+`resources/content_catalog.tres` is the explicit, typed `ContentCatalog` registration resource. Its `towers`, `enemies`, and `items` arrays are the only shipped content lists. Array order is presentation order. `CombatRules.catalog` references it; custom rules may reference another catalog.
 
 A tower entry is a `TowerDefinition` that references its `TowerReward` identity/art resource. Collection rewards are derived from those entries, not registered separately. The match palette and both `PathBoard` renderers use the rules' catalog. Enemy send choices and inspection stats come from the accepted host snapshot; artwork comes from the same local catalog. Both peers must ship matching IDs and art. Resources are local project assets, not downloaded or sent by the host.
 
 Host commands validate admitted loadouts, ownership, funds, phase, and stable IDs. `MatchCombat` captures scalar stats and deep-copies nested behavior/evolution/upgrade/roll configuration on admission, then publishes detached snapshots; editing a source resource or a received snapshot cannot retune an admitted match. Collection saves retain their existing version and stable tower IDs. Arrow is the guaranteed starter: atomic migration preserves existing unlocks, and collection reset restores the starter. Never rename or remove a saved ID without an explicit save migration. Guest collection ownership is a local-save claim in this trusted-friends game, not remote account/save attestation; the host validates and freezes the admitted deck and enforces it on every purchase.
+
+## Add a guide item
+
+Create an `ItemDefinition` resource under `resources/items/` with a stable `id`, `title`, `ItemRarity.Tier`, `effect_text`, optional `flavor_text`, and `icon_texture`. Register it once in `ContentCatalog.items`. The Itemiery uses the current rules' catalog, places entries in their rarity alcoves, and renders selection text at native UI resolution. Missing/duplicate IDs, missing titles/effect text/icons, or unknown rarities fail catalog validation. Empty item lists preserve injected/custom catalogs.
+
+The eight initial icons are original 32×32 hard-alpha artwork reproduced by `python3 tools/author_items.py` (Pillow, offline only). Their resources own descriptions, not active mechanics. No item acquisition, run modifiers, element assignment, or reward rolls exist; adding an effect description never changes a match. Orcish Lunch Tin is **Uncommon**, including its leak-free-clear formula/streak-reset description. Ominous Bells of Doom is **Orcfeccion**, describing ten-round increments and both players taking ×1.1 damage initially, increasing by 0.1 per ten-round step to a ×10 cap. Runtime implementation still requires explicit acquisition and authoritative rules.
 
 ## Add a tower using an existing role
 

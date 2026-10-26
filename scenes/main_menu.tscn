@@ -74,20 +74,31 @@ custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 mouse_default_cursor_shape = 2
 focus_neighbor_top = NodePath("../Orcieary")
-focus_neighbor_bottom = NodePath("../Collection")
-focus_next = NodePath("../Collection")
+focus_neighbor_bottom = NodePath("../Itemiery")
+focus_next = NodePath("../Itemiery")
 focus_previous = NodePath("../Orcieary")
 text = "Towerieary"
+script = ExtResource("2_button")
+
+[node name="Itemiery" type="Button" parent="Center/Panel"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+mouse_default_cursor_shape = 2
+focus_neighbor_top = NodePath("../Towerieary")
+focus_neighbor_bottom = NodePath("../Collection")
+focus_next = NodePath("../Collection")
+focus_previous = NodePath("../Towerieary")
+text = "Itemiery"
 script = ExtResource("2_button")
 
 [node name="Collection" type="Button" parent="Center/Panel"]
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 mouse_default_cursor_shape = 2
-focus_neighbor_top = NodePath("../Towerieary")
+focus_neighbor_top = NodePath("../Itemiery")
 focus_neighbor_bottom = NodePath("../Quit")
 focus_next = NodePath("../Quit")
-focus_previous = NodePath("../Towerieary")
+focus_previous = NodePath("../Itemiery")
 text = "Collection"
 script = ExtResource("2_button")
 

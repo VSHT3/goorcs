@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/ominous_bells_of_doom.png" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = &"ominous_bells_of_doom"
+title = "Ominous Bells of Doom"
+rarity = 6
+effect_text = "Rounds advance by 10. Both players take ×1.1 damage, increasing by 0.1 every 10 rounds up to ×10."
+flavor_text = "do you hear them? the bells"
+icon_texture = ExtResource("2")
