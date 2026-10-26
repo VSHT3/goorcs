@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/philosophorers_stoner.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/philosophorers_stoner_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"philosophorers_stoner"
+title = "Philosophorers Stoner"
+rarity = 6
+effect_text = "Every 5th shared counter event grants 1 Shard and starts a 4-second Gold Rush with 5× kill bounties. Excess crystal healing becomes Coins."
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Replaces the earlier stones. Actual enemy kills on your board and Gold Mine-family production payout events advance one shared alchemy counter by 1 each.", "Every 5th counter event grants 1 Shard and starts a Gold Rush lasting 4 simulation seconds. Retriggering refreshes the remaining duration to 4 seconds rather than adding durations.", "Every actual enemy kill on your board during Gold Rush pays 5× its normal Coin bounty, including a kill that starts the rush. Golden enemies are visibly marked. The bounty multiplier never stacks to 25×; a normal bounty of 0 remains 0.", "Each Gold Mine-family payout advances the counter once, regardless of payout amount. Production itself is not a kill or bounty and is not multiplied by Gold Rush.", "Healing beyond full crystal HP converts the excess to Coins at a 1:1 rate.")

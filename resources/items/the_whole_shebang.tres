@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/the_whole_shebang.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/the_whole_shebang_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"the_whole_shebang"
+title = "The Whole Shebang"
+rarity = 5
+effect_text = "Complete every terminal upgrade branch in your loadout, then grow each registered tower's attack rate by 1 percentage point per survived wave, up to +85%."
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Keep a historical completion checklist of every reachable terminal upgrade branch in the equipped loadout. The first tower to reach each end node registers that branch's one tower slot.", "Activate only after every reachable end node has been completed at least once. Only each slot's registered tower receives the bonus; duplicate maxed towers do not receive additional slots.", "After activation, each occupied slot gains +1 percentage point of attack rate per actual cleared wave that its registered tower survives, up to +85% attack rate.", "There is no retroactive growth before activation. Skipping displayed round numbers does not grant extra stacks.", "Selling a registered tower never resets historical completion or its slot's accrued bonus. An empty slot pauses growth.", "The next tower to reach that same terminal branch inherits the slot's accrued attack-rate bonus and resumes growth.", "Upgrade to The Whole She BangBang for a base price of 10,000 Coins. The only change is a +115% cap: no counter reset and no other stat changes.")
+upgrade_to = &"the_whole_shebang_orcfeccion"
+upgrade_cost = 10000
+acquisition_text = "The Whole She BangBang can only be obtained by upgrading this item for a base price of 10,000 Coins; it is never a random drop or a Monkey’s Paw reward."

@@ -19,18 +19,34 @@ func tower_rewards() -> Array[TowerReward]:
 
 func validation_errors() -> PackedStringArray:
 	var errors := PackedStringArray()
-	var item_ids: Dictionary[StringName, bool] = {}
+	var item_ids: Dictionary[StringName, ItemDefinition] = {}
 	for item: ItemDefinition in items:
 		if item == null:
 			errors.append("Item catalog contains a missing definition.")
 			continue
 		if item.id == &"" or item_ids.has(item.id):
 			errors.append("Item catalog contains an empty or duplicate ID '%s'." % item.id)
-		item_ids[item.id] = true
-		if item.title.is_empty() or item.effect_text.is_empty() or item.icon_texture == null:
-			errors.append("Item '%s' requires a title, effect description, and icon." % item.id)
+		item_ids[item.id] = item
+		if item.title.is_empty() or item.effect_text.is_empty() or item.icon_texture == null or item.detail_texture == null or item.mechanics.is_empty():
+			errors.append("Item '%s' requires a title, effect description, icon, detail portrait, and mechanics." % item.id)
+		for mechanic: String in item.mechanics:
+			if mechanic.strip_edges().is_empty():
+				errors.append("Item '%s' contains an empty mechanic." % item.id)
+		if item.upgrade_cost < 0 or ((item.upgrade_to == &"") != (item.upgrade_cost == 0)):
+			errors.append("Item '%s' requires an upgrade target and positive Coin cost together, or empty/zero defaults." % item.id)
 		if item.rarity < ItemRarity.Tier.COMMON or item.rarity > ItemRarity.Tier.ORCFECCION:
 			errors.append("Item '%s' has an unknown rarity." % item.id)
+	for item: ItemDefinition in items:
+		if item == null or item.upgrade_to == &"":
+			continue
+		if not item_ids.has(item.upgrade_to):
+			errors.append("Item '%s' requires a registered upgrade target '%s'." % [item.id, item.upgrade_to])
+			continue
+		var target: ItemDefinition = item_ids[item.upgrade_to]
+		if target == item or target.rarity <= item.rarity:
+			errors.append("Item '%s' must upgrade to a different item with a higher rarity." % item.id)
+		if target.acquisition_text.strip_edges().is_empty():
+			errors.append("Item '%s' upgrade target '%s' requires acquisition instructions." % [item.id, item.upgrade_to])
 	var tower_ids: Dictionary[StringName, bool] = {}
 	for tower: TowerDefinition in towers:
 		if tower == null or tower.reward == null:

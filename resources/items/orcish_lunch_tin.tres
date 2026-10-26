@@ -1,12 +1,15 @@
-[gd_resource type="Resource" script_class="ItemDefinition" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/items/orcish_lunch_tin.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/orcish_lunch_tin_detail.png" id="3"]
 
 [resource]
 script = ExtResource("1")
 id = &"orcish_lunch_tin"
 title = "Orcish Lunch Tin"
 rarity = 1
-effect_text = "Clear a wave without leaks: +10 + wave ÷ 5 Coins, plus +1 per 2 consecutive leak-free clears. A leak resets the streak."
+effect_text = "Each leak-free clear pays floor(10 + displayed round / 5) + floor(consecutive leak-free clears / 2) Coins. Count this clear before paying; any leak resets the streak."
 icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Each leak-free wave clear pays floor(10 + displayed round / 5) + floor(current consecutive leak-free clears / 2) Coins.", "The current clean wave increments the consecutive leak-free streak before calculating its reward.", "Any leak resets the streak to 0. A wave with a leak pays no Lunch Tin bonus.")

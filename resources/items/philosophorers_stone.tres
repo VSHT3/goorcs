@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/philosophorers_stone.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/philosophorers_stone_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"philosophorers_stone"
+title = "Philosophorers Stone"
+rarity = 5
+effect_text = "Every 10th shared counter event grants 1 Shard; a triggering kill pays 5× its normal Coin bounty. Kills and Gold Mine payouts advance the counter."
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Replaces Philosophers Stone. Keep one shared alchemy counter rather than stacking separate stone counters.", "Each actual enemy kill on your board advances the counter by 1. Every 10th counter event triggers alchemy and grants 1 Shard.", "An actual kill that triggers alchemy pays 5× its normal Coin bounty and is marked golden. A normal bounty of 0 remains 0.", "Each Gold Mine-family production payout event also advances that same counter by 1, regardless of the payout amount. Production is not an enemy kill or a Coin bounty.")
