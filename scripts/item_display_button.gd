@@ -15,7 +15,10 @@ func _ready() -> void:
 	empty.set_content_margin_all(3)
 	for state: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 		add_theme_stylebox_override(state, empty)
-	mouse_entered.connect(queue_redraw)
+	mouse_entered.connect(func() -> void:
+		if not disabled and focus_mode != Control.FOCUS_NONE:
+			grab_focus()
+		queue_redraw())
 	mouse_exited.connect(queue_redraw)
 	focus_entered.connect(queue_redraw)
 	focus_exited.connect(queue_redraw)

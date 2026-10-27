@@ -15,10 +15,18 @@ var menu_audio: RecordingAudio
 func _initialize() -> void:
 	_run.call_deferred()
 
-func _check(condition: bool, description: String) -> void:
-	if not condition:
-		push_error(description)
-		failures += 1
+func _check(condition: bool, description: String) -> bool:
+	if condition:
+		return true
+	var focus: Control = root.gui_get_focus_owner()
+	var context: String = "width=%d focus=%s" % [root.size.x, str(focus.get_path()) if is_instance_valid(focus) else "<none>"]
+	if is_instance_valid(main) and is_instance_valid(main.itemiery_screen):
+		var guide: ItemieryScreen = main.itemiery_screen
+		var item: ItemDefinition = guide.inspection.shown_item
+		context += " item=%s room=%d transitioning=%s modal_visible=%s" % [String(item.id) if item != null else "<none>", guide.current_rarity, guide.transitioning, guide.inspection.is_visible_in_tree()]
+	push_error("%s\nNavigation trace: %s" % [description, context])
+	failures += 1
+	return false
 
 func _run() -> void:
 	root.gui_embed_subwindows = true
@@ -89,28 +97,99 @@ func _run() -> void:
 	_check(main.menu.visible, "Orcieary Escape returns to menu")
 	_check(menu_audio.actions == 10, "Sandbox Back/Escape, menu resume and Orcieary entry/return each cue once")
 	await _check_towerieary(sandbox)
-	await _key(KEY_I)
-	var itemiery: ItemieryScreen = main.itemiery_screen
-	_check(itemiery.visible and not main.menu.visible and not sandbox.visible, "I opens Itemiery without exposing the previous activity")
-	_check(itemiery._lights.is_processing(), "Visible Itemiery animates its highest rarity")
-	await _key(KEY_ESCAPE)
-	_check(main.menu.visible and root.gui_get_focus_owner() == main.itemiery_button, "Itemiery Escape restores its menu focus")
-	_check(not itemiery._lights.is_processing() and itemiery._viewport.render_target_update_mode == SubViewport.UPDATE_DISABLED, "Hidden Itemiery stops both animation and viewport rendering")
-	await _key(KEY_ESCAPE)
-	_check(itemiery.visible and root.gui_get_focus_owner() == itemiery.back_button, "Menu Escape resumes Itemiery with an accessible close control")
-	await _click(itemiery.back_button.get_global_rect().get_center())
-	_check(main.menu.visible and not itemiery.visible, "Itemiery X returns to the main menu")
+	if failures > 0 or not await _check_itemiery(sandbox):
+		await _finish()
+		return
 	await _key(KEY_S)
 	_check(sandbox.layout.route == route and sandbox.layout.is_ready(), "Sandbox state survives visits to other menus")
 	await _check_match_music()
-	main.queue_free()
-	await create_timer(0.2).timeout
-	for file: String in DirAccess.get_files_at(directory):
-		DirAccess.remove_absolute(directory.path_join(file))
-	DirAccess.remove_absolute(directory)
-	if failures == 0:
-		print("PASS: native menu focus/navigation, connection teardown, sandbox edits/resume, both guides, read-only Towerieary tree pointer/arrows and direct Escape, and match music lifecycle")
-	quit(1 if failures else 0)
+	await _finish()
+
+func _check_itemiery(sandbox: SandboxScreen) -> bool:
+	var route: Array = sandbox.layout.route.duplicate()
+	await _key(KEY_I)
+	var guide: ItemieryScreen = main.itemiery_screen
+	if not _check(guide != null and guide.visible and not main.menu.visible and not sandbox.visible, "I opens Itemiery without exposing the previous activity"):
+		return false
+	if not _check(guide.current_rarity == -1 and not guide.transitioning and not guide.inspection.visible, "Itemiery starts in the closed-door hall"):
+		return false
+	if not _check(guide._lights.is_processing(), "Visible hall effects are active"):
+		return false
+	var tier: int = ItemRarity.Tier.LEGENDARY
+	var door: Button = guide.door_buttons[tier]
+	if not await _click_itemiery(door):
+		return false
+	if not _check(guide.transitioning and guide.current_rarity == -1, "Native door input starts entry, not immediate shelf inspection"):
+		return false
+	await _key(KEY_ESCAPE)
+	if not _check(guide.visible and not main.menu.visible and not guide.transitioning and guide.current_rarity == -1, "Escape during entry cancels to the hall rather than leaving the guide"):
+		return false
+	if not _check(root.gui_get_focus_owner() == door, "Cancelled entry restores its native door focus"):
+		return false
+	await _key(KEY_ENTER)
+	if not await _wait_itemiery_entry(guide):
+		return false
+	if not _check(guide.current_rarity == tier and not guide.inspection.visible, "Focused Enter reaches the actual rarity shelf room"):
+		return false
+	await _key(KEY_ESCAPE)
+	if not _check(guide.visible and guide.current_rarity == -1 and root.gui_get_focus_owner() == door, "Room Escape returns to its focused hall door"):
+		return false
+	await _key(KEY_SPACE)
+	if not await _wait_itemiery_entry(guide) or not await _click_itemiery(guide.back_button):
+		return false
+	if not _check(guide.visible and guide.current_rarity == -1 and root.gui_get_focus_owner() == door, "Room X has the same hall/focus boundary"):
+		return false
+	await _key(KEY_ESCAPE)
+	if not _check(main.menu.visible and root.gui_get_focus_owner() == main.itemiery_button, "Hall Escape restores Itemiery's menu focus"):
+		return false
+	if not _check(not guide._lights.is_processing() and guide._viewport.render_target_update_mode == SubViewport.UPDATE_DISABLED, "Hidden Itemiery stops effects and viewport rendering"):
+		return false
+	await _key(KEY_ESCAPE)
+	if not _check(guide.visible and guide.current_rarity == -1 and not guide.transitioning and not guide.inspection.visible, "Menu Escape resumes the existing guide at a reset hall"):
+		return false
+	var focus: Control = root.gui_get_focus_owner()
+	if not _check(focus != null and (guide.door_buttons.has(focus) or focus == guide.back_button), "Resumed hall owns an accessible native focus target"):
+		return false
+	if not await _click_itemiery(guide.back_button):
+		return false
+	if not _check(main.menu.visible and not guide.visible, "Hall X returns to the main menu"):
+		return false
+	return _check(sandbox.layout.route == route and sandbox.controller.paused, "Rarity-room navigation preserves the paused Sandbox route")
+
+
+func _wait_itemiery_entry(guide: ItemieryScreen) -> bool:
+	var deadline: int = Time.get_ticks_msec() + 3000
+	while guide.transitioning and Time.get_ticks_msec() < deadline:
+		await process_frame
+	return _check(not guide.transitioning, "Itemiery entry completes within its bounded timeout")
+
+
+func _click_itemiery(control: Button) -> bool:
+	var deadline: int = Time.get_ticks_msec() + 3000
+	var previous := Rect2()
+	while Time.get_ticks_msec() < deadline:
+		await process_frame
+		if DisplayServer.get_name() != "headless":
+			RenderingServer.force_draw.call_deferred(false)
+			await RenderingServer.frame_post_draw
+		if not _check(is_instance_valid(control), "Itemiery pointer target survives presentation"):
+			return false
+		var bounds: Rect2 = control.get_global_rect()
+		if not control.is_visible_in_tree() or control.disabled or not bounds.has_area() or not root.get_visible_rect().encloses(bounds):
+			previous = Rect2()
+			continue
+		if bounds != previous:
+			previous = bounds
+			continue
+		var point: Vector2 = bounds.get_center()
+		await _motion(point)
+		if not _check(control.is_visible_in_tree() and not control.disabled and control.get_global_rect() == bounds, "Itemiery pointer target retains its presented bounds through hover"):
+			return false
+		await _button(point, true)
+		await _button(point, false)
+		return true
+	return _check(false, "Itemiery pointer target reaches stable presented geometry")
+
 
 func _check_match_music() -> void:
 	var music: AudioStreamPlayer = main.get_node("MatchMusic")
@@ -341,3 +420,17 @@ func _key(code: Key, shift: bool = false) -> void:
 		event.pressed = pressed
 		Input.parse_input_event(event)
 		await process_frame
+
+func _finish() -> void:
+	# Match the game's quit boundary: finish the final clack before driver teardown.
+	var tail: float = MenuAudio.CLACK.get_length() + AudioServer.get_output_latency() + AudioServer.get_time_to_next_mix()
+	await create_timer(tail, true, false, true).timeout
+	main.queue_free()
+	await process_frame
+	await process_frame
+	for file: String in DirAccess.get_files_at(directory):
+		DirAccess.remove_absolute(directory.path_join(file))
+	DirAccess.remove_absolute(directory)
+	if failures == 0:
+		print("PASS: native menu focus/navigation, connection teardown, sandbox edits/resume, read-only guides including Itemiery door/room cancellation and focus, Towerieary tree input, and match music lifecycle")
+	quit(1 if failures else 0)

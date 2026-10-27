@@ -13,4 +13,4 @@ effect_text = "Enemies summoned on opponents side are 15% faster."
 flavor_text = "CHARGE ORCS"
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
-mechanics = PackedStringArray("Enemies summoned on the opposing side have their movement speed multiplied by 1.15 (15% faster).")
+mechanics = PackedStringArray("Opposing side's summoned enemy speed ×1.15.")

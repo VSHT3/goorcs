@@ -9,7 +9,7 @@ script = ExtResource("1")
 id = &"orcish_lunch_tin"
 title = "Orcish Lunch Tin"
 rarity = 1
-effect_text = "Each leak-free clear pays floor(10 + displayed round / 5) + floor(consecutive leak-free clears / 2) Coins. Count this clear before paying; any leak resets the streak."
+effect_text = "Leak-free clears earn Coins; longer clean streaks pay more."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
-mechanics = PackedStringArray("Each leak-free wave clear pays floor(10 + displayed round / 5) + floor(current consecutive leak-free clears / 2) Coins.", "The current clean wave increments the consecutive leak-free streak before calculating its reward.", "Any leak resets the streak to 0. A wave with a leak pays no Lunch Tin bonus.")
+mechanics = PackedStringArray("Coins = floor(10 + displayed round / 5) + floor(clean streak / 2).", "Streak includes this clear; any leak resets it to 0 and pays no bonus.")

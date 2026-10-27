@@ -13,4 +13,4 @@ effect_text = "Your towers attack 10% slower but deal 35% more damage."
 flavor_text = "SHOGUN yokosoo sushi anime."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
-mechanics = PackedStringArray("Your towers deal 35% more damage: damage is multiplied by 1.35.", "Your towers attack 10% slower: attack rate is multiplied by 0.90, so attack interval is divided by 0.90.")
+mechanics = PackedStringArray("Tower damage ×1.35; attack rate ×0.90 (attack interval ÷0.90).")

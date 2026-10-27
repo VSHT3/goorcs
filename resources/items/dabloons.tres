@@ -13,4 +13,4 @@ effect_text = "EVERYTHING for you is 10% cheaper."
 flavor_text = "Go a long way"
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
-mechanics = PackedStringArray("Every Coin and Shard purchase price is multiplied by 0.90 (10% cheaper).", "Round each discounted price up to the next whole unit of its currency.")
+mechanics = PackedStringArray("Every Coin or Shard purchase price = ceil(base price × 0.90).")
