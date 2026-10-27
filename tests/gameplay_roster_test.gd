@@ -6,6 +6,7 @@ func _init() -> void:
 	_fixture_isolation()
 	_transactions_and_capture()
 	_mirrored_rolls()
+	_batch_rolls()
 	_chain()
 	_support()
 	_support_damage_rounding()
@@ -209,6 +210,84 @@ func _mirrored_rolls() -> void:
 	var before: Dictionary = model.snapshot()
 	var state: int = solo_rng.state
 	check(not model.reroll_tower_mirrored(0, model.towers[0][0]["id"], "attributes") and model.snapshot() == before and solo_rng.state == state, "Unaffordable mirror counterpart rejects whole transaction before rolling")
+
+func _batch_rolls() -> void:
+	var rules := fixture()
+	rules.catalog.towers = [tower_definition(rules, &"arrow_tower")]
+	rules.roll_rules = rolls({"damage": Vector2(0.1, 0.9)})
+	for tier: Dictionary in rules.roll_rules.rarities:
+		tier["weight"] = 1.0
+	var random := rng(209)
+	var model := MatchCombat.new(rules, null, null, null, random)
+	var tower: Dictionary = build(model, &"arrow_tower")
+	var id: int = tower["id"]
+	tower["rarity"] = "mythic"
+	tower["attribute_rerolls"] = 4
+	model._refresh_board(0)
+	var ten_cost: int = 0
+	for index: int in range(10):
+		ten_cost += rules.roll_rules.rarity_reroll_cost(index)
+	model.reroll_currency[0] = ten_cost - 1
+	var before: Dictionary = model.snapshot()
+	var random_state: int = random.state
+	check(not model.reroll_tower(0, id, "rarity", 10) and before == model.snapshot() and random_state == random.state, "Ten requires its full cumulative price and rejects before RNG or mutation")
+	for invalid: Variant in [-1, 2, 11, 1.0, 10.5, "10", true, null]:
+		check(not model.reroll_tower(0, id, "rarity", invalid), "Malformed batch is rejected")
+	check(not model.reroll_tower(0, id, "attributes", 10) and not model.reroll_tower(0, id, "attributes", 0) and before == model.snapshot() and random_state == random.state, "Malformed and attribute batches preserve every counter, balance and RNG")
+	model.reroll_currency[0] = ten_cost
+	var quote: Dictionary = model.snapshot()["towers"][0][0]["rarity_batch_quotes"]["10"]
+	check(quote["count"] == 10 and quote["cost"] == ten_cost and quote["affordable"], "Snapshot quotes refresh immediately after direct currency change")
+	var expected_rng := rng(0)
+	expected_rng.state = random.state
+	var expected: Array[Dictionary] = []
+	var winner: int = 0
+	for index: int in range(10):
+		var draw: Dictionary = rules.roll_rules.generate_admitted(expected_rng, PackedStringArray(["damage"]), "mythic")
+		expected.append({"rarity": draw["rarity"], "attributes": draw["attributes"]})
+		if TowerRollRules.RARITIES.find(draw["rarity"]) > TowerRollRules.RARITIES.find(expected[winner]["rarity"]):
+			winner = index
+	# Mutating source rules cannot alter the admitted quote or candidate stream.
+	rules.roll_rules.rarity_reroll_cost_curve = Vector3(999, 999, 999)
+	rules.roll_rules.rarities.clear()
+	check(model.reroll_tower(0, id, "rarity", 10), "Exact-funds ten batch is accepted with captured rules")
+	check(tower["rarity_batch_results"] == expected and tower["rarity_batch_winner"] == winner and random.state == expected_rng.state, "All ten candidates exclude the original tier and first highest-tier tie wins")
+	check(tower["rarity"] == expected[winner]["rarity"] and tower["attributes"] == expected[winner]["attributes"] and tower["rarity"] != "mythic", "Winner carries its own attributes and original tower is not a fallback candidate")
+	check(tower["rarity_rerolls"] == 10 and tower["attribute_rerolls"] == 0 and model.reroll_currency[0] == 0, "Batch charges summed curve and advances rarity counter by every draw")
+	quote = model.snapshot()["towers"][0][0]["rarity_batch_quotes"]["max"]
+	check(quote["count"] == 0 and not quote["affordable"], "Zero-affordable Max is disabled")
+	before = model.snapshot()
+	random_state = random.state
+	check(not model.reroll_tower(0, id, "rarity", 0) and before == model.snapshot() and random.state == random_state, "Zero-affordable Max consumes no RNG")
+	var max_cost: int = 0
+	for index: int in range(10, 35):
+		max_cost += model._roll_rules.rarity_reroll_cost(index)
+	model.reroll_currency[0] = max_cost
+	quote = model.snapshot(false)["towers"][0][0]["rarity_batch_quotes"]["max"]
+	check(quote["count"] == 25 and quote["cost"] == max_cost, "Metadata-free snapshots refresh uncapped Max affordability")
+	check(model.reroll_tower(0, id, "rarity", 0) and tower["rarity_batch_results"].size() == 25 and tower["rarity_rerolls"] == 35 and model.reroll_currency[0] == 0, "Max accepts every affordable draw, including more than ten")
+	var copy: Dictionary = model.snapshot()
+	copy["towers"][0][0]["rarity_batch_results"].clear()
+	check(tower["rarity_batch_results"].size() == 25, "Published candidate arrays are detached from authoritative state")
+
+	var mirror_rules := fixture()
+	mirror_rules.catalog.towers = [tower_definition(mirror_rules, &"arrow_tower")]
+	mirror_rules.roll_rules = rolls({"damage": Vector2(0.1, 0.9)})
+	var mirror_rng := rng(311)
+	var control_rng := rng(311)
+	var mirror := MatchCombat.new(mirror_rules, null, null, null, mirror_rng)
+	var control := MatchCombat.new(mirror_rules, null, null, null, control_rng)
+	check(mirror.build_mirrored(0, Vector2i(0, 1), &"arrow_tower", 0), "Batch mirror fixture places both towers")
+	control.build(0, Vector2i(0, 1), &"arrow_tower", 0)
+	var mirror_id: int = mirror.towers[0][0]["id"]
+	mirror.reroll_currency = [10000, 23]
+	control.reroll_currency[0] = 23
+	quote = mirror.snapshot(true, true)["towers"][0][0]["rarity_batch_quotes"]["max"]
+	check(quote["count"] == 3 and quote["cost"] == 23, "Mirrored Max quote uses the poorer counterpart")
+	before = mirror.snapshot()
+	random_state = mirror_rng.state
+	check(not mirror.reroll_tower_mirrored(0, mirror_id, "rarity", 10) and before == mirror.snapshot() and random_state == mirror_rng.state, "Unaffordable mirrored ten rejects both charges and every draw")
+	check(mirror.reroll_tower_mirrored(0, mirror_id, "rarity", 0) and control.reroll_tower(0, control.towers[0][0]["id"], "rarity", 0), "Mirrored and ordinary Max accept the same affordable three candidates")
+	check(mirror_rng.state == control_rng.state and mirror.towers[0][0]["rarity_batch_results"] == control.towers[0][0]["rarity_batch_results"] and mirror.towers[0][0]["rarity_batch_results"] == mirror.towers[1][0]["rarity_batch_results"] and mirror.reroll_currency == [9977, 0], "Mirror rolls once, copies candidates/winner and charges both prevalidated balances")
 
 func _chain() -> void:
 	var rules := fixture()
@@ -677,6 +756,9 @@ func _sandbox() -> void:
 	upgrade(model, tower, ["damage", "speed", "bounty_board", "income_aura"])
 	check(model.reroll_tower(0, tower["id"], "attributes") and model.reroll_tower(0, tower["id"], "rarity") and model.coins[0] == 0 and model.reroll_currency[0] == 0 and tower["invested"] == 0, "Sandbox permits every role upgrade/reroll without spending or investment")
 	check(is_equal_approx(tower["behavior_config"]["kill_income_bonus"], 0.6825), "Economy roll and both paid role modifiers survive Bounty and income-aura evolution")
+	var quote: Dictionary = model.snapshot()["towers"][0][0]["rarity_batch_quotes"]["max"]
+	check(quote["count"] == 10 and quote["cost"] == 0 and quote["affordable"], "Free Sandbox Max has a finite ten-result quote")
+	check(model.reroll_tower(0, tower["id"], "rarity", 0) and tower["rarity_batch_results"].size() == 10 and tower["rarity_rerolls"] == 11 and model.reroll_currency[0] == 0, "Sandbox Max rolls ten candidates without currency")
 	rules.roll_rules = null
 	model = MatchCombat.new(rules)
 	tower = build(model, &"gold_mine")

@@ -499,64 +499,101 @@ func _find_tower(slot: int, tower_id: int) -> Dictionary:
 	return {}
 
 
-func _can_reroll(slot: int, tower_id: int, kind: String) -> bool:
-	if phase == Phase.FINISHED or not _valid_slot(slot) or _roll_rules == null or kind not in ["rarity", "attributes"]:
-		return false
-	var tower: Dictionary = _find_tower(slot, tower_id)
-	if tower.is_empty():
-		return false
-	var cost: int = tower["rarity_reroll_cost" if kind == "rarity" else "attribute_reroll_cost"]
-	return cost >= 0 and (_sandbox_mode or (reroll_currency[slot] if kind == "rarity" else coins[slot]) >= cost)
-
-
-func reroll_tower(slot: int, tower_id: int, kind: String) -> bool:
-	if not _can_reroll(slot, tower_id, kind):
-		return false
-	var tower: Dictionary = _find_tower(slot, tower_id)
-	_apply_reroll(slot, tower, kind, _reroll_result(tower, kind))
-	return true
-
-
-func reroll_tower_mirrored(slot: int, tower_id: int, kind: String) -> bool:
-	if not _can_reroll(slot, tower_id, kind):
-		return false
-	var tower: Dictionary = _find_tower(slot, tower_id)
-	var counterpart: Dictionary = {}
+func _mirror_tower(slot: int, tower: Dictionary) -> Dictionary:
 	for other: Dictionary in towers[1 - slot]:
 		if other["cell"] == tower["cell"] and other["type_id"] == tower["type_id"]:
-			counterpart = other
-			break
-	if counterpart.is_empty() or not _can_reroll(1 - slot, counterpart["id"], kind) or counterpart["rarity"] != tower["rarity"]:
+			return other
+	return {}
+
+
+func _rarity_batch_quote(slot: int, tower: Dictionary, requested: int, mirrored: bool = false) -> Dictionary:
+	if _roll_rules == null:
+		return {"count": 0, "cost": -1, "affordable": false}
+	var quote: Dictionary = _roll_rules.rarity_batch_quote(tower["rarity_rerolls"], requested, reroll_currency[slot], _sandbox_mode)
+	if not mirrored:
+		return quote
+	var counterpart: Dictionary = _mirror_tower(slot, tower)
+	if counterpart.is_empty() or counterpart["rarity"] != tower["rarity"]:
+		quote["affordable"] = false
+		return quote
+	var other: Dictionary = _roll_rules.rarity_batch_quote(counterpart["rarity_rerolls"], requested, reroll_currency[1 - slot], _sandbox_mode)
+	if requested == 0:
+		var count: int = mini(quote["count"], other["count"])
+		if count == 0:
+			return {"count": 0, "cost": 0, "affordable": false}
+		quote = _roll_rules.rarity_batch_quote(tower["rarity_rerolls"], count, reroll_currency[slot], _sandbox_mode)
+		other = _roll_rules.rarity_batch_quote(counterpart["rarity_rerolls"], count, reroll_currency[1 - slot], _sandbox_mode)
+	quote["affordable"] = quote["affordable"] and other["affordable"]
+	return quote
+
+
+func _reroll_quote(slot: int, tower_id: int, kind: String, requested: Variant, mirrored: bool) -> Dictionary:
+	if phase == Phase.FINISHED or not _valid_slot(slot) or _roll_rules == null or kind not in ["rarity", "attributes"] or not TowerRollRules.valid_reroll_batch(kind, requested):
+		return {}
+	var tower: Dictionary = _find_tower(slot, tower_id)
+	if tower.is_empty():
+		return {}
+	if kind == "rarity":
+		return _rarity_batch_quote(slot, tower, requested, mirrored)
+	var cost: int = tower["attribute_reroll_cost"]
+	var affordable: bool = cost >= 0 and (_sandbox_mode or coins[slot] >= cost)
+	if mirrored:
+		var counterpart: Dictionary = _mirror_tower(slot, tower)
+		if counterpart.is_empty() or counterpart["rarity"] != tower["rarity"]:
+			return {}
+		var other_cost: int = counterpart["attribute_reroll_cost"]
+		affordable = affordable and other_cost >= 0 and (_sandbox_mode or coins[1 - slot] >= other_cost)
+	return {"count": 1, "cost": cost, "affordable": affordable}
+
+
+func reroll_tower(slot: int, tower_id: int, kind: String, requested: Variant = 1) -> bool:
+	return _reroll_tower(slot, tower_id, kind, requested, false)
+
+
+func reroll_tower_mirrored(slot: int, tower_id: int, kind: String, requested: Variant = 1) -> bool:
+	return _reroll_tower(slot, tower_id, kind, requested, true)
+
+
+func _reroll_tower(slot: int, tower_id: int, kind: String, requested: Variant, mirrored: bool) -> bool:
+	var quote: Dictionary = _reroll_quote(slot, tower_id, kind, requested, mirrored)
+	if not quote.get("affordable", false):
 		return false
-	var rolled: Dictionary = _reroll_result(tower, kind)
-	_apply_reroll(slot, tower, kind, rolled)
-	_apply_reroll(1 - slot, counterpart, kind, rolled)
+	var tower: Dictionary = _find_tower(slot, tower_id)
+	var counterpart: Dictionary = _mirror_tower(slot, tower) if mirrored else {}
+	var other_cost: int = 0
+	if mirrored:
+		other_cost = int(_roll_rules.rarity_batch_quote(counterpart["rarity_rerolls"], quote["count"], reroll_currency[1 - slot], _sandbox_mode)["cost"]) if kind == "rarity" else int(counterpart["attribute_reroll_cost"])
+	var rolled: Dictionary = _reroll_result(tower, kind, quote["count"])
+	_apply_reroll(slot, tower, kind, rolled, quote["count"], quote["cost"])
+	if mirrored:
+		_apply_reroll(1 - slot, counterpart, kind, rolled, quote["count"], other_cost)
 	return true
 
 
-func _reroll_result(tower: Dictionary, kind: String) -> Dictionary:
+func _reroll_result(tower: Dictionary, kind: String, count: int) -> Dictionary:
 	var definition: Dictionary = _tower_types[tower["type_id"]]
 	if kind == "rarity":
-		return _roll_rules.generate_admitted(_roll_random, definition["roll_attributes"], tower["rarity"], definition["roll_profile"])
+		return _roll_rules.generate_batch_admitted(_roll_random, definition["roll_attributes"], tower["rarity"], definition["roll_profile"], count)
 	return _roll_rules.regenerate_attributes_admitted(tower["rarity"], _roll_random, definition["roll_attributes"], definition["roll_profile"])
 
 
-func _apply_reroll(slot: int, tower: Dictionary, kind: String, rolled: Dictionary) -> void:
+func _apply_reroll(slot: int, tower: Dictionary, kind: String, rolled: Dictionary, count: int, cost: int) -> void:
 	if kind == "rarity":
 		if not _sandbox_mode:
-			reroll_currency[slot] -= int(tower["rarity_reroll_cost"])
-			_recap.add(slot, "spent", "rarity_shards", int(tower["rarity_reroll_cost"]))
-		tower["rarity_rerolls"] += 1
+			reroll_currency[slot] -= cost
+			_recap.add(slot, "spent", "rarity_shards", cost)
+		tower["rarity_rerolls"] += count
 		tower["attribute_rerolls"] = 0
+		tower["rarity_batch_results"] = rolled["rarity_batch_results"].duplicate(true)
+		tower["rarity_batch_winner"] = rolled["rarity_batch_winner"]
 	else:
 		if not _sandbox_mode:
-			coins[slot] -= int(tower["attribute_reroll_cost"])
-			_recap.add(slot, "spent", "attribute_rerolls", int(tower["attribute_reroll_cost"]))
+			coins[slot] -= cost
+			_recap.add(slot, "spent", "attribute_rerolls", cost)
 		tower["attribute_rerolls"] += 1
 	tower["rarity"] = rolled["rarity"]
 	tower["attributes"] = rolled["attributes"].duplicate(true)
 	_refresh_board(slot)
-
 
 # Derive effective values from purchased baselines, never from prior rolled stats.
 # Recompute only when the board changes, not for each target/attack.
@@ -2297,7 +2334,7 @@ func _boss_abilities(slot: int, enemy: Dictionary, definition: Dictionary) -> vo
 	enemy["speed"] = 0.0
 
 
-func snapshot(include_metadata: bool = true) -> Dictionary:
+func snapshot(include_metadata: bool = true, mirrored: bool = false) -> Dictionary:
 	var result: Dictionary = {
 		"phase": phase, "wave": wave, "health": base_health.duplicate(), "max_health": base_max_health.duplicate(),
 		"statistics_id": statistics_id, "enemy_totals": enemy_totals.duplicate(true),
@@ -2320,6 +2357,15 @@ func snapshot(include_metadata: bool = true) -> Dictionary:
 		"spawned": _spawned.duplicate(), "total": wave_roster.size(),
 		"wave_weight": _wave_weight(maxi(1, wave)),
 	}
+	# Quotes are derived at publication, so every income/drain/debug change is
+	# reflected without coupling currency producers to tower-stat refreshes.
+	for slot: int in range(2):
+		for tower: Dictionary in result["towers"][slot]:
+			tower["rarity_batch_quotes"] = {
+				"1": _rarity_batch_quote(slot, tower, 1, mirrored),
+				"10": _rarity_batch_quote(slot, tower, 10, mirrored),
+				"max": _rarity_batch_quote(slot, tower, 0, mirrored),
+			}
 	if not include_metadata:
 		return result
 	result["wave_groups"] = wave_groups.duplicate(true)

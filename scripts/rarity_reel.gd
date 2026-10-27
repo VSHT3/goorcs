@@ -13,6 +13,8 @@ const CRUISE_SECONDS: float = 1.35
 const BRAKE_SECONDS: float = 4.0
 const SPIN_SECONDS: float = ACCEL_SECONDS + CRUISE_SECONDS + BRAKE_SECONDS
 const REVEAL_SECONDS: float = 2.8
+const BATCH_STAGGER_SECONDS: float = 0.06
+const BATCH_MAX_SPREAD_SECONDS: float = 1.5
 const CARD_COUNT: int = 141
 const WINNER_INDEX: int = 135
 const START_POSITION: float = 3.15
@@ -43,6 +45,20 @@ var _close: Button
 var _strip: ReelStrip
 var _tick: AudioStreamPlayer
 var _reveal: AudioStreamPlayer
+var _batch: Array[BatchReel] = []
+var _batch_winner: int = -1
+var _batch_columns: int = 0
+var _batch_scroll: ScrollContainer
+var _batch_content: Control
+
+
+class BatchReel extends RefCounted:
+	var strip: ReelStrip
+	var landing: float
+	var peak_speed: float
+	var spin_seconds: float
+	var settled: bool = false
+	var last_crossing: int = floori(START_POSITION + 0.5)
 
 
 class ReelStrip extends Control:
@@ -67,6 +83,8 @@ class ReelStrip extends Control:
 	var _top_marker := PackedVector2Array()
 	var flap_angle: float = 0.0
 	var flap_velocity: float = 0.0
+	var compact: bool = false
+	var retained: bool = false
 
 	func release_contact() -> void:
 		# Release stored spring deflection; don't inject an unrelated full flip.
@@ -115,7 +133,8 @@ class ReelStrip extends Control:
 		for index: int in range(first, last):
 			var rank: int = rarities[index]
 			var color: Color = colors[rank]
-			var card := Rect2(Vector2(roundf(center + (float(index) - scroll_position) * STRIDE - CARD_WIDTH * 0.5), 16.0), Vector2(CARD_WIDTH, CARD_HEIGHT))
+			var card_height: float = minf(CARD_HEIGHT, size.y - 20.0) if compact else CARD_HEIGHT
+			var card := Rect2(Vector2(roundf(center + (float(index) - scroll_position) * STRIDE - CARD_WIDTH * 0.5), 16.0), Vector2(CARD_WIDTH, card_height))
 			var winning: bool = index == winner_index
 			if winning and reveal > 0.0:
 				for ring: int in range(4, 0, -1):
@@ -125,15 +144,16 @@ class ReelStrip extends Control:
 			draw_rect(card, shades[rank])
 			draw_rect(card, color.darkened(0.45), false, 1.0)
 			draw_rect(Rect2(card.position, Vector2(CARD_WIDTH, 4.0)), color)
-			draw_rect(Rect2(card.position + Vector2(0.0, CARD_HEIGHT - 5.0), Vector2(CARD_WIDTH, 5.0)), color)
+			draw_rect(Rect2(card.position + Vector2(0.0, card_height - 5.0), Vector2(CARD_WIDTH, 5.0)), color)
 			if artwork != null and artwork_bounds.has_area():
 				var reward: bool = not coins.is_empty()
-				var icon_size: float = 60.0 if reward else 96.0
+				var icon_size: float = minf(48.0, card_height - 30.0) if compact else (60.0 if reward else 96.0)
 				var extent: Vector2 = (artwork_bounds.size * (icon_size / maxf(artwork_bounds.size.x, artwork_bounds.size.y))).floor()
-				var icon_rect := Rect2((card.position + Vector2((CARD_WIDTH - extent.x) * 0.5, 18.0 + (64.0 - extent.y) * 0.5 if reward else 24.0 + (102.0 - extent.y) * 0.5)).round(), extent)
+				var icon_y: float = (card_height - 26.0 - extent.y) * 0.5 if compact else (18.0 + (64.0 - extent.y) * 0.5 if reward else 24.0 + (102.0 - extent.y) * 0.5)
+				var icon_rect := Rect2((card.position + Vector2((CARD_WIDTH - extent.x) * 0.5, icon_y)).round(), extent)
 				draw_texture_rect_region(artwork, icon_rect, artwork_bounds)
-			var name_y: float = 104.0 if not coins.is_empty() else 158.0
-			draw_string(FONT, card.position + Vector2(6.0, name_y), names[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 18, color)
+			var name_y: float = card_height - 10.0 if compact else (104.0 if not coins.is_empty() else 158.0)
+			draw_string(FONT, card.position + Vector2(6.0, name_y), names[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 16 if compact else 18, color)
 			if not coins.is_empty():
 				draw_string(NUMBERS, card.position + Vector2(6.0, 136.0), coins[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 16, Color("f5dca5"))
 				draw_string(NUMBERS, card.position + Vector2(6.0, 160.0), shards[rank], HORIZONTAL_ALIGNMENT_CENTER, CARD_WIDTH - 12.0, 16, Color("c1eff0"))
@@ -154,6 +174,8 @@ class ReelStrip extends Control:
 			var shade := Color(0.051, 0.090, 0.075, float(6 - step) * 0.12)
 			draw_rect(Rect2(float(step) * 5.0, 0.0, 5.0, size.y), shade)
 			draw_rect(Rect2(size.x - float(step + 1) * 5.0, 0.0, 5.0, size.y), shade)
+		if retained and reveal > 0.0:
+			draw_rect(Rect2(Vector2.ONE, size - Vector2(2.0, 2.0)), MARKER, false, 2.0)
 
 
 func _ready() -> void:
@@ -181,6 +203,15 @@ func _ready() -> void:
 		_strip.colors.append(color)
 		_strip.shades.append(Color("17251f").lerp(color, 0.09))
 	_panel.add_child(_strip)
+	_batch_scroll = ScrollContainer.new()
+	_batch_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_batch_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	_panel.add_child(_batch_scroll)
+	_batch_content = Control.new()
+	_batch_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_batch_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_batch_scroll.add_child(_batch_content)
+	_batch_scroll.hide()
 	_result = _label(24)
 	_result.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_panel.add_child(_result)
@@ -209,12 +240,34 @@ func present(tower: Dictionary, artwork: Texture2D) -> void:
 	_winner_payout = ""
 	_heading.text = "Rarity"
 	_floor_rank = 0
+	_clear_batch()
+	var results: Array = tower.get("rarity_batch_results", [])
+	if results.size() > 1:
+		_strip.set_artwork(artwork)
+		_batch_winner = clampi(int(tower.get("rarity_batch_winner", 0)), 0, results.size() - 1)
+		for result: Dictionary in results:
+			var entry := BatchReel.new()
+			entry.strip = ReelStrip.new()
+			entry.strip.compact = true
+			entry.strip.artwork = _strip.artwork
+			entry.strip.artwork_bounds = _strip.artwork_bounds
+			entry.strip.names = _strip.names
+			entry.strip.colors = _strip.colors
+			entry.strip.shades = _strip.shades
+			_batch_content.add_child(entry.strip)
+			var rank: int = maxi(0, RARITIES.find(String(result["rarity"])))
+			entry.landing = _prepare_strip(entry.strip, rank, artwork)
+			entry.peak_speed = _speed_for_landing(entry.landing)
+			entry.spin_seconds = _batch_spin_seconds(_batch.size(), results.size())
+			_batch.append(entry)
+		_heading.text = "Rarity · %d" % results.size()
 	_start(String(tower.get("rarity", "common")), artwork)
 
 
 func present_reward(award: Dictionary, artwork: Texture2D = null) -> void:
 	if not _can_present():
 		return
+	_clear_batch()
 	_strip.coins.resize(RARITIES.size())
 	_strip.shards.resize(RARITIES.size())
 	_floor_rank = RARITIES.size() - 1
@@ -247,35 +300,17 @@ func _start(rarity: String, artwork: Texture2D, winner_name: String = "") -> voi
 	_floor_rank = mini(_floor_rank, _winner_rank)
 	_winner_name = _strip.names[_winner_rank] if winner_name.is_empty() else winner_name
 	_winner_color = MatchPlanningScreen.tower_rarity_color({"rarity": rarity})
-	_strip.set_artwork(artwork)
-	_strip.rarities.resize(CARD_COUNT)
-	for index: int in range(CARD_COUNT):
-		_strip.rarities[index] = _rng.randi_range(_floor_rank, RARITIES.size() - 1)
-	_strip.rarities[WINNER_INDEX] = _winner_rank
-	# Clear every potentially visible landing neighbor before staging one near-miss.
-	for index: int in range(WINNER_INDEX - LANDING_RADIUS, WINNER_INDEX + LANDING_RADIUS + 1):
-		if index != WINNER_INDEX:
-			_strip.rarities[index] = _rng.randi_range(_floor_rank, maxi(_floor_rank, mini(_winner_rank, RARITIES.find("rare"))))
-	if _winner_rank < RARITIES.size() - 1:
-		var offset: int = _rng.randi_range(1, 2)
-		if _rng.randi_range(0, 1) == 0:
-			offset = -offset
-		var better_rank: int = _rng.randi_range(maxi(RARITIES.find("epic"), _winner_rank + 1), RARITIES.size() - 1)
-		_strip.rarities[WINNER_INDEX + offset] = better_rank
-	_strip.winner_index = WINNER_INDEX
-	_strip.scroll_position = START_POSITION
-	_strip.reveal = 0.0
-	_strip.flap_angle = 0.0
-	_strip.flap_velocity = 0.0
-	# Keep the accepted result inside its card; the pointer rests over its face.
-	_landing_position = float(WINNER_INDEX) + _rng.randf_range(-0.14, 0.14)
-	_peak_speed = (_landing_position - START_POSITION) / (ACCEL_SECONDS * 0.5 + CRUISE_SECONDS + BRAKE_SECONDS / 5.0)
+	_landing_position = _prepare_strip(_strip, _winner_rank, artwork)
+	_peak_speed = _speed_for_landing(_landing_position)
 	_elapsed = 0.0
 	_revealed = false
 	_last_crossing = floori(START_POSITION + 0.5)
 	_result.text = ""
 	_payout.text = ""
 	_payout.visible = not _winner_payout.is_empty()
+	_strip.visible = _batch.is_empty()
+	_batch_scroll.visible = not _batch.is_empty()
+	_batch_scroll.scroll_vertical = 0
 	_suspended = false
 	_busy = true
 	show()
@@ -286,6 +321,51 @@ func _start(rarity: String, artwork: Texture2D, winner_name: String = "") -> voi
 	set_process_input(true)
 	_strip.queue_redraw()
 	queue_redraw()
+
+
+func _clear_batch() -> void:
+	for entry: BatchReel in _batch:
+		entry.strip.free()
+	_batch.clear()
+	_batch_winner = -1
+	_batch_columns = 0
+
+
+func _prepare_strip(strip: ReelStrip, rank: int, artwork: Texture2D) -> float:
+	if strip.artwork != artwork:
+		strip.set_artwork(artwork)
+	strip.rarities.resize(CARD_COUNT)
+	for index: int in range(CARD_COUNT):
+		strip.rarities[index] = _rng.randi_range(_floor_rank, RARITIES.size() - 1)
+	strip.rarities[WINNER_INDEX] = rank
+	# Keep the same staged near-miss and low landing neighbors on every reel.
+	for index: int in range(WINNER_INDEX - LANDING_RADIUS, WINNER_INDEX + LANDING_RADIUS + 1):
+		if index != WINNER_INDEX:
+			strip.rarities[index] = _rng.randi_range(_floor_rank, maxi(_floor_rank, mini(rank, RARITIES.find("rare"))))
+	if rank < RARITIES.size() - 1:
+		var offset: int = _rng.randi_range(1, 2) * (-1 if _rng.randi_range(0, 1) == 0 else 1)
+		strip.rarities[WINNER_INDEX + offset] = _rng.randi_range(maxi(RARITIES.find("epic"), rank + 1), RARITIES.size() - 1)
+	strip.winner_index = WINNER_INDEX
+	strip.scroll_position = START_POSITION
+	strip.reveal = 0.0
+	strip.retained = false
+	strip.flap_angle = 0.0
+	strip.flap_velocity = 0.0
+	return float(WINNER_INDEX) + _rng.randf_range(-0.14, 0.14)
+
+
+func _speed_for_landing(landing: float) -> float:
+	return (landing - START_POSITION) / (ACCEL_SECONDS * 0.5 + CRUISE_SECONDS + BRAKE_SECONDS / 5.0)
+
+
+func _batch_spin_seconds(index: int, count: int) -> float:
+	# Keep the first ten distinct; compress only the tail of very large Max batches.
+	var tail_step: float = minf(BATCH_STAGGER_SECONDS, (BATCH_MAX_SPREAD_SECONDS - 9.0 * BATCH_STAGGER_SECONDS) / maxi(1, count - 10))
+	return SPIN_SECONDS + mini(index, 9) * BATCH_STAGGER_SECONDS + maxi(0, index - 9) * tail_step
+
+
+func _spin_end() -> float:
+	return SPIN_SECONDS if _batch.is_empty() else _batch.back().spin_seconds
 
 
 func is_busy() -> bool:
@@ -333,6 +413,9 @@ func _process(delta: float) -> void:
 	if not _busy or _suspended:
 		return
 	_elapsed += delta
+	if not _batch.is_empty():
+		_process_batch(delta)
+		return
 	if not _revealed:
 		var previous_position: float = _strip.scroll_position
 		var travel: float = _spin_position(_elapsed)
@@ -358,20 +441,23 @@ func _process(delta: float) -> void:
 	queue_redraw()
 
 
-func _spin_position(elapsed: float) -> float:
+func _spin_position(elapsed: float, landing: float = -1.0, peak: float = -1.0) -> float:
+	if landing < 0.0:
+		landing = _landing_position
+		peak = _peak_speed
 	if elapsed >= SPIN_SECONDS:
-		return _landing_position
+		return landing
 	if elapsed < ACCEL_SECONDS:
 		var progress: float = elapsed / ACCEL_SECONDS
 		var ramp_area: float = progress * progress * progress * (1.0 - progress * 0.5)
-		return START_POSITION + _peak_speed * ACCEL_SECONDS * ramp_area
-	var cruise_start: float = START_POSITION + _peak_speed * ACCEL_SECONDS * 0.5
+		return START_POSITION + peak * ACCEL_SECONDS * ramp_area
+	var cruise_start: float = START_POSITION + peak * ACCEL_SECONDS * 0.5
 	if elapsed < ACCEL_SECONDS + CRUISE_SECONDS:
-		return cruise_start + _peak_speed * (elapsed - ACCEL_SECONDS)
+		return cruise_start + peak * (elapsed - ACCEL_SECONDS)
 	var progress: float = clampf((elapsed - ACCEL_SECONDS - CRUISE_SECONDS) / BRAKE_SECONDS, 0.0, 1.0)
 	var remaining: float = 1.0 - progress
 	# Fast early braking leaves time for distinct, progressively slower final teeth.
-	return _landing_position - _peak_speed * BRAKE_SECONDS * remaining * remaining * remaining * remaining * remaining / 5.0
+	return landing - peak * BRAKE_SECONDS * remaining * remaining * remaining * remaining * remaining / 5.0
 
 
 func _skip_to_result() -> void:
@@ -382,16 +468,51 @@ func _skip_to_result() -> void:
 	_strip.flap_angle = 0.0
 	_strip.flap_velocity = 0.0
 	_begin_reveal()
-	_elapsed = SPIN_SECONDS + 0.45
+	_elapsed = _spin_end() + 0.45
 	_strip.reveal = 1.0
 	_strip.queue_redraw()
+	queue_redraw()
+	for entry: BatchReel in _batch:
+		entry.strip.flap_angle = 0.0
+		entry.strip.flap_velocity = 0.0
+		entry.strip.reveal = 1.0
+		entry.strip.queue_redraw()
+
+
+func _process_batch(delta: float) -> void:
+	for index: int in range(_batch.size()):
+		var entry: BatchReel = _batch[index]
+		var strip: ReelStrip = entry.strip
+		if not entry.settled:
+			var previous: float = strip.scroll_position
+			var travel: float = _spin_position(_elapsed * SPIN_SECONDS / entry.spin_seconds, entry.landing, entry.peak_speed)
+			strip.scroll_position = travel + 0.12 * sin(TAU * travel)
+			var crossing: int = floori(strip.scroll_position + 0.5)
+			if crossing != entry.last_crossing:
+				entry.last_crossing = crossing
+				strip.release_contact()
+				# One shared audible rhythm, not one sound player per candidate.
+				if index == 0:
+					var speed: float = (strip.scroll_position - previous) / maxf(delta, 0.0001)
+					_tick.pitch_scale = lerpf(0.92, 1.08, clampf(speed / entry.peak_speed, 0.0, 1.0))
+					_tick.volume_db = lerpf(-5.0, -11.0, clampf(speed / 10.0, 0.0, 1.0))
+					_tick.play()
+			if _elapsed >= entry.spin_seconds:
+				entry.settled = true
+		if entry.settled:
+			strip.reveal = maxf(strip.reveal, clampf((_elapsed - entry.spin_seconds) / 0.45, 0.0, 1.0))
+		strip.advance_flap(delta)
+		strip.queue_redraw()
+	if not _revealed and _batch.back().settled:
+		_begin_reveal()
+	# A batch stays available for reading/scrolling until explicitly dismissed.
 	queue_redraw()
 
 
 func _begin_reveal() -> void:
 	_revealed = true
 	# Start the readable hold at the actual reveal, even after a delayed frame.
-	_elapsed = SPIN_SECONDS
+	_elapsed = _spin_end()
 	_strip.scroll_position = _landing_position + 0.12 * sin(TAU * _landing_position)
 	_reveal.pitch_scale = 0.92 + float(_winner_rank) * 0.035
 	_reveal.volume_db = -8.0 + float(_winner_rank) * 0.35
@@ -401,6 +522,15 @@ func _begin_reveal() -> void:
 	_result.add_theme_color_override("font_color", _winner_color)
 	_strip.reveal = 0.0
 	_strip.queue_redraw()
+	if not _batch.is_empty():
+		for index: int in range(_batch.size()):
+			var entry: BatchReel = _batch[index]
+			entry.settled = true
+			entry.strip.scroll_position = entry.landing + 0.12 * sin(TAU * entry.landing)
+			entry.strip.retained = index == _batch_winner
+			entry.strip.reveal = maxf(entry.strip.reveal, clampf((_elapsed - entry.spin_seconds) / 0.45, 0.0, 1.0))
+			entry.strip.queue_redraw()
+		_result.text = _winner_name
 	queue_redraw()
 
 
@@ -417,6 +547,13 @@ func _input(event: InputEvent) -> void:
 				cancel()
 			elif event.keycode in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
 				_skip_to_result()
+			elif not _batch.is_empty() and event.keycode in [KEY_PAGEDOWN, KEY_PAGEUP, KEY_HOME, KEY_END]:
+				if event.keycode == KEY_HOME:
+					_batch_scroll.scroll_vertical = 0
+				elif event.keycode == KEY_END:
+					_batch_scroll.scroll_vertical = int(_batch_content.size.y)
+				else:
+					_batch_scroll.scroll_vertical += int(_batch_scroll.size.y) * (1 if event.keycode == KEY_PAGEDOWN else -1)
 			else:
 				_close.grab_focus()
 	elif event is InputEventMouseButton:
@@ -425,6 +562,10 @@ func _input(event: InputEvent) -> void:
 				cancel()
 			else:
 				_skip_to_result()
+		elif event.pressed and not _batch.is_empty() and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+			_batch_scroll.scroll_vertical += roundi(72.0 * event.factor) * (1 if event.button_index == MOUSE_BUTTON_WHEEL_DOWN else -1)
+	elif event is InputEventPanGesture and not _batch.is_empty():
+		_batch_scroll.scroll_vertical += roundi(event.delta.y * 36.0)
 	elif event.is_action_pressed(&"ui_cancel"):
 		cancel()
 	elif event.is_action_pressed(&"ui_accept"):
@@ -449,6 +590,9 @@ func _exit_tree() -> void:
 func _layout() -> void:
 	if _panel == null:
 		return
+	if not _batch.is_empty():
+		_layout_batch()
+		return
 	_panel.size = Vector2(minf(1000.0, maxf(0.0, size.x - 64.0)), 382.0 if not _winner_payout.is_empty() else 354.0)
 	_panel.position = ((size - _panel.size) * 0.5).floor()
 	_heading.position = Vector2(24.0, 18.0)
@@ -462,6 +606,35 @@ func _layout() -> void:
 	_payout.position = Vector2(24.0, 334.0)
 	_payout.size = Vector2(maxf(0.0, _panel.size.x - 48.0), 28.0)
 	queue_redraw()
+
+func _layout_batch() -> void:
+	_panel.size = Vector2(maxf(0.0, size.x - 48.0), maxf(0.0, size.y - 40.0))
+	_panel.position = ((size - _panel.size) * 0.5).floor()
+	_heading.position = Vector2(20.0, 12.0)
+	_heading.size = Vector2(maxf(0.0, _panel.size.x - 100.0), 40.0)
+	_close.position = Vector2(_panel.size.x - 60.0, 12.0)
+	_close.size = Vector2(40.0, 40.0)
+	_batch_scroll.position = Vector2(16.0, 76.0)
+	_batch_scroll.size = Vector2(maxf(0.0, _panel.size.x - 32.0), maxf(0.0, _panel.size.y - 128.0))
+	var available: Vector2 = _batch_scroll.size
+	var max_columns: int = maxi(1, floori((available.x + 8.0) / 300.0))
+	_batch_columns = 2 if _batch.size() == 10 else mini(max_columns, maxi(1, ceili(sqrt(float(_batch.size()) * available.x / maxf(available.y, 1.0) / 3.0))))
+	var rows: int = ceili(float(_batch.size()) / _batch_columns)
+	# Try additional columns before requiring vertical scrolling; never shrink text.
+	while _batch.size() != 10 and rows * 96.0 - 8.0 > available.y and _batch_columns < max_columns:
+		_batch_columns += 1
+		rows = ceili(float(_batch.size()) / _batch_columns)
+	var cell_height: float = clampf(floorf((available.y - float(rows - 1) * 8.0) / rows), 88.0, 216.0)
+	var cell_width: float = floorf((available.x - float(_batch_columns - 1) * 8.0) / _batch_columns)
+	_batch_content.custom_minimum_size = Vector2(0.0, rows * (cell_height + 8.0) - 8.0)
+	for index: int in range(_batch.size()):
+		var strip: ReelStrip = _batch[index].strip
+		strip.position = Vector2((index % _batch_columns) * (cell_width + 8.0), (index / _batch_columns) * (cell_height + 8.0))
+		strip.size = Vector2(cell_width, cell_height)
+	_result.position = Vector2(20.0, _panel.size.y - 44.0)
+	_result.size = Vector2(maxf(0.0, _panel.size.x - 40.0), 32.0)
+	queue_redraw()
+
 
 
 func _draw() -> void:

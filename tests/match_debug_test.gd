@@ -159,6 +159,26 @@ func _random_states(planning: MatchPlanning) -> PackedInt64Array:
 	return PackedInt64Array([core._random.state, core._wave_random.state, core._timing_random.state, core._group_random.state, core._roll_random.state, core._drop_random.state])
 
 
+func _without_rarity_quotes(snapshot: Dictionary) -> Dictionary:
+	var result: Dictionary = snapshot.duplicate(true)
+	# Affordability is derived from the edited balance, not frozen combat state.
+	for board: Array in result["combat"]["towers"]:
+		for tower: Dictionary in board:
+			tower.erase("rarity_batch_quotes")
+	return result
+
+
+func _rarity_quotes_match_balance(planning: MatchPlanning) -> bool:
+	for slot: int in range(2):
+		for tower: Dictionary in planning.combat["towers"][slot]:
+			for key: String in ["1", "10", "max"]:
+				var count: int = 0 if key == "max" else int(key)
+				var expected: Dictionary = planning.combat_rules.roll_rules.rarity_batch_quote(tower["rarity_rerolls"], count, planning.combat["reroll_currency"][slot])
+				if tower["rarity_batch_quotes"][key] != expected:
+					return false
+	return true
+
+
 func _test_currency_only() -> void:
 	var planning: MatchPlanning = _new_model(true, true)
 	var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i.ZERO)
@@ -176,7 +196,8 @@ func _test_currency_only() -> void:
 	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning.is_physics_processing(), "Planning money-only changes retain paths, pending sends, readiness, deadline, pacing, tower rolls and RNG")
 	_check(planning.debug_set_values(2, 321, 93), "The same upcoming planning round accepts a Shards-only change")
 	before["combat"]["reroll_currency"] = [93, 93]
-	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning.is_physics_processing(), "Planning Shards-only changes retain committed Ready, real-time deadline, queues, pacing, attributes, reroll counters and every RNG stream")
+	_check(_without_rarity_quotes(planning._snapshot()) == _without_rarity_quotes(before) and _random_states(planning) == random_states and planning.is_physics_processing(), "Planning Shards-only changes retain committed Ready, real-time deadline, queues, pacing, attributes, reroll counters and every RNG stream")
+	_check(_rarity_quotes_match_balance(planning) and planning.combat["towers"][0][0]["rarity_batch_quotes"]["max"]["count"] < before["combat"]["towers"][0][0]["rarity_batch_quotes"]["max"]["count"], "Lower planning Shards refresh both boards' exact batch quotes and reduce the affordable Max count")
 	planning.submit_ready(true)
 	planning._physics_process(0.1)
 	planning.send_enemy(0, &"grunt")
@@ -191,7 +212,8 @@ func _test_currency_only() -> void:
 	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed and planning.is_physics_processing(), "Wave money-only changes preserve phase, enemies, towers, cooldowns, queues, clock, locks, pacing and RNG")
 	_check(planning.debug_set_values(2, 654, 147), "The same displayed active round accepts a Shards-only change")
 	before["combat"]["reroll_currency"] = [147, 147]
-	_check(planning._snapshot() == before and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed and planning.is_physics_processing(), "Wave Shards-only changes preserve live enemies, spawn/send timetables, Ready, cooldowns, pacing, accepted attributes/counters and RNG")
+	_check(_without_rarity_quotes(planning._snapshot()) == _without_rarity_quotes(before) and _random_states(planning) == random_states and planning._host_combat._elapsed == elapsed and planning.is_physics_processing(), "Wave Shards-only changes preserve live enemies, spawn/send timetables, Ready, cooldowns, pacing, accepted attributes/counters and RNG")
+	_check(_rarity_quotes_match_balance(planning) and planning.combat["towers"][0][0]["rarity_batch_quotes"]["max"]["count"] > before["combat"]["towers"][0][0]["rarity_batch_quotes"]["max"]["count"], "Higher wave Shards refresh both boards' exact batch quotes and increase the affordable Max count")
 	_dispose(planning)
 
 

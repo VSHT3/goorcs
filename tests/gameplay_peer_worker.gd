@@ -41,7 +41,14 @@ func _execute_command(command: Dictionary) -> void:
 		"commit":
 			_last_result = planning.commit_loadout()
 		"reroll":
-			_last_result = planning.reroll_tower(int(command["slot"]), int(command["tower_id"]), String(command["kind"]))
+			_last_result = planning.reroll_tower(int(command["slot"]), int(command["tower_id"]), String(command["kind"]), int(command.get("batch", 1)))
+		"authenticated_reroll":
+			var batch: Variant = command.get("batch", "invalid")
+			if _session.is_host:
+				_last_result = planning._apply_tower_command(1, "reroll", int(command["slot"]), Vector2i.ZERO, int(command["tower_id"]), -1, String(command["kind"]), batch)
+			else:
+				planning._receive_tower_command.rpc_id(1, "reroll", int(command["slot"]), Vector2i.ZERO, int(command["tower_id"]), -1, String(command["kind"]), batch)
+				_last_result = true
 		"set_owned":
 			_set_owned(command.get("ids", []))
 			_last_result = planning.collection_store.error_message.is_empty()

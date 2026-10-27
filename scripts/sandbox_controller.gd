@@ -177,8 +177,8 @@ func upgrade(tower_id: int, command: String) -> bool:
 	return accepted
 
 
-func reroll_tower(tower_id: int, kind: String) -> bool:
-	var accepted: bool = combat.reroll_tower(0, tower_id, kind)
+func reroll_tower(tower_id: int, kind: String, requested: Variant = 1) -> bool:
+	var accepted: bool = combat.reroll_tower(0, tower_id, kind, requested)
 	if accepted:
 		_publish()
 	return accepted

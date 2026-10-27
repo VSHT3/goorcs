@@ -165,6 +165,10 @@ func _execute_command(command: Dictionary) -> void:
 			if _session.is_host and planning._host_combat != null:
 				planning._host_combat._roll_random.seed = 1249
 				planning._host_combat._drop_random.seed = 5723
+		"shard_fixture":
+			if _session.is_host:
+				planning._host_combat.reroll_currency[int(command["slot"])] = int(command["amount"])
+				planning._publish_snapshot()
 		"step":
 			if _session.is_host:
 				planning._physics_process(float(command["delta"]))

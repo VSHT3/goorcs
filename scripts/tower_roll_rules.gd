@@ -144,6 +144,48 @@ func rarity_reroll_cost(completed_rerolls: int) -> int:
 	return _curve_cost(rarity_reroll_cost_curve, completed_rerolls)
 
 
+static func valid_reroll_batch(kind: String, requested: Variant) -> bool:
+	return typeof(requested) == TYPE_INT and (requested == 1 or (kind == "rarity" and requested in [0, 10]))
+
+
+## Host quote; Max stops only at affordability or the exact currency limit.
+func rarity_batch_quote(completed: int, requested: int, available: int, free: bool = false) -> Dictionary:
+	var count: int = 0
+	var total: int = 0
+	var limit: int = 10 if free and requested == 0 else requested
+	if free:
+		return {"count": limit, "cost": 0, "affordable": limit > 0}
+	while requested == 0 or count < limit:
+		var cost: int = rarity_reroll_cost(completed + count)
+		if cost < 0 or total > int(MAX_EXACT_COST) - cost:
+			if requested != 0:
+				return {"count": requested, "cost": -1, "affordable": false}
+			break
+		if requested == 0 and cost > available - total:
+			break
+		total += cost
+		count += 1
+	return {"count": count, "cost": total, "affordable": count > 0 and total <= available}
+
+
+## Every candidate excludes the original rarity, never the previous candidate.
+func generate_batch_admitted(random: RandomNumberGenerator, compatible_effects: PackedStringArray, excluded_rarity: String, profile: String, count: int) -> Dictionary:
+	var results: Array[Dictionary] = []
+	var winner: int = 0
+	var best_rank: int = -1
+	for index: int in range(count):
+		var rolled: Dictionary = generate_admitted(random, compatible_effects, excluded_rarity, profile)
+		results.append({"rarity": rolled["rarity"], "attributes": rolled["attributes"]})
+		var rank: int = RARITIES.find(rolled["rarity"])
+		if rank > best_rank:
+			best_rank = rank
+			winner = index
+	return {
+		"rarity": results[winner]["rarity"], "attributes": results[winner]["attributes"],
+		"rarity_batch_results": results, "rarity_batch_winner": winner,
+	}
+
+
 func attribute_reroll_cost(completed_rerolls: int) -> int:
 	return _curve_cost(attribute_reroll_cost_curve, completed_rerolls)
 

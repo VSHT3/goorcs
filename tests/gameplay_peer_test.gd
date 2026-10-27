@@ -182,8 +182,8 @@ func _upgrade(lane: String, slot: int, id: int, upgrades: Array) -> void:
 		_check(accepted, "Remote observer receives the host-accepted %s purchase" % upgrade)
 
 
-func _reroll(lane: String, slot: int, id: int, kind: String) -> void:
-	await _command(lane, {"action": "reroll", "slot": slot, "tower_id": id, "kind": kind})
+func _reroll(lane: String, slot: int, id: int, kind: String, batch: int = 1) -> void:
+	await _command(lane, {"action": "reroll", "slot": slot, "tower_id": id, "kind": kind, "batch": batch})
 
 
 func _admission_and_rolls() -> void:
@@ -247,6 +247,8 @@ func _admission_and_rolls() -> void:
 	random_state = _snapshot("host")["roll_state"]
 	await _reroll("host", 0, ids[0], "rarity")
 	await _reroll("host", 0, ids[0], "attributes")
+	await _reroll("host", 0, ids[0], "rarity", 10)
+	await _reroll("host", 0, ids[0], "rarity", 0)
 	await _stable("Committed Ready rejects both reroll kinds atomically", before, random_state)
 	await _command("guest", {"action": "ready", "value": true})
 	await _wait_combat("guest", {"phase": 1}, "Both commits begin combat without automatic simulation")
@@ -268,6 +270,45 @@ func _admission_and_rolls() -> void:
 			await _reroll("host" if slot == 0 else "guest", slot, ids[slot], kind)
 	await _stable("Insufficient rarity currency and Coins preserve all attributes, counters, balances and RNG", before, random_state)
 	_assert_private_decks(host_ids, guest_ids, [["arrow_tower"], ["arrow_tower"]])
+	await _batch_rerolls(ids[1])
+
+
+func _batch_rerolls(id: int) -> void:
+	var before: Dictionary = await _agree("Batch fixture starts from agreed exhausted resources")
+	var random_state: String = _snapshot("host")["roll_state"]
+	await _reroll("guest", 1, id, "rarity", 10)
+	await _reroll("guest", 1, id, "rarity", 0)
+	await _reroll("guest", 1, id, "attributes", 10)
+	for malformed: Variant in ["10", 10.5, true, null, -1]:
+		await _command("guest", {"action": "authenticated_reroll", "slot": 1, "tower_id": id, "kind": "rarity", "batch": malformed})
+	await _stable("Remote unaffordable ten/Max, attribute batches and malformed raw RPC batches are atomic", before, random_state)
+	await _command("host", {"action": "shard_fixture", "slot": 1, "amount": 5000})
+	await _wait_combat("guest", {"reroll_currency": [0, 5000]}, "Host funds batch without changing counter or client resources")
+	before = await _agree("Fresh host balance refreshes quotes on both real peers")
+	var original: Dictionary = _tower(before, 1, Vector2i(1, 3))
+	var quote: Dictionary = original["rarity_batch_quotes"]["10"]
+	_check(quote["count"] == 10 and quote["cost"] == 1070 and quote["affordable"], "Remote ten quote sums captured host curve at completed counter one")
+	await _reroll("guest", 1, id, "rarity", 10)
+	await _wait_combat("guest", {"reroll_currency": [0, 3930]}, "Remote ten charges its full summed host quote")
+	var accepted: Dictionary = await _agree("All accepted batch candidates replicate to both processes")
+	var tower: Dictionary = _tower(accepted, 1, Vector2i(1, 3))
+	_check(tower["rarity_rerolls"] == 11 and tower["attribute_rerolls"] == 0 and tower["rarity_batch_results"].size() == 10 and tower["rarity_batch_winner"] == 0, "Ten equal-tier candidates retain first tie and advance counter by ten")
+	for candidate: Dictionary in tower["rarity_batch_results"]:
+		_check(candidate["rarity"] != original["rarity"] and candidate["attributes"][0]["value"] == 0.25, "Remote candidates exclude original tier and use host attributes, not divergent guest pools")
+	_check(tower["rarity"] == tower["rarity_batch_results"][0]["rarity"] and tower["attributes"] == tower["rarity_batch_results"][0]["attributes"], "Accepted remote tower retains exactly the winner's attributes")
+	quote = tower["rarity_batch_quotes"]["max"]
+	var count: int = int(quote["count"])
+	var cost: int = int(quote["cost"])
+	_check(count > 0 and quote["affordable"], "Remote Max quote reflects remaining currency and new counter")
+	await _reroll("guest", 1, id, "rarity", 0)
+	await _wait_combat("guest", {"reroll_currency": [0, 3930 - cost]}, "Remote Max debits precisely the accepted quote")
+	accepted = await _agree("Remote Max winner and all candidates agree")
+	tower = _tower(accepted, 1, Vector2i(1, 3))
+	_check(tower["rarity_batch_results"].size() == count and tower["rarity_rerolls"] == 11 + count and tower["rarity_batch_quotes"]["max"]["count"] == 0, "Remote Max consumes every affordable roll and disables exhausted Max")
+	before = accepted
+	random_state = _snapshot("host")["roll_state"]
+	await _reroll("guest", 1, id, "rarity", 0)
+	await _stable("Exhausted remote Max remains atomic after a successful batch", before, random_state)
 
 
 func _chain_scenario(code: String) -> void:

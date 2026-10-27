@@ -55,6 +55,8 @@ var _active: bool = false
 var sound_player: GameSoundPlayer
 var _roll_details: Label
 var rarity_reroll: Button
+var rarity_batch_selector: Button
+var _rarity_batch: int = 1
 var attribute_reroll: Button
 var _rarity_reel: RarityReel
 var boss_bars: BossHealthBars
@@ -302,9 +304,16 @@ func _build_management() -> void:
 	_roll_details = _label(content, "", true)
 	_roll_details.name = "TowerRoll"
 	_roll_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	rarity_reroll = _button(content, "Reroll rarity · Free", _reroll.bind("rarity"))
+	var rarity_row := HBoxContainer.new()
+	content.add_child(rarity_row)
+	rarity_reroll = _button(rarity_row, "Reroll rarity · Free", _reroll.bind("rarity"))
 	rarity_reroll.name = "RerollRarity"
-	rarity_reroll.tooltip_text = MatchPlanningScreen.reroll_tooltip("rarity") + "\nFree in Sandbox."
+	rarity_reroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rarity_batch_selector = _button(rarity_row, "1×", _cycle_rarity_batch)
+	rarity_batch_selector.name = "RarityBatch"
+	rarity_batch_selector.custom_minimum_size.x = 56
+	rarity_reroll.focus_neighbor_right = rarity_reroll.get_path_to(rarity_batch_selector)
+	rarity_batch_selector.focus_neighbor_left = rarity_batch_selector.get_path_to(rarity_reroll)
 	attribute_reroll = _button(content, "Reroll attributes · Free", _reroll.bind("attributes"))
 	attribute_reroll.name = "RerollAttributes"
 	attribute_reroll.tooltip_text = MatchPlanningScreen.reroll_tooltip("attributes") + "\nFree in Sandbox."
@@ -620,7 +629,11 @@ func _refresh_management(state: Dictionary) -> void:
 	_tower_stats.text = MatchPlanningScreen.tower_stats_text(tower, stats)
 	_roll_details.text = MatchPlanningScreen.roll_details_text(tower)
 	tower_status.refresh(tower, float(state.get("magic_nullified", [0.0])[0]))
-	rarity_reroll.disabled = not _active or int(tower.get("rarity_reroll_cost", -1)) < 0 or _rarity_reel.is_busy()
+	var quote: Dictionary = tower.get("rarity_batch_quotes", {}).get("max" if _rarity_batch == 0 else str(_rarity_batch), {})
+	var terminal: bool = int(state.get("phase", -1)) == MatchCombat.Phase.FINISHED
+	rarity_batch_selector.disabled = not _active or terminal or _rarity_reel.is_busy()
+	rarity_batch_selector.text = "Max" if _rarity_batch == 0 else "%d×" % _rarity_batch
+	rarity_reroll.disabled = rarity_batch_selector.disabled or int(quote.get("count", 0)) <= 0 or int(quote.get("cost", -1)) < 0
 	attribute_reroll.disabled = not _active or int(tower.get("attribute_reroll_cost", -1)) < 0 or _rarity_reel.is_busy()
 	targeting.get_parent_control().visible = tower.get("behavior_kind", stats.get("behavior_kind", "attack")) in ["attack", "chain"]
 	targeting.mode = int(tower["mode"])
@@ -694,11 +707,18 @@ func _upgrade(command: String) -> void:
 		controller.upgrade(selected_tower_id, command)
 
 
+func _cycle_rarity_batch() -> void:
+	if rarity_batch_selector.disabled:
+		return
+	_rarity_batch = 10 if _rarity_batch == 1 else (0 if _rarity_batch == 10 else 1)
+	_refresh_management(controller.state)
+
+
 func _reroll(kind: String) -> void:
 	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
 	if not button.is_visible_in_tree() or button.disabled or _rarity_reel.is_busy():
 		return
-	if controller.reroll_tower(selected_tower_id, kind) and kind == "rarity":
+	if controller.reroll_tower(selected_tower_id, kind, _rarity_batch if kind == "rarity" else 1) and kind == "rarity":
 		var tower: Dictionary = _find(controller.state["towers"][0], selected_tower_id)
 		var shop: TowerShopButton = shop_buttons[StringName(tower["type_id"])]
 		world.boards[0].cancel_stroke()

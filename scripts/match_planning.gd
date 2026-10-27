@@ -469,10 +469,10 @@ func upgrade_tower(slot: int, tower_id: int, upgrade: String) -> void:
 
 func sell_tower(slot: int, tower_id: int) -> void:
 	_request_tower_command("sell", slot, Vector2i.ZERO, tower_id, -1, "")
-func reroll_tower(slot: int, tower_id: int, kind: String) -> bool:
-	if kind not in ["rarity", "attributes"]:
+func reroll_tower(slot: int, tower_id: int, kind: String, requested: Variant = 1) -> bool:
+	if kind not in ["rarity", "attributes"] or not TowerRollRules.valid_reroll_batch(kind, requested):
 		return false
-	return _request_tower_command("reroll", slot, Vector2i.ZERO, tower_id, -1, kind)
+	return _request_tower_command("reroll", slot, Vector2i.ZERO, tower_id, -1, kind, requested)
 
 
 func request_commander_ability(target: int) -> bool:
@@ -491,15 +491,15 @@ func send_enemy(slot: int, type_id: StringName) -> void:
 	_request_tower_command("send", slot, Vector2i.ZERO, -1, -1, String(type_id))
 
 
-func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> bool:
+func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String, requested: Variant = 1) -> bool:
 	if singleplayer:
-		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
+		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument, requested)
 	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
 		feedback.emit("Wait for both players to connect and synchronize their boards.")
 		return false
 	if session.is_host:
-		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
-	_receive_tower_command.rpc_id(1, command, slot, cell, tower_id, mode, argument)
+		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument, requested)
+	_receive_tower_command.rpc_id(1, command, slot, cell, tower_id, mode, argument, requested)
 	return true
 
 func _request_command(command: String, slot: int, cell: Vector2i, value: bool) -> void:
@@ -628,11 +628,11 @@ func _receive_command(command: String, slot: int, cell: Vector2i, value: bool) -
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func _receive_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> void:
-	_apply_tower_command(multiplayer.get_remote_sender_id(), command, slot, cell, tower_id, mode, argument)
+func _receive_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String, requested: Variant = 1) -> void:
+	_apply_tower_command(multiplayer.get_remote_sender_id(), command, slot, cell, tower_id, mode, argument, requested)
 
 
-func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> bool:
+func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String, requested: Variant = 1) -> bool:
 	if not _can_accept(sender) or not active:
 		return false
 	var permitted_slot: int = 0 if sender == 1 else 1
@@ -685,7 +685,7 @@ func _apply_tower_command(sender: int, command: String, slot: int, cell: Vector2
 			else:
 				accepted = _host_combat.build(slot, cell, StringName(argument), mode)
 		"reroll":
-			accepted = _host_combat.reroll_tower_mirrored(slot, tower_id, argument) if mirrored else _host_combat.reroll_tower(slot, tower_id, argument)
+			accepted = _host_combat.reroll_tower_mirrored(slot, tower_id, argument, requested) if mirrored else _host_combat.reroll_tower(slot, tower_id, argument, requested)
 		"target":
 			accepted = _host_combat.set_targeting(slot, tower_id, mode)
 		"upgrade":
@@ -924,7 +924,7 @@ func _try_start_wave() -> bool:
 
 
 func _combat_snapshot(include_metadata: bool = true) -> Dictionary:
-	var snapshot: Dictionary = _host_combat.snapshot(include_metadata)
+	var snapshot: Dictionary = _host_combat.snapshot(include_metadata, singleplayer)
 	snapshot["speed_votes"] = _host_speed_votes.duplicate()
 	snapshot["triple_speed_votes"] = _host_triple_speed_votes.duplicate()
 	snapshot["autoplay_votes"] = _host_autoplay_votes.duplicate()

@@ -27,8 +27,8 @@ class DualPlanning extends MatchPlanning:
 	func _request_loadout_command(command: String, ids: Array, owned: Array, commander_id: String = "") -> bool:
 		return _apply_loadout_command(1, command, ids, owned, commander_id)
 
-	func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String) -> bool:
-		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument)
+	func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String, requested: Variant = 1) -> bool:
+		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument, requested)
 
 
 class DelayedPlanning extends DualPlanning:

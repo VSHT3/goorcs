@@ -251,6 +251,38 @@ func _check_null_art_scene() -> void:
 	await process_frame
 
 
+func _audio_playbacks(scene: Node) -> Array[Dictionary]:
+	var playbacks: Array[Dictionary] = []
+	for node: Node in scene.find_children("*", "", true, false):
+		var playback: AudioStreamPlayback
+		var stream: AudioStream
+		if node is AudioStreamPlayer and node.has_stream_playback():
+			playback = node.get_stream_playback()
+			stream = node.stream
+		elif node is AudioStreamPlayer2D and node.has_stream_playback():
+			playback = node.get_stream_playback()
+			stream = node.stream
+		else:
+			continue
+		# Observe the mixer's ownership without retaining the playback ourselves.
+		playbacks.append({"reference": weakref(playback), "owner": String(node.get_path()), "stream": stream.resource_path})
+	return playbacks
+
+
+func _await_audio_retirement(playbacks: Array[Dictionary]) -> void:
+	# The timeout is a failure bound, not a presumed mixer-retirement duration.
+	var deadline: int = Time.get_ticks_usec() + 2_000_000
+	while not playbacks.is_empty():
+		for index: int in range(playbacks.size() - 1, -1, -1):
+			if playbacks[index]["reference"].get_ref() == null:
+				playbacks.remove_at(index)
+		if playbacks.is_empty() or Time.get_ticks_usec() >= deadline:
+			break
+		await process_frame
+	for playback: Dictionary in playbacks:
+		_check(false, "Stopped audio playback still retained after scene teardown: %s (%s)" % [playback["owner"], playback["stream"]])
+
+
 func _run() -> void:
 	_check_validation()
 	_check_directional_validation()
@@ -331,11 +363,11 @@ func _run() -> void:
 		var captured: Dictionary = accepted["enemy_types"].duplicate(true)
 		catalog.enemies[0].send_cost = 1
 		_check(planning._host_combat.snapshot()["enemy_types"] == captured, "Editing source definitions cannot rewrite admitted host stats")
+	var playbacks: Array[Dictionary] = _audio_playbacks(main)
 	planning.stop_singleplayer()
 	main.queue_free()
 	await process_frame
-	# Let the audio mix thread retire the stopped match playback before exit.
-	await create_timer(0.2).timeout
+	await _await_audio_retirement(playbacks)
 	DirAccess.remove_absolute(save_path)
 	DirAccess.remove_absolute(directory)
 	if failures == 0:

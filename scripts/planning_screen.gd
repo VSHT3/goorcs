@@ -47,6 +47,8 @@ var _results_run_id: String = ""
 var sound_player: GameSoundPlayer
 var _roll_details: Label
 var rarity_reroll: Button
+var rarity_batch_selector: Button
+var _rarity_batch: int = 1
 var attribute_reroll: Button
 var _extra_upgrade_buttons: Dictionary[String, Button] = {}
 var _reroll_balance: Label
@@ -241,7 +243,23 @@ func _build_tower_management() -> void:
 		button.add_theme_font_override("font", _coins.get_theme_font("font"))
 		button.add_theme_font_size_override("font_size", 16)
 		button.pressed.connect(_reroll.bind(kind))
-		rerolls.add_child(button)
+		if kind == "rarity":
+			var row := HBoxContainer.new()
+			rerolls.add_child(row)
+			button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(button)
+			rarity_batch_selector = Button.new()
+			rarity_batch_selector.name = "RarityBatch"
+			rarity_batch_selector.text = "1×"
+			rarity_batch_selector.custom_minimum_size = Vector2(56, 36)
+			rarity_batch_selector.add_theme_font_override("font", _coins.get_theme_font("font"))
+			rarity_batch_selector.add_theme_font_size_override("font_size", 16)
+			rarity_batch_selector.pressed.connect(_cycle_rarity_batch)
+			row.add_child(rarity_batch_selector)
+			button.focus_neighbor_right = button.get_path_to(rarity_batch_selector)
+			rarity_batch_selector.focus_neighbor_left = rarity_batch_selector.get_path_to(button)
+		else:
+			rerolls.add_child(button)
 		if kind == "rarity":
 			rarity_reroll = button
 		else:
@@ -508,6 +526,13 @@ func _build_currencies() -> void:
 			value.reparent(row, false)
 		value.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+func _cycle_rarity_batch() -> void:
+	if rarity_batch_selector.disabled:
+		return
+	_rarity_batch = 10 if _rarity_batch == 1 else (0 if _rarity_batch == 10 else 1)
+	_refresh_targeting()
+
+
 func _reroll(kind: String) -> void:
 	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
 	var tower: Dictionary = _selected_tower()
@@ -517,7 +542,8 @@ func _reroll(kind: String) -> void:
 		_pending_rarity_id = selected_tower_id
 		_pending_rarity_count = int(tower["rarity_rerolls"])
 		rarity_reroll.disabled = true
-	if not planning.reroll_tower(planning.local_slot(), selected_tower_id, kind):
+		rarity_batch_selector.disabled = true
+	if not planning.reroll_tower(planning.local_slot(), selected_tower_id, kind, _rarity_batch if kind == "rarity" else 1):
 		_pending_rarity_id = -1
 		_refresh()
 
@@ -1211,6 +1237,8 @@ func _refresh_targeting() -> void:
 	targeting_button.disabled = not planning.can_manage_towers(planning.local_slot())
 	var terminal: bool = int(planning.combat.get("phase", -1)) == MatchCombat.Phase.FINISHED
 	rarity_reroll.visible = not terminal
+	rarity_batch_selector.visible = not terminal
+	rarity_batch_selector.disabled = terminal or targeting_button.disabled or _pending_rarity_id >= 0 or not _queued_rarity_tower.is_empty() or _rarity_reel.is_busy()
 	attribute_reroll.visible = not terminal
 	sell_button.visible = not terminal
 	if terminal:
@@ -1306,6 +1334,14 @@ func _refresh_action(button: Button, action: Dictionary) -> void:
 
 func _refresh_reroll(button: Button, tower: Dictionary, kind: String, balance: int) -> void:
 	var price: int = int(tower.get("rarity_reroll_cost" if kind == "rarity" else "attribute_reroll_cost", -1))
+	if kind == "rarity":
+		var quote: Dictionary = tower.get("rarity_batch_quotes", {}).get("max" if _rarity_batch == 0 else str(_rarity_batch), {})
+		price = int(quote.get("cost", -1))
+		rarity_batch_selector.text = "Max" if _rarity_batch == 0 else "%d×" % _rarity_batch
+		button.text = "Reroll rarity · %s" % ("%d Shards" % price if price >= 0 else "Unavailable")
+		button.disabled = rarity_batch_selector.disabled or not bool(quote.get("affordable", false)) or int(quote.get("count", 0)) <= 0 or price < 0 or balance < price
+		button.tooltip_text = ""
+		return
 	button.text = "%s · %s" % ["Reroll rarity" if kind == "rarity" else "Reroll attributes", ("%d Shards" if kind == "rarity" else "%d Coins") % price if price >= 0 else "Unavailable"]
 	button.disabled = targeting_button.disabled or price < 0 or balance < price or _pending_rarity_id >= 0 or not _queued_rarity_tower.is_empty() or _rarity_reel.is_busy()
 	button.tooltip_text = reroll_tooltip(kind)
