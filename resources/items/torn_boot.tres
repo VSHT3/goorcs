@@ -13,4 +13,4 @@ effect_text = "Enemies summoned on your side are 12% slower."
 flavor_text = "A torn boot, orcs feet hurt more so they go slower."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
-mechanics = PackedStringArray("Enemies summoned on your side have their movement speed multiplied by 0.88 (12% slower).")
+mechanics = PackedStringArray("Your side's summoned enemy speed ×0.88.")

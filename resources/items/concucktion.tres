@@ -12,4 +12,4 @@ rarity = 3
 effect_text = "Your towers switch their targeting randomly each time they attack, but gain +50% attack speed."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
-mechanics = PackedStringArray("For each attack, choose a random targeting policy from that tower's available policies.", "Your towers gain 50% attack rate: attack rate is multiplied by 1.50, so attack interval is divided by 1.50.")
+mechanics = PackedStringArray("Each attack randomly selects one of that tower's available targeting policies.", "Attack rate ×1.50; attack interval ÷1.50.")

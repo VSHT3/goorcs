@@ -25,6 +25,7 @@ var _art_column: VBoxContainer
 var _art_frame: PortraitFrame
 var _entrance: Tween
 var _layout_pending: bool = false
+var _layout_generation: int = 0
 
 
 class PortraitFrame extends Control:
@@ -83,9 +84,14 @@ func _ready() -> void:
 	style.set_content_margin_all(24)
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
+	# Keep wrapped content minimums from resizing the viewport-owned modal.
+	var panel_content := Control.new()
+	panel_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_panel.add_child(panel_content)
 	var shell := VBoxContainer.new()
 	shell.add_theme_constant_override("separation", 22)
-	_panel.add_child(shell)
+	panel_content.add_child(shell)
+	shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 18)
 	shell.add_child(header)
@@ -98,13 +104,20 @@ func _ready() -> void:
 	_heading = _label(30)
 	_heading.name = "ItemTitle"
 	title_stack.add_child(_heading)
+	var close_space := Control.new()
+	close_space.custom_minimum_size = Vector2(40, 40)
+	close_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	header.add_child(close_space)
 	back_button = Button.new()
 	back_button.name = "CloseInspection"
 	CloseButtonStyle.apply(back_button)
-	back_button.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	MenuAudio.bind_action(back_button)
 	back_button.pressed.connect(dismiss)
-	header.add_child(back_button)
+	# The close target must not move when a title or description rewraps.
+	panel_content.add_child(back_button)
+	back_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	back_button.offset_left = -40
+	back_button.offset_bottom = 40
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 28)
@@ -169,10 +182,6 @@ func _ready() -> void:
 	_effect = _label(21)
 	_effect.name = "Effect"
 	content.add_child(_effect)
-	var mechanics_title := _label(18)
-	mechanics_title.text = "Mechanics"
-	mechanics_title.add_theme_color_override("font_color", Color("b8cba8"))
-	content.add_child(mechanics_title)
 	_mechanics = _label(18)
 	_mechanics.name = "ExactMechanics"
 	_mechanics.add_theme_constant_override("line_spacing", 4)
@@ -185,6 +194,7 @@ func _ready() -> void:
 	_flavor.add_theme_color_override("font_color", Color("c5cbb3"))
 	content.add_child(_flavor)
 	_panel.minimum_size_changed.connect(_queue_panel_layout)
+	shell.minimum_size_changed.connect(_queue_panel_layout)
 	resized.connect(_queue_panel_layout)
 	visibility_changed.connect(_visibility_changed)
 	_layout_panel()
@@ -227,7 +237,7 @@ func _present(item: ItemDefinition) -> void:
 	_heading.add_theme_color_override("font_color", Color("f0f3df"))
 	portrait.texture = item.detail_texture
 	_effect.text = item.effect_text
-	_mechanics.text = "• " + "\n\n• ".join(item.mechanics)
+	_mechanics.text = "• " + "\n• ".join(item.mechanics)
 	_flavor.text = item.flavor_text
 	_flavor.visible = not item.flavor_text.is_empty()
 	_acquisition.text = item.acquisition_text
@@ -283,23 +293,34 @@ func _find_upgrade(item: ItemDefinition) -> ItemDefinition:
 
 
 func _queue_panel_layout() -> void:
-	if _layout_pending:
+	if _layout_pending or not is_visible_in_tree():
 		return
 	_layout_pending = true
-	_layout_panel.call_deferred()
+	_flush_panel_layout.call_deferred(_layout_generation)
+
+
+func _flush_panel_layout(generation: int) -> void:
+	if generation != _layout_generation:
+		return
+	_layout_pending = false
+	if is_visible_in_tree():
+		_layout_panel()
+
+
+func _cancel_panel_layout() -> void:
+	_layout_generation += 1
+	_layout_pending = false
 
 
 func _layout_panel() -> void:
 	if _panel == null:
 		return
-	_layout_pending = false
 	var panel_size := Vector2(minf(1120, size.x - 64), minf(660, size.y - 64))
 	var art_side: float = clampf((panel_size.x - 48) * 0.33, 288, 352)
 	_art_column.custom_minimum_size.x = art_side
 	_art_frame.custom_minimum_size = Vector2.ONE * art_side
-	# Wrapped text and newly visible actions settle through deferred container sorts.
-	# Reapply the viewport-owned size when their minimum changes, so a transient
-	# narrow label cannot leave this freely positioned panel permanently enlarged.
+	# Coalesce wrapped-content sorts while keeping panel and close geometry owned
+	# by the viewport, not by a label's transient minimum size.
 	_panel.size = panel_size.round()
 	_panel.position = ((size - panel_size) * 0.5).round()
 
@@ -344,6 +365,7 @@ func _scroll_input(event: InputEvent) -> void:
 
 func _visibility_changed() -> void:
 	if not is_visible_in_tree():
+		_cancel_panel_layout()
 		_stop_entrance()
 		set_process_input(false)
 		if _art_frame != null:
@@ -351,6 +373,7 @@ func _visibility_changed() -> void:
 
 
 func _exit_tree() -> void:
+	_cancel_panel_layout()
 	_stop_entrance()
 
 

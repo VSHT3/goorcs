@@ -12,4 +12,4 @@ rarity = 2
 effect_text = "Every 20th enemy kill on your board pays 5× its normal Coin bounty."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
-mechanics = PackedStringArray("Count actual enemy kills on your own board. Every 20th kill pays 5× its normal Coin bounty.", "The golden enemy is visibly marked. A normal bounty of 0 still pays 0 Coins.", "Higher stone tiers replace this version and use one shared alchemy counter, never independent stacking counters.")
+mechanics = PackedStringArray("Count actual kills on your board; every 20th is marked golden. Zero bounty stays 0.", "Higher stones replace this tier, never stack separate alchemy counters.")
