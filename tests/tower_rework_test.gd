@@ -15,6 +15,7 @@ var failures: int = 0
 func _init() -> void:
 	_test_circular_range()
 	_test_rune_range()
+	_test_war_drums_rolls()
 	_test_war_drums()
 	_test_crits()
 	_test_capstones()
@@ -83,32 +84,133 @@ func _test_rune_range() -> void:
 	_check(is_equal_approx(float(storm["range"]), 4.0), "Storm Sigil is the long-range Rune path")
 
 
-func _test_war_drums() -> void:
-	var catalog: ContentCatalog = _rules().catalog
-	var drums: TowerDefinition = null
-	for definition: TowerDefinition in catalog.towers:
+func _test_war_drums_rolls() -> void:
+	var rules: CombatRules = (load("res://resources/combat/prototype.tres") as CombatRules).duplicate(true)
+	rules.sandbox_mode = false
+	_check(rules.roll_rules != null, "The actual prototype enables placement rolls")
+	if rules.roll_rules == null:
+		return
+	var drums_definition: TowerDefinition
+	var valid: bool = true
+	for definition: TowerDefinition in rules.catalog.towers:
+		var errors: PackedStringArray = rules.roll_rules.validation_errors(definition.roll_attributes, definition.roll_profile)
+		_check(errors.is_empty(), "Prototype roll rules admit %s: %s" % [definition.reward.id, " ".join(errors)])
+		valid = valid and errors.is_empty()
 		if definition.reward.id == &"war_drums":
-			drums = definition
-	_check(drums.cost == 110 and int(drums.evolutions["forge"]["cost"]) == 550 and int(drums.evolutions["command_banner"]["cost"]) == 550, "Forge and Command Banner cost more")
-	var combat := MatchCombat.new(_rules())
-	var forge := _built(combat, Vector2i(5, 5), &"war_drums", ["damage", "speed", "forge"] + FORGE)
-	var arrow := _built(combat, Vector2i(6, 5), &"arrow_tower", [])
-	_check(is_equal_approx(float(forge["behavior_config"]["damage_bonus"]), 0.9) and is_equal_approx(float(arrow["support_damage_bonus"]), 0.9), "Dragonfire Forge stacks its steps and keeps both paid upgrades: %s" % forge["behavior_config"])
-	_check(is_equal_approx(float(forge["range"]), 2.5), "Master Smith widens the Forge's own aura")
-	var lookout_board := MatchCombat.new(_rules())
-	var horn := _built(lookout_board, Vector2i(5, 5), &"war_drums", ["damage", "speed", "lookout_horn"])
-	var near := _built(lookout_board, Vector2i(6, 5), &"arrow_tower", [])
-	var buddy := _built(lookout_board, Vector2i(5, 6), &"war_drums", [])
-	_check(is_equal_approx(float(near["range"]), 3.75), "Lookout Horn adds reach to nearby attacking towers: %s" % near["range"])
-	_check(is_equal_approx(float(buddy["range"]), 2.0), "Range auras never extend other auras")
-	for step: String in LOOKOUT:
-		_check(lookout_board.upgrade_tower(0, horn["id"], step), "Lookout Horn accepts %s" % step)
-	_check(is_equal_approx(float(near["range"]), 4.75) and is_equal_approx(float(horn["range"]), 3.5) and is_equal_approx(float(near["crit_chance"]), 0.05), "All-Seeing Tower: +1.75 reach, wider aura and Eagle Eyes crits")
-	var totem_board := MatchCombat.new(_rules())
-	var totem := _built(totem_board, Vector2i(5, 5), &"war_drums", ["damage", "speed", "bloodlust_totem"] + TOTEM)
-	var striker := _built(totem_board, Vector2i(6, 5), &"arrow_tower", [])
-	_check(is_equal_approx(float(striker["crit_chance"]), 0.3) and is_equal_approx(float(striker["support_range_bonus"]), 0.25), "Skullsplitter Totem: 30% crit chance and a little reach")
-	_check(not totem_board.upgrade_tower(0, totem["id"], "forge"), "Drum branches stay exclusive")
+			drums_definition = definition
+	if not valid:
+		return
+	_check(drums_definition != null, "The actual prototype includes War Drums")
+	if drums_definition == null:
+		return
+	_check(drums_definition.roll_attributes == PackedStringArray(["support_buff"]), "Shipped Drums opt into only support strength, never range")
+	for index: int in range(TowerRollRules.RARITIES.size()):
+		var rarity: String = TowerRollRules.RARITIES[index]
+		var random := RandomNumberGenerator.new()
+		random.seed = 0
+		if not _select_drums_roll(random, rules.roll_rules, drums_definition, rarity):
+			continue
+		var combat := MatchCombat.new(rules, null, null, null, random)
+		var coins: int = combat.coins[0]
+		var accepted: bool = combat.build(0, Vector2i(5, 5), &"war_drums", MatchCombat.TargetMode.FURTHEST)
+		_check(accepted and coins - combat.coins[0] == drums_definition.cost, "%s Drums placement succeeds and charges its authored price" % rarity)
+		if not accepted:
+			continue
+		var drums := _tower(combat, 0, Vector2i(5, 5))
+		_check(drums["rarity"] == rarity, "Paid placement exercises %s using the unchanged shipped pools and weights" % rarity)
+		_check_drums_roll(drums, rules.roll_rules, drums_definition)
+		var attribute_cost: int = drums["attribute_reroll_cost"]
+		var shards: int = combat.reroll_currency[0]
+		coins = combat.coins[0]
+		_check(combat.reroll_tower(0, drums["id"], "attributes") and coins - combat.coins[0] == attribute_cost and combat.reroll_currency[0] == shards and drums["attribute_rerolls"] == 1 and drums["rarity"] == rarity, "%s attribute reroll is paid in Coins and retains its tier" % rarity)
+		_check_drums_roll(drums, rules.roll_rules, drums_definition)
+		var next_rarity: String = TowerRollRules.RARITIES[(index + 1) % TowerRollRules.RARITIES.size()]
+		if not _select_drums_roll(random, rules.roll_rules, drums_definition, next_rarity, rarity):
+			continue
+		var rarity_cost: int = drums["rarity_reroll_cost"]
+		coins = combat.coins[0]
+		_check(combat.reroll_tower(0, drums["id"], "rarity") and shards - combat.reroll_currency[0] == rarity_cost and combat.coins[0] == coins and drums["rarity_rerolls"] == 1 and drums["attribute_rerolls"] == 0 and drums["rarity"] == next_rarity, "Paid %s-to-%s rarity reroll replaces the tier, including Mythic-to-Broken downgrade" % [rarity, next_rarity])
+		_check_drums_roll(drums, rules.roll_rules, drums_definition)
+
+
+func _select_drums_roll(random: RandomNumberGenerator, rules: TowerRollRules, definition: TowerDefinition, rarity: String, excluded: String = "") -> bool:
+	for tier: Dictionary in rules.rarities:
+		if tier["id"] != rarity:
+			continue
+		_check(float(tier["weight"]) > 0.0 and rarity != excluded, "Requested paid Drums tier is selectable")
+		if float(tier["weight"]) <= 0.0 or rarity == excluded:
+			return false
+		# Find a stream state, not a pinned seed/result or modified rarity weight.
+		# Replay that state through the real paid placement/reroll transaction.
+		while true:
+			var state: int = random.state
+			var rolled: Dictionary = rules.generate_admitted(random, definition.roll_attributes, excluded, definition.roll_profile)
+			if rolled["rarity"] == rarity:
+				random.state = state
+				return true
+	_check(false, "Requested Drums tier exists in the shipped rules")
+	return false
+
+
+func _check_drums_roll(drums: Dictionary, rules: TowerRollRules, definition: TowerDefinition) -> void:
+	var attributes: Array[Dictionary] = drums["attributes"]
+	_check(attributes.size() == 1, "Every shipped Drums tier has exactly one non-opposing strength effect")
+	_check(is_equal_approx(float(drums["range"]), definition.range_cells), "Placement and both rerolls preserve authored Drums coverage")
+	if attributes.size() != 1:
+		return
+	var attribute: Dictionary = attributes[0]
+	_check(attribute["effect"] == "support_buff", "Paid Drums placement and rerolls never roll range or fake effects")
+	if attribute["effect"] != "support_buff":
+		return
+	var positive: bool = drums["rarity"] not in ["broken", "shoddy"]
+	var value: float = attribute["value"]
+	_check(attribute["positive"] == positive and (value > 0.0 if positive else value < 0.0), "Broken/Shoddy weaken support; higher rarities strengthen it without an opposing effect")
+	for tier: Dictionary in rules.rarities:
+		if tier["id"] == drums["rarity"]:
+			var bounds: Vector2 = tier["positive_pool" if positive else "drawback_pool"]["support_buff"]
+			_check(value >= bounds.x and value <= bounds.y, "Support strength retains its authored rarity-specific bounds")
+	for component: String in ["damage_bonus", "attack_speed_bonus"]:
+		_check(is_equal_approx(float(drums["behavior_config"][component]), float(definition.behavior_config[component]) * (1.0 + value)), "Paid Drums rolls apply their strength to the real %s aura" % component)
+
+
+func _test_war_drums() -> void:
+	_check(_rules().catalog.validation_errors().is_empty(), "Rebalanced authored resources satisfy content validation")
+	var branches: Dictionary = {
+		"forge": [FORGE, "support_damage_bonus", [0.5, 0.6, 0.7, 0.9], 825],
+		"command_banner": [["drill_sergeant", "rallying_cry", "warlords_standard"], "support_speed_bonus", [0.5, 0.6, 0.7, 0.9], 825],
+		"lookout_horn": [LOOKOUT, "support_range_bonus", [0.75, 1.0, 1.25, 1.75], 750],
+		"bloodlust_totem": [TOTEM, "crit_chance", [0.1, 0.15, 0.2, 0.3], 750],
+	}
+	for branch: String in branches:
+		var combat := MatchCombat.new(_rules(false))
+		var before: int = combat.coins[0]
+		var source := _built(combat, Vector2i(5, 5), &"war_drums", [])
+		_check(before - combat.coins[0] == 110, "Placement retains its actual 110-Coin charge")
+		var attack := _built(combat, Vector2i(6, 5), &"arrow_tower", [])
+		var buddy := _built(combat, Vector2i(5, 6), &"war_drums", [])
+		var buddy_radius: float = buddy["range"]
+		# Remove the second mixed aura before purity assertions, but retain a
+		# support target to prove the Horn never extends other support coverage.
+		_check(combat.upgrade_tower(0, buddy["id"], "damage") and combat.upgrade_tower(0, buddy["id"], "speed") and combat.upgrade_tower(0, buddy["id"], branch), "Companion specializes into the same pure branch")
+		var commands: Array = ["damage", "speed", branch] + branches[branch][0]
+		var prices: Array[int] = [75, 113, int(branches[branch][3]), 900, 1350, 2250]
+		for index: int in range(commands.size()):
+			var command: String = commands[index]
+			combat.coins[0] = prices[index] - 1
+			var state: Dictionary = source.duplicate(true)
+			_check(not combat.upgrade_tower(0, source["id"], command) and combat.coins[0] == prices[index] - 1 and source == state, "%s rejects unaffordable %s without spending or changing accepted state" % [branch, command])
+			combat.coins[0] = prices[index]
+			_check(combat.upgrade_tower(0, source["id"], command) and combat.coins[0] == 0, "%s charges exactly %d for %s" % [branch, prices[index], command])
+			if index < 2:
+				continue
+			var expected: float = branches[branch][2][index - 2]
+			for stat: String in ["support_damage_bonus", "support_speed_bonus", "support_range_bonus", "crit_chance"]:
+				_check(is_equal_approx(float(attack[stat]), expected if stat == branches[branch][1] else 0.0), "%s tier %d affects only its chosen attacker stat (%s)" % [branch, index - 1, stat])
+			var expected_radius: float = [2.0, 2.5, 2.5, 3.5][index - 2] if branch == "lookout_horn" else 2.0
+			_check(is_equal_approx(float(source["range"]), expected_radius) and is_equal_approx(float(buddy["range"]), buddy_radius), "%s tier %d has only its own authored coverage; supports never extend each other" % [branch, index - 1])
+		combat.coins[0] = 100000
+		var final_state: Dictionary = source.duplicate(true)
+		_check(not combat.upgrade_tower(0, source["id"], branch) and not combat.upgrade_tower(0, source["id"], String(commands.back())) and source == final_state and combat.coins[0] == 100000, "Terminal branches reject repurchase without spending")
 
 
 func _test_crits() -> void:

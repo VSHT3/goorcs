@@ -15,7 +15,7 @@
 script = ExtResource("1_reward")
 id = &"war_drums"
 title = "War Drums"
-description = "Paired war drums strengthen the damage and attack speed of nearby towers. Evolve into a Forge, Command Banner, Lookout Horn or Bloodlust Totem."
+description = "Paired war drums strengthen nearby attackers. Choose one permanent specialty: Forge damage, Command Banner attack speed, Lookout Horn range or Bloodlust Totem critical hits. Only the Horn expands its aura; the strongest nearby bonus of each kind applies."
 icon_texture = ExtResource("2_art")
 accent = Color(0.76, 0.40, 0.28, 1)
 board_height = 0.8

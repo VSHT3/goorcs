@@ -12,20 +12,22 @@ Health and movement use the existing wave-scaled baseline in `CombatRules`: each
 
 | Enemy | HP multiplier | Speed multiplier | Base damage | Regular wave | Send wave | Weight | Max weight share | Send price / income |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| Orcling | 0.5 | 0.9 | 1 | 1 | 1 | 1 per group | 35% | 12 / +1 per group |
-| Orc (`grunt`) | 1 | 1 | 1 | 1 | 6 | 1 | 100% | 20 / +2 |
-| Runner | 0.6 | 1.7 | 1 | 6 | 12 | 2 | 30% | 25 / +2 |
-| Brute | 2.5 | 0.65 | 3 | 12 | 22 | 5 | 35% | 40 / +4 |
-| Orc Chief | 6 | 0.5 | 5 | 22 | 34 | 12 | 25% | 130 / +5 |
-| NecOrcmancer | 5 | 0.5 | 3 | 34 | 46 | 15 | 25% | 140 / +6 |
-| NecOrcmancer Mancer | 30 | 0.3 | 8 | 40, then occasional | 60 | 40 | 50% | 7,500 / −100 |
-| Trollorc | 180 | 0.09 | 10 | 60, then occasional | 80 | 60 | 65% | 20,000 / −300 |
-| Orc king war orchine | 450 | 0.07 | 10 | 100, then occasional | 120 | 100 | 75% | 50,000 / −1,000 |
+| Orcling | 0.5 | 0.9 | 1 | 1 | 1 | 1 per group | 35% | 15 / +1 per group |
+| Orc (`grunt`) | 1 | 1 | 1 | 1 | 6 | 1 | 100% | 25 / +2 |
+| Runner | 0.6 | 1.7 | 1 | 6 | 12 | 2 | 30% | 32 / +2 |
+| Brute | 2.5 | 0.65 | 3 | 12 | 22 | 5 | 35% | 50 / +4 |
+| Orc Chief | 6 | 0.5 | 5 | 22 | 34 | 12 | 25% | 163 / +5 |
+| NecOrcmancer | 5 | 0.5 | 3 | 34 | 46 | 15 | 25% | 175 / +6 |
+| NecOrcmancer Mancer | 30 | 0.3 | 8 | 40, then occasional | 60 | 40 | 50% | 9,375 / −100 |
+| Trollorc | 180 | 0.09 | 10 | 60, then occasional | 80 | 60 | 65% | 25,000 / −300 |
+| Orc king war orchine | 450 | 0.07 | 10 | 100, then occasional | 120 | 100 | 75% | 62,500 / −1,000 |
 | Skeltorc | 0.5 | 1.05 | 1 | Summoned only | Not purchasable | Not in regular roster | — | — |
 | Giant Skeltorc | 50× rounded Skeltorc HP | 0.84 | 1 | 1% Skeltorc births from 151 | Not purchasable | Not in regular roster | — | — |
-| KamikaOrc | 0.35 | 1.1 | 2 | 80 | 100 | 8 | 12% | 200 / +8 |
+| KamikaOrc | 0.35 | 1.1 | 2 | 80 | 100 | 8 | 12% | 250 / +8 |
 
 The first five rounds allow only Orcling sends. Each later send unlock trails its regular threat tier; the ordinary NecOrcmancer send unlock is deliberately delayed until round 46. UI previews and command validation use the same accepted gate. Earlier-round debug jumps relock later sends. Skeltorcs and Giants remain available directly in Sandbox.
+
+Every enabled send, including bosses, costs `ceil(previous price × 1.25)` after the send rebalance. Income changes, unlock rounds, enemy stats, and wave composition are unchanged.
 
 Boss orders pay both the listed Coin price and the full recurring-income penalty immediately and atomically. A sender with too little of either cannot order; income never becomes negative or gets silently clamped. The loss persists through later clears until ordinary sends rebuild income. Mirrored Singleplayer validates both balances before spending or rolling. Each order queues exactly one boss through the existing paced opponent FIFO; regular encounter count/share limits do not cap paid orders. Planning/Ready/terminal restrictions remain unchanged, and a first actual paid-boss kill remains eligible for the existing first-kill loot. All send tuning is provisional.
 
@@ -56,11 +58,11 @@ These five roles join the existing roster progressively. All are available direc
 
 | Enemy | Regular / Send round | HP / Speed multiplier | Weight / share | Send Coins / income | Gimmick |
 | --- | --- | --- | --- | --- | --- |
-| Scrapguard | 9 / 16 | 2 / 0.8 | 3 / 30% | 35 / +3 | Physical damage ×0.5; elemental damage stays normal. |
-| CrateOrc | 18 / 28 | 2.2 / 0.7 | 5 / 25% | 50 / +3 | A confirmed death releases exactly two individual Orclings. |
-| RageOrc | 28 / 40 | 3.5 / 0.8 | 7 / 30% | 80 / +4 | First surviving hit to ≤50% HP permanently multiplies speed by 1.6. |
-| MossOrc | 52 / 66 | 6 / 0.55 | 12 / 20% | 120 / +5 | Regenerates 8% of maximum HP every four simulation seconds. |
-| HeavyDutyOrc | 30 / 40 | 9 / 0.4 | 10 / 25% | 110 / +4 | Slowest regular orc; industrial plate takes Physical ×0.5 and every other element ×0.9; leaks for 6. |
+| Scrapguard | 9 / 16 | 2 / 0.8 | 3 / 30% | 44 / +3 | Physical damage ×0.5; elemental damage stays normal. |
+| CrateOrc | 18 / 28 | 2.2 / 0.7 | 5 / 25% | 63 / +3 | A confirmed death releases exactly two individual Orclings. |
+| RageOrc | 28 / 40 | 3.5 / 0.8 | 7 / 30% | 100 / +4 | First surviving hit to ≤50% HP permanently multiplies speed by 1.6. |
+| MossOrc | 52 / 66 | 6 / 0.55 | 12 / 20% | 150 / +5 | Regenerates 8% of maximum HP every four simulation seconds. |
+| HeavyDutyOrc | 30 / 40 | 9 / 0.4 | 10 / 25% | 138 / +4 | Slowest regular orc; industrial plate takes Physical ×0.5 and every other element ×0.9; leaks for 6. |
 
 Crate children inherit the captured parent route/current progress, start fresh at birth, keep ordinary Orcling rewards, and prevent clearance. Tower kills award the crate bounty once; collateral death releases children without awarding the player; leaks release none. Combined summon/death-child graphs reject missing references, boss children, and cycles.
 
@@ -74,12 +76,12 @@ An enemy listed as immune to an element takes no damage from it. Single-target t
 
 | Enemy | Regular / Send round | HP / Speed multiplier | Weight / cap | Send Coins / income | Gimmick |
 | --- | --- | --- | --- | --- | --- |
-| Ember Orc | 10 / 16 | 1.3 / 1.0 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Fire (including explosions); never burns. |
-| Frost Orc | 13 / 19 | 1.4 / 0.9 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Ice; never slowed. |
-| Storm Orc | 15 / 21 | 1.2 / 1.15 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Lightning. |
-| Arcane Orc | 17 / 23 | 1.3 / 1.0 | 2 / 1 (+1 per 10 rounds) | 30 / +2 | Immune to Magic. |
-| EleMetal Orc | 20 / 26 | 1.6 / 0.75 | 3 / 1 (+1 per 10 rounds) | 40 / +3 | Heavy full-body iron plate: immune to Physical, takes 50% more Lightning. |
-| Omega Elemental Orc (elite) | 32 / 48 | 4 / 0.7 | 12 / 1 (+1 per 12 rounds) | 90 / +5 | Immune to Fire, Ice, Lightning and Magic; only Physical hurts it. |
+| Ember Orc | 10 / 16 | 1.3 / 1.0 | 2 / 1 (+1 per 10 rounds) | 38 / +2 | Immune to Fire (including explosions); never burns. |
+| Frost Orc | 13 / 19 | 1.4 / 0.9 | 2 / 1 (+1 per 10 rounds) | 38 / +2 | Immune to Ice; never slowed. |
+| Storm Orc | 15 / 21 | 1.2 / 1.15 | 2 / 1 (+1 per 10 rounds) | 38 / +2 | Immune to Lightning. |
+| Arcane Orc | 17 / 23 | 1.3 / 1.0 | 2 / 1 (+1 per 10 rounds) | 38 / +2 | Immune to Magic. |
+| EleMetal Orc | 20 / 26 | 1.6 / 0.75 | 3 / 1 (+1 per 10 rounds) | 50 / +3 | Heavy full-body iron plate: immune to Physical, takes 50% more Lightning. |
+| Omega Elemental Orc (elite) | 32 / 48 | 4 / 0.7 | 12 / 1 (+1 per 12 rounds) | 113 / +5 | Immune to Fire, Ice, Lightning and Magic; only Physical hurts it. |
 
 Their caps grow quickly so one or two of each season most mid-game waves: together the Elemental Orcs take about a quarter of a round-40–50 wave's weight and just under a fifth by round 100, when more types share the draw. That is enough to punish a single-element defence without replacing the horde.
 
@@ -87,8 +89,8 @@ Their caps grow quickly so one or two of each season most mid-game waves: togeth
 
 | Enemy | Regular / Send round | HP / Speed multiplier | Weight / cap | Send Coins / income | Gimmick |
 | --- | --- | --- | --- | --- | --- |
-| ShaOrc | 24 / 32 | 2 / 0.6 | 5 / 2 (+1 per 10 rounds) | 60 / +3 | Every 6 s raises its staff: heals other orcs within 2 cells for 15% of their maximum HP and restores its own one-hit shield. |
-| Greater ShaOrc (elite) | 60 / 72 | 7 / 0.5 | 30 / 1 (+1 per 20 rounds) | 400 / +8 | Every 12 s wards every other non-boss orc within 3.5 cells: immune to all damage for 10 s. |
+| ShaOrc | 24 / 32 | 2 / 0.6 | 5 / 2 (+1 per 10 rounds) | 75 / +3 | Every 6 s raises its staff: heals other orcs within 2 cells for 15% of their maximum HP and restores its own one-hit shield. |
+| Greater ShaOrc (elite) | 60 / 72 | 7 / 0.5 | 30 / 1 (+1 per 20 rounds) | 500 / +8 | Every 12 s wards every other non-boss orc within 3.5 cells: immune to all damage for 10 s. |
 
 **OrcShakra.** Each other living ShaOrc within 3 cells charges a ShaOrc's cast faster, with diminishing returns: +20%, +30%, +35%, +37.5% for one to four neighbours, approaching +40% (`shakra_max_bonus * (1 - 0.5^n)`). The charge is integrated on the simulation clock, so a ShaOrc that walks into a group speeds up from that moment.
 
@@ -141,11 +143,11 @@ Every **8 seconds**, a **1.2-second** door-opening action releases **4–7** hos
 
 ### Wraithorc (round 120)
 
-`wraithorc` is a late elite shade: **7×** HP, **0.75×** speed, **4** leak damage, weight 14 (one per wave, +1 every 20 rounds), sends from round 135 for 160 Coins. Every **3 s** it switches between solid and ethereal; while ethereal it is drawn translucent and **Physical and Fire deal nothing**, so towers of those elements switch targets until it turns solid again. Lightning, Ice and Magic always hurt it. The phase follows its own simulation clock (`phase_interval`, `phase_immune_elements`).
+`wraithorc` is a late elite shade: **7×** HP, **0.75×** speed, **4** leak damage, weight 14 (one per wave, +1 every 20 rounds), sends from round 135 for 200 Coins. Every **3 s** it switches between solid and ethereal; while ethereal it is drawn translucent and **Physical and Fire deal nothing**, so towers of those elements switch targets until it turns solid again. Lightning, Ice and Magic always hurt it. The phase follows its own simulation clock (`phase_interval`, `phase_immune_elements`).
 
 ### Grand Mage Orcafus (round 140)
 
-`grand_mage_orcafus` is a mid-sized gliding archmage: **100×** HP, **0.3×** speed, silent **0.25% max-HP regeneration every 2 s**, and immune to **Fire, Ice and Magic** (only Physical and Lightning hurt him). His debut is guaranteed at **round 140**; afterwards he rolls **5% + 0.6 points per round, up to 50%**, so he becomes a regular sight in late waves. Paid sends unlock at round 160 for **30,000 Coins / −600 income**.
+`grand_mage_orcafus` is a mid-sized gliding archmage: **100×** HP, **0.3×** speed, silent **0.25% max-HP regeneration every 2 s**, and immune to **Fire, Ice and Magic** (only Physical and Lightning hurt him). His debut is guaranteed at **round 140**; afterwards he rolls **5% + 0.6 points per round, up to 50%**, so he becomes a regular sight in late waves. Paid sends unlock at round 160 for **37,500 Coins / −600 income**.
 
 He glides **1.4 s**, then stops for the next castable spell of his `spellbook` rotation, spending most of his time standing still and casting:
 
@@ -161,7 +163,7 @@ When he dies, his last swing sends a lightning bolt that stuns your **most valua
 
 ### Dreadmaw, the Bone Wyrm (round 200)
 
-`dreadmaw` is a colossal skeletal dragon ridden by a lich warlord: **250×** HP, **0.12×** speed, **25** leak damage. Bone takes **60%** of Physical damage, Fire deals **150%**, and it is immune to Ice. Below **50% HP** it enrages and moves **1.3×** faster. Its death spills **8 Skeltorcs**. Debut guaranteed at **round 200**, then **3% + 0.3 points per round, up to 30%**; sends from round 220 for **120,000 Coins / −2,500 income**.
+`dreadmaw` is a colossal skeletal dragon ridden by a lich warlord: **250×** HP, **0.12×** speed, **25** leak damage. Bone takes **60%** of Physical damage, Fire deals **150%**, and it is immune to Ice. Below **50% HP** it enrages and moves **1.3×** faster. Its death spills **8 Skeltorcs**. Debut guaranteed at **round 200**, then **3% + 0.3 points per round, up to 30%**; sends from round 220 for **150,000 Coins / −2,500 income**.
 
 It walks **3 s** between casts:
 

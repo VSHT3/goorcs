@@ -353,9 +353,9 @@ func _support_scenario(code: String) -> void:
 	for cell: Vector2i in [Vector2i(3, 2), Vector2i(5, 2), Vector2i(4, 2)]:
 		var support: Dictionary = await _place("host", 0, cell, "war_drums")
 		await _upgrade("host", 0, int(support["id"]), ["damage", "speed", "command_banner" if cell == Vector2i(4, 2) else "forge"])
-	state = await _agree("Independent permanent support families stack on actual peers")
+	state = await _agree("Independent support stat winners reach actual peers")
 	archer = _tower(state, 0, Vector2i(4, 3))
-	_check(is_equal_approx(archer["support_damage_bonus"], 0.75) and is_equal_approx(archer["support_speed_bonus"], 0.75) and archer["damage"] == 18 and is_equal_approx(archer["interval"], 1.0 / 1.75), "Mixed Drums, pure-damage Forge and pure-speed Banner stack; duplicate Forges do not")
+	_check(is_equal_approx(archer["support_damage_bonus"], 0.5) and is_equal_approx(archer["support_speed_bonus"], 0.5) and archer["damage"] == 15 and is_equal_approx(archer["interval"], 1.0 / 1.5), "Forge damage and Banner speed coexist without adding weaker mixed Drums or duplicate Forges")
 	_check(_tower(state, 1, Vector2i(4, 3))["damage"] == 10 and _tower(state, 1, Vector2i(4, 3))["interval"] == 1.0, "Support never crosses ownership into the opposing board")
 	var forge: Dictionary = _tower(state, 0, Vector2i(3, 2))
 	var banner: Dictionary = _tower(state, 0, Vector2i(4, 2))

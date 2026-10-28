@@ -713,24 +713,17 @@ func _refresh_board(slot: int) -> void:
 		tower["element"] = String(TowerDefinition.element_of(_tower_damage_type(tower))) if kind in ["attack", "chain", "catapult"] else ""
 	_refresh_max_health(slot)
 	for tower: Dictionary in towers[slot]:
-		# Keep bonuses as 64-bit floats; Vector2 components narrow them to 32-bit.
-		var damage_groups: Dictionary[String, float] = {}
-		var speed_groups: Dictionary[String, float] = {}
-		var range_groups: Dictionary[String, float] = {}
-		var crit_groups: Dictionary[String, float] = {}
+		# Each stat has one winner across every support identity and stack group.
+		var range_bonus: float = 0.0
+		var crit_chance: float = 0.0
 		for support: Dictionary in towers[slot]:
 			if support["behavior_kind"] != "support" or float(support["stunned_remaining"]) > 0.000000001 or not cell_in_range(support["cell"], tower["cell"], support["range"]):
 				continue
 			var config: Dictionary = support["behavior_config"]
-			var group: String = config["stack_group"]
-			damage_groups[group] = maxf(damage_groups.get(group, 0.0), float(config["damage_bonus"]))
-			speed_groups[group] = maxf(speed_groups.get(group, 0.0), float(config["attack_speed_bonus"]))
-			range_groups[group] = maxf(range_groups.get(group, 0.0), float(config.get("range_aura", 0.0)))
-			crit_groups[group] = maxf(crit_groups.get(group, 0.0), float(config.get("crit_chance", 0.0)))
-		for bonus: float in damage_groups.values():
-			tower["support_damage_bonus"] += bonus
-		for bonus: float in speed_groups.values():
-			tower["support_speed_bonus"] += bonus
+			tower["support_damage_bonus"] = maxf(float(tower["support_damage_bonus"]), float(config["damage_bonus"]))
+			tower["support_speed_bonus"] = maxf(float(tower["support_speed_bonus"]), float(config["attack_speed_bonus"]))
+			range_bonus = maxf(range_bonus, float(config.get("range_aura", 0.0)))
+			crit_chance = maxf(crit_chance, float(config.get("crit_chance", 0.0)))
 		var commander: Dictionary = commanders[slot]
 		if not commander.is_empty() and tower["behavior_kind"] in ["attack", "chain", "catapult"]:
 			if cell_in_range(commander["landmark"], tower["cell"], CommanderRules.RADIUS):
@@ -745,12 +738,9 @@ func _refresh_board(slot: int) -> void:
 				_commander_rate_timing[slot] = true
 		# Reach and crits only help towers that attack; auras never extend auras.
 		if tower["behavior_kind"] in ["attack", "chain", "catapult"]:
-			for bonus: float in range_groups.values():
-				tower["support_range_bonus"] += bonus
-			tower["range"] = float(tower["range"]) + float(tower["support_range_bonus"])
-			for bonus: float in crit_groups.values():
-				tower["crit_chance"] += bonus
-			tower["crit_chance"] = minf(float(tower["crit_chance"]), TowerDefinition.MAX_CRIT_CHANCE)
+			tower["support_range_bonus"] = range_bonus
+			tower["range"] = float(tower["range"]) + range_bonus
+			tower["crit_chance"] = minf(crit_chance, TowerDefinition.MAX_CRIT_CHANCE)
 		var modifiers: Dictionary = tower["modifiers"]
 		var damage_multiplier: float = (1.0 + float(modifiers.get("damage", 0.0))) * (1.0 + float(tower["support_damage_bonus"]))
 		# Dreadmaw's Soulfire withers a tower's damage until it fades.

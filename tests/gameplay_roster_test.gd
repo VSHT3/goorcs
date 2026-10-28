@@ -9,6 +9,7 @@ func _init() -> void:
 	_batch_rolls()
 	_chain()
 	_support()
+	_support_winner_transitions()
 	_support_damage_rounding()
 	_rolled_range_cells()
 	_production()
@@ -344,7 +345,7 @@ func _support() -> void:
 	check(is_equal_approx(attack["support_damage_bonus"], 0.3) and is_equal_approx(attack["support_speed_bonus"], 0.4), "Strongest upgraded duplicate wins each component")
 	upgrade(model, first, ["forge"])
 	check(first["behavior_config"]["attack_speed_bonus"] == 0.0 and is_equal_approx(first["behavior_config"]["damage_bonus"], 0.5), "Forge remains pure damage and both prerequisite purchases retain useful role effects")
-	check(is_equal_approx(attack["support_damage_bonus"], 0.7) and is_equal_approx(attack["support_speed_bonus"], 0.3), "Different mixed/Forge stack groups add")
+	check(is_equal_approx(attack["support_damage_bonus"], 0.5) and is_equal_approx(attack["support_speed_bonus"], 0.3) and attack["damage"] == 150, "Forge replaces weaker mixed damage across groups while mixed speed remains independent")
 	upgrade(model, duplicate, ["damage", "speed", "command_banner"])
 	check(duplicate["behavior_config"]["damage_bonus"] == 0.0 and is_equal_approx(attack["support_damage_bonus"], 0.5) and is_equal_approx(attack["support_speed_bonus"], 0.5), "Banner replaces mixed role with pure speed while stacking independently with Forge")
 	open_wave(model)
@@ -355,6 +356,7 @@ func _support() -> void:
 	rules = fixture()
 	arrow = tower_definition(rules, &"arrow_tower")
 	drums = tower_definition(rules, &"war_drums")
+	drums.roll_attributes = PackedStringArray(["range", "support_buff"])
 	rules.catalog.towers = [arrow, drums]
 	arrow.roll_attributes = PackedStringArray(["range"])
 	rules.roll_rules = rolls({"range": Vector2(1, 1), "support_buff": Vector2(0.5, 0.5)}, 2)
@@ -366,6 +368,35 @@ func _support() -> void:
 	check(is_equal_approx(attack["support_damage_bonus"], 0.225) and is_equal_approx(attack["support_speed_bonus"], 0.225), "Rolled range reaches a distant tower and rolled strength scales both mixed support components")
 	upgrade(model, first, ["damage", "speed", "forge"])
 	check(model.reroll_tower(0, first["id"], "rarity") and is_equal_approx(attack["support_damage_bonus"], 0.75) and attack["support_speed_bonus"] == 0.0, "Support rolls and role purchases survive evolution/reroll without compounding or restoring replaced mixed speed")
+
+func _support_winner_transitions() -> void:
+	var rules := fixture()
+	var drums: TowerDefinition = tower_definition(rules, &"war_drums")
+	drums.behavior_config = {"stack_group": "weak", "damage_bonus": 0.15, "attack_speed_bonus": 0.2, "range_aura": 0.5, "crit_chance": 0.1}
+	var stronger := drums.duplicate(true) as TowerDefinition
+	stronger.reward = stronger.reward.duplicate(true) as TowerReward
+	stronger.reward.id = &"strong_support"
+	stronger.behavior_config = {"stack_group": "distinct", "damage_bonus": 0.4, "attack_speed_bonus": 0.0, "range_aura": 1.0, "crit_chance": 0.25}
+	rules.catalog.towers.append(stronger)
+	var model := MatchCombat.new(rules)
+	var attack: Dictionary = build(model, &"arrow_tower", Vector2i(1, 1))
+	var weak: Dictionary = build(model, &"war_drums", Vector2i(0, 1))
+	var winner: Dictionary = build(model, &"strong_support", Vector2i(1, 2))
+	var duplicate: Dictionary = build(model, &"strong_support", Vector2i(2, 1))
+	check(is_equal_approx(attack["support_damage_bonus"], 0.4) and is_equal_approx(attack["support_speed_bonus"], 0.2) and is_equal_approx(attack["support_range_bonus"], 1.0) and is_equal_approx(attack["crit_chance"], 0.25), "Distinct groups and duplicate auras select a maximum per stat, with independent winners")
+	check(weak["support_range_bonus"] == 0.0 and winner["range"] == stronger.range_cells and duplicate["range"] == stronger.range_cells, "Range support never extends another support aura")
+	model.sell_tower(0, duplicate["id"])
+	model._stun_tower(0, winner, 2.0, "test", Vector2(winner["cell"]))
+	model._refresh_board(0)
+	check(is_equal_approx(attack["support_damage_bonus"], 0.15) and is_equal_approx(attack["support_range_bonus"], 0.5) and is_equal_approx(attack["crit_chance"], 0.1), "Stunning the remaining winner restores weaker support across distinct groups")
+	model._elapsed += 2.0
+	model._advance_stuns(0, 2.0)
+	check(is_equal_approx(attack["support_damage_bonus"], 0.4) and is_equal_approx(attack["support_range_bonus"], 1.0), "Stun expiry restores the stronger stat winners without accumulation")
+	var accepted: Dictionary = model.snapshot()["towers"][0][0]
+	check(accepted["support_damage_bonus"] == attack["support_damage_bonus"] and accepted["range"] == attack["range"] and accepted["interval"] == attack["interval"], "Host snapshot retains the effective combat winners")
+	model.sell_tower(0, winner["id"])
+	check(is_equal_approx(attack["support_damage_bonus"], 0.15) and is_equal_approx(attack["support_range_bonus"], 0.5), "Selling the winner restores weaker support immediately")
+
 
 func _support_damage_rounding() -> void:
 	var bonuses: Array[float] = [0.2, (0.1 + 0.2) * 1.5, 0.200001]
@@ -405,6 +436,7 @@ func _rolled_range_cells() -> void:
 		check(is_equal_approx(rune["range"], 2.25 if bonus > 0.0 else (1.0 if bonus < 0.0 else 1.5)) and enemy["hp"] == (98 if bonus > 0.0 else 100), "A positive Rune range roll hits a newly included tile; unrolled range and minimum drawback radius stay intact")
 		var support_rules := fixture()
 		support_rules.catalog.towers = [tower_definition(support_rules, &"arrow_tower"), tower_definition(support_rules, &"war_drums")]
+		tower_definition(support_rules, &"war_drums").roll_attributes = PackedStringArray(["range", "support_buff"])
 		support_rules.roll_rules = rules.roll_rules
 		model = MatchCombat.new(support_rules)
 		var far: Dictionary = build(model, &"arrow_tower", Vector2i(3, 1))

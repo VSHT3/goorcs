@@ -23,6 +23,12 @@ Direct `godot --path .` does not perform the editor's project scan. A stale cach
 
 The stale-cache repair passed all **51/51** isolated headless/rendered checks with Mesa software rendering. A separate isolated Wayland main-scene smoke launched through `tools/run.sh`, clicked Play/Sandbox/Orcieary/Collection, returned with Escape, and exited through Quit. A rendered hover capture confirmed the main menu keeps its highlights without descriptive popups. This does not establish native NVIDIA driver behavior.
 
+### War Drums and sends balance
+
+War Drums upgrades now cost 50% more; sends cost 25% more, rounded upward, without changing enemy strength or recurring income. Each evolved Drums branch supplies only damage, attack speed, crit chance, or range. Only Lookout Horn grows coverage; shipped Drums roll only support strength. Support bonuses use the strongest source per stat across groups, never summed duplicates.
+
+Focused isolated checks passed: `tower_rework_test`, `gameplay_roster_test`, `tower_roll_rules_test`, `gameplay_peer_test`, `boss_send_screen_test`, and `send_queue_test`. An actual-main-scene rendered Sandbox smoke purchased every branch through upgrade controls and inspected accepted attacker buffs; a second main-scene smoke exercised all 26 enabled send types for both owners, including atomic insufficient-funds rejection. Logs and the inspected Sandbox capture are under `.verify-logs/balance-smoke/`. The broad suite was stopped at the user's request; no full-suite claim. GDScript LSP diagnostics were unavailable (no language server).
+
 ### Itemiery hall and rarity rooms
 
 Item rarities are owned by `ItemRarity`, separate from tower rarities and their roll odds. `ItemieryRoom` draws the 640×360 hall with seven closed doors and no item exhibits. Native labels/door targets use its shared plaque/door bounds. Activating a door first animates its opening, then a `Camera2D` pushes forward before switching to a separate `ItemieryChamber`. The isolated viewport uses nearest filtering; native-resolution lettering never scales with the camera. A single cancellable transition ignores repeated entry input. X/Escape cancels entry to the closed hall; external hiding also resets camera, shade, doors, and modal state.
