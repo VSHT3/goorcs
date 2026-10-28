@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/wormwood_censer.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/wormwood_censer_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"wormwood_censer"
+title = "Wormwood Censer"
+rarity = 3
+effect_text = "Enemies burning from your Fire Arrow branches receive 50% less healing."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Reduction lasts only while that burn is active; duplicates do not stack.", "Fire-immune enemies cannot receive the burn or this penalty.")

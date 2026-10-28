@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/reed_warpipes.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/reed_warpipes_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"reed_warpipes"
+title = "Reed Warpipes"
+rarity = 2
+effect_text = "War Drums' existing support bonuses become 15% stronger."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Multiply only the active branch's existing support stats by 1.15; add no new stat.", "Pure branches stay pure; strongest source per stat still wins globally.", "Coverage stays unchanged and discrete crit chance keeps its existing cap.")

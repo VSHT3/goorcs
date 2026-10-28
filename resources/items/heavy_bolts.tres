@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/heavy_bolts.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/heavy_bolts_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"heavy_bolts"
+title = "Heavy Bolts"
+rarity = 1
+effect_text = "Physical Ballista attacks deal +25% damage but have 10% less attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Only physical Ballista branches receive these modifiers.", "Elemental Ballista branches are unaffected.")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/the_walking_fortress.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/the_walking_fortress_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"the_walking_fortress"
+title = "The Walking Fortress"
+rarity = 6
+effect_text = "Gain 30 maximum base HP. Rally: heal 10 HP and block new tower stuns for 6 seconds; 60-second cooldown."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("No healing on equip or revival; removing it clamps HP to the resulting maximum.", "Rally affects only your base and friendly towers, using combat simulation time.", "Healing cannot exceed maximum HP; existing stuns, wither and magic nullification are not cleansed.")

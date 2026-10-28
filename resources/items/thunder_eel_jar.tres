@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/thunder_eel_jar.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/thunder_eel_jar_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"thunder_eel_jar"
+title = "Thunder-Eel Jar"
+rarity = 4
+effect_text = "Lightning chains gain one additional hit but deal 15% less damage."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Each chain still hits an individual enemy at most once.", "Jump distance is unchanged; Lightning-immune targets remain ineligible.")

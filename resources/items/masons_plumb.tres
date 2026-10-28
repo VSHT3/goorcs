@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/masons_plumb.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/masons_plumb_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"masons_plumb"
+title = "Mason's Plumb"
+rarity = 2
+effect_text = "Rune towers gain 0.5 tiles of attack range."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Adds 0.5 tiles to Rune attack range, including evolved Rune attacks.", "Does not affect support coverage, slow strength or elemental immunity.")

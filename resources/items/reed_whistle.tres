@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/reed_whistle.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/reed_whistle_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"reed_whistle"
+title = "Reed Whistle"
+rarity = 0
+effect_text = "Attacking towers gain 4% attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("All attacking towers; +4% attack speed.", "Does not strengthen or extend support auras.")

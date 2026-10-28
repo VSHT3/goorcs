@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/copper_tooth.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/copper_tooth_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"copper_tooth"
+title = "Copper Tooth"
+rarity = 0
+effect_text = "The board's first bounty-paying kill each wave grants 1 extra Coin."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("One +1 Coin bonus per board per wave.", "Requires a kill that already pays bounty; leaks do not count.")

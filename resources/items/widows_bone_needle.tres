@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/widows_bone_needle.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/widows_bone_needle_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"widows_bone_needle"
+title = "Widow's Bone Needle"
+rarity = 4
+effect_text = "Bloodlust Totem grants 30% stronger critical-chance buffs."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Totem remains a pure critical-chance branch; its coverage is unchanged.", "Global strongest-only support rules and the critical-chance cap remain.")

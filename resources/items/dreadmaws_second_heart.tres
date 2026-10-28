@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/dreadmaws_second_heart.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/dreadmaws_second_heart_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"dreadmaws_second_heart"
+title = "Dreadmaw's Second Heart"
+rarity = 5
+effect_text = "Store half the HP lost to leaks; heal that reserve when the next boss is killed on your board."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Reserve uses actual HP lost after mitigation; fractional HP carries until healing.", "A boss kill consumes the reserve; healing cannot exceed maximum HP or revive a defeated base.")

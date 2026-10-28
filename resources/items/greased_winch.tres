@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/greased_winch.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/greased_winch_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"greased_winch"
+title = "Greased Winch"
+rarity = 0
+effect_text = "Ballista towers gain 8% attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Ballista family only; +8% attack speed.", "Damage and attack range stay unchanged.")

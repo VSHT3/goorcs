@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/worldroot_seed.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/worldroot_seed_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"worldroot_seed"
+title = "Worldroot Seed"
+rarity = 5
+effect_text = "One bound attacking tower gains 2 percentage points of damage per actual round clear, up to 60%."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Bind to one friendly attacker; clears count only while bound, never retroactively.", "Selling the bound tower destroys the seed and its growth; no transfer or refunds.")

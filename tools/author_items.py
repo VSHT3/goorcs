@@ -3,11 +3,19 @@
 
 No source images, external artwork, models, resampling or antialiasing.
 The two sizes have separate compositions; portraits add native-pixel material work.
+Rarity modules supply new guide metadata and renderers. Existing item resources
+and artwork are retained; catalog registration only adds the authored entries.
 """
+import json
+import re
+import sys
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-OUT = Path(__file__).resolve().parents[1] / "assets" / "items"
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "assets" / "items"
+ITEM_RESOURCES = ROOT / "resources" / "items"
+CATALOG = ROOT / "resources" / "content_catalog.tres"
 INK = "#17201b"
 
 
@@ -902,9 +910,88 @@ def shebang_detail(upgraded):
     return im
 
 
+def _gd_string(value):
+    """Godot text-resource strings use JSON-compatible quoted escapes."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def write_item_resource(item, tier):
+    """Write one new guide-only definition; legacy definitions are never inputs."""
+    item_id = item["id"]
+    mechanics = ", ".join(_gd_string(rule) for rule in item["mechanics"])
+    text = (
+        '[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]\n\n'
+        '[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]\n'
+        f'[ext_resource type="Texture2D" path="res://assets/items/{item_id}.png" id="2"]\n'
+        f'[ext_resource type="Texture2D" path="res://assets/items/{item_id}_detail.png" id="3"]\n\n'
+        '[resource]\n'
+        'script = ExtResource("1")\n'
+        f'id = &{_gd_string(item_id)}\n'
+        f'title = {_gd_string(item["title"])}\n'
+        f'rarity = {tier}\n'
+        f'effect_text = {_gd_string(item["effect"])}\n'
+        f'flavor_text = {_gd_string(item.get("flavor", ""))}\n'
+        'icon_texture = ExtResource("2")\n'
+        'detail_texture = ExtResource("3")\n'
+        f'mechanics = PackedStringArray({mechanics})\n'
+    )
+    (ITEM_RESOURCES / f"{item_id}.tres").write_text(text, encoding="utf-8")
+
+
+def register_catalog_items(items):
+    """Append missing item references without rebuilding tower/enemy resources."""
+    text = CATALOG.read_text(encoding="utf-8")
+    resource_ids = dict(re.findall(
+        r'^\[ext_resource [^\n]*path="([^"]+)" id="([^"]+)"\]$', text, re.MULTILINE
+    ))
+    item_array = re.search(
+        r'^items = Array\[ExtResource\("([^"]+)"\)\]\(\[(.*?)\]\)$', text, re.MULTILINE
+    )
+    if item_array is None:
+        raise ValueError("Content catalog is missing its typed item array")
+    script_id, current_items = item_array.groups()
+    references = re.findall(r'ExtResource\("([^"]+)"\)', current_items)
+    declarations = []
+    for item in items:
+        item_id = item["id"]
+        resource_path = f"res://resources/items/{item_id}.tres"
+        resource_id = resource_ids.get(resource_path)
+        if resource_id is None:
+            resource_id = f"item_{item_id}"
+            declarations.append(
+                f'[ext_resource type="Resource" path="{resource_path}" id="{resource_id}"]'
+            )
+            resource_ids[resource_path] = resource_id
+        if resource_id not in references:
+            references.append(resource_id)
+    array_body = ", ".join(f'ExtResource("{reference}")' for reference in references)
+    text = text[:item_array.start()] + (
+        f'items = Array[ExtResource("{script_id}")]([{array_body}])'
+    ) + text[item_array.end():]
+    if declarations:
+        text = text.replace("\n[resource]\n", "\n" + "\n".join(declarations) + "\n\n[resource]\n", 1)
+    load_steps = len(re.findall(r'^\[(?:ext_resource|sub_resource)\b', text, re.MULTILINE)) + 1
+    text = re.sub(r'\bload_steps=\d+', f"load_steps={load_steps}", text, count=1)
+    CATALOG.write_text(text, encoding="utf-8")
+
+
 def main():
+    # Modules import the drawing helpers above, never another running main().
+    sys.modules.setdefault("author_items", sys.modules[__name__])
+    import item_art_common
+    import item_art_uncommon
+    import item_art_rare
+    import item_art_epic
+    import item_art_mythic
+    import item_art_legendary
+    import item_art_orcfeccion
+
+    modules = (
+        item_art_common, item_art_uncommon, item_art_rare, item_art_epic,
+        item_art_mythic, item_art_legendary, item_art_orcfeccion,
+    )
     OUT.mkdir(parents=True, exist_ok=True)
-    renderers = {
+    original_renderers = {
         "orc_tusk": (tusk, tusk_detail),
         "torn_boot": (boot, boot_detail),
         "command_banner": (banner, banner_detail),
@@ -921,13 +1008,31 @@ def main():
         "the_whole_shebang": (lambda: shebang_icon(False), lambda: shebang_detail(False)),
         "the_whole_shebang_orcfeccion": (lambda: shebang_icon(True), lambda: shebang_detail(True)),
     }
+    renderers = dict(original_renderers)
+    new_items = []
+    for module in modules:
+        for item in module.ITEMS:
+            item_id = item["id"]
+            if item_id in renderers:
+                raise ValueError(f"Duplicate Itemiery ID: {item_id}")
+            renderers[item_id] = module.RENDERERS[item_id]
+            new_items.append((item, module.TIER))
+    ITEM_RESOURCES.mkdir(parents=True, exist_ok=True)
     for name, (render_icon, render_detail) in renderers.items():
         for suffix, render, size in [("", render_icon, 32), ("_detail", render_detail, 96)]:
+            destination = OUT / f"{name}{suffix}.png"
+            if name in original_renderers and destination.exists():
+                continue
             image = render()
+            assert image.mode == "RGBA"
             assert image.size == (size, size)
             assert set(image.getchannel("A").tobytes()) <= {0, 255}
-            image.save(OUT / f"{name}{suffix}.png")
+            image.save(destination)
             print(f"{name}{suffix}: {size}x{size} RGBA, hard alpha")
+    for item, tier in new_items:
+        write_item_resource(item, tier)
+    register_catalog_items([item for item, _tier in new_items])
+    print(f"Registered {len(new_items)} new guide-only Itemiery definitions; preserved 15 originals")
 
 
 if __name__ == "__main__":

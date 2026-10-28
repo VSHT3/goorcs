@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/obsidian_saddle.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/obsidian_saddle_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"obsidian_saddle"
+title = "Obsidian Saddle"
+rarity = 4
+effect_text = "Orcapults gain 25% attack speed but lose 15% slam damage."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Throw distance and lift eligibility are unchanged.", "Does not change enemy weight or allow boss lifting.")

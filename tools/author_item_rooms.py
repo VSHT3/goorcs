@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Original 640x360 Itemiery interiors; integer Pillow geometry, no source art.
 
-Five physical shelf boards support six bays apiece. Item hit areas are shared
-with ItemieryChamber.slot_rect: (83 + column*82, 58 + row*44, 64, 36).
+Five physical shelf boards support four bays apiece (20 slots), or two for
+Orcfeccion (10 slots). Hit areas share ItemieryChamber.slot_columns(tier),
+slot_count(tier), and slot_rect(index, tier), with SLOT_ROWS retained at five.
+The rack spans 488px with 14px upright gaps:
+(83 + column*pitch, 58 + row*44, pitch - 14, 36), pitch = 488 / columns.
 Run with --contact-sheet /tmp/itemiery-rooms.png for an outside-assets overview.
 """
 import argparse
@@ -136,13 +139,16 @@ def wood_grain(d, box, ramp, phase=0):
 
 
 def rack(d, timber, metal, kind):
-    # Continuous back panelling and five boards, not thirty UI cards.
+    # Keep these measurements aligned with ItemieryChamber's tier-aware API.
+    columns = 2 if kind == 6 else 4
+    pitch = 488 // columns
+    # Continuous back panelling and five boards, not individual UI cards.
     rect(d, (71, 49, 568, 283), INK)
     rect(d, (78, 55, 561, 271), timber[0])
-    for bay in range(6):
-        x = 80+bay*82
-        rect(d, (x, 56, x+70, 269), timber[1])
-        rect(d, (x+2, 57, x+69, 268), timber[0])
+    for bay in range(columns):
+        x = 80+bay*pitch
+        rect(d, (x, 56, x+pitch-12, 269), timber[1])
+        rect(d, (x+2, 57, x+pitch-13, 268), timber[0])
         # Dim horizontal grain leaves the icon silhouettes clean.
         if kind in (0, 1, 3, 5):
             for y in range(66+bay % 3, 265, 17):
@@ -174,9 +180,9 @@ def rack(d, timber, metal, kind):
                 line(d, [(x, y+5), (x+4, y+7), (x+8, y+5)], metal[2])
                 if kind >= 5:
                     d.point((x+4, y+6), fill=metal[3])
-    # Uprights sit in the 18px gaps between the contractual 64px hit areas.
-    for col in range(7):
-        x = 74+col*82
+    # Uprights sit in the 14px gaps between the contractual hit areas.
+    for col in range(columns+1):
+        x = 74+col*pitch
         rect(d, (x, 55, x+7, 279), timber[0])
         rect(d, (x+1, 56, x+5, 277), timber[2])
         line(d, [(x+1, 57), (x+1, 275)], timber[3])
@@ -201,8 +207,8 @@ def rack(d, timber, metal, kind):
         if kind in (2, 4, 5, 6):
             rect(d, (78, y+3, 561, y+5), metal[1])
             line(d, [(79, y+3), (560, y+3)], metal[2])
-        for col in range(7):
-            x = 77+col*82
+        for col in range(columns+1):
+            x = 77+col*pitch
             # Carved brackets attach to the supports, below the board.
             poly(d, [(x-3, y+6), (x+4, y+6), (x+4, y+13), (x+1, y+13)], timber[1])
             if kind > 0:
@@ -211,8 +217,8 @@ def rack(d, timber, metal, kind):
         if kind == 0:
             wood_grain(d, (81, y+1, 558, y+6), timber, row)
         if kind in (1, 3, 5, 6):
-            for bay in range(6):
-                x = 115+bay*82
+            for bay in range(columns):
+                x = 83+bay*pitch+(pitch-14)//2
                 if kind == 1:
                     line(d, [(x-8, y+4), (x, y+2), (x+8, y+4)], metal[2])
                 elif kind == 3:
@@ -222,7 +228,7 @@ def rack(d, timber, metal, kind):
                 else:
                     line(d, [(x-21, y+5), (x-13, y+3), (x-5, y+5)], JADE[3])
                     line(d, [(x+5, y+5), (x+13, y+3), (x+21, y+5)], JADE[3])
-    for x in (72, 154, 482, 564):
+    for x in (72, 74+pitch, 562-pitch, 564):
         rect(d, (x-2, 284, x+8, 291), timber[0])
         line(d, [(x-2, 284), (x+8, 284)], timber[3])
 

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/bastion_in_a_bottle.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/bastion_in_a_bottle_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"bastion_in_a_bottle"
+title = "Bastion in a Bottle"
+rarity = 5
+effect_text = "Uncork: halve the next leak's HP loss, preventing at most 20 HP. Lasts 6 seconds; 60-second cooldown."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Active protects only your base; one leak consumes the ward, and expiry wastes it.", "Combat simulation time only; cannot stack, revive or prevent defeat after remaining damage.")

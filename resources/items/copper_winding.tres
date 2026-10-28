@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/copper_winding.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/copper_winding_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"copper_winding"
+title = "Copper Winding"
+rarity = 1
+effect_text = "Lightning towers gain +12% attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Applies only to Lightning towers.", "Damage type and enemy elemental immunities are unchanged.")

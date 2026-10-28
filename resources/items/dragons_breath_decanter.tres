@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/dragons_breath_decanter.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/dragons_breath_decanter_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"dragons_breath_decanter"
+title = "Dragon's Breath Decanter"
+rarity = 5
+effect_text = "Fire towers gain 60% damage but lose 15% attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Applies only while a tower's current attack element is Fire.", "Burn damage grows too; Fire immunity remains absolute.")

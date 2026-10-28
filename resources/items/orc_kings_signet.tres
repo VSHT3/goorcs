@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/orc_kings_signet.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/orc_kings_signet_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"orc_kings_signet"
+title = "Orc King's Signet"
+rarity = 5
+effect_text = "Attacking towers gain 30% damage and 15% attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Affects attack, chain and Orcapult towers.", "Support strength and economy production are unchanged.")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/mooncap_jerky.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/mooncap_jerky_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"mooncap_jerky"
+title = "Mooncap Jerky"
+rarity = 1
+effect_text = "Attacking towers deal +15% damage to bosses but 5% less damage to other enemies."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("The target's boss status selects the damage modifier.", "Does not change enemy immunities.")

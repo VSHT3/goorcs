@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/woven_sling.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/woven_sling_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"woven_sling"
+title = "Woven Sling"
+rarity = 0
+effect_text = "Orcapult towers deal 8% more damage."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Orcapult family only; +8% damage.", "Crew count, reload time and blast radius unchanged.")

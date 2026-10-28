@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/entire_quiver.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/entire_quiver_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"entire_quiver"
+title = "Entire Quiver"
+rarity = 6
+effect_text = "Arrow towers with 2+ archers fire a second arrow at 75% damage with every ordinary arrow."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("The extra arrow copies its source arrow's target and element.", "Extra arrows never trigger or count toward additional-arrow effects.", "Replaces Bottomless Quiver's fifth-arrow trigger rather than stacking with it.")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/executioners_iron.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/executioners_iron_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"executioners_iron"
+title = "Executioner's Iron"
+rarity = 2
+effect_text = "Attacking towers gain 30% damage but lose 15% attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Applies to attacking towers only.", "Damage ×1.30; attack speed ×0.85. Extends no support effect.")

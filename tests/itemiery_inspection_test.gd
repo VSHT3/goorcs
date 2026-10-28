@@ -124,11 +124,13 @@ func _check_every_exhibit(width: int, tier: int) -> bool:
 	trace_phase = "room exhibits"
 	var expected: Array[ItemDefinition] = _rarity_items(tier)
 	var exhibits: Array[ItemDisplayButton] = _exhibits()
-	if not _check(exhibits.size() == mini(expected.size(), ItemieryChamber.SLOT_COUNT), "The room exposes only occupied shelf slots for its rarity"):
+	if not _check(exhibits.size() == mini(expected.size(), ItemieryChamber.slot_count(tier)), "The room exposes only occupied shelf slots for its rarity"):
 		return false
 	if not _check(not guide.page_previous_button.is_visible_in_tree() and not guide.page_next_button.is_visible_in_tree(), "A single shelf page has no paging controls"):
 		return false
 	if not await _check_shelf_bounds():
+		return false
+	if tier == ItemRarity.Tier.COMMON and not await _check_stationary_shelf_focus(exhibits):
 		return false
 	for item: ItemDefinition in expected:
 		trace_item = String(item.id)
@@ -171,6 +173,52 @@ func _check_every_exhibit(width: int, tier: int) -> bool:
 			return false
 	trace_item = "<none>"
 	return true
+
+
+func _check_stationary_shelf_focus(exhibits: Array[ItemDisplayButton]) -> bool:
+	trace_phase = "stationary shelf focus"
+	if not _check(exhibits.size() == 20, "Stationary modal transition regression uses twenty populated native shelf bays"):
+		return false
+	var origin: ItemDisplayButton = exhibits[0]
+	var hovered: ItemDisplayButton = exhibits[1]
+	var another: ItemDisplayButton = exhibits[2]
+	var item: ItemDefinition = _item_for_id(StringName(origin.name))
+	trace_item = String(origin.name)
+	for activation: Key in [KEY_ENTER, KEY_SPACE]:
+		for use_x: bool in [false, true]:
+			if not await _hover(hovered):
+				return false
+			if not _check(root.gui_get_focus_owner() == hovered, "Genuine pointer entry focuses a different shelf bay"):
+				return false
+			await _key(KEY_LEFT)
+			if not _check(root.gui_get_focus_owner() == origin, "Keyboard navigation leaves the pointer over a different populated bay"):
+				return false
+			var parked_pointer: Vector2 = pointer_position
+			await _key(activation)
+			if not _check_open(item, "Keyboard activation with the pointer parked on another shelf item"):
+				return false
+			if use_x:
+				if not await _click(guide.inspection.back_button):
+					return false
+			else:
+				await _key(KEY_ESCAPE)
+				if not _check(pointer_position == parked_pointer, "Escape dismisses inspection without moving the parked pointer"):
+					return false
+			if not _check_closed_at(origin, "Stationary shelf transition"):
+				return false
+			await _motion(pointer_position)
+			if not _check_closed_at(origin, "Zero-motion event after shelf focus restoration"):
+				return false
+			if not use_x:
+				await _motion(pointer_position + Vector2(1, 0))
+				if not _check_closed_at(origin, "Motion within the already-hovered bay preserves keyboard focus"):
+					return false
+			await _motion(another.get_global_rect().get_center())
+			if not _check(root.gui_get_focus_owner() == another and not guide.inspection.visible, "Genuine entry after modal close still focuses another exhibit without opening it"):
+				return false
+	trace_phase = "room exhibits"
+	trace_item = "<none>"
+	return _check_read_only()
 
 
 func _check_nested_preview() -> bool:
@@ -501,7 +549,8 @@ func _check_synthetic_rooms() -> bool:
 	await _settle()
 	var overflow_catalog := ContentCatalog.new()
 	var expected_ids: Dictionary = {}
-	for index: int in range(ItemieryChamber.SLOT_COUNT + 5):
+	var capacity: int = ItemieryChamber.slot_count(ItemRarity.Tier.COMMON)
+	for index: int in range(capacity + 5):
 		var item: ItemDefinition = source.duplicate()
 		item.id = StringName("synthetic_shelf_%02d" % index)
 		item.rarity = ItemRarity.Tier.COMMON
@@ -520,10 +569,10 @@ func _check_synthetic_rooms() -> bool:
 		return false
 	trace_phase = "synthetic overflow"
 	var seen: Dictionary = {}
-	var page_limit: int = ceili(float(expected_ids.size()) / float(ItemieryChamber.SLOT_COUNT))
+	var page_limit: int = ceili(float(expected_ids.size()) / float(capacity))
 	for page: int in range(page_limit):
 		var exhibits: Array[ItemDisplayButton] = _exhibits()
-		if not _check(exhibits.size() == mini(ItemieryChamber.SLOT_COUNT, expected_ids.size() - seen.size()), "Each page occupies at most the room's 30 shelf slots"):
+		if not _check(exhibits.size() == mini(capacity, expected_ids.size() - seen.size()), "Each page occupies at most the room's shelf capacity"):
 			return false
 		if not await _check_shelf_bounds():
 			return false
@@ -548,12 +597,12 @@ func _check_synthetic_rooms() -> bool:
 			if not await _click(guide.page_next_button):
 				return false
 			await _settle()
-	if not _check(seen.size() == expected_ids.size(), "All 31-plus same-rarity entries are inspectable without silent drops"):
+	if not _check(seen.size() == expected_ids.size(), "All overflow entries are inspectable without silent drops"):
 		return false
 	if not await _click(guide.page_previous_button):
 		return false
 	await _settle()
-	if not _check(_exhibits().size() == ItemieryChamber.SLOT_COUNT and _exhibit_for(overflow_catalog.items.front(), _exhibits()) != null, "Previous returns to the complete first shelf page") or not _check_read_only():
+	if not _check(_exhibits().size() == capacity and _exhibit_for(overflow_catalog.items.front(), _exhibits()) != null, "Previous returns to the complete first shelf page") or not _check_read_only():
 		return false
 	guide.hide()
 	guide.queue_free()
@@ -567,7 +616,7 @@ func _check_synthetic_rooms() -> bool:
 
 func _check_shelf_bounds() -> bool:
 	var exhibits: Array[ItemDisplayButton] = _exhibits()
-	if not _check(exhibits.size() <= ItemieryChamber.SLOT_COUNT, "Occupied shelf controls never exceed room capacity"):
+	if not _check(exhibits.size() <= ItemieryChamber.slot_count(guide.current_rarity), "Occupied shelf controls never exceed room capacity"):
 		return false
 	var surface := Rect2(Vector2.ZERO, Vector2(root.size))
 	var art: Control = guide.get("_room")
@@ -576,7 +625,7 @@ func _check_shelf_bounds() -> bool:
 	for index: int in range(exhibits.size()):
 		var exhibit: ItemDisplayButton = exhibits[index]
 		var bounds: Rect2 = exhibit.get_global_rect()
-		var slot: Rect2 = ItemieryChamber.slot_rect(index)
+		var slot: Rect2 = ItemieryChamber.slot_rect(index, guide.current_rarity)
 		var native_slot := Rect2(origin + slot.position * art_scale, slot.size * art_scale).grow(2.0)
 		if not _check(bounds.has_area() and surface.encloses(bounds) and native_slot.encloses(bounds), "Every item target fits a reachable physical shelf slot"):
 			return false

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/mountains_pocket_change.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/mountains_pocket_change_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"mountains_pocket_change"
+title = "Mountain's Pocket Change"
+rarity = 6
+effect_text = "Coin-producing Mines double production; each actual payout has a 10% chance to grant 1 Shard."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Affects Gold Mine and Royal Mint clear and periodic payouts, not marks or income auras.", "One independent Shard roll per actual payout, regardless of Coin amount.", "Only actual clears and combat-time periodic payouts count; no offline accrual.")

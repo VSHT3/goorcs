@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/rune_pulse_metronome.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/rune_pulse_metronome_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"rune_pulse_metronome"
+title = "Rune Pulse Metronome"
+rarity = 4
+effect_text = "Pulsed Rune branches gain 30% attack speed."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Affects Onyx Ring and Storm Sigil pulses, not continuous branches.", "Elemental immunities and each pulse's damage remain unchanged.")

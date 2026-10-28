@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/basilisk_fang.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/basilisk_fang_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"basilisk_fang"
+title = "Basilisk Fang"
+rarity = 2
+effect_text = "Physical attacking towers gain 18% damage."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Damage ×1.18 only for attacks whose resolved element is Physical.", "Adds no poison or elemental conversion; Physical immunity remains.")

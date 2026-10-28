@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/troll_kings_molar.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/troll_kings_molar_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"troll_kings_molar"
+title = "Troll-King's Molar"
+rarity = 4
+effect_text = "Your base gains 20 maximum HP while this item is equipped."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Equipping grants no immediate healing or revival.", "Removing it clamps current HP to the resulting maximum.")

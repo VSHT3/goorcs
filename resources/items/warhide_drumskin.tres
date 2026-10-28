@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/warhide_drumskin.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/warhide_drumskin_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"warhide_drumskin"
+title = "Warhide Drumskin"
+rarity = 3
+effect_text = "Command Banner grants 25% stronger attack-speed buffs."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Banner remains a pure speed branch.", "Only the strongest nearby speed buff applies; coverage is unchanged.")

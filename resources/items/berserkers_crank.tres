@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/berserkers_crank.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/berserkers_crank_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"berserkers_crank"
+title = "Berserker's Crank"
+rarity = 3
+effect_text = "Projectile towers gain 45% attack speed, but lose 20% damage and 0.25 cells of range."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Affects Arrow and Ballista branches that launch projectiles.", "Does not accelerate continuous beams or support.")

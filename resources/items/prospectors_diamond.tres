@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/prospectors_diamond.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/prospectors_diamond_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"prospectors_diamond"
+title = "Prospector's Diamond"
+rarity = 2
+effect_text = "Crystal Mines produce 20% more Shards."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Crystal Mine Shard production ×1.20; no extra Coins.", "Accumulate fractional Shards until whole; never round each production tick upward.")

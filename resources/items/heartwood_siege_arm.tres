@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/heartwood_siege_arm.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/heartwood_siege_arm_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"heartwood_siege_arm"
+title = "Heartwood Siege Arm"
+rarity = 5
+effect_text = "Orcapults can lift enemies one weight class heavier, including base Brutes."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Only Orcapult lift eligibility changes; throw distance and slam damage do not.", "Bosses remain unliftable regardless of weight.")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/crystal_sutures.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/crystal_sutures_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"crystal_sutures"
+title = "Crystal Sutures"
+rarity = 2
+effect_text = "If a wave has only one leak, heal half that first leak's damage, rounded down, at wave end."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Board effect: record the wave's first leak and require all remaining enemies not to leak.", "On wave completion, heal floor(first leak damage / 2); at most once per wave.", "A later leak cancels the heal; healing never exceeds maximum base HP.")

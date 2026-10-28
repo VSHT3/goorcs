@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/riveted_gorget.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/riveted_gorget_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"riveted_gorget"
+title = "Riveted Gorget"
+rarity = 2
+effect_text = "Attacking towers gain 18% damage but lose 0.25 tiles of attack range."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Attacker damage ×1.18; attack range −0.25 tiles within existing range limits.", "Never changes support coverage or Lightning jump distance.")

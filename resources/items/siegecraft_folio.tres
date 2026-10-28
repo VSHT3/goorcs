@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/siegecraft_folio.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/siegecraft_folio_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"siegecraft_folio"
+title = "Siegecraft Folio"
+rarity = 2
+effect_text = "Ballista towers gain 20% damage."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Ballista attack damage ×1.20, including its evolved attacks.", "Pierce, bounce counts and elemental immunities are unchanged.")

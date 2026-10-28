@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/clockwork_raincloud.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/clockwork_raincloud_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"clockwork_raincloud"
+title = "Clockwork Raincloud"
+rarity = 4
+effect_text = "Every tenth Lightning chain briefly stuns its first non-boss victim for 0.5 seconds."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Count released chains board-wide; extra jumps do not advance the counter.", "Lightning-immune enemies cannot be selected; bosses never receive this stun.")

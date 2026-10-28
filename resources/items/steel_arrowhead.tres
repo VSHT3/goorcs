@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/steel_arrowhead.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/steel_arrowhead_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"steel_arrowhead"
+title = "Steel Arrowhead"
+rarity = 1
+effect_text = "All attacking towers deal +10% damage."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Applies to every attacking tower's damage.", "Does not add an attack to support or economy towers.")

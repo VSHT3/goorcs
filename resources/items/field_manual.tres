@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/field_manual.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/field_manual_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"field_manual"
+title = "Field Manual"
+rarity = 0
+effect_text = "Rune towers gain 0.25 attack range."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Rune family only; +0.25 tiles of attack reach.", "Support coverage and blast radii stay unchanged.")

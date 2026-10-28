@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/horizon_prism.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/horizon_prism_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"horizon_prism"
+title = "Horizon Prism"
+rarity = 4
+effect_text = "Lookout Horn grants 30% stronger range bonuses."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Horn remains a pure range branch; its own coverage is unchanged.", "Only the strongest range aura applies to each attacking tower.")

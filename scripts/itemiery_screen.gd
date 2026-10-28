@@ -209,9 +209,10 @@ func _layout_rarity_labels() -> void:
 		label.position = (art_origin + plaque.position * art_scale).round()
 		label.size = (plaque.size * art_scale).round()
 	for index: int in range(_item_buttons.size()):
-		var slot: Rect2 = ItemieryChamber.slot_rect(index)
+		var slot: Rect2 = ItemieryChamber.slot_rect(index, current_rarity as ItemRarity.Tier)
 		_item_buttons[index].position = (art_origin + slot.position * art_scale).round()
 		_item_buttons[index].size = (slot.size * art_scale).round()
+		_item_buttons[index].add_theme_constant_override("icon_max_width", maxi(1, roundi(32.0 * art_scale)))
 
 
 func enter_room(tier: ItemRarity.Tier) -> void:
@@ -257,7 +258,7 @@ func _show_chamber(tier: ItemRarity.Tier) -> void:
 		if item != null and item.rarity == tier:
 			_room_items.append(item)
 	var selected_index: int = _room_items.find(selected_item)
-	_room_page = maxi(0, selected_index) / ItemieryChamber.SLOT_COUNT
+	_room_page = maxi(0, selected_index) / ItemieryChamber.slot_count(tier)
 	_build_items()
 	_shelf_ui.show()
 
@@ -330,8 +331,9 @@ func _build_items() -> void:
 	_clear_items()
 	var group := ButtonGroup.new()
 	group.allow_unpress = false
-	var start: int = _room_page * ItemieryChamber.SLOT_COUNT
-	var end: int = mini(start + ItemieryChamber.SLOT_COUNT, _room_items.size())
+	var capacity: int = ItemieryChamber.slot_count(current_rarity as ItemRarity.Tier)
+	var start: int = _room_page * capacity
+	var end: int = mini(start + capacity, _room_items.size())
 	for index: int in range(start, end):
 		var item: ItemDefinition = _room_items[index]
 		var button := ItemDisplayButton.new()
@@ -341,17 +343,22 @@ func _build_items() -> void:
 		button.button_group = group
 		button.pressed.connect(inspect_item.bind(item))
 		_shelf_ui.add_child(button)
+		# The hit area fills its cupboard bay; artwork stays at 32 native pixels.
+		var empty := StyleBoxEmpty.new()
+		for state: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
+			button.add_theme_stylebox_override(state, empty)
 		button.set_pressed_no_signal(item == selected_item)
 		_item_buttons.append(button)
 		_page_items.append(item)
-	_paging.visible = _room_items.size() > ItemieryChamber.SLOT_COUNT
+	_paging.visible = _room_items.size() > capacity
 	page_label.text = "%d / %d" % [_room_page + 1, _page_count()]
 	_layout_rarity_labels()
 	_update_navigation()
 
 
 func _page_count() -> int:
-	return maxi(1, ceili(float(_room_items.size()) / ItemieryChamber.SLOT_COUNT))
+	var capacity: int = ItemieryChamber.slot_count(current_rarity as ItemRarity.Tier)
+	return maxi(1, ceili(float(_room_items.size()) / capacity))
 
 
 func _change_page(direction: int) -> void:
@@ -519,10 +526,11 @@ func _wire_exhibit_focus() -> void:
 		control.focus_neighbor_top = control.get_path_to(back_button)
 		control.focus_neighbor_bottom = control.focus_next
 	if current_rarity >= 0:
+		var columns: int = ItemieryChamber.slot_columns(current_rarity as ItemRarity.Tier)
 		for index: int in range(_item_buttons.size()):
 			var button: ItemDisplayButton = _item_buttons[index]
-			var above: Control = back_button if index < ItemieryChamber.SLOT_COLUMNS else _item_buttons[index - ItemieryChamber.SLOT_COLUMNS]
-			var below: Control = back_button if index + ItemieryChamber.SLOT_COLUMNS >= _item_buttons.size() else _item_buttons[index + ItemieryChamber.SLOT_COLUMNS]
+			var above: Control = back_button if index < columns else _item_buttons[index - columns]
+			var below: Control = back_button if index + columns >= _item_buttons.size() else _item_buttons[index + columns]
 			button.focus_neighbor_top = button.get_path_to(above)
 			button.focus_neighbor_bottom = button.get_path_to(below)
 

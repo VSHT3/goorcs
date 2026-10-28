@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/ironroot_bulb.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/ironroot_bulb_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"ironroot_bulb"
+title = "Ironroot Bulb"
+rarity = 3
+effect_text = "Your base gains 10 maximum HP while this item is equipped."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Does not heal existing damage when equipped.", "Removing it clamps current HP to the resulting maximum; no revive.")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/oversized_bucket.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/oversized_bucket_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"oversized_bucket"
+title = "Oversized Bucket"
+rarity = 1
+effect_text = "Orcapult throws one additional member per throw, but reload duration increases by 20%."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Adds exactly one member to each Orcapult throw.", "The full reload duration is multiplied by 1.20.")

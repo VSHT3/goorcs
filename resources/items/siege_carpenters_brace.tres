@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/siege_carpenters_brace.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/siege_carpenters_brace_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"siege_carpenters_brace"
+title = "Siege Carpenter's Brace"
+rarity = 3
+effect_text = "Ballista gains 5% damage per second spent holding the same aim, up to 35%."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Builds only while tracking the same target without turning.", "Turning, losing the target or selling the Ballista resets the bonus.")

@@ -15,14 +15,21 @@ func _ready() -> void:
 	empty.set_content_margin_all(3)
 	for state: String in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 		add_theme_stylebox_override(state, empty)
-	mouse_entered.connect(func() -> void:
-		if not disabled and focus_mode != Control.FOCUS_NONE:
-			grab_focus()
-		queue_redraw())
+	mouse_entered.connect(queue_redraw)
 	mouse_exited.connect(queue_redraw)
 	focus_entered.connect(queue_redraw)
 	focus_exited.connect(queue_redraw)
 	toggled.connect(func(_selected: bool) -> void: queue_redraw())
+
+
+func _gui_input(event: InputEvent) -> void:
+	if not event is InputEventMouseMotion or disabled or focus_mode == Control.FOCUS_NONE:
+		return
+	var motion := event as InputEventMouseMotion
+	# Modal visibility/reenabling can emit mouse_entered without pointer movement.
+	# Route hover focus only on genuine entry, not motion within a stationary bay.
+	if motion.relative != Vector2.ZERO and not Rect2(Vector2.ZERO, size).has_point(motion.position - motion.relative):
+		grab_focus()
 
 
 func _draw() -> void:

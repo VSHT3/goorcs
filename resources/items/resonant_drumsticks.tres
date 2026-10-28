@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/resonant_drumsticks.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/resonant_drumsticks_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"resonant_drumsticks"
+title = "Resonant Drumsticks"
+rarity = 1
+effect_text = "Drums gain +12% retained support strength without changing coverage or stacking rules."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Strengthens only support stats retained by the Drums' pure branch.", "Coverage is unchanged; only the strongest global bonus per stat applies.")

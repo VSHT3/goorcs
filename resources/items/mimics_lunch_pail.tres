@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/mimics_lunch_pail.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/mimics_lunch_pail_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"mimics_lunch_pail"
+title = "Mimic's Lunch Pail"
+rarity = 4
+effect_text = "After 10 seconds without a kill, your next non-summoned enemy kill grants 3 extra Coins."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("One board-wide serving; the next qualifying kill consumes it and resets the timer.", "Own-board kills only; leaks and summoned enemies never pay or consume a serving.")

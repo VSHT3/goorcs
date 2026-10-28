@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/forbidden_beat.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/forbidden_beat_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"forbidden_beat"
+title = "Forbidden Beat"
+rarity = 6
+effect_text = "War Drums and its branches grant twice their normal support strength."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Branches remain pure: Forge damage, Banner speed, Totem crit and Horn range only.", "Strongest source per stat still wins globally; critical caps remain.", "Coverage never grows; no new buff component is added to any branch.")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/trollhide_earplugs.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/trollhide_earplugs_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"trollhide_earplugs"
+title = "Trollhide Earplugs"
+rarity = 1
+effect_text = "All towers suffer received stuns for 20% less time."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Multiplies stun durations received by towers by 0.80.", "Does not alter stuns inflicted on enemies.")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ItemDefinition" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/item_definition.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/items/lucky_fang.png" id="2"]
+[ext_resource type="Texture2D" path="res://assets/items/lucky_fang_detail.png" id="3"]
+
+[resource]
+script = ExtResource("1")
+id = &"lucky_fang"
+title = "Lucky Fang"
+rarity = 1
+effect_text = "Attacking towers gain +3 percentage points of critical chance on discrete hits."
+flavor_text = ""
+icon_texture = ExtResource("2")
+detail_texture = ExtResource("3")
+mechanics = PackedStringArray("Only discrete damage hits can critically strike.", "The existing critical-chance cap still applies.")
