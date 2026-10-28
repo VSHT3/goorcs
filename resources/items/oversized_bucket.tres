@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Adds exactly one member to each Orcapult throw.", "The full reload duration is multiplied by 1.20.")
+runtime = {"stats": [{"filter": "orcapult", "values": {"throw_count_add": 1, "reload_multiplier": 1.2}}]}

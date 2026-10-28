@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only Ballistas whose current attack element is Physical are affected.", "Extra pierces continue along the shot; Physical immunity remains absolute.")
+runtime = {"stats": [{"filter": "physical_ballista", "values": {"damage_multiplier": 2.5, "pierce_add": 3, "attack_rate_multiplier": 0.75}}]}

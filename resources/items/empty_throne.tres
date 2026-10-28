@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Adjacent means the 8 touching tiles; attack, chain and Orcapult towers disqualify.", "Support and economy neighbors are allowed; rechecks as placements change.")
+runtime = {"mechanic": "empty_throne", "parameters": {"damage_multiplier": 1.6}}

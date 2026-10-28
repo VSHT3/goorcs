@@ -72,13 +72,14 @@ static func event_step(enemy: Dictionary, definition: Dictionary) -> float:
 	return maxf(EPSILON, float(enemy["next_regeneration"]) - float(enemy["age"]))
 
 
-static func advance(enemy: Dictionary, definition: Dictionary) -> void:
+static func advance(enemy: Dictionary, definition: Dictionary, healing_multiplier: float = 1.0) -> void:
 	if int(enemy["hp"]) <= 0 or not has_abilities(definition):
 		return
 	var interval: float = float(definition["regeneration_interval"])
 	while float(enemy["next_regeneration"]) <= float(enemy["age"]) + EPSILON:
 		enemy["next_regeneration"] = float(enemy["next_regeneration"]) + interval
-		var healed: int = mini(int(enemy["max_hp"]) - int(enemy["hp"]), ceili(float(enemy["max_hp"]) * float(definition["regeneration_fraction"])))
+		var amount: int = ceili(float(enemy["max_hp"]) * float(definition["regeneration_fraction"]))
+		var healed: int = mini(int(enemy["max_hp"]) - int(enemy["hp"]), floori(float(amount) * healing_multiplier + EPSILON))
 		if healed <= 0:
 			continue
 		enemy["hp"] = int(enemy["hp"]) + healed

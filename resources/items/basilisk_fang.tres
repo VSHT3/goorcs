@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Damage ×1.18 only for attacks whose resolved element is Physical.", "Adds no poison or elemental conversion; Physical immunity remains.")
+runtime = {"stats": [{"filter": "physical", "values": {"damage_multiplier": 1.18}}]}

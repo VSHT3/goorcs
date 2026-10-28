@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Does not heal existing damage when equipped.", "Removing it clamps current HP to the resulting maximum; no revive.")
+runtime = {"mechanic": "ironroot_bulb", "parameters": {"max_health_add": 10}}

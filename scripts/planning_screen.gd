@@ -85,6 +85,7 @@ var _terrain_close: Button
 var _selected_terrain := Vector2i(-1, -1)
 var _terrain_run: String = ""
 var _terrain_board_origin_y: int = 0
+var item_panel: ItemRuntimePanel
 
 @onready var world: MatchWorld = $World
 @onready var boards: Array[PathBoard] = world.boards
@@ -150,6 +151,7 @@ func _ready() -> void:
 	_build_health()
 	_build_tower_management()
 	_build_commander_controls()
+	_build_item_controls()
 	_build_boss_bars()
 	_build_match_feedback()
 	_cancel_placement.pressed.connect(cancel_interaction)
@@ -334,6 +336,30 @@ func _refresh_boss_bars(state: Dictionary, own_slot: int, finished: bool) -> voi
 	boss_bars.refresh(enemies[own_slot], state.get("enemy_types", {}), deaths[own_slot] if own_slot < deaths.size() else [])
 	boss_bars.selected_id = selected_enemy_id if selected_enemy_slot == own_slot else -1
 
+
+
+func _build_item_controls() -> void:
+	item_panel = ItemRuntimePanel.new()
+	item_panel.name = "OwnedItems"
+	if planning != null:
+		item_panel.configure(planning.combat_rules.catalog)
+	item_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	item_panel.anchor_bottom = 1.0
+	item_panel.offset_left = 14
+	item_panel.offset_right = 374
+	item_panel.offset_top = 166
+	item_panel.offset_bottom = -132
+	$HUD.add_child(item_panel)
+	item_panel.command_requested.connect(_item_command)
+	item_panel.expanded_changed.connect(func(_expanded: bool) -> void:
+		cancel_strokes()
+		_present_pending_reel()
+	)
+
+
+func _item_command(id: StringName, action: String, target_id: int) -> void:
+	if _commander_input_available():
+		planning.item_command(planning.local_slot(), id, action, target_id)
 
 
 func _build_commander_controls() -> void:
@@ -614,7 +640,7 @@ func _present_pending_reel() -> void:
 		cancel_strokes()
 		enemy_selector.get_popup().hide()
 		commander_target.get_popup().hide()
-	world.set_input_blocked(blocked or _rarity_reel.is_busy())
+	world.set_input_blocked(blocked or _rarity_reel.is_busy() or item_panel.expanded)
 
 
 func cancel_strokes() -> void:
@@ -682,6 +708,7 @@ func _visibility_changed() -> void:
 		_clear_reel_presentations()
 		sound_player.deactivate()
 		debug_popup.hide()
+		item_panel.close()
 		_close_results()
 		_close_pause_menu()
 		world.set_active(false)
@@ -707,7 +734,7 @@ func _open_debug() -> void:
 	enemy_selector.get_popup().hide()
 	commander_target.get_popup().hide()
 	var state: Dictionary = planning.combat
-	debug_round.value = int(state.get("wave", 0)) + (1 if int(state.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.PLANNING else 0)
+	debug_round.value = int(state.get("upcoming_wave", int(state.get("wave", 0)) + 1)) if int(state.get("phase", MatchCombat.Phase.PLANNING)) == MatchCombat.Phase.PLANNING else int(state.get("wave", 0))
 	debug_money.value = _own_coins()
 	debug_shards.value = int(planning.combat["reroll_currency"][planning.local_slot()])
 	world.set_input_blocked(true)
@@ -739,6 +766,8 @@ func _debug_window_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if _rarity_reel.is_busy():
 		return
+	if is_visible_in_tree() and not pause_menu.visible and not debug_popup.visible and not results_menu.visible and item_panel.handle_key(event):
+		return
 	if not is_visible_in_tree() or pause_menu.visible or debug_popup.visible or (_placement_id == &"" and selected_enemy_id < 0 and selected_tower_id < 0 and _selected_terrain == Vector2i(-1, -1)):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
@@ -749,7 +778,7 @@ func _input(event: InputEvent) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if _rarity_reel.is_busy():
 		return
-	if not is_visible_in_tree() or planning == null or not planning.active or pause_menu.visible or debug_popup.visible or results_menu.visible or get_viewport().gui_is_dragging():
+	if not is_visible_in_tree() or planning == null or not planning.active or pause_menu.visible or debug_popup.visible or results_menu.visible or item_panel.expanded or get_viewport().gui_is_dragging():
 		return
 	var focus: Control = get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit:
@@ -780,6 +809,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func cancel_interaction() -> bool:
+	if item_panel != null and item_panel.expanded:
+		item_panel.close()
+		return true
 	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0 and _pending_tower_cell == Vector2i(-1, -1) and _selected_terrain == Vector2i(-1, -1):
 		return false
 	cancel_strokes()
@@ -1023,7 +1055,7 @@ func _refresh_sends() -> void:
 			delivery += "\nNeed %d more recurring income." % (-gain - int(income[own_slot]))
 		if queue_full:
 			delivery += "\nQueue full: %d orders are waiting to reach your opponent." % queue_limit
-	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("wave", 0)) + 1
+	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("upcoming_wave", int(state.get("wave", 0)) + 1))
 	var gap: float = MatchCombat.send_order_gap(float(rules["send_spawn_interval"]), int(stats.get("spawn_weight", 1)))
 	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nOutgoing orders: %d/%d.\nOrder cooldown: %.3f simulation seconds after its final member (heavier orcs take longer)." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, int(orders[1 - own_slot]), queue_limit, gap]
 	enemy_selector.tooltip_text = send_button.tooltip_text
@@ -1831,6 +1863,9 @@ func _refresh() -> void:
 		return
 	debug_button.visible = planning != null and planning.can_debug()
 	_refresh_commander()
+	item_panel.visible = planning != null and planning.active
+	if planning != null:
+		item_panel.refresh(planning.combat, planning.local_slot(), _commander_input_available() and int(planning.combat.get("phase", -1)) != MatchCombat.Phase.FINISHED)
 	if not debug_button.visible:
 		debug_popup.hide()
 	if planning == null:
@@ -1953,7 +1988,7 @@ func _refresh() -> void:
 		_status.text = "Round %d" % int(state.get("wave", 0))
 		_status.tooltip_text = ""
 	else:
-		_status.text = "Round %d" % (int(state.get("wave", 0)) + 1)
+		_status.text = "Round %d" % int(state.get("upcoming_wave", int(state.get("wave", 0)) + 1))
 		_status.tooltip_text = "Untimed strategy break: redesign your path, then both Ready." if bool(state.get("path_editing", false)) else "Paths stay locked until the next main round. Ready commits your planning actions."
 	_refresh_targeting()
 	_refresh_pacing()

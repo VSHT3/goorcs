@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Board effect: record the wave's first leak and require all remaining enemies not to leak.", "On wave completion, heal floor(first leak damage / 2); at most once per wave.", "A later leak cancels the heal; healing never exceeds maximum base HP.")
+runtime = {"mechanic": "crystal_sutures", "parameters": {"heal_fraction": 0.5}}

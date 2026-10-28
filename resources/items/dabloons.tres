@@ -14,3 +14,4 @@ flavor_text = "Go a long way"
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Every Coin or Shard purchase price = ceil(base price × 0.90).")
+runtime = {"mechanic": "dabloons", "parameters": {"cost_multiplier": 0.9}}

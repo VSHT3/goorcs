@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Ballista attack damage ×1.20, including its evolved attacks.", "Pierce, bounce counts and elemental immunities are unchanged.")
+runtime = {"stats": [{"filter": "ballista", "values": {"damage_multiplier": 1.2}}]}

@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Affects friendly attackers, support and economy towers.", "Does not shorten magic nullification or wither.")
+runtime = {"mechanic": "bloodglass_hourglass", "parameters": {"duration_multiplier": 0.5}}

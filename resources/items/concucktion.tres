@@ -13,3 +13,4 @@ effect_text = "Your towers switch their targeting randomly each time they attack
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Each attack randomly selects one of that tower's available targeting policies.", "Attack rate ×1.50; attack interval ÷1.50.")
+runtime = {"stats": [{"filter": "attacking", "values": {"attack_rate_multiplier": 1.5}}], "mechanic": "concucktion", "parameters": {"targeting_random": 1}}

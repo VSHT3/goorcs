@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Rune family only; +8% damage.", "Elemental immunities still apply.")
+runtime = {"stats": [{"filter": "rune", "values": {"damage_multiplier": 1.08}}]}

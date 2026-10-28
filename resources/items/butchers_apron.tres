@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Checks victim HP before damage: strictly below 50% of maximum HP.", "Attacker damage ×1.15 while eligible; does not bypass elemental immunity.")
+runtime = {"mechanic": "butchers_apron", "parameters": {"damage_multiplier": 1.15, "hp_fraction": 0.5}}

@@ -61,6 +61,7 @@ var attribute_reroll: Button
 var _rarity_reel: RarityReel
 var boss_bars: BossHealthBars
 var tower_status: TowerStatusStrip
+var item_panel: ItemRuntimePanel
 
 @onready var world: SandboxWorld = $World
 @onready var board: PathBoard = world.boards[0]
@@ -126,6 +127,7 @@ func prepare_to_leave() -> void:
 	controller.set_active(false)
 	world.set_active(false)
 	resize_dialog.hide()
+	item_panel.close()
 	reset_dialog.hide()
 	world.set_input_blocked(false)
 	world.boards[0].cancel_stroke()
@@ -242,6 +244,7 @@ func _build_interface() -> void:
 	_notice_timer.timeout.connect(func() -> void: _notice.text = "")
 	add_child(_notice_timer)
 	_build_management()
+	_build_item_controls()
 	boss_bars = BossHealthBars.new()
 	boss_bars.catalog = catalog
 	add_child(boss_bars)
@@ -260,6 +263,31 @@ func _build_interface() -> void:
 	resize_dialog = _confirmation("Resize map?", "This removes every path tile, tower, and enemy. The selected round is kept.", _confirm_resize)
 	reset_dialog = _confirmation("Reset build?", "This removes every tower and enemy. The map, path, and selected round are kept.", _confirm_reset)
 	world._hud_popups.append(enemy_selector.get_popup())
+
+
+func _build_item_controls() -> void:
+	item_panel = ItemRuntimePanel.new()
+	item_panel.name = "OwnedItems"
+	item_panel.configure(catalog, true)
+	item_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	item_panel.anchor_bottom = 1.0
+	item_panel.offset_left = 14
+	item_panel.offset_right = 374
+	item_panel.offset_top = 110
+	item_panel.offset_bottom = -132
+	add_child(item_panel)
+	item_panel.command_requested.connect(func(id: StringName, action: String, target_id: int) -> void:
+		if _active and not resize_dialog.visible and not reset_dialog.visible and not _rarity_reel.is_busy():
+			controller.item_command(id, action, target_id)
+	)
+	item_panel.owned_set_requested.connect(func(ids: Array) -> void:
+		if _active and not resize_dialog.visible and not reset_dialog.visible and not _rarity_reel.is_busy():
+			controller.set_items(ids)
+	)
+	item_panel.expanded_changed.connect(func(_expanded: bool) -> void:
+		board.cancel_stroke()
+		_refresh()
+	)
 
 
 func _build_management() -> void:
@@ -549,6 +577,9 @@ func _enemy_clicked(enemy_id: int) -> void:
 
 
 func cancel_interaction() -> bool:
+	if item_panel != null and item_panel.expanded:
+		item_panel.close()
+		return true
 	var had_selection: bool = placement_id != &"" or selected_tower_id >= 0 or selected_enemy_id >= 0
 	placement_id = &""
 	selected_tower_id = -1
@@ -572,6 +603,8 @@ func _refresh() -> void:
 	if not is_node_ready() or _status == null:
 		return
 	var state: Dictionary = controller.state
+	item_panel.refresh(state, 0, _active and not resize_dialog.visible and not reset_dialog.visible and not _rarity_reel.is_busy())
+	world.set_input_blocked(item_panel.expanded or resize_dialog.visible or reset_dialog.visible or _rarity_reel.is_busy())
 	board.layout = controller.layout
 	world.boards[1].layout = controller.layout
 	world.configure(controller.layout.dimensions)
@@ -745,6 +778,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if not _active or not is_visible_in_tree() or resize_dialog.visible or reset_dialog.visible:
 		return
+	if item_panel.handle_key(event):
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT and (placement_id != &"" or selected_enemy_id >= 0 or selected_tower_id >= 0):
 		cancel_interaction()
 		get_viewport().set_input_as_handled()
@@ -774,7 +809,7 @@ func _input(event: InputEvent) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if _rarity_reel.is_busy():
 		return
-	if not _active or not is_visible_in_tree() or resize_dialog.visible or reset_dialog.visible or get_viewport().gui_is_dragging():
+	if not _active or not is_visible_in_tree() or resize_dialog.visible or reset_dialog.visible or item_panel.expanded or get_viewport().gui_is_dragging():
 		return
 	var focus: Control = get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit:

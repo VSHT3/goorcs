@@ -14,3 +14,4 @@ icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only from Shebang: base 10,000 Coins; never drops.", "Same first-maxed slots: +1 percentage point per clear survived; max +115%.", "Sold slots pause; replacements inherit. All progress stays.")
 acquisition_text = "Never a random drop or Monkey’s Paw reward."
+runtime = {"mechanic": "the_whole_shebang_orcfeccion", "parameters": {"rate_per_clear": 0.01, "rate_cap": 1.15}}

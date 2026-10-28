@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Banner remains a pure speed branch.", "Only the strongest nearby speed buff applies; coverage is unchanged.")
+runtime = {"stats": [{"filter": "command_banner", "values": {"support_speed_multiplier": 1.25}}]}

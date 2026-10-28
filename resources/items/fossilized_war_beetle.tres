@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Affects attacks whose current element is Physical, including Orcapult slams.", "Element changes remove eligibility; Physical immunity remains.")
+runtime = {"stats": [{"filter": "physical", "values": {"damage_multiplier": 1.35}}]}

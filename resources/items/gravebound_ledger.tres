@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies to Bounty Board and Greater Bounty's marked victim only.", "Mark damage, normal enemy bounty and Tribute Office are unchanged.")
+runtime = {"mechanic": "gravebound_ledger", "parameters": {"mark_multiplier": 1.3}}

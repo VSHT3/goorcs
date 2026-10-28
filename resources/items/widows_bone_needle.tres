@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Totem remains a pure critical-chance branch; its coverage is unchanged.", "Global strongest-only support rules and the critical-chance cap remain.")
+runtime = {"stats": [{"filter": "bloodlust_totem", "values": {"support_crit_multiplier": 1.3}}]}

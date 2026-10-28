@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Initial range and jump distance are unchanged.", "Each enemy can be hit once per chain; Lightning immunity remains.")
+runtime = {"stats": [{"filter": "lightning", "values": {"chain_hits_add": 2, "damage_multiplier": 0.8}}]}

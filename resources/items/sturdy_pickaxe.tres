@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Coin mine clear and periodic production +8%.", "No bounty, Shard, send-income or interest bonus.")
+runtime = {"mechanic": "sturdy_pickaxe", "parameters": {"production_multiplier": 1.08}}

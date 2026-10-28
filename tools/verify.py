@@ -24,6 +24,7 @@ RENDERED_TESTS = {
     "enemy_death_presentation_test.gd",
     "enemy_inspection_test.gd",
     "horde_presentation_test.gd",
+    "item_runtime_ui_test.gd",
     "late_boss_presentation_test.gd",
     "late_enemy_presentation_test.gd",
     "match_feedback_presentation_test.gd",
@@ -275,6 +276,8 @@ def main():
     parser.add_argument("--timeout", type=float, default=180, help="seconds per test (default: 180)")
     parser.add_argument("--import-timeout", type=float, default=300, help="seconds for resource import")
     parser.add_argument("--log-dir", type=Path, help="new durable log directory (must not exist)")
+    parser.add_argument("--tests", nargs="+", metavar="NAME",
+                        help="run only these exact test basenames (omit .gd); peer workers follow their owning suites")
     args = parser.parse_args()
     if not all(math.isfinite(value) and value > 0 for value in (args.timeout, args.import_timeout)):
         parser.error("timeouts must be finite and positive")
@@ -301,9 +304,21 @@ def main():
             raise VerificationError(f"Godot executable not found: {args.godot}")
         engine = str(Path(engine).resolve())
         tests, workers = discover_tests()
-        selected = [(path, mode) for path, mode in tests if args.mode in (mode, "all")]
+        requested = set(args.tests or [])
+        if requested:
+            known = {Path(path).stem for path, _mode in tests}
+            missing = requested - known
+            if missing:
+                raise VerificationError(f"Unknown test basenames: {sorted(missing)}")
+            compatible = {Path(path).stem for path, mode in tests if args.mode in (mode, "all")}
+            wrong_mode = requested - compatible
+            if wrong_mode:
+                raise VerificationError(f"Tests are outside requested mode {args.mode}: {sorted(wrong_mode)}")
+        selected = [(path, mode) for path, mode in tests
+                    if args.mode in (mode, "all") and (not requested or Path(path).stem in requested)]
         inventory = {"mode": args.mode, "tests": [{"path": path, "mode": mode,
-                     "selected": (path, mode) in selected} for path, mode in tests], "workers": workers}
+                     "selected": (path, mode) in selected} for path, mode in tests],
+                     "requested_tests": sorted(requested), "workers": workers}
         (logs / "inventory.json").write_text(json.dumps(inventory, indent=2) + "\n", encoding="utf-8")
         for path, mode in tests:
             print(f"{'SELECT' if (path, mode) in selected else 'OTHER MODE'} {mode:8} {path}")

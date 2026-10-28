@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Each burst deals 300% of that tower's hit damage to enemies within 1 cell of its current target.", "Idle pauses charge; bursts reset heat. Shutdown prevents attacks; timers use simulation time.", "The burst deals Fire damage and never bypasses Fire immunity.")
+runtime = {"mechanic": "sun_in_a_cage", "parameters": {"charge_duration": 10.0, "burst_multiplier": 3.0, "radius": 1.0, "shutdown_duration": 3.0}}

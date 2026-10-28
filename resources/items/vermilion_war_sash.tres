@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Scales the critical-hit damage multiplier, not ordinary hits.", "Critical chance cannot fall below zero or exceed the existing cap.")
+runtime = {"stats": [{"filter": "attacking", "values": {"crit_damage_multiplier": 1.4, "crit_chance_add": -0.05}}]}

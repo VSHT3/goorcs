@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("War Drums: +5% to retained support components.", "Pure branches stay pure; coverage unchanged.", "Only the strongest support bonus per stat applies.")
+runtime = {"stats": [{"filter": "drums", "values": {"support_multiplier": 1.05}}]}

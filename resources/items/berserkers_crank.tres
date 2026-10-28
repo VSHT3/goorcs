@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Affects Arrow and Ballista branches that launch projectiles.", "Does not accelerate continuous beams or support.")
+runtime = {"stats": [{"filter": "projectile", "values": {"attack_rate_multiplier": 1.45, "damage_multiplier": 0.8, "range_add": -0.25}}]}

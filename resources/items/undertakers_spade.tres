@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only existing periodic payouts grow; this does not create a new payout timer.", "Bounty Board and Tribute Office are unaffected.")
+runtime = {"mechanic": "undertakers_spade", "parameters": {"periodic_multiplier": 1.35, "clear_multiplier": 0.85}}

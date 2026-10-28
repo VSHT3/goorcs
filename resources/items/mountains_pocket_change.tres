@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Affects Gold Mine and Royal Mint clear and periodic payouts, not marks or income auras.", "One independent Shard roll per actual payout, regardless of Coin amount.", "Only actual clears and combat-time periodic payouts count; no offline accrual.")
+runtime = {"mechanic": "mountains_pocket_change", "parameters": {"production_multiplier": 2.0, "shard_chance": 0.1, "shards": 1}}

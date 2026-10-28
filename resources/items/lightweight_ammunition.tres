@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Both modifiers apply to all attacking towers.", "Does not change support or economy output.")
+runtime = {"stats": [{"filter": "attacking", "values": {"damage_multiplier": 0.9, "attack_rate_multiplier": 1.18}}]}

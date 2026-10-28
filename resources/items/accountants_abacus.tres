@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only actual completed rounds pay; no periodic-production bonus.", "Does not change Bounty Board marks or Tribute Office income.")
+runtime = {"mechanic": "accountants_abacus", "parameters": {"clear_multiplier": 1.25}}

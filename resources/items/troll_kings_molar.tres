@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Equipping grants no immediate healing or revival.", "Removing it clamps current HP to the resulting maximum.")
+runtime = {"mechanic": "troll_kings_molar", "parameters": {"max_health_add": 20}}

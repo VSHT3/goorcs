@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Active works only during combat; cooldown uses simulation time.", "Does not extend support coverage or chain-jump distance; no stacking.")
+runtime = {"mechanic": "witchs_folded_ladder", "parameters": {"duration": 5.0, "cooldown": 30.0, "range_add": 1.0}}

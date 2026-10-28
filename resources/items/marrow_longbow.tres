@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies to every Arrow evolution's own damage.", "Attack speed and elemental immunities are unchanged.")
+runtime = {"stats": [{"filter": "arrow", "values": {"damage_multiplier": 1.4, "range_add": -0.25}}]}

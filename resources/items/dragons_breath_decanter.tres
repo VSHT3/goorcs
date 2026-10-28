@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies only while a tower's current attack element is Fire.", "Burn damage grows too; Fire immunity remains absolute.")
+runtime = {"stats": [{"filter": "fire", "values": {"damage_multiplier": 1.6, "attack_rate_multiplier": 0.85}}]}

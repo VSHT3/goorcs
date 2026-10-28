@@ -13,3 +13,4 @@ effect_text = "A crystal-side mushroom infects arriving enemies; infected deaths
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Infect 1 arrival/wave; feed 5 Shards for +1 permanent quota.", "Infection: 2% enemy max HP/s for 4 simulation seconds.", "On death: spread within 1.5 cells; each enemy infected once/wave.")
+runtime = {"mechanic": "spore_spawn_of_marko", "parameters": {"initial_quota": 1, "feed_cost": 5, "damage_fraction": 0.02, "duration": 4.0, "spread_radius": 1.5}}

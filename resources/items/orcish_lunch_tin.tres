@@ -13,3 +13,4 @@ effect_text = "Leak-free clears earn Coins; longer clean streaks pay more."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Coins = floor(10 + displayed round / 5) + floor(clean streak / 2).", "Streak includes this clear; any leak resets it to 0 and pays no bonus.")
+runtime = {"mechanic": "orcish_lunch_tin", "parameters": {"base_coins": 10, "round_divisor": 5, "streak_divisor": 2}}

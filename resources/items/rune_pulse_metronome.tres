@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Affects Onyx Ring and Storm Sigil pulses, not continuous branches.", "Elemental immunities and each pulse's damage remain unchanged.")
+runtime = {"stats": [{"filter": "pulsed_rune", "values": {"attack_rate_multiplier": 1.3}}]}

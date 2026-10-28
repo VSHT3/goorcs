@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only Freeze Runes is affected; slow does not stack.", "Ice immunity and maximum-HP-scaled thaw remain unchanged.")
+runtime = {"stats": [{"filter": "rune", "values": {"freeze_slow_multiplier": 0.7}}]}

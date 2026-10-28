@@ -1,6 +1,6 @@
 class_name ItemDefinition
 extends Resource
-## Authored Itemiery entry. Effect text describes design, not active run rules.
+## Authored Itemiery presentation and numeric host-owned run configuration.
 
 @export var id: StringName = &""
 @export var title: String = ""
@@ -13,3 +13,4 @@ extends Resource
 @export var upgrade_to: StringName = &""
 @export var upgrade_cost: int = 0
 @export_multiline var acquisition_text: String = ""
+@export var runtime: Dictionary = {}

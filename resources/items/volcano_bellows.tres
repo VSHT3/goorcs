@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only the Flamethrower Arrow branch is affected.", "Fire immunity still prevents all flame damage.")
+runtime = {"stats": [{"filter": "flamethrower", "values": {"damage_multiplier": 1.35, "range_add": -0.25}}]}

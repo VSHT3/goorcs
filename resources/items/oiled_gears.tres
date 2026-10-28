@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("All attacking towers; +5% attack speed.", "No change to support or production clocks.")
+runtime = {"stats": [{"filter": "attacking", "values": {"attack_rate_multiplier": 1.05}}]}

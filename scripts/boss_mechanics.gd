@@ -38,7 +38,7 @@ static func prepare(enemy: Dictionary) -> void:
 	elif not can_act(enemy):
 		enemy["speed"] = 0.0
 	else:
-		enemy["speed"] = float(enemy["base_speed"]) * (TowerDefinition.FREEZE_SPEED_MULTIPLIER if enemy["slowed"] else 1.0)
+		enemy["speed"] = float(enemy["base_speed"]) * (float(enemy.get("slow_multiplier", TowerDefinition.FREEZE_SPEED_MULTIPLIER)) if enemy["slowed"] else 1.0)
 
 
 static func event_step(enemy: Dictionary, definition: Dictionary) -> float:

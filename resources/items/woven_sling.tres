@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Orcapult family only; +8% damage.", "Crew count, reload time and blast radius unchanged.")
+runtime = {"stats": [{"filter": "orcapult", "values": {"damage_multiplier": 1.08}}]}

@@ -142,7 +142,7 @@ func _ready() -> void:
 
 func start_singleplayer() -> void:
 	session.leave()
-	_reset_match()
+	_reset_match(true)
 	singleplayer = true
 	selecting_loadout = true
 	_begin_commander_draft()
@@ -288,6 +288,7 @@ func _apply_loadout_command(sender: int, command: String, ids: Array, owned: Arr
 			_host_owned_claims[1] = _host_owned_claims[0].duplicate()
 			_host_loadout_committed[1] = true
 		if _host_loadout_committed[0] and _host_loadout_committed[1]:
+			_host_combat.configure_item_loadouts(_host_loadouts)
 			selecting_loadout = false
 			active = true
 	else:
@@ -403,7 +404,7 @@ func _host_can_set_values() -> bool:
 func _set_debug_values(round_number: int, money: int, shards: int) -> bool:
 	if not _host_can_set_values() or round_number < 1 or round_number > 1000 or money < 0 or money > 1000000000 or shards < 0 or shards > 1000000000:
 		return false
-	var displayed_round: int = _host_combat.wave + 1 if _host_combat.phase == MatchCombat.Phase.PLANNING else _host_combat.wave
+	var displayed_round: int = _host_combat.next_wave_number() if _host_combat.phase == MatchCombat.Phase.PLANNING else _host_combat.wave
 	if round_number != displayed_round:
 		if not _host_combat.debug_set_round(round_number):
 			return false
@@ -491,6 +492,40 @@ func send_enemy(slot: int, type_id: StringName) -> void:
 	_request_tower_command("send", slot, Vector2i.ZERO, -1, -1, String(type_id))
 
 
+func item_command(slot: int, id: StringName, action: String, target_id: int = -1) -> bool:
+	if action == "activate":
+		action = "active"
+	if action not in ["active", "bind", "feed", "upgrade"]:
+		return false
+	if singleplayer:
+		return _apply_item_command(1, slot, id, action, target_id)
+	if session == null or session.state != MultiplayerSession.State.CONNECTED or _active_peer_id == 0:
+		return false
+	if session.is_host:
+		return _apply_item_command(1, slot, id, action, target_id)
+	_receive_item_command.rpc_id(1, slot, String(id), action, target_id)
+	return true
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func _receive_item_command(slot: int, id: String, action: String, target_id: int = -1) -> void:
+	_apply_item_command(multiplayer.get_remote_sender_id(), slot, StringName(id), action, target_id)
+
+
+func _apply_item_command(sender: int, slot: int, id: StringName, action: String, target_id: int = -1) -> bool:
+	if not _can_accept(sender) or not active or (singleplayer and sender != 1):
+		return false
+	var owner_slot: int = 0 if sender == 1 else 1
+	if slot != owner_slot or action not in ["active", "bind", "feed", "upgrade"] or not _host_can_manage_towers(slot):
+		_reject(sender, "Only available item actions on your own board before Ready or during combat are allowed.")
+		return false
+	if not _host_combat.can_item_command(slot, id, action, target_id) or not _host_combat.item_command(slot, id, action, target_id):
+		_reject(sender, "Item action unavailable: check ownership, target, currency, phase, and cooldown.")
+		return false
+	_publish_snapshot()
+	return true
+
+
 func _request_tower_command(command: String, slot: int, cell: Vector2i, tower_id: int, mode: int, argument: String, requested: Variant = 1) -> bool:
 	if singleplayer:
 		return _apply_tower_command(1, command, slot, cell, tower_id, mode, argument, requested)
@@ -543,7 +578,7 @@ func _on_session_changed() -> void:
 		_request_snapshot.rpc_id(1)
 
 
-func _reset_match() -> void:
+func _reset_match(solo: bool = false) -> void:
 	_host_layouts = [
 		PathLayout.new(_dimensions, _budget, _entrance, _base),
 		PathLayout.new(_dimensions, _budget, _entrance, _base),
@@ -564,7 +599,7 @@ func _reset_match() -> void:
 	locked_routes = [[], []]
 	locked = false
 	active = false
-	singleplayer = false
+	singleplayer = solo
 	selecting_loadout = false
 	chosen_tower_ids = []
 	chosen_commander_id = &""
@@ -585,7 +620,15 @@ func _reset_match() -> void:
 	_active_peer_id = 0
 	_synced_guest_id = 0
 	_pending_snapshot_peer = 0
-	_host_combat = MatchCombat.new(combat_rules)
+	var captured_rules: CombatRules = combat_rules.duplicate() as CombatRules
+	captured_rules.starting_items = []
+	for slot: int in range(2):
+		var source_slot: int = 0 if solo else slot
+		var ids := PackedStringArray()
+		if source_slot < combat_rules.starting_items.size():
+			ids = combat_rules.starting_items[source_slot].duplicate()
+		captured_rules.starting_items.append(ids)
+	_host_combat = MatchCombat.new(captured_rules)
 	_ready_seconds_left = -1.0
 	_expansion_count = 0
 	combat = _combat_snapshot()
@@ -860,7 +903,7 @@ func _full_autoplay_enabled() -> bool:
 
 
 func _is_main_round() -> bool:
-	return _host_combat.phase == MatchCombat.Phase.PLANNING and (_host_combat.wave + 1) % combat_rules.main_round_interval == 0
+	return _host_combat.phase == MatchCombat.Phase.PLANNING and _host_combat.next_wave_number() % combat_rules.main_round_interval == 0
 
 
 func _is_setup_round() -> bool:
@@ -888,7 +931,7 @@ func _enter_planning() -> void:
 	_host_ready = [false, false]
 	_ready_seconds_left = -1.0
 	_combat_publish_elapsed = 0.0
-	_grow_to_round(_host_combat.wave + 1)
+	_grow_to_round(_host_combat.next_wave_number())
 
 
 func _grow_to_round(round_number: int) -> void:
@@ -925,6 +968,7 @@ func _try_start_wave() -> bool:
 
 func _combat_snapshot(include_metadata: bool = true) -> Dictionary:
 	var snapshot: Dictionary = _host_combat.snapshot(include_metadata, singleplayer)
+	snapshot["upcoming_wave"] = _host_combat.next_wave_number()
 	snapshot["speed_votes"] = _host_speed_votes.duplicate()
 	snapshot["triple_speed_votes"] = _host_triple_speed_votes.duplicate()
 	snapshot["autoplay_votes"] = _host_autoplay_votes.duplicate()

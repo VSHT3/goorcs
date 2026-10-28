@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("The extra arrow copies its source arrow's target and element.", "Extra arrows never trigger or count toward additional-arrow effects.", "Replaces Bottomless Quiver's fifth-arrow trigger rather than stacking with it.")
+runtime = {"mechanic": "entire_quiver", "parameters": {"every": 1, "damage_multiplier": 0.75}}

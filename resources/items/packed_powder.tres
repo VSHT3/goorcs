@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies only to Arrow's explosive attacks: blast radius ×1.20, attack speed ×0.90.", "Does not enlarge non-explosive attacks or bypass elemental immunity.")
+runtime = {"stats": [{"filter": "explosive_arrow", "values": {"splash_radius_multiplier": 1.2, "attack_rate_multiplier": 0.9}}]}

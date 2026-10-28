@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Builds only while tracking the same target without turning.", "Turning, losing the target or selling the Ballista resets the bonus.")
+runtime = {"mechanic": "siege_carpenters_brace", "parameters": {"damage_per_second": 0.05, "maximum_bonus": 0.35}}

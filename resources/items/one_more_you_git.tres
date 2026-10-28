@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Consumes on the first lethal leak; later leaks can still defeat you.", "Bosses are never stunned; queued enemies and sends are not cleared.", "Own board only; cannot revive a base that has already been defeated.")
+runtime = {"mechanic": "one_more_you_git", "parameters": {"health_remaining": 1, "stun_duration": 3.0}}

@@ -13,3 +13,4 @@ effect_text = "Every 10th counter event grants 1 Shard; a triggering kill pays 5
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Replaces Philosophers Stone: one shared counter, +1 per own-board kill or Gold Mine-family payout.", "Triggering kills are marked golden; zero bounty stays 0.", "Each payout counts once regardless of amount; production is not a kill or bounty.")
+runtime = {"mechanic": "philosophorers_stone", "parameters": {"event_period": 10, "bounty_multiplier": 5.0, "shards": 1, "rush_seconds": 0.0}}

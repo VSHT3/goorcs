@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("The target must be a summoned enemy.", "Damage against other enemies is unchanged.")
+runtime = {"mechanic": "gravediggers_lantern", "parameters": {"damage_multiplier": 1.25}}

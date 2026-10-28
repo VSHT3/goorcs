@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Attacker damage ×1.18; attack range −0.25 tiles within existing range limits.", "Never changes support coverage or Lightning jump distance.")
+runtime = {"stats": [{"filter": "attacking", "values": {"damage_multiplier": 1.18, "range_add": -0.25}}]}

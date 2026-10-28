@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only Orcapult lift eligibility changes; throw distance and slam damage do not.", "Bosses remain unliftable regardless of weight.")
+runtime = {"stats": [{"filter": "orcapult", "values": {"lift_classes_add": 1}}]}

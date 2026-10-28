@@ -13,3 +13,4 @@ effect_text = "Every 5th counter event grants 1 Shard and a 4-second, 5× bounty
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Replaces stones: own-board kills and Mine payouts add 1 shared count.", "Rush refreshes to 4s: 5× kill Coins, including trigger; never stacking.", "Excess crystal healing → Coins 1:1.")
+runtime = {"mechanic": "philosophorers_stoner", "parameters": {"event_period": 5, "bounty_multiplier": 5.0, "shards": 1, "rush_seconds": 4.0, "overheal_coins_multiplier": 1.0}}

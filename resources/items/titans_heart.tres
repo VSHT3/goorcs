@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies to attack, chain and Orcapult damage.", "Does not change support buffs, production or elemental immunities.")
+runtime = {"stats": [{"filter": "attacking", "values": {"damage_multiplier": 1.8, "attack_rate_multiplier": 0.7}}]}

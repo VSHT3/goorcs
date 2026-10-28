@@ -209,6 +209,50 @@ static func _stages(definition: TowerDefinition) -> Array[Dictionary]:
 	return stages
 
 
+## Pure terminal purchase metadata; never constructs a preview combat owner.
+## Compatible optional followups (Freeze) belong to the completed ordered path,
+## rather than becoming a separate, prematurely maxed branch.
+static func terminal_command_metadata(definition: TowerDefinition) -> Array[Dictionary]:
+	var candidates: Array[Dictionary] = _stages(definition)
+	for stage: Dictionary in candidates:
+		var commands: Array[String] = stage["commands"]
+		for branch_id: String in definition.evolutions:
+			if not commands.has(branch_id):
+				continue
+			var branch: Dictionary = definition.evolutions[branch_id]
+			var optional: Dictionary = branch.get("followup", {})
+			if not optional.is_empty() and not commands.has(String(optional["id"])):
+				commands.append(String(optional["id"]))
+	var terminals: Array[Dictionary] = []
+	var seen: Dictionary = {}
+	for candidate: Dictionary in candidates:
+		var commands: Array[String] = candidate["commands"]
+		var has_successor: bool = false
+		for other: Dictionary in candidates:
+			var other_commands: Array[String] = other["commands"]
+			if other_commands.size() <= commands.size():
+				continue
+			var contains: bool = true
+			for command: String in commands:
+				if not other_commands.has(command):
+					contains = false
+					break
+			if contains:
+				has_successor = true
+				break
+		if has_successor:
+			continue
+		var id: String = "/".join(commands)
+		if seen.has(id):
+			continue
+		seen[id] = true
+		terminals.append({
+			"id": id, "type_id": String(definition.reward.id),
+			"title": candidate["title"], "commands": commands.duplicate(),
+		})
+	return terminals
+
+
 static func _advancement_chain(advancements: Dictionary, command: String) -> Array[String]:
 	var chain: Array[String] = []
 	var current: String = command

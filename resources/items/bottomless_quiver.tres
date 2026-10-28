@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Count ordinary arrows per eligible tower; the extra arrow copies its target and element.", "Extra arrows cannot count toward or trigger additional arrows.")
+runtime = {"mechanic": "bottomless_quiver", "parameters": {"every": 5, "damage_multiplier": 0.5}}

@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Rune attack speed ×1.12, including evolved Rune attacks.", "Does not add slow, critical hits or an immunity bypass.")
+runtime = {"stats": [{"filter": "rune", "values": {"attack_rate_multiplier": 1.12}}]}

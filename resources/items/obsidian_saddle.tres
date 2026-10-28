@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Throw distance and lift eligibility are unchanged.", "Does not change enemy weight or allow boss lifting.")
+runtime = {"stats": [{"filter": "orcapult", "values": {"attack_rate_multiplier": 1.25, "damage_multiplier": 0.85}}]}

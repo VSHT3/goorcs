@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies to all friendly towers, including support and economy.", "Does not shorten wither or magic nullification.")
+runtime = {"mechanic": "trollhide_apron", "parameters": {"duration_multiplier": 0.65}}

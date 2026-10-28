@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies only to Lightning towers.", "Damage type and enemy elemental immunities are unchanged.")
+runtime = {"stats": [{"filter": "lightning", "values": {"attack_rate_multiplier": 1.12}}]}

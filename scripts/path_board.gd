@@ -240,6 +240,10 @@ var _crystal_hits: Array[Dictionary] = []
 var _health_run: String = ""
 var _last_health: int = -1
 var _crystal_flash_texture: AtlasTexture
+var _item_state: Dictionary = {}
+var _item_effects: Array[Dictionary] = []
+var _last_item_event: int = 0
+var _spore_texture: Texture2D
 
 
 func _ready() -> void:
@@ -291,13 +295,17 @@ func _advance_endpoints() -> void:
 	queue_redraw()
 
 func _sync_combat_animation() -> void:
-	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or _has_catapult_motion or not _flight_traces.is_empty() or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty() or not _ground_bombs.is_empty() or not _bomb_explosion_traces.is_empty() or not _crystal_hits.is_empty()))
+	set_process(is_visible_in_tree() and (_has_boulders or _has_idle_flames or _has_archer_motion or _has_catapult_motion or not _flight_traces.is_empty() or not combat_enemies.is_empty() or not _shot_traces.is_empty() or not _corpse_traces.is_empty() or not _boss_effects.is_empty() or not _ground_bombs.is_empty() or not _bomb_explosion_traces.is_empty() or not _crystal_hits.is_empty() or not _item_effects.is_empty()))
 
 
 func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
 	var visual_delta: float = 0.0 if _corpse_paused else delta * _corpse_speed
+	for index: int in range(_item_effects.size() - 1, -1, -1):
+		_item_effects[index]["age"] += visual_delta
+		if float(_item_effects[index]["age"]) >= 0.55:
+			_item_effects.remove_at(index)
 	_bomb_visual_clock += visual_delta
 	for index: int in range(_bomb_explosion_traces.size() - 1, -1, -1):
 		_bomb_explosion_traces[index]["age"] += visual_delta
@@ -374,6 +382,7 @@ func apply_combat(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 	_observe_base_health(state, slot)
 	combat_enemies = state.get("enemies", [[], []])[slot]
 	combat_towers = state.get("towers", [[], []])[slot]
+	_capture_item_events(state, slot)
 
 
 ## A drop in this board's accepted base HP within one run shakes and flashes
@@ -416,6 +425,8 @@ func apply_deaths(state: Dictionary, slot: int, speed: float = 1.0, paused: bool
 		_ground_bombs.clear()
 		_bomb_explosion_traces.clear()
 		_last_bomb_explosion_id = 0
+		_item_effects.clear()
+		_last_item_event = 0
 		_death_match_id = match_id
 		_death_generation = generation
 	_corpse_speed = maxf(0.0, speed)
@@ -495,7 +506,7 @@ func _capture_shots() -> void:
 
 
 func _archer_advancement(tower: Dictionary, definition: Dictionary) -> Dictionary:
-	return definition.get("advancements", {}).get(tower.get("advancement", ""), {})
+	return tower.get("effective_attack_config", definition.get("advancements", {}).get(tower.get("advancement", ""), {}))
 
 func _tower_variant(tower: Dictionary, artwork: TowerReward) -> Dictionary:
 	var advancement: String = tower.get("advancement", "")
@@ -993,6 +1004,7 @@ func _draw() -> void:
 	_draw_combat()
 	_draw_projectiles()
 	_draw_boss_effects()
+	_draw_item_effects()
 	_draw_feedback()
 	_draw_arena_nullify()
 	if _commander_slow_remaining > 0.0:
@@ -1437,6 +1449,7 @@ func _draw_combat() -> void:
 					draw_texture_rect(texture, _sprite_rect(texture, 1.05, anchor, item["foot"]), false)
 				else:
 					_draw_crystal(item["foot"])
+					_draw_spore_pet(item["foot"])
 			1:
 				_draw_tower(item["data"], item["foot"])
 			2:
@@ -1463,6 +1476,12 @@ func _draw_combat() -> void:
 			var enemy: Dictionary = item["data"]
 			EnemyVisuals.draw_hit_shield(self, item["bounds"], int(enemy.get("shield_hits", 0)), int(enemy.get("shield_max_hits", 0)), cell_size, float(_shield_hit_life.get(int(enemy["id"]), 0.0)) / 0.18)
 			_draw_bounty_indicator(item)
+			if float(enemy.get("infected_remaining", 0.0)) > 0.0:
+				var bounds: Rect2 = item["bounds"]
+				var mark: Vector2 = Vector2(bounds.get_center().x, bounds.position.y - cell_size * 0.12)
+				var pixel: float = maxf(1.0, floorf(cell_size * 0.05))
+				draw_rect(Rect2(mark + Vector2(-pixel * 2.0, 0), Vector2(pixel * 4.0, pixel * 2.0)), Color("dcb3f5"))
+				draw_rect(Rect2(mark + Vector2(-pixel, pixel * 2.0), Vector2(pixel * 2.0, pixel * 2.0)), Color("9ee5a4"))
 
 
 func _draw_tower(tower: Dictionary, foot: Vector2) -> void:
@@ -3317,3 +3336,62 @@ func leak_danger() -> float:
 			continue
 		nearest = minf(nearest, float(route.size() - 1) - _enemy_route_progress(enemy))
 	return BoardFeedback.leak_danger(nearest) if nearest < INF else 0.0
+
+
+## Cosmetic traces are created only from accepted host item events.
+func _capture_item_events(state: Dictionary, slot: int) -> void:
+	var items: Array = state.get("items", [])
+	_item_state = items[slot] if slot >= 0 and slot < items.size() else {}
+	var clock: float = float(state.get("item_time", 0.0))
+	for event: Dictionary in state.get("item_events", []):
+		var event_id: int = int(event["id"])
+		if event_id <= _last_item_event:
+			continue
+		_last_item_event = event_id
+		if int(event.get("slot", -1)) != slot:
+			continue
+		var age: float = maxf(0.0, clock - float(event.get("time", clock)))
+		if age >= 0.55:
+			continue
+		if event.get("kind", "") == "extra_arrow":
+			for tower: Dictionary in combat_towers:
+				if int(tower["id"]) != int(event.get("tower_id", -1)):
+					continue
+				_capture_attack(tower, tower_types.get(tower["type_id"], {}), 0, event.get("aim", event.get("pos", Vector2.ZERO)), age)
+				if not _shot_traces.is_empty():
+					_shot_traces[-1]["origin_offset"] += Vector2(0.10, -0.10)
+				break
+		elif event.get("kind", "") in ["sun_burst", "spore_infected"]:
+			var trace: Dictionary = event.duplicate(true)
+			trace["age"] = age
+			_item_effects.append(trace)
+	_sync_combat_animation()
+	queue_redraw()
+
+
+func _draw_item_effects() -> void:
+	var cell_size: float = _cell_size()
+	for trace: Dictionary in _item_effects:
+		var phase: float = clampf(float(trace["age"]) / 0.55, 0.0, 1.0)
+		var point: Vector2 = _position_center(trace.get("pos", Vector2.ZERO))
+		if trace["kind"] == "sun_burst":
+			ArrowWeaponVisuals.draw_impact(self, point, float(trace.get("radius", 1.0)) * cell_size, phase, maxf(1.0, floorf(cell_size * 0.022)), "rocket")
+		else:
+			draw_arc(point, cell_size * (0.15 + phase * 0.35), 0, TAU, 12, Color(0.73, 0.95, 0.67, 1.0 - phase), maxf(1.0, cell_size * 0.035))
+
+
+func _draw_spore_pet(crystal_foot: Vector2) -> void:
+	if not _item_state.get("owned", []).has("spore_spawn_of_marko"):
+		return
+	if _spore_texture == null:
+		for definition: ItemDefinition in content_catalog.items:
+			if definition.id == &"spore_spawn_of_marko":
+				_spore_texture = definition.icon_texture
+				break
+	if _spore_texture == null:
+		return
+	var cell_size: float = _cell_size()
+	var side: float = 1.0 if mirror_horizontal else -1.0
+	var foot: Vector2 = crystal_foot + Vector2(side * cell_size * 0.60, cell_size * 0.08)
+	var extent: Vector2 = Vector2.ONE * cell_size * 0.58
+	draw_texture_rect(_spore_texture, Rect2((foot - Vector2(extent.x * 0.5, extent.y)).floor(), extent), false)

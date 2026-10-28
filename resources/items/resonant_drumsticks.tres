@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Strengthens only support stats retained by the Drums' pure branch.", "Coverage is unchanged; only the strongest global bonus per stat applies.")
+runtime = {"stats": [{"filter": "drums", "values": {"support_multiplier": 1.12}}]}

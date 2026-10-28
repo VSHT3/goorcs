@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Reserve uses actual HP lost after mitigation; fractional HP carries until healing.", "A boss kill consumes the reserve; healing cannot exceed maximum HP or revive a defeated base.")
+runtime = {"mechanic": "dreadmaws_second_heart", "parameters": {"reserve_fraction": 0.5}}

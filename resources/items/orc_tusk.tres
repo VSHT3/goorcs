@@ -14,3 +14,4 @@ flavor_text = "A long forgotten tusk of a defeated Orc."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Your side's summoned enemy max HP ×0.90.")
+runtime = {"mechanic": "orc_tusk", "parameters": {"health_multiplier": 0.9}}

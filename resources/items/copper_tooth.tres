@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("One +1 Coin bonus per board per wave.", "Requires a kill that already pays bounty; leaks do not count.")
+runtime = {"mechanic": "copper_tooth", "parameters": {"bonus_coins": 1}}

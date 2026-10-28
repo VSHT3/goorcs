@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Active protects only your base; one leak consumes the ward, and expiry wastes it.", "Combat simulation time only; cannot stack, revive or prevent defeat after remaining damage.")
+runtime = {"mechanic": "bastion_in_a_bottle", "parameters": {"duration": 6.0, "cooldown": 60.0, "damage_prevent_fraction": 0.5, "damage_prevent_cap": 20.0}}

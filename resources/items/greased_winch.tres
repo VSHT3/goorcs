@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Ballista family only; +8% attack speed.", "Damage and attack range stay unchanged.")
+runtime = {"stats": [{"filter": "ballista", "values": {"attack_rate_multiplier": 1.08}}]}

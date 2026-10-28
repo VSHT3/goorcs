@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Attacker damage ×1.20 only while the victim is slowed.", "Does not apply slow or bypass elemental immunity.")
+runtime = {"mechanic": "frostbite_nail", "parameters": {"damage_multiplier": 1.2}}

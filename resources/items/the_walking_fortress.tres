@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("No healing on equip or revival; removing it clamps HP to the resulting maximum.", "Rally affects only your base and friendly towers, using combat simulation time.", "Healing cannot exceed maximum HP; existing stuns, wither and magic nullification are not cleansed.")
+runtime = {"mechanic": "the_walking_fortress", "parameters": {"max_health_add": 30, "duration": 6.0, "cooldown": 60.0, "heal": 10}}

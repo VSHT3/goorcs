@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Choose one placed Arrow or Ballista that launches projectiles; combat time only.", "No damage or range bonus; continuous, support and economy towers are ineligible.")
+runtime = {"mechanic": "minute_hand_cannon", "parameters": {"duration": 5.0, "cooldown": 30.0, "attack_rate_multiplier": 1.75}}

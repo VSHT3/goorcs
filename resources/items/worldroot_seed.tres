@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Bind to one friendly attacker; clears count only while bound, never retroactively.", "Selling the bound tower destroys the seed and its growth; no transfer or refunds.")
+runtime = {"mechanic": "worldroot_seed", "parameters": {"damage_per_clear": 0.02, "damage_cap": 0.6}}

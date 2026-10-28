@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("One board-wide serving; the next qualifying kill consumes it and resets the timer.", "Own-board kills only; leaks and summoned enemies never pay or consume a serving.")
+runtime = {"mechanic": "mimics_lunch_pail", "parameters": {"wait_seconds": 10.0, "bonus_coins": 3}}

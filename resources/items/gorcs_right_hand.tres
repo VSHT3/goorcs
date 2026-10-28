@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Affects attack, chain and Orcapult towers.", "Does not increase support strength or economy production.")
+runtime = {"stats": [{"filter": "attacking", "values": {"damage_multiplier": 1.6, "attack_rate_multiplier": 1.4}}]}

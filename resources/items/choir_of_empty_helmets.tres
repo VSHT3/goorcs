@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Count other friendly towers within 2 cells; each base identity counts once.", "Branches share their base identity; duplicate helmets do not stack.")
+runtime = {"mechanic": "choir_of_empty_helmets", "parameters": {"radius": 2.0, "damage_per_identity": 0.08, "max_identities": 4}}

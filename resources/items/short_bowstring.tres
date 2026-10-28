@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Arrow family only; +10% damage.", "Attack range -0.25 tiles; no support coverage change.")
+runtime = {"stats": [{"filter": "arrow", "values": {"damage_multiplier": 1.1, "range_add": -0.25}}]}

@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only that summoner's living summons on your board are affected.", "Duration refreshes rather than stacking; no opponent-board effects.")
+runtime = {"mechanic": "necromancers_receipt", "parameters": {"damage_multiplier": 1.25, "duration": 5.0}}

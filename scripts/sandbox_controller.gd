@@ -18,6 +18,9 @@ var _snapshot_elapsed: float = 0.0
 var _last_test_kind: TestKind = TestKind.NONE
 var _last_spawn_type: StringName = &""
 var _last_spawn_count: int = 0
+# Reset/resize start a fresh run with this session's current ownership, not its
+# consumed flags, cooldowns, growth, or item rewards. Stop only abandons a wave.
+var _session_items: Array[String] = []
 
 
 func configure(catalog: ContentCatalog, source_rules: CombatRules) -> void:
@@ -25,7 +28,12 @@ func configure(catalog: ContentCatalog, source_rules: CombatRules) -> void:
 	rules.catalog = catalog
 	rules.sandbox_mode = true
 	layout = _new_layout(Vector2i(14, 9))
-	combat = MatchCombat.new(rules)
+	combat = null
+	_session_items.clear()
+	if not source_rules.starting_items.is_empty():
+		for id: String in source_rules.starting_items[0]:
+			_session_items.append(id)
+	_new_combat()
 	_publish()
 
 
@@ -66,7 +74,7 @@ func resize_map(dimensions: Vector2i) -> bool:
 	if dimensions.x < 2 or dimensions.y < 1:
 		return false
 	layout = _new_layout(dimensions)
-	combat = MatchCombat.new(rules)
+	_new_combat()
 	combat.debug_set_round(round_number)
 	paused = true
 	_publish()
@@ -148,7 +156,7 @@ func stop() -> bool:
 
 
 func reset_build() -> void:
-	combat = MatchCombat.new(rules)
+	_new_combat()
 	combat.debug_set_round(round_number)
 	paused = true
 	_publish()
@@ -197,6 +205,64 @@ func set_targeting(tower_id: int, mode: int) -> bool:
 		_publish()
 	return accepted
 
+
+
+func set_items(ids: Array) -> bool:
+	var accepted: bool = combat.set_items(0, ids)
+	if accepted:
+		_session_items.assign(combat.item_runtime.owned_ids(0))
+		_publish()
+	return accepted
+
+
+func add_item(id: StringName) -> bool:
+	var accepted: bool = combat.grant_item(0, id)
+	if accepted:
+		_session_items.assign(combat.item_runtime.owned_ids(0))
+		_publish()
+	return accepted
+
+
+func remove_item(id: StringName) -> bool:
+	var accepted: bool = combat.remove_item(0, id)
+	if accepted:
+		_session_items.assign(combat.item_runtime.owned_ids(0))
+		_publish()
+	return accepted
+
+
+func item_command(id: StringName, action: String, target_id: int = -1) -> bool:
+	if action not in ["active", "bind", "feed", "upgrade"]:
+		return false
+	var accepted: bool = combat.item_command(0, id, action, target_id)
+	if accepted:
+		_session_items.assign(combat.item_runtime.owned_ids(0))
+		_publish()
+	return accepted
+
+
+func set_item_funds(coins: int, shards: int) -> bool:
+	if coins < 0 or shards < 0:
+		return false
+	combat.coins[0] = coins
+	combat.reroll_currency[0] = shards
+	_publish()
+	return true
+
+
+func _new_combat() -> void:
+	# Ownership is session-local. Replacing the model never changes collection.
+	if combat != null:
+		_session_items.assign(combat.item_runtime.owned_ids(0))
+	var captured_rules: CombatRules = rules.duplicate() as CombatRules
+	captured_rules.starting_items = [PackedStringArray(_session_items), PackedStringArray()]
+	combat = MatchCombat.new(captured_rules)
+	var tower_ids: Array[String] = []
+	for definition: TowerDefinition in rules.catalog.towers:
+		if definition != null and definition.reward != null:
+			tower_ids.append(String(definition.reward.id))
+	combat.configure_item_loadouts([tower_ids, tower_ids.duplicate()])
+	_session_items.assign(combat.item_runtime.owned_ids(0))
 
 func _new_layout(dimensions: Vector2i) -> PathLayout:
 	var row: int = floori(float(dimensions.y) * 0.5)

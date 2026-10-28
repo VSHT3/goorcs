@@ -14,3 +14,4 @@ flavor_text = "do you hear them? the bells"
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Play rounds 10, 20, 30, …", "Both crystals share ×1.1 damage taken; +0.1 per next played step, capped at ×10.")
+runtime = {"mechanic": "ominous_bells_of_doom", "parameters": {"wave_step": 10, "damage_initial": 1.1, "damage_step": 0.1, "damage_cap": 10.0}}

@@ -17,6 +17,9 @@ extends Resource
 @export var roll_rules: TowerRollRules
 @export var boss_reward_rules: BossRewardRules
 @export var starting_reroll_currency: int = 0
+# Host-injected run configuration only; no match acquisition or item draft.
+# Packed arrays are captured independently for each board by MatchCombat.
+@export var starting_items: Array[PackedStringArray] = [PackedStringArray(), PackedStringArray()]
 @export var clear_reroll_currency: int = 3
 @export var health_growth: int = 1
 # Each milestone adds a fraction of original speed; spans grow 5, 10, 15... rounds.

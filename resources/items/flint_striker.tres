@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Fire Arrow branches: direct fire damage +8%.", "Burn damage unchanged; fire immunity still applies.")
+runtime = {"stats": [{"filter": "fire_arrow", "values": {"direct_damage_multiplier": 1.08}}]}

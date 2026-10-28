@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Horn remains a pure range branch; its own coverage is unchanged.", "Only the strongest range aura applies to each attacking tower.")
+runtime = {"stats": [{"filter": "lookout_horn", "values": {"support_range_multiplier": 1.3}}]}

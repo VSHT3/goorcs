@@ -13,3 +13,4 @@ effect_text = "Every 20th enemy kill on your board pays 5× its normal Coin boun
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Count actual kills on your board; every 20th is marked golden. Zero bounty stays 0.", "Higher stones replace this tier, never stack separate alchemy counters.")
+runtime = {"mechanic": "philosophers_stone", "parameters": {"event_period": 20, "bounty_multiplier": 5.0, "shards": 0, "rush_seconds": 0.0}}

@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Branches remain pure: Forge damage, Banner speed, Totem crit and Horn range only.", "Strongest source per stat still wins globally; critical caps remain.", "Coverage never grows; no new buff component is added to any branch.")
+runtime = {"stats": [{"filter": "drums", "values": {"support_multiplier": 2.0}}]}

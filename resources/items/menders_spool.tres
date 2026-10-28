@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Multiplies slow durations received by towers by 0.85.", "Does not change slow strength or slows inflicted on enemies.")
+runtime = {"mechanic": "menders_spool", "parameters": {"duration_multiplier": 0.85}}

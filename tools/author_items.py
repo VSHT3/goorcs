@@ -11,6 +11,7 @@ import re
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw
+from item_runtime_data import gd_runtime
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "items"
@@ -916,7 +917,7 @@ def _gd_string(value):
 
 
 def write_item_resource(item, tier):
-    """Write one new guide-only definition; legacy definitions are never inputs."""
+    """Write authored guide metadata and its preserved numeric gameplay record."""
     item_id = item["id"]
     mechanics = ", ".join(_gd_string(rule) for rule in item["mechanics"])
     text = (
@@ -934,6 +935,7 @@ def write_item_resource(item, tier):
         'icon_texture = ExtResource("2")\n'
         'detail_texture = ExtResource("3")\n'
         f'mechanics = PackedStringArray({mechanics})\n'
+        f'runtime = {gd_runtime(item_id)}\n'
     )
     (ITEM_RESOURCES / f"{item_id}.tres").write_text(text, encoding="utf-8")
 

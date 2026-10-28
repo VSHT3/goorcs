@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies only to Gold Mine production payouts.", "Production cadence and gold from other sources are unchanged.")
+runtime = {"mechanic": "counting_frame", "parameters": {"production_multiplier": 1.1}}

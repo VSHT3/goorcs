@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Physical Arrow and Ballista branches only.", "+4% damage; elemental branches receive no bonus.")
+runtime = {"stats": [{"filter": "physical_projectile", "values": {"damage_multiplier": 1.04}}]}

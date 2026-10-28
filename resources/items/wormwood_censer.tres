@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Reduction lasts only while that burn is active; duplicates do not stack.", "Fire-immune enemies cannot receive the burn or this penalty.")
+runtime = {"mechanic": "wormwood_censer", "parameters": {"healing_multiplier": 0.5}}

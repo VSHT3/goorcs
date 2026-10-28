@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Lightning family only; +8% damage.", "No extra chain targets or immunity bypass.")
+runtime = {"stats": [{"filter": "lightning", "values": {"damage_multiplier": 1.08}}]}

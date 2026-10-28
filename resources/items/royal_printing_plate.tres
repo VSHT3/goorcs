@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only existing periodic payouts grow; combat simulation controls their timing.", "Base Gold Mines, Bounty Board and Tribute Office are unaffected.")
+runtime = {"mechanic": "royal_printing_plate", "parameters": {"periodic_multiplier": 1.5, "clear_multiplier": 0.8}}

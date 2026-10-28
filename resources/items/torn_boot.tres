@@ -14,3 +14,4 @@ flavor_text = "A torn boot, orcs feet hurt more so they go slower."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Your side's summoned enemy speed ×0.88.")
+runtime = {"mechanic": "torn_boot", "parameters": {"speed_multiplier": 0.88}}

@@ -14,3 +14,4 @@ flavor_text = "SHOGUN yokosoo sushi anime."
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Tower damage ×1.35; attack rate ×0.90 (attack interval ÷0.90).")
+runtime = {"stats": [{"filter": "attacking", "values": {"damage_multiplier": 1.35, "attack_rate_multiplier": 0.9}}]}

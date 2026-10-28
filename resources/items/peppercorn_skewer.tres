@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Applies to attacking towers only.", "Does not accelerate support or gold production.")
+runtime = {"stats": [{"filter": "attacking", "values": {"attack_rate_multiplier": 1.08}}]}

@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Multiplies stun durations received by towers by 0.80.", "Does not alter stuns inflicted on enemies.")
+runtime = {"mechanic": "trollhide_earplugs", "parameters": {"duration_multiplier": 0.8}}

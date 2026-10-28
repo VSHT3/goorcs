@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Count released chains board-wide; extra jumps do not advance the counter.", "Lightning-immune enemies cannot be selected; bosses never receive this stun.")
+runtime = {"mechanic": "clockwork_raincloud", "parameters": {"every": 10, "stun_duration": 0.5}}

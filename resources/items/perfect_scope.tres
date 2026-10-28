@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Does not extend support coverage or chain-jump distance.", "Existing critical-chance caps still apply.")
+runtime = {"stats": [{"filter": "attacking", "values": {"range_add": 1.0, "crit_chance_add": 0.1}}]}

@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only Molotov's ongoing burn is affected; damage per second is unchanged.", "Repeated burns refresh normally and never bypass Fire immunity.")
+runtime = {"stats": [{"filter": "molotov", "values": {"burn_duration_multiplier": 1.4}}]}

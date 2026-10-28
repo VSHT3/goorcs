@@ -16,3 +16,4 @@ mechanics = PackedStringArray("Complete every loadout end node; first maxed towe
 upgrade_to = &"the_whole_shebang_orcfeccion"
 upgrade_cost = 10000
 acquisition_text = "Upgrade to BangBang: base 10,000 Coins; only the cap rises to +115%, no resets."
+runtime = {"mechanic": "the_whole_shebang", "parameters": {"rate_per_clear": 0.01, "rate_cap": 0.85}}

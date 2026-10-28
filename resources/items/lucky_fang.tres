@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Only discrete damage hits can critically strike.", "The existing critical-chance cap still applies.")
+runtime = {"stats": [{"filter": "attacking", "values": {"crit_chance_add": 0.03}}]}

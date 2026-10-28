@@ -36,6 +36,8 @@ func validation_errors() -> PackedStringArray:
 			errors.append("Item '%s' requires an upgrade target and positive Coin cost together, or empty/zero defaults." % item.id)
 		if item.rarity < ItemRarity.Tier.COMMON or item.rarity > ItemRarity.Tier.ORCFECCION:
 			errors.append("Item '%s' has an unknown rarity." % item.id)
+		for runtime_error: String in ItemStatEffects.validate_runtime(item.runtime):
+			errors.append("Item '%s' runtime: %s" % [item.id, runtime_error])
 	for item: ItemDefinition in items:
 		if item == null or item.upgrade_to == &"":
 			continue

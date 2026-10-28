@@ -14,3 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("The target's boss status selects the damage modifier.", "Does not change enemy immunities.")
+runtime = {"mechanic": "mooncap_jerky", "parameters": {"boss_multiplier": 1.15, "nonboss_multiplier": 0.95}}
