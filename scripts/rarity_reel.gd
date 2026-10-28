@@ -48,6 +48,7 @@ var _reveal: AudioStreamPlayer
 var _batch: Array[BatchReel] = []
 var _batch_winner: int = -1
 var _batch_columns: int = 0
+var _compact_batch: bool = false
 var _batch_scroll: ScrollContainer
 var _batch_content: Control
 
@@ -84,6 +85,7 @@ class ReelStrip extends Control:
 	var flap_angle: float = 0.0
 	var flap_velocity: float = 0.0
 	var compact: bool = false
+	var single_card: bool = false
 	var retained: bool = false
 
 	func release_contact() -> void:
@@ -169,11 +171,13 @@ class ReelStrip extends Control:
 		draw_colored_polygon(_top_marker, MARKER)
 		draw_circle(Vector2.ZERO, 2.5, Color("f5dca5"))
 		draw_set_transform(Vector2.ZERO)
-		# Quiet end masks reinforce the clipped horizontal window without a shader.
-		for step: int in range(6):
-			var shade := Color(0.051, 0.090, 0.075, float(6 - step) * 0.12)
-			draw_rect(Rect2(float(step) * 5.0, 0.0, 5.0, size.y), shade)
-			draw_rect(Rect2(size.x - float(step + 1) * 5.0, 0.0, 5.0, size.y), shade)
+		# Single-card windows leave every label pixel visible.
+		if not single_card:
+			# Quiet end masks reinforce the clipped horizontal window without a shader.
+			for step: int in range(6):
+				var shade := Color(0.051, 0.090, 0.075, float(6 - step) * 0.12)
+				draw_rect(Rect2(float(step) * 5.0, 0.0, 5.0, size.y), shade)
+				draw_rect(Rect2(size.x - float(step + 1) * 5.0, 0.0, 5.0, size.y), shade)
 		if retained and reveal > 0.0:
 			draw_rect(Rect2(Vector2.ONE, size - Vector2(2.0, 2.0)), MARKER, false, 2.0)
 
@@ -229,7 +233,7 @@ func _ready() -> void:
 	hide()
 
 
-func present(tower: Dictionary, artwork: Texture2D) -> void:
+func present(tower: Dictionary, artwork: Texture2D, compact_batch: bool = false) -> void:
 	# The caller owns acceptance detection and duplicate-request locking.
 	if not _can_present():
 		return
@@ -241,14 +245,16 @@ func present(tower: Dictionary, artwork: Texture2D) -> void:
 	_heading.text = "Rarity"
 	_floor_rank = 0
 	_clear_batch()
+	_compact_batch = compact_batch
 	var results: Array = tower.get("rarity_batch_results", [])
-	if results.size() > 1:
+	if results.size() > 1 or (_compact_batch and results.size() == 1):
 		_strip.set_artwork(artwork)
 		_batch_winner = clampi(int(tower.get("rarity_batch_winner", 0)), 0, results.size() - 1)
 		for result: Dictionary in results:
 			var entry := BatchReel.new()
 			entry.strip = ReelStrip.new()
 			entry.strip.compact = true
+			entry.strip.single_card = _compact_batch
 			entry.strip.artwork = _strip.artwork
 			entry.strip.artwork_bounds = _strip.artwork_bounds
 			entry.strip.names = _strip.names
@@ -329,6 +335,7 @@ func _clear_batch() -> void:
 	_batch.clear()
 	_batch_winner = -1
 	_batch_columns = 0
+	_compact_batch = false
 
 
 func _prepare_strip(strip: ReelStrip, rank: int, artwork: Texture2D) -> float:
@@ -351,7 +358,7 @@ func _prepare_strip(strip: ReelStrip, rank: int, artwork: Texture2D) -> float:
 	strip.retained = false
 	strip.flap_angle = 0.0
 	strip.flap_velocity = 0.0
-	return float(WINNER_INDEX) + _rng.randf_range(-0.14, 0.14)
+	return float(WINNER_INDEX) if strip.single_card else float(WINNER_INDEX) + _rng.randf_range(-0.14, 0.14)
 
 
 func _speed_for_landing(landing: float) -> float:
@@ -617,19 +624,23 @@ func _layout_batch() -> void:
 	_batch_scroll.position = Vector2(16.0, 76.0)
 	_batch_scroll.size = Vector2(maxf(0.0, _panel.size.x - 32.0), maxf(0.0, _panel.size.y - 128.0))
 	var available: Vector2 = _batch_scroll.size
-	var max_columns: int = maxi(1, floori((available.x + 8.0) / 300.0))
-	_batch_columns = 2 if _batch.size() == 10 else mini(max_columns, maxi(1, ceili(sqrt(float(_batch.size()) * available.x / maxf(available.y, 1.0) / 3.0))))
+	var max_columns: int = maxi(1, floori((available.x + 8.0) / (ReelStrip.CARD_WIDTH + 8.0 if _compact_batch else 300.0)))
+	if _compact_batch:
+		_batch_columns = mini(_batch.size(), max_columns)
+	else:
+		_batch_columns = 2 if _batch.size() == 10 else mini(max_columns, maxi(1, ceili(sqrt(float(_batch.size()) * available.x / maxf(available.y, 1.0) / 3.0))))
 	var rows: int = ceili(float(_batch.size()) / _batch_columns)
 	# Try additional columns before requiring vertical scrolling; never shrink text.
-	while _batch.size() != 10 and rows * 96.0 - 8.0 > available.y and _batch_columns < max_columns:
+	while not _compact_batch and _batch.size() != 10 and rows * 96.0 - 8.0 > available.y and _batch_columns < max_columns:
 		_batch_columns += 1
 		rows = ceili(float(_batch.size()) / _batch_columns)
-	var cell_height: float = clampf(floorf((available.y - float(rows - 1) * 8.0) / rows), 88.0, 216.0)
-	var cell_width: float = floorf((available.x - float(_batch_columns - 1) * 8.0) / _batch_columns)
+	var cell_height: float = clampf(floorf((available.y - float(rows - 1) * 8.0) / rows), 72.0 if _compact_batch else 88.0, 216.0)
+	var cell_width: float = ReelStrip.CARD_WIDTH if _compact_batch else floorf((available.x - float(_batch_columns - 1) * 8.0) / _batch_columns)
+	var left: float = floorf((available.x - _batch_columns * (cell_width + 8.0) + 8.0) * 0.5) if _compact_batch else 0.0
 	_batch_content.custom_minimum_size = Vector2(0.0, rows * (cell_height + 8.0) - 8.0)
 	for index: int in range(_batch.size()):
 		var strip: ReelStrip = _batch[index].strip
-		strip.position = Vector2((index % _batch_columns) * (cell_width + 8.0), (index / _batch_columns) * (cell_height + 8.0))
+		strip.position = Vector2(left + (index % _batch_columns) * (cell_width + 8.0), (index / _batch_columns) * (cell_height + 8.0))
 		strip.size = Vector2(cell_width, cell_height)
 	_result.position = Vector2(20.0, _panel.size.y - 44.0)
 	_result.size = Vector2(maxf(0.0, _panel.size.x - 40.0), 32.0)

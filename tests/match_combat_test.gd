@@ -75,8 +75,13 @@ func _catalog_rules() -> CombatRules:
 		preload("res://resources/combat/enemies/runner.tres").duplicate() as EnemyDefinition,
 		preload("res://resources/combat/enemies/brute.tres").duplicate() as EnemyDefinition,
 	]
+	# Scenario-owned prices/income keep transaction boundaries independent of balance.
+	var send_terms := {&"grunt": Vector2i(20, 2), &"runner": Vector2i(25, 2), &"brute": Vector2i(40, 4)}
 	for enemy: EnemyDefinition in rules.catalog.enemies:
 		enemy.send_first_wave = 1
+		var terms: Vector2i = send_terms[enemy.id]
+		enemy.send_cost = terms.x
+		enemy.send_income = terms.y
 	rules.catalog.enemies[1].first_wave = 3
 	rules.catalog.enemies[2].first_wave = 6
 	return rules
@@ -716,6 +721,10 @@ func _test_typed_enemy_sends() -> void:
 	combat.send_enemy(0, &"runner")
 	_check(combat.coins == [175, 200] and combat.income == [2, 0] and is_equal_approx(combat.enemies[1][0]["speed"], 1.7), "Accepted match captures type prices, income and movement independently of later resource edits")
 	var exact_rules := _rules()
+	exact_rules.starting_coins = 39
+	combat = MatchCombat.new(exact_rules)
+	frozen = combat.snapshot()
+	_check(not combat.send_enemy(0, &"brute") and combat.snapshot() == frozen, "One Coin short rejects the whole typed payment, income gain and queued order")
 	exact_rules.starting_coins = 40
 	combat = MatchCombat.new(exact_rules)
 	_check(combat.send_enemy(0, &"brute") and combat.coins[0] == 0 and combat.snapshot()["send_queues"][1] == ["brute"], "Exact funds buy a Brute without granting a free extra order")

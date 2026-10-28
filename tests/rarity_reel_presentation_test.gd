@@ -5,6 +5,7 @@ var viewport: SubViewport
 var backdrop: ColorRect
 var accepted_details: Label
 var reel: RarityReel
+var audio_playbacks: Array[Dictionary] = []
 
 
 func _initialize() -> void:
@@ -76,9 +77,12 @@ func _run() -> void:
 	reel._skip_to_result()
 	_check(not reel.is_busy() and not reel.is_visible_in_tree(), "Second activation dismisses the revealed result and its opaque cover together")
 	await _check_batches()
+	await _check_compact_batches()
 	await _check_batch_selectors()
+	_remember_audio()
 	viewport.queue_free()
 	await process_frame
+	await _await_audio_retirement()
 	if failures == 0:
 		print("PASS: rarity reel conceals every underlying pixel through spin, stop, skip and reveal at desktop, ultrawide and portrait sizes; suspension retains its lifecycle")
 	quit(1 if failures else 0)
@@ -205,6 +209,113 @@ func _check_batches() -> void:
 	reel.cancel()
 
 
+func _check_compact_batches() -> void:
+	for dimensions: Vector2i in [Vector2i(1000, 720), Vector2i(1568, 920)]:
+		viewport.size = dimensions
+		await process_frame
+		for count: int in [1, 10, 24, 40, 103]:
+			var results: Array[Dictionary] = []
+			for index: int in range(count):
+				results.append({"rarity": "mythic" if index == count - 1 else "common", "attributes": []})
+			var accepted: Dictionary = {"rarity": "mythic", "rarity_batch_results": results, "rarity_batch_winner": count - 1}
+			reel.present(accepted, preload("res://assets/towers/arrow_tower_board.png"), true)
+			reel.set_process(false)
+			await process_frame
+			_check(reel._batch.size() == count and reel._batch_content.get_child_count() == count, "Compact Max keeps every accepted result, including a one-roll Max")
+			var available: Vector2 = reel._batch_scroll.size
+			var columns: int = mini(count, maxi(1, floori((available.x + 8.0) / 144.0)))
+			_check(reel._batch_columns == columns, "Max uses as many single-card columns as fit rather than the ten-roll layout")
+			var grid_width: float = columns * 144.0 - 8.0
+			_check(absf(reel._batch[0].strip.position.x - (available.x - grid_width) * 0.5) <= 1.0, "The compact Max grid is horizontally centered")
+			for index: int in range(count):
+				var entry: RarityReel.BatchReel = reel._batch[index]
+				_check(entry.strip.single_card and entry.strip.size.x == 136.0 and entry.strip.size.y >= 72.0, "Max has one-card-wide readable windows with no label-obscuring edge masks")
+				_check(entry.landing == float(RarityReel.WINNER_INDEX), "A narrow window lands exactly at the accepted card center")
+				_check(not entry.settled and not entry.strip.retained and entry.strip.reveal == 0.0, "Compact layout does not reveal results early")
+				if index > 0:
+					_check(entry.spin_seconds > reel._batch[index - 1].spin_seconds, "Compact Max preserves strictly ordered stops")
+					if index < 10:
+						_check(is_equal_approx(entry.spin_seconds - reel._batch[index - 1].spin_seconds, 0.06), "Compact Max preserves the first ten sixty-millisecond stops")
+				if count <= 40:
+					_check(reel._batch_scroll.get_global_rect().encloses(entry.strip.get_global_rect()), "Every typical Max result fits inside the viewport without scrolling")
+			_check(reel._batch[0].spin_seconds == RarityReel.SPIN_SECONDS and reel._spin_end() <= RarityReel.SPIN_SECONDS + 1.5, "Compact layout preserves the normal spin and bounded Max duration")
+			if count <= 40:
+				_check(reel._batch_content.size.y <= available.y and reel._batch_scroll.scroll_vertical == 0, "Max24 and Max40 require no vertical overflow at either desktop size")
+			reel._process(RarityReel.ACCEL_SECONDS * 0.5)
+			_remember_audio()
+			for entry: RarityReel.BatchReel in reel._batch:
+				_check(entry.strip.scroll_position > RarityReel.START_POSITION and entry.strip.scroll_position < entry.landing, "Compact windows still scroll real cards during wind-up")
+			reel._process(RarityReel.SPIN_SECONDS + 0.001 - reel._elapsed)
+			_remember_audio()
+			_check(reel._batch[0].settled and (count == 1 or not reel._batch[1].settled), "Compact Max stops its first result independently")
+			var elapsed: float = reel._elapsed
+			var positions: Array[float] = []
+			for entry: RarityReel.BatchReel in reel._batch:
+				positions.append(entry.strip.scroll_position)
+			reel.set_suspended(true)
+			reel._process(100.0)
+			_check(reel._elapsed == elapsed and not reel.is_visible_in_tree(), "Compact suspension freezes the presentation")
+			reel.set_suspended(false)
+			reel.set_process(false)
+			viewport.size = Vector2i(720, 1000)
+			await process_frame
+			for index: int in range(count):
+				_check(reel._batch[index].strip.scroll_position == positions[index] and reel._batch[index].strip.size.x == 136.0, "Resize preserves single-card widths and every independent clock")
+			viewport.size = dimensions
+			await process_frame
+			_check(reel._elapsed == elapsed, "Resize does not advance the accepted spin")
+			if count % 2 == 0:
+				reel._skip_to_result()
+			elif count > 1:
+				reel._process(reel._spin_end() + 0.5 - reel._elapsed)
+			_remember_audio()
+			_check(reel._revealed and reel._result.text == "Mythic", "Compact natural landing and skip show the accepted highest rarity")
+			for index: int in range(count):
+				var entry: RarityReel.BatchReel = reel._batch[index]
+				_check(entry.settled and is_equal_approx(entry.strip.scroll_position, float(RarityReel.WINNER_INDEX)), "The complete accepted tile remains centered after stop or skip")
+				var left: float = roundf(floorf(entry.strip.size.x * 0.5) + (float(RarityReel.WINNER_INDEX) - entry.strip.scroll_position) * RarityReel.ReelStrip.STRIDE - RarityReel.ReelStrip.CARD_WIDTH * 0.5)
+				_check(left == 0.0 and left + RarityReel.ReelStrip.CARD_WIDTH == entry.strip.size.x, "Neither edge of the landed accepted tile is clipped")
+				_check(entry.strip.rarities[RarityReel.WINNER_INDEX] == RarityReel.RARITIES.find(results[index]["rarity"]) and entry.strip.retained == (index == count - 1), "Compact layout preserves accepted identities and first-tie winner ownership")
+			reel._process(100.0)
+			_check(reel.is_busy(), "Compact results remain available until dismissed")
+			if count == 103:
+				var end := InputEventKey.new()
+				end.keycode = KEY_END
+				end.pressed = true
+				reel._input(end)
+				await process_frame
+				_check(reel._batch_scroll.scroll_vertical > 0 and reel._batch_scroll.get_global_rect().encloses(reel._batch.back().strip.get_global_rect()), "Huge Max batches retain accessible overflow to the final result")
+			reel._skip_to_result()
+			_check(not reel.is_busy(), "A second activation dismisses the complete compact batch")
+			if count == 10:
+				reel.present(accepted, null)
+				reel.set_process(false)
+				_check(reel._batch_columns == 2 and not reel._batch[0].strip.single_card and reel._batch[0].strip.size.x >= 272.0, "Default ten rolls remain two wide columns, unlike compact Max10")
+				reel.cancel()
+	_remember_audio()
+
+
+func _remember_audio() -> void:
+	for node: Node in root.find_children("*", "", true, false):
+		if node is AudioStreamPlayer and node.has_stream_playback():
+			audio_playbacks.append({"reference": weakref(node.get_stream_playback()), "owner": String(node.get_path()), "stream": node.stream.resource_path})
+		elif node is AudioStreamPlayer2D and node.has_stream_playback():
+			audio_playbacks.append({"reference": weakref(node.get_stream_playback()), "owner": String(node.get_path()), "stream": node.stream.resource_path})
+
+
+func _await_audio_retirement() -> void:
+	var deadline: int = Time.get_ticks_usec() + 2_000_000
+	while not audio_playbacks.is_empty():
+		for index: int in range(audio_playbacks.size() - 1, -1, -1):
+			if audio_playbacks[index]["reference"].get_ref() == null:
+				audio_playbacks.remove_at(index)
+		if audio_playbacks.is_empty() or Time.get_ticks_usec() >= deadline:
+			break
+		await process_frame
+	for playback: Dictionary in audio_playbacks:
+		_check(false, "Stopped audio playback still retained after teardown: %s (%s)" % [playback["owner"], playback["stream"]])
+
+
 func _check_concealed(stage: String) -> void:
 	# Change every underlying pixel as well as the title color, stats, attributes
 	# and reroll prices. Any transparency or uncovered edge changes the capture.
@@ -278,6 +389,8 @@ func _check_batch_selectors() -> void:
 	var accepted: Dictionary = screen._selected_tower()
 	_check(int(accepted["rarity_rerolls"]) == int(original["rarity_rerolls"]) + 10 and int(planning.combat["reroll_currency"][0]) == shards - int(quote["cost"]), "The selected batch reaches the host API and spends its complete accepted quote")
 	_check(accepted["rarity_batch_results"].size() == 10 and screen._rarity_reel.is_busy() and screen.rarity_batch_selector.disabled, "All accepted batch results reach the shared presentation while controls stay locked")
+	_check(screen._rarity_reel._batch_columns == 2 and not screen._rarity_reel._batch[0].strip.single_card, "Match ten-roll selector retains the wide two-column layout")
+	_remember_audio()
 	screen._rarity_reel.cancel()
 	await _selector_settle()
 	_check(screen._rarity_batch == 10 and not screen.rarity_batch_selector.disabled, "Finishing presentation preserves the chosen batch and unlocks its selector")
@@ -291,6 +404,8 @@ func _check_batch_selectors() -> void:
 	screen.rarity_reroll.pressed.emit()
 	screen._rarity_reel.set_process(false)
 	_check(int(screen._selected_tower()["rarity_rerolls"]) == count_before + int(quote["count"]), "Max submits the complete accepted affordable count")
+	_check(screen._rarity_reel._batch.size() == int(quote["count"]) and screen._rarity_reel._batch[0].strip.single_card and screen._rarity_reel._batch[0].strip.size.x == 136.0, "Match Max selector propagates compact presentation independently of its accepted count")
+	_remember_audio()
 	screen._rarity_reel.cancel()
 	await _selector_settle()
 	screen.rarity_batch_selector.pressed.emit()
@@ -319,6 +434,9 @@ func _check_batch_selectors() -> void:
 		accepted = sandbox.controller.state["towers"][0][0]
 		_check(int(accepted["rarity_rerolls"]) == count_before + 10 and accepted["rarity_batch_results"].size() == 10, "Sandbox ten and Max both produce ten accepted free previews")
 		_check(sandbox._rarity_reel.is_busy() and sandbox.rarity_batch_selector.disabled, "Sandbox batch uses the shared locked presentation lifecycle")
+		_check(sandbox._rarity_reel._batch[0].strip.single_card == (batch == 0), "Sandbox Max10 uses compact windows while ordinary ten keeps two wide columns")
+		_check(sandbox._rarity_reel._batch[0].strip.size.x == 136.0 if batch == 0 else sandbox._rarity_reel._batch_columns == 2, "Sandbox selector chooses layout by mode, not equal accepted counts")
+		_remember_audio()
 		sandbox._rarity_reel.cancel()
 		await _selector_settle()
 	var rarity_before: String = String(sandbox.controller.state["towers"][0][0]["rarity"])
@@ -326,6 +444,7 @@ func _check_batch_selectors() -> void:
 	sandbox.attribute_reroll.pressed.emit()
 	accepted = sandbox.controller.state["towers"][0][0]
 	_check(int(accepted["attribute_rerolls"]) == count_before + 1 and accepted["rarity"] == rarity_before and not sandbox._rarity_reel.is_busy(), "Max selection does not batch or animate attribute rerolls")
+	_remember_audio()
 	sandbox.prepare_to_leave()
 	main.queue_free()
 	await _selector_settle()

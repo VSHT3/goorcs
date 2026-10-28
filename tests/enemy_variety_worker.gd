@@ -13,7 +13,22 @@ func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
 	var definitions: Array[EnemyDefinition] = []
 	for source: EnemyDefinition in rules.catalog.enemies:
-		definitions.append(source.duplicate() as EnemyDefinition)
+		var enemy := source.duplicate() as EnemyDefinition
+		# Four individual payments total 285 coins and 15 income in this fixture.
+		match enemy.id:
+			&"scrapguard":
+				enemy.send_cost = 35
+				enemy.send_income = 3
+			&"crate_orc":
+				enemy.send_cost = 50
+				enemy.send_income = 3
+			&"rage_orc":
+				enemy.send_cost = 80
+				enemy.send_income = 4
+			&"moss_orc":
+				enemy.send_cost = 120
+				enemy.send_income = 5
+		definitions.append(enemy)
 	rules.catalog.enemies = definitions
 	rules.base_health = 10000
 	rules.starting_coins = 10000

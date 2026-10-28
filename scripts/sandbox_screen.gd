@@ -718,12 +718,13 @@ func _reroll(kind: String) -> void:
 	var button: Button = rarity_reroll if kind == "rarity" else attribute_reroll
 	if not button.is_visible_in_tree() or button.disabled or _rarity_reel.is_busy():
 		return
+	var compact_batch: bool = _rarity_batch == 0
 	if controller.reroll_tower(selected_tower_id, kind, _rarity_batch if kind == "rarity" else 1) and kind == "rarity":
 		var tower: Dictionary = _find(controller.state["towers"][0], selected_tower_id)
 		var shop: TowerShopButton = shop_buttons[StringName(tower["type_id"])]
 		world.boards[0].cancel_stroke()
 		world.set_input_blocked(true)
-		_rarity_reel.present(tower, shop.tower_artwork)
+		_rarity_reel.present(tower, shop.tower_artwork, compact_batch)
 		_refresh()
 
 

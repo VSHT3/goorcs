@@ -32,8 +32,13 @@ func _rules() -> CombatRules:
 		preload("res://resources/combat/enemies/runner.tres").duplicate() as EnemyDefinition,
 		preload("res://resources/combat/enemies/brute.tres").duplicate() as EnemyDefinition,
 	]
+	# Scenario-owned prices/income keep payment and payout assertions balance-independent.
+	var send_terms := {&"grunt": Vector2i(20, 2), &"runner": Vector2i(25, 2), &"brute": Vector2i(40, 4)}
 	for enemy: EnemyDefinition in rules.catalog.enemies:
 		enemy.send_first_wave = 1
+		var terms: Vector2i = send_terms[enemy.id]
+		enemy.send_cost = terms.x
+		enemy.send_income = terms.y
 	rules.base_health = 1000
 	rules.starting_coins = 1000
 	rules.enemy_health = 8

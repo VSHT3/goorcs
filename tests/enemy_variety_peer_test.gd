@@ -30,7 +30,7 @@ func _run() -> void:
 		await _command("host", {"action": "send", "slot": 0, "type_id": type_id})
 	await _wait_combat("guest", {"income": [15, 0]}, "Four independent paid identities accepted")
 	var ordered: Dictionary = await _agree("Accepted variety economy agrees")
-	_check(ordered["coins"][0] == 9715 and ordered["queued_sends"][1] == 4, "One price and one individual per new send, no rolled Orcling group")
+	_check(ordered["coins"][0] == 9715 and ordered["queued_sends"][1] == 4, "Fixture prices 35 + 50 + 80 + 120 buy one individual each, no rolled Orcling group")
 	await _both_ready()
 	await _wait_combat("guest", {"wave": 66, "phase": 1}, "Variety wave starts")
 	await _command("host", {"action": "step", "delta": 1.1})

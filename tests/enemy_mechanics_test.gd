@@ -63,6 +63,15 @@ func _sandbox(roster: Array[String], length: int = 100) -> MatchCombat:
 
 func _test_progression_and_atomic_groups() -> void:
 	var rules := _rules()
+	# This scenario owns its one-payment math, not the shipped send balance.
+	var definitions: Array[EnemyDefinition] = []
+	for source: EnemyDefinition in rules.catalog.enemies:
+		var enemy := source.duplicate() as EnemyDefinition
+		if enemy.id == &"orcling":
+			enemy.send_cost = 12
+			enemy.send_income = 1
+		definitions.append(enemy)
+	rules.catalog.enemies = definitions
 	var combat := MatchCombat.new(rules, null, _rng())
 	var frozen: Dictionary = combat.snapshot()
 	var random_state: int = combat._group_random.state

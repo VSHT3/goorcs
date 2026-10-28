@@ -55,7 +55,9 @@ var _reroll_balance: Label
 var _rarity_reel: RarityReel
 var _pending_rarity_id: int = -1
 var _pending_rarity_count: int = -1
+var _pending_rarity_compact_batch: bool = false
 var _queued_rarity_tower: Dictionary = {}
+var _queued_rarity_compact_batch: bool = false
 var _boss_rewards := BossRewardPresenter.new()
 var boss_bars: BossHealthBars
 # Sell asks for a second press: purchased upgrade buttons vanish and slide Sell
@@ -541,10 +543,13 @@ func _reroll(kind: String) -> void:
 	if kind == "rarity":
 		_pending_rarity_id = selected_tower_id
 		_pending_rarity_count = int(tower["rarity_rerolls"])
+		_pending_rarity_compact_batch = _rarity_batch == 0
 		rarity_reroll.disabled = true
 		rarity_batch_selector.disabled = true
 	if not planning.reroll_tower(planning.local_slot(), selected_tower_id, kind, _rarity_batch if kind == "rarity" else 1):
 		_pending_rarity_id = -1
+		_pending_rarity_count = -1
+		_pending_rarity_compact_batch = false
 		_refresh()
 
 
@@ -557,8 +562,13 @@ func _observe_rarity_reroll() -> void:
 		if int(tower["rarity_rerolls"]) > _pending_rarity_count:
 			_pending_rarity_id = -1
 			_queued_rarity_tower = tower.duplicate(true)
+			_queued_rarity_compact_batch = _pending_rarity_compact_batch
+			_pending_rarity_count = -1
+			_pending_rarity_compact_batch = false
 		return
 	_pending_rarity_id = -1
+	_pending_rarity_count = -1
+	_pending_rarity_compact_batch = false
 
 
 func _rarity_reel_finished() -> void:
@@ -569,7 +579,9 @@ func _rarity_reel_finished() -> void:
 func _reset_rarity_presentation() -> void:
 	_pending_rarity_id = -1
 	_pending_rarity_count = -1
+	_pending_rarity_compact_batch = false
 	_queued_rarity_tower.clear()
+	_queued_rarity_compact_batch = false
 	_rarity_reel.cancel()
 
 
@@ -586,9 +598,10 @@ func _present_pending_reel() -> void:
 	if not blocked and not _rarity_reel.is_busy():
 		if not _queued_rarity_tower.is_empty():
 			var button: TowerShopButton = shop_buttons.get(StringName(_queued_rarity_tower["type_id"]))
-			_rarity_reel.present(_queued_rarity_tower, button.tower_artwork if button != null else null)
+			_rarity_reel.present(_queued_rarity_tower, button.tower_artwork if button != null else null, _queued_rarity_compact_batch)
 			if _rarity_reel.is_busy():
 				_queued_rarity_tower.clear()
+				_queued_rarity_compact_batch = false
 		elif _pending_rarity_id < 0 and _boss_rewards.pending_count() > 0:
 			var artwork: Texture2D
 			var boss_id: StringName = _boss_rewards.next_boss_id()
@@ -2010,6 +2023,8 @@ func handle_results_escape() -> void:
 
 func _show_feedback(message: String) -> void:
 	_pending_rarity_id = -1
+	_pending_rarity_count = -1
+	_pending_rarity_compact_batch = false
 	if is_visible_in_tree():
 		sound_player.reject()
 	_pending_tower_cell = Vector2i(-1, -1)

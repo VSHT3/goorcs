@@ -17,6 +17,7 @@ func _run() -> void:
 		await _command(lane, {"action": "stream_scenario"})
 	await _connect_guest("guest", "host", code)
 	await _wait_combat("guest", {"phase": 0, "coins": [400, 400], "health": [20, 20]}, "Host stream fixture is admitted")
+	# The worker owns 20/25/40-Coin sends and 2/2/4 income, independent of shipped balance.
 	for type_id: String in ["runner", "brute", "grunt", "runner", "brute"]:
 		await _command("host", {"action": "send", "slot": 0, "type_id": type_id})
 	await _wait_combat("guest", {"coins": [250, 400], "income": [14, 0], "send_queues": [[], ["runner", "brute", "grunt", "runner", "brute"]]}, "Paid mixed FIFO is owned by the destination board")

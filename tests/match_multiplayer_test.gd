@@ -394,7 +394,7 @@ func _peer_sends(code: String) -> void:
 	await _command("host", {"action": "fence"})
 	_check(_snapshot("host")["active"] and _snapshot("guest")["active"] and _snapshot("host")["combat"] == _snapshot("guest")["combat"], "Send rejection baseline includes both peers' admitted commander state")
 	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "wave": 0, "health": [6, 6], "coins": [45, 45], "income": [0, 0], "queued_sends": [0, 0]}, "Fresh send scenario uses host resources and zero income")
-	_check(fresh["enemy_types"]["grunt"]["send_cost"] == 20 and fresh["enemy_types"]["grunt"]["send_income"] == 2 and fresh["rules"]["send_spawn_interval"] == 0.25, "Guest receives host prices and send cadence instead of its cheap/high-income/slow local rules")
+	_check(fresh["enemy_types"]["grunt"]["send_cost"] == 20 and fresh["enemy_types"]["grunt"]["send_income"] == 2 and fresh["rules"]["send_spawn_interval"] == 0.25, "Guest receives host fixture prices and send cadence instead of its cheap/high-income/slow local rules")
 	var before: Dictionary = _snapshot("host")["combat"]
 	await _command("guest", {"action": "send", "slot": 0, "type_id": "grunt"})
 	await _command("host", {"action": "send", "slot": 1, "type_id": "grunt"})
@@ -480,7 +480,7 @@ func _peer_typed_sends(code: String) -> void:
 	var fresh: Dictionary = await _wait_combat("guest", {"phase": 0, "health": [12, 12], "coins": [200, 200], "income": [0, 0], "send_queues": [[], []]}, "Typed scenario starts with empty ordered queues")
 	for type_id: String in ["runner", "brute"]:
 		var definition: Dictionary = fresh["enemy_types"][type_id]
-		_check(definition["send_cost"] == (25 if type_id == "runner" else 40) and definition["send_income"] == (2 if type_id == "runner" else 4), "Guest receives host-owned %s economy despite different local resources" % type_id)
+		_check(definition["send_cost"] == (25 if type_id == "runner" else 40) and definition["send_income"] == (2 if type_id == "runner" else 4), "Guest receives host-owned %s fixture economy despite different local resources" % type_id)
 		_check(definition["health"] == (3 if type_id == "runner" else 10) and is_equal_approx(float(definition["speed"]), 2.0 * (1.7 if type_id == "runner" else 0.65)), "Planning catalog previews host-scaled %s HP and speed" % type_id)
 	var before: Dictionary = _snapshot("host")["combat"]
 	for type_id: String in ["runner", "brute", "missing_enemy"]:

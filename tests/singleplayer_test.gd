@@ -424,10 +424,15 @@ func _solo_typed_sends(planning: MatchPlanning) -> void:
 	rules.spawn_interval = 0.05
 	rules.send_spawn_interval = 0.35
 	var definitions: Array[EnemyDefinition] = []
+	# Own both mirrored validators' prices/income rather than inheriting shipped balance.
+	var send_terms := {&"grunt": Vector2i(20, 2), &"runner": Vector2i(25, 2), &"brute": Vector2i(40, 4)}
 	for source: EnemyDefinition in rules.catalog.enemies:
 		if source.id in [&"grunt", &"runner", &"brute"]:
 			var enemy := source.duplicate() as EnemyDefinition
 			enemy.send_first_wave = 1
+			var terms: Vector2i = send_terms[enemy.id]
+			enemy.send_cost = terms.x
+			enemy.send_income = terms.y
 			definitions.append(enemy)
 	rules.catalog.enemies = definitions
 	planning.combat_rules = rules

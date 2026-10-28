@@ -13,18 +13,29 @@ func _planning_rules() -> CombatRules:
 	rules.speed_growth_fraction = 0.0
 	rules.spawn_jitter_ratio = 0.0
 	rules.spawn_interval_reduction_per_wave = 0.0
-	if _lane == "guest":
-		# Client-local ability/group metadata must never simulate accepted effects.
-		var definitions: Array[EnemyDefinition] = []
-		for source: EnemyDefinition in rules.catalog.enemies:
-			var enemy := source.duplicate() as EnemyDefinition
+	# Keep the peer economy scenario independent of shipped send balance.
+	var definitions: Array[EnemyDefinition] = []
+	for source: EnemyDefinition in rules.catalog.enemies:
+		var enemy := source.duplicate() as EnemyDefinition
+		match enemy.id:
+			&"orcling":
+				enemy.send_cost = 12
+				enemy.send_income = 1
+			&"orc_chief":
+				enemy.send_cost = 130
+				enemy.send_income = 5
+			&"necorcmancer":
+				enemy.send_cost = 140
+				enemy.send_income = 6
+		if _lane == "guest":
+			# Client-local ability/group metadata must never simulate accepted effects.
 			enemy.group_weights = PackedInt32Array([1])
 			if enemy.heal_interval > 0.0:
 				enemy.heal_interval = 0.01
 			if enemy.summon_interval > 0.0:
 				enemy.summon_interval = 0.01
-			definitions.append(enemy)
-		rules.catalog.enemies = definitions
+		definitions.append(enemy)
+	rules.catalog.enemies = definitions
 	return rules
 
 

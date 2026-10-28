@@ -69,6 +69,7 @@ func _fixture_landmark_exclusions() -> Array[Vector2i]:
 
 func _planning_rules() -> CombatRules:
 	var rules := CombatRules.new()
+	rules.catalog = rules.catalog.duplicate() as ContentCatalog
 	rules.roll_rules = null
 	rules.catalog.towers = [
 		preload("res://resources/combat/towers/arrow_tower.tres").duplicate(true) as TowerDefinition,
@@ -108,6 +109,18 @@ func _planning_rules() -> CombatRules:
 			continue
 		var definition := source.duplicate() as EnemyDefinition
 		definition.send_first_wave = 1
+		# Own the send budgets used by the payment, rejection and FIFO scenarios;
+		# shipped balance changes must not change which commands are affordable.
+		match definition.id:
+			&"grunt":
+				definition.send_cost = 20
+				definition.send_income = 2
+			&"runner":
+				definition.send_cost = 25
+				definition.send_income = 2
+			&"brute":
+				definition.send_cost = 40
+				definition.send_income = 4
 		if _lane == "guest":
 			definition.health_multiplier = 9.0
 			definition.speed_multiplier = 0.1
