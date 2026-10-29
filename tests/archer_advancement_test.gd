@@ -169,7 +169,7 @@ func _fire() -> void:
 	tower["cooldown"] = 100.0
 	model.advance(0.25)
 	check(enemy["hp"]==93,"Burn integrates exactly four damage per simulation second")
-	model._ignite(enemy,tower,model.snapshot()["tower_types"]["arrow_tower"]["advancements"]["fire_arrows"])
+	model._ignite(0,enemy,tower,model.snapshot()["tower_types"]["arrow_tower"]["advancements"]["fire_arrows"])
 	model.advance(0.25)
 	check(enemy["hp"]==92,"Repeated ignition refreshes rather than stacks damage")
 	model.sell_tower(0,tower["id"])

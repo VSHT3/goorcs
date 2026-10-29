@@ -12,6 +12,10 @@ func _init() -> void:
 	_test_siege_brace_and_burning_heals()
 	_test_tenth_chain_stuns_one_victim()
 	_test_lift_class_and_anchored_throw()
+	_test_continuous_item_deadlines()
+	_test_live_burn_conditionals()
+	_test_hasted_transfer_preserves_multiplier()
+	_test_high_health_infection_event_horizons()
 	if failures == 0:
 		print("PASS: combat items alter real accepted projectiles, continuous/burn damage, attack windows, summon marks, infection, and chain effects")
 	quit(1 if failures > 0 else 0)
@@ -40,8 +44,9 @@ func _rules() -> CombatRules:
 	return rules
 
 
-func _combat(ids: Array = []) -> MatchCombat:
+func _combat(ids: Array = [], speed: float = 0.0) -> MatchCombat:
 	var rules: CombatRules = _rules()
+	rules.enemy_speed = speed
 	var combat := MatchCombat.new(rules)
 	var loadout: Array[String] = []
 	for definition: TowerDefinition in rules.catalog.towers:
@@ -71,10 +76,17 @@ func _spawn(combat: MatchCombat, count: int = 1) -> Array[Dictionary]:
 func _build_arrow(combat: MatchCombat, advancement: String = "fire_arrows", special: bool = true) -> Dictionary:
 	_check(combat.build(0, Vector2i(1, 1), &"arrow_tower", MatchCombat.TargetMode.FURTHEST), "Combat fixture builds an accepted Arrow Tower")
 	var tower: Dictionary = combat.towers[0].back()
-	tower["advancement"] = advancement
-	tower["special_upgraded"] = special
-	tower["cooldown"] = 0.0
-	combat._refresh_board(0)
+	if special or not advancement.is_empty():
+		for upgrade: String in ["damage", "speed", "special"]:
+			_check(combat.upgrade_tower(0, int(tower["id"]), upgrade), "Arrow fixture purchases its real prerequisite " + upgrade)
+	var path: Array[String] = []
+	var current: String = advancement
+	var definitions: Dictionary = combat._tower_types["arrow_tower"]["advancements"]
+	while not current.is_empty():
+		path.push_front(current)
+		current = String(definitions[current].get("requires", ""))
+	for upgrade: String in path:
+		_check(combat.upgrade_tower(0, int(tower["id"]), upgrade), "Arrow fixture purchases its authored advancement " + upgrade)
 	return tower
 
 
@@ -134,11 +146,11 @@ func _test_quiver_precedence_and_real_archers() -> void:
 	_check(copied.size() == 2 and int(combat.item_runtime.state(0)["combat"]["arrow_counts"][int(tower["id"])]) == 2, "Whole Quiver copies both actually fired accepted arrows and owns the shared counter")
 	_check(not _item_events(combat, "extra_arrow", "bottomless_quiver").size(), "Entire Quiver replaces Bottomless rather than stacking its trigger")
 	var one_archer: MatchCombat = _combat(["entire_quiver"])
-	var solo: Dictionary = _build_arrow(one_archer, "fire_arrows", false)
+	var solo: Dictionary = _build_arrow(one_archer, "", false)
 	_start(one_archer)
 	_spawn(one_archer)
 	one_archer.advance(0.01)
-	_check(_item_events(one_archer, "extra_arrow").is_empty() and not one_archer.item_runtime.state(0)["combat"].get("arrow_counts", {}).has(int(solo["id"])), "A fire advancement's two-archer config does not copy until a second archer is actually purchased")
+	_check(_item_events(one_archer, "extra_arrow").is_empty() and not one_archer.item_runtime.state(0)["combat"].get("arrow_counts", {}).has(int(solo["id"])), "An actually unupgraded single archer does not copy arrows before Second Archer is purchased")
 	var interval: float = float(tower["interval"])
 	_check(combat.remove_item(0, &"entire_quiver"), "Removing Whole Quiver leaves the retained ordinary-arrow counter")
 	combat.advance(interval)
@@ -249,11 +261,11 @@ func _test_lift_class_and_anchored_throw() -> void:
 	_check(combat.build(0, Vector2i(5, 1), &"orcapult", MatchCombat.TargetMode.FURTHEST), "Anchor fixture builds a real Orcapult")
 	var tower: Dictionary = combat.towers[0].back()
 	_start(combat)
-	combat._spawn_enemy(0, "storm_orc", 6.0, combat._elapsed)
+	combat._spawn_enemy(0, "brute", 6.0, combat._elapsed)
 	var enemy: Dictionary = combat.enemies[0].back()
 	var original_route: Array = enemy["route"].duplicate()
 	combat.advance(0.01)
-	_check(is_equal_approx(float(tower["behavior_config"]["lift"]), 1.2), "Heartwood lifts the next real nonboss weight class rather than an arbitrary HP amount")
+	_check(is_equal_approx(float(tower["behavior_config"]["lift"]), 2.5), "Heartwood lifts the next authored nonboss weight class rather than an arbitrary HP amount")
 	_check(combat.flights.size() == 1 and bool(combat.flights[0]["anchored"]), "Leviathan accepts the heavier target as a same-route anchored flight")
 	if combat.flights.is_empty():
 		return
@@ -308,3 +320,180 @@ func _test_tenth_chain_stuns_one_victim() -> void:
 		if float(enemy["stunned_remaining"]) > 0.0:
 			stunned += 1
 	_check(stuns.size() == 1 and stunned == 1, "Exactly the tenth released Lightning chain stuns its first eligible nonboss victim")
+
+
+func _advance_partitioned(combat: MatchCombat, duration: float, fine: bool) -> void:
+	if not fine:
+		combat.advance(duration)
+		return
+	var remaining: float = duration
+	while remaining > 0.000000001:
+		var step: float = minf(0.01, remaining)
+		combat.advance(step)
+		remaining -= step
+
+
+func _flame_field(ids: Array, immune: bool = false, dying_primary: bool = false) -> MatchCombat:
+	var combat: MatchCombat = _combat(ids)
+	_build_arrow(combat, "flamethrower")
+	_start(combat)
+	_check(combat.sandbox_spawn(0, &"skeleorc" if immune else &"grunt", 1), "Timeline fixture spawns a real elemental target")
+	var enemy: Dictionary = combat.enemies[0].back()
+	enemy["hp"] = 100 if dying_primary else 1000000
+	enemy["max_hp"] = int(enemy["hp"])
+	if dying_primary:
+		_spawn(combat)
+		combat.enemies[0].back()["hp"] = 1000000
+		combat.enemies[0].back()["max_hp"] = 1000000
+	return combat
+
+
+func _test_continuous_item_deadlines() -> void:
+	for scenario: String in ["primary", "immune", "death", "all130"]:
+		var ids: Array = ["sun_in_a_cage"]
+		if scenario == "all130":
+			ids.clear()
+			for item: ItemDefinition in _rules().catalog.items:
+				ids.append(String(item.id))
+		var coarse: MatchCombat = _flame_field(ids, scenario == "immune", scenario == "death")
+		var fine: MatchCombat = _flame_field(ids, scenario == "immune", scenario == "death")
+		_advance_partitioned(coarse, 13.1, false)
+		_advance_partitioned(fine, 13.1, true)
+		var first: Dictionary = coarse.towers[0][0]
+		var second: Dictionary = fine.towers[0][0]
+		_check(first["damage_dealt"] == second["damage_dealt"] and first["kills"] == second["kills"], "Sun integrates exposure, target death and immunity identically across coarse/fine host advances: " + scenario)
+		_check(is_equal_approx(float(first.get("item_sun_shutdown", 0.0)), float(second.get("item_sun_shutdown", 0.0))) and is_equal_approx(float(first.get("item_sun_heat", 0.0)), float(second.get("item_sun_heat", 0.0))), "Sun's charge/shutdown boundaries are frame-partition independent: " + scenario)
+		if scenario == "primary":
+			_check(int(first["damage_dealt"]) == 1620, "Ten firing seconds, three shutdown seconds of residual burn, burst9 and resumed0.1s deliver the authored1620 whole HP")
+		elif scenario == "immune":
+			_check(int(first["damage_dealt"]) == 0 and float(first.get("item_sun_heat", 0.0)) == 0.0, "A real Fire-immune target neither takes flame damage nor charges Sun")
+		elif scenario == "death":
+			_check(int(first["kills"]) == 1, "A primary death is retired exactly once before continuous retargeting")
+		else:
+			_check(coarse.item_runtime.owned_ids(0).size() == 130 and fine.item_runtime.owned_ids(0).size() == 130, "Every simultaneous item survives the real purchased-Flamethrower timeline")
+	var ladder_coarse: MatchCombat = _flame_field(["witchs_folded_ladder"])
+	var ladder_fine: MatchCombat = _flame_field(["witchs_folded_ladder"])
+	for combat: MatchCombat in [ladder_coarse, ladder_fine]:
+		var enemy: Dictionary = combat.enemies[0][0]
+		enemy["progress"] = 4.0
+		enemy["pos"] = Vector2(4.0, 2.0)
+		combat._enemies_relocated(0)
+		_check(combat.item_command(0, &"witchs_folded_ladder", "active"), "Ladder activates through the actual host command")
+	_advance_partitioned(ladder_coarse, 5.0, false)
+	_advance_partitioned(ladder_fine, 5.0, true)
+	_check(int(ladder_coarse.towers[0][0]["damage_dealt"]) == 780 and int(ladder_fine.towers[0][0]["damage_dealt"]) == 780, "All five seconds of Ladder-only range integrate before expiry, without a frame-sized substitute")
+	_check(ladder_coarse.item_runtime.state(0)["active"].is_empty() and is_equal_approx(float(ladder_coarse.towers[0][0]["range"]), 3.0), "Ladder retires its active range at the same boundary after the preceding exposure")
+
+
+func _burn_field(ids: Array, speed: float = 0.0) -> MatchCombat:
+	var combat: MatchCombat = _combat(ids, speed)
+	_build_arrow(combat, "fire_arrows")
+	_start(combat)
+	_spawn(combat)
+	combat.towers[0][0]["cooldown"] = 1000.0
+	return combat
+
+
+func _ignite_target(combat: MatchCombat, enemy: Dictionary) -> void:
+	var tower: Dictionary = combat.towers[0][0]
+	combat._attack_arrow(0, tower, int(enemy["id"]), enemy["pos"], tower["effective_attack_config"])
+
+
+func _test_live_burn_conditionals() -> void:
+	for fine: bool in [false, true]:
+		var butcher: MatchCombat = _burn_field(["butchers_apron"])
+		var enemy: Dictionary = butcher.enemies[0][0]
+		_ignite_target(butcher, enemy)
+		enemy["hp"] = 400
+		var before: int = int(enemy["hp"])
+		_advance_partitioned(butcher, 2.0, fine)
+		var burn: Dictionary = butcher._burns[int(enemy["id"])]
+		_check(before - int(enemy["hp"]) == 9 and is_equal_approx(float(burn["dps"]), 4.6) and is_equal_approx(float(burn["fraction"]), 0.2), "A live burn re-evaluates Butcher after ignition above half HP, before every positive exposure")
+
+		var crossing: MatchCombat = _burn_field(["butchers_apron"])
+		var crossing_enemy: Dictionary = crossing.enemies[0][0]
+		_ignite_target(crossing, crossing_enemy)
+		crossing_enemy["hp"] = 501
+		_advance_partitioned(crossing, 2.0, fine)
+		var crossing_burn: Dictionary = crossing._burns[int(crossing_enemy["id"])]
+		_check(int(crossing_enemy["hp"]) == 493 and is_equal_approx(float(crossing_burn["fraction"]), 0.9), "Butcher switches a running burn exactly when whole-HP damage crosses below half, not at the next render frame")
+
+		var receipt: MatchCombat = _burn_field(["necromancers_receipt"])
+		var parent: Dictionary = receipt.enemies[0][0]
+		receipt._spawn_enemy(0, "grunt", 0.0, receipt._elapsed, [], int(parent["id"]))
+		var child: Dictionary = receipt.enemies[0].back()
+		receipt._hit(0, receipt.towers[0][0], receipt._enemy_index(0, int(parent["id"])), 1000000, true)
+		receipt.advance(4.0)
+		_ignite_target(receipt, child)
+		before = int(child["hp"])
+		_advance_partitioned(receipt, 2.0, fine)
+		_check(before - int(child["hp"]) == 9 and is_equal_approx(float(receipt._burns[int(child["id"])]["dps"]), 4.0), "Receipt boosts exactly the preceding one-second burn exposure before its real five-second expiry")
+
+		var frost: MatchCombat = _burn_field(["frostbite_nail"])
+		enemy = frost.enemies[0][0]
+		_ignite_target(frost, enemy)
+		enemy["slowed"] = true
+		enemy["slow_remaining"] = 1.0
+		frost._prepare_motion(enemy)
+		before = int(enemy["hp"])
+		_advance_partitioned(frost, 2.0, fine)
+		burn = frost._burns[int(enemy["id"])]
+		_check(before - int(enemy["hp"]) == 8 and is_equal_approx(float(burn["fraction"]), 0.8) and is_equal_approx(float(burn["dps"]), 4.0), "Frostbite follows the victim's changing real slow duration instead of caching ignition state")
+
+		var watch: MatchCombat = _burn_field(["watchmans_cup"], 1.0)
+		enemy = watch.enemies[0][0]
+		_ignite_target(watch, enemy)
+		enemy["progress"] = 10.5
+		enemy["pos"] = Vector2(10.5, 2.0)
+		watch._enemies_relocated(0)
+		before = int(enemy["hp"])
+		_advance_partitioned(watch, 2.0, fine)
+		burn = watch._burns[int(enemy["id"])]
+		_check(before - int(enemy["hp"]) == 8 and is_equal_approx(float(burn["fraction"]), 0.5) and is_equal_approx(float(burn["dps"]), 5.0), "Watchman's existing burn gains its final-tile bonus only after the exact path-entry boundary")
+
+
+func _test_hasted_transfer_preserves_multiplier() -> void:
+	var combat: MatchCombat = _combat([], 1.0)
+	_check(combat.build(0, Vector2i(1, 1), &"orcapult", 0), "Haste fixture purchases its real transport tower")
+	var tower: Dictionary = combat.towers[0][0]
+	_start(combat)
+	var enemy: Dictionary = _spawn(combat)[0]
+	var baseline: float = float(enemy["base_speed"])
+	_check(combat.sandbox_spawn(0, &"grand_mage_orcafus", 1), "Haste fixture admits the real spellcasting boss")
+	var mage: Dictionary = combat.enemies[0].back()
+	var book: Dictionary = combat._enemy_types["grand_mage_orcafus"]["spellbook"]
+	_check(combat._begin_spell(0, mage, book, "haste"), "The real Grand Mage spellbook admits Haste")
+	combat._resolve_spell(0, mage, book)
+	_check(is_equal_approx(float(enemy["base_speed"]), baseline * 1.4), "The actual Haste spell multiplies the departure baseline")
+	combat._attack_catapult(0, tower, 0.0)
+	_check(combat.flights.size() == 1, "The real transport attack accepts a hasted passenger")
+	combat.advance(MatchCombat.FLIGHT_DURATION + 0.01)
+	_check(String(enemy["birth_kind"]) == "transfer" and is_equal_approx(float(enemy["base_speed"]), baseline * 1.4), "Arrival recomputation preserves the same still-live Haste multiplier")
+	combat.advance(6.01 - combat._elapsed)
+	_check(is_equal_approx(float(enemy["haste_multiplier"]), 1.0) and is_equal_approx(float(enemy["base_speed"]), baseline), "Haste expiry divides out exactly the multiplier retained on landing, restoring the original baseline")
+
+
+func _test_high_health_infection_event_horizons() -> void:
+	var combat: MatchCombat = _combat(["spore_spawn_of_marko"])
+	_start(combat)
+	var enemy: Dictionary = _spawn(combat)[0]
+	enemy["max_hp"] = 1000000
+	enemy["hp"] = 1000000
+	var rate: float = 20000.0
+	_check(is_equal_approx(combat.item_damage_event_step(0, int(enemy["id"]), rate, &"magic", &"spore_spawn_of_marko", 4.0), 4.0) and is_equal_approx(combat._next_event_step(4.0), 4.0), "A million-HP infection schedules its actual duration boundary, never20000 whole-HP bookkeeping events per second")
+	enemy["hp"] = 40000
+	_check(is_equal_approx(combat.item_damage_event_step(0, int(enemy["id"]), rate, &"magic", &"spore_spawn_of_marko", 4.0), 2.0), "Infection's next damage event is its real lethal horizon rather than the next quantized HP")
+	combat.item_damage(0, int(enemy["id"]), 0.5, &"magic", &"spore_spawn_of_marko", {}, {"continuous": true, "exposure": 0.000025})
+	_check(is_equal_approx(combat.item_damage_event_step(0, int(enemy["id"]), rate, &"magic", &"spore_spawn_of_marko", 4.0), (40000.0 - 0.5) / rate), "The lethal infection horizon retains the actual continuous stream's fractional HP")
+	combat.advance(0.5)
+	_check(int(enemy["hp"]) == 30000, "One accepted half-second high-HP infection integrates10000 actual damage without per-HP passes")
+
+	for fine: bool in [false, true]:
+		var shared: MatchCombat = _flame_field(["spore_spawn_of_marko"])
+		var infected: Dictionary = shared.enemies[0][0]
+		infected["max_hp"] = 1000000
+		infected["hp"] = 1000
+		var event: float = shared._next_event_step(1.0)
+		_check(event > 0.049 and event < 0.05, "The shared death solver combines Spore with real flame/burn streams before choosing the lethal boundary")
+		_advance_partitioned(shared, 0.1, fine)
+		_check(shared.enemies[0].is_empty() and shared.enemy_totals[0]["kills"].get("grunt", 0) == 1, "Coarse/fine combined infection and tower damage retire one high-HP victim exactly once")

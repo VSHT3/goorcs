@@ -22,6 +22,12 @@ Runtime behavior uses the captured numeric records, not the guide descriptions. 
 
 Orcish Lunch Tin remains **Uncommon**, including its leak-free-clear formula/streak reset. Ominous Bells of Doom remains **Orcfeccion**, with ten-round increments and both players taking ×1.1 damage initially, increasing by 0.1 per ten-round step to a ×10 cap. Item tuning is provisional until playtested.
 
+Item interval effects own the exposure immediately preceding their expiry: integrate continuous damage before ending buffs or starting Sun's shutdown. Conditional burn damage uses current victim eligibility, with event boundaries for half-HP crossings, slow expiry, and final-tile entry; no fixed-size subdivision substitutes for those transitions. Gold Rush schedules its own deadline independently of Mimic ownership. Enemy arrival reconstruction retains live Haste so its later expiry restores the correct baseline.
+
+Packed Powder applies to all explosive Arrow configurations, including Bomb Arrows and Bigger Explosions; Besieger's Powder Horn retains its narrower grenade/rocket restriction. Heartwood advances through the frozen Orcapult's authored lift capacities (currently 1.0 → 2.5 → 3.5 → 6.0), saturating at the strongest class and never lifting bosses. Strongest support crit chance remains uncapped until flat item adjustments are summed, then the existing final cap applies once.
+
+Normal purchase controls consume host-owned `item_quotes` for builds, sends, and terrain, and each tower's `upgrade_quotes` for legal upgrade actions. Displayed prices, affordability, validation, and actual debits must agree. Ready locks item actions as well as tower actions. Sandbox modal blockers compose with the expanded item panel; programmatic cancellation clears selections, while Escape dismisses one interaction layer.
+
 These implemented mechanics include:
 
 - **Philosophers Stone (Rare):** every 20th actual enemy kill on your board pays five times its normal Coin bounty; the marked enemy is golden, and zero bounty remains zero.

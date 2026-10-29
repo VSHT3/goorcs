@@ -2,7 +2,7 @@ class_name ItemStatEffects
 extends RefCounted
 ## Item modifiers are products, flat points are sums; branch baselines belong to combat.
 
-const FILTERS: PackedStringArray = ["attacking", "arrow", "ballista", "rune", "lightning", "orcapult", "drums", "physical", "fire", "physical_projectile", "physical_ballista", "projectile", "explosive_arrow", "fire_arrow", "flamethrower", "molotov", "pulsed_rune", "forge", "command_banner", "lookout_horn", "bloodlust_totem"]
+const FILTERS: PackedStringArray = ["attacking", "arrow", "ballista", "rune", "lightning", "orcapult", "drums", "physical", "fire", "physical_projectile", "physical_ballista", "projectile", "explosive_arrow", "grenade_rocket_arrow", "fire_arrow", "flamethrower", "molotov", "pulsed_rune", "forge", "command_banner", "lookout_horn", "bloodlust_totem"]
 const MULTIPLIERS: PackedStringArray = ["damage_multiplier", "direct_damage_multiplier", "attack_rate_multiplier", "reload_multiplier", "crit_damage_multiplier", "support_multiplier", "support_damage_multiplier", "support_speed_multiplier", "support_range_multiplier", "support_crit_multiplier", "splash_radius_multiplier", "burn_duration_multiplier"]
 const ADDITIONS: PackedStringArray = ["range_add", "crit_chance_add", "chain_hits_add", "chain_range_add", "pierce_add", "throw_count_add", "lift_classes_add", "throw_distance_add"]
 const COUNT_KEYS: PackedStringArray = ["chain_hits_add", "pierce_add", "throw_count_add", "lift_classes_add"]
@@ -49,6 +49,7 @@ const INTEGER_PARAMETERS: PackedStringArray = ["bonus_coins", "base_coins", "rou
 const FRACTION_PARAMETERS: PackedStringArray = ["hp_fraction", "heal_fraction", "damage_fraction", "reserve_fraction", "damage_prevent_fraction", "shard_chance"]
 
 var _runtime_ref: WeakRef
+var _lift_classes: PackedFloat64Array = []
 var runtime: Variant:
 	get:
 		return _runtime_ref.get_ref()
@@ -56,6 +57,23 @@ var runtime: Variant:
 
 func _init(owner: Variant) -> void:
 	_runtime_ref = weakref(owner)
+	# Weight classes are the arm's authored capacities, not each enemy's HP value.
+	# Capture once alongside the host's frozen tower definitions.
+	var definition: Dictionary = owner.combat._tower_types.get("orcapult", {})
+	var base: Dictionary = definition.get("behavior_config", {})
+	if base.has("lift"):
+		_lift_classes.append(float(base["lift"]))
+	for branch: Dictionary in definition.get("evolutions", {}).values():
+		if branch.get("behavior_kind", "") != "catapult":
+			continue
+		var lift: float = float(branch["behavior_config"]["lift"])
+		if not _lift_classes.has(lift):
+			_lift_classes.append(lift)
+		for upgrade: Dictionary in branch.get("upgrades", []):
+			lift += float(upgrade.get("behavior_add", {}).get("lift", 0.0))
+			if not _lift_classes.has(lift):
+				_lift_classes.append(lift)
+	_lift_classes.sort()
 
 
 static func mechanic_keys() -> PackedStringArray:
@@ -101,7 +119,7 @@ static func validate_modifier(modifier: Dictionary) -> bool:
 			return false
 		if key == "support_crit_multiplier" and filter_name != "bloodlust_totem":
 			return false
-		if key == "splash_radius_multiplier" and filter_name != "explosive_arrow":
+		if key == "splash_radius_multiplier" and filter_name not in ["explosive_arrow", "grenade_rocket_arrow"]:
 			return false
 		if key == "burn_duration_multiplier" and filter_name != "molotov":
 			return false
@@ -179,7 +197,8 @@ static func matches_filter(tower: Dictionary, filter_name: String) -> bool:
 		"physical_projectile": return attacking and family in ["arrow_tower", "orc_ballista"] and element == "physical"
 		"physical_ballista": return attacking and family == "orc_ballista" and element == "physical"
 		"projectile": return attacking and family in ["arrow_tower", "orc_ballista"] and weapon != "flamethrower"
-		"explosive_arrow": return attacking and family == "arrow_tower" and weapon in ["grenade", "rocket"]
+		"explosive_arrow": return attacking and family == "arrow_tower" and weapon in ["arrow", "grenade", "rocket"] and float(config.get("splash_radius", 0.0)) > 0.0
+		"grenade_rocket_arrow": return attacking and family == "arrow_tower" and weapon in ["grenade", "rocket"]
 		"fire_arrow": return attacking and family == "arrow_tower" and element == "fire"
 		"flamethrower": return attacking and family == "arrow_tower" and weapon == "flamethrower"
 		"molotov": return attacking and family == "arrow_tower" and weapon == "molotov"
@@ -252,14 +271,12 @@ func prepare_tower(slot: int, tower: Dictionary) -> void:
 
 func _lift_limit(baseline: float, classes: int) -> float:
 	var limit: float = baseline
-	for index: int in classes:
-		var next: float = INF
-		for definition: Dictionary in runtime.combat._enemy_types.values():
-			var weight: float = float(definition.get("health_multiplier", 1.0))
-			if not bool(definition.get("boss", false)) and weight > limit + 0.000000001:
-				next = minf(next, weight)
-		if is_finite(next):
-			limit = next
+	for capacity: float in _lift_classes:
+		if classes <= 0:
+			break
+		if capacity > limit + 0.000000001:
+			limit = capacity
+			classes -= 1
 	return limit
 
 

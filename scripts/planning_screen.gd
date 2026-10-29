@@ -475,8 +475,9 @@ func _refresh_commander() -> void:
 	if id == &"priestess" and remaining > 0.0:
 		commander_target.select(0 if int(state.get("ability_target", -1)) == slot else 1)
 	obstacle_clear_button.visible = obstacle and not combat
-	obstacle_clear_button.text = "Clear · %d Coins" % CommanderRules.CLEAR_COST
-	obstacle_clear_button.disabled = not _commander_input_available() or phase != MatchCombat.Phase.PLANNING or planning.ready_flags[slot] or _own_coins() < CommanderRules.CLEAR_COST
+	var clear_cost: int = _item_quote("terrain")
+	obstacle_clear_button.text = "Clear · %d Coins" % clear_cost if clear_cost >= 0 else "Clear unavailable"
+	obstacle_clear_button.disabled = not planning.can_manage_towers(slot) or phase != MatchCombat.Phase.PLANNING or clear_cost < 0 or _own_coins() < clear_cost
 
 
 func _build_health() -> void:
@@ -809,11 +810,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func cancel_interaction() -> bool:
-	if item_panel != null and item_panel.expanded:
+	var panel_was_open: bool = item_panel != null and item_panel.expanded
+	if panel_was_open:
 		item_panel.close()
-		return true
 	if _placement_id == &"" and selected_tower_id < 0 and selected_enemy_id < 0 and _pending_tower_cell == Vector2i(-1, -1) and _selected_terrain == Vector2i(-1, -1):
-		return false
+		return panel_was_open
 	cancel_strokes()
 	_placement_id = &""
 	selected_tower_id = -1
@@ -962,17 +963,17 @@ func _refresh_palette() -> void:
 		button.shortcut_number = shortcut_number if equipped else 0
 		var title: String = String(stats.get("title", button.tower_title))
 		button.tower_title = title
-		button.cost = int(stats.get("cost", 0))
+		button.cost = _item_quote("build", String(id))
 		var status: String = ""
 		if not unlocked:
 			status = "Locked"
 		elif stats.is_empty():
 			status = "Unavailable"
-		button.disabled = not available or not equipped or not unlocked or stats.is_empty() or coins < button.cost
+		button.disabled = not available or not equipped or not unlocked or stats.is_empty() or button.cost < 0 or coins < button.cost
 		button.set_pressed_no_signal(id == _placement_id)
-		var price: String = str(button.cost) if not stats.is_empty() else ""
+		var price: String = str(button.cost) if not stats.is_empty() and button.cost >= 0 else ""
 		button.refresh_caption(price, status)
-		button.tooltip_text = "%d Coins\n%s" % [button.cost, behavior_summary(stats)] if not stats.is_empty() else "This tower is unavailable in the host's match catalog."
+		button.tooltip_text = "%d Coins\n%s" % [button.cost, behavior_summary(stats)] if not stats.is_empty() and button.cost >= 0 else "This tower is unavailable in the host's match catalog."
 		if not button.disabled:
 			button.tooltip_text += "\nHold Shift when placing or dropping to keep building."
 		if coins < button.cost:
@@ -1001,6 +1002,17 @@ func _own_coins() -> int:
 	return int(coins[planning.local_slot()])
 
 
+func _item_quote(kind: String, type_id: String = "") -> int:
+	if planning == null:
+		return -1
+	var quotes: Array = planning.combat.get("item_quotes", [])
+	var slot: int = planning.local_slot()
+	if slot < 0 or slot >= quotes.size():
+		return -1
+	var prices: Dictionary = quotes[slot]
+	return int(prices.get(kind, -1)) if type_id.is_empty() else int(prices.get(kind, {}).get(type_id, -1))
+
+
 func _refresh_sends() -> void:
 	var state: Dictionary = planning.combat if planning != null else {}
 	var rules: Dictionary = state.get("rules", {})
@@ -1014,15 +1026,15 @@ func _refresh_sends() -> void:
 	var finished: bool = phase == MatchCombat.Phase.FINISHED
 	var stats: Dictionary = types.get(String(_selected_enemy_type), {})
 	var configured: bool = not stats.is_empty() and rules.has("send_spawn_interval")
-	var cost: int = int(stats.get("send_cost", 0))
+	var cost: int = _item_quote("send", String(_selected_enemy_type))
 	var gain: int = int(stats.get("send_income", 0))
-	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured and bool(stats.get("send_available", false))
+	var available: bool = planning != null and planning.can_manage_towers(own_slot) and configured and cost >= 0 and bool(stats.get("send_available", false))
 	var orders: Array = state.get("queued_send_orders", [0, 0])
 	var queue_limit: int = int(rules.get("send_queue_limit", MatchCombat.SEND_QUEUE_LIMIT))
 	var queue_full: bool = int(orders[1 - own_slot]) >= queue_limit
 	enemy_selector.disabled = planning == null or not planning.active or finished or types.is_empty()
 	send_button.disabled = not available or _own_coins() < cost or int(income[own_slot]) < -gain or queue_full
-	send_button.text = "Send · %d/%+d" % [cost, gain] if configured else "Send unavailable"
+	send_button.text = "Send · %d/%+d" % [cost, gain] if configured and cost >= 0 else "Send unavailable"
 	if finished:
 		send_button.text = "Match finished"
 	var recurring: int = int(income[own_slot])
@@ -1057,11 +1069,11 @@ func _refresh_sends() -> void:
 			delivery += "\nQueue full: %d orders are waiting to reach your opponent." % queue_limit
 	var stats_wave: int = int(state.get("wave", 0)) if phase == MatchCombat.Phase.WAVE or finished else int(state.get("upcoming_wave", int(state.get("wave", 0)) + 1))
 	var gap: float = MatchCombat.send_order_gap(float(rules["send_spawn_interval"]), int(stats.get("spawn_weight", 1)))
-	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nOutgoing orders: %d/%d.\nOrder cooldown: %.3f simulation seconds after its final member (heavier orcs take longer)." % [_enemy_send_description(stats), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, int(orders[1 - own_slot]), queue_limit, gap]
+	send_button.tooltip_text = "%s\n%s\nHost stats for round %d: %d HP · %.2f cells/s.\n%s\nOutgoing orders: %d/%d.\nOrder cooldown: %.3f simulation seconds after its final member (heavier orcs take longer)." % [_enemy_send_description(stats, String(_selected_enemy_type)), delivery, stats_wave, int(stats.get("health", 0)), float(stats.get("speed", 0.0)), queue_feedback, int(orders[1 - own_slot]), queue_limit, gap]
 	enemy_selector.tooltip_text = send_button.tooltip_text
 	for index: int in range(enemy_selector.item_count):
 		var type_stats: Dictionary = types[String(enemy_selector.get_item_metadata(index))]
-		var item_tooltip: String = "%s\nHost stats for wave %d: %d HP · %.2f cells/s." % [_enemy_send_description(type_stats), stats_wave, int(type_stats.get("health", 0)), float(type_stats.get("speed", 0.0))]
+		var item_tooltip: String = "%s\nHost stats for wave %d: %d HP · %.2f cells/s." % [_enemy_send_description(type_stats, String(enemy_selector.get_item_metadata(index))), stats_wave, int(type_stats.get("health", 0)), float(type_stats.get("speed", 0.0))]
 		if not bool(type_stats.get("send_available", false)):
 			item_tooltip += "\nAvailable from round %d." % int(type_stats.get("send_first_wave", 1))
 		enemy_selector.set_item_tooltip(index, item_tooltip)
@@ -1113,8 +1125,9 @@ static func send_item_text(stats: Dictionary, fallback: String) -> String:
 	return "%s · round %d" % [title, int(stats.get("send_first_wave", 1))]
 
 
-func _enemy_send_description(stats: Dictionary) -> String:
-	return "%s: %d Coins; %+d recurring Coins per both-board clear." % [String(stats.get("title", _selected_enemy_type)), int(stats.get("send_cost", 0)), int(stats.get("send_income", 0))]
+func _enemy_send_description(stats: Dictionary, type_id: String) -> String:
+	var price: int = _item_quote("send", type_id)
+	return "%s: %s; %+d recurring Coins per both-board clear." % [String(stats.get("title", type_id)), "%d Coins" % price if price >= 0 else "unavailable", int(stats.get("send_income", 0))]
 
 
 func _queue_composition(queue: Array, types: Dictionary) -> String:
@@ -1295,9 +1308,10 @@ func _refresh_targeting() -> void:
 	_refresh_reroll(rarity_reroll, tower, "rarity", int(currency[planning.local_slot()]))
 	_refresh_reroll(attribute_reroll, tower, "attributes", _own_coins())
 	var actions: Dictionary = tower_upgrade_actions(tower, stats)
+	var upgrade_quotes: Dictionary = tower.get("upgrade_quotes", {})
 	var base_ready: bool = bool(tower.get("damage_upgraded", false)) and bool(tower.get("speed_upgraded", false))
 	for command: String in ["damage", "speed"]:
-		_refresh_action(damage_upgrade if command == "damage" else speed_upgrade, actions[command])
+		_refresh_action(damage_upgrade if command == "damage" else speed_upgrade, actions[command], int(upgrade_quotes.get(command, -1)))
 	var choices: Array[String] = []
 	for command: String in actions:
 		if base_ready and command not in ["damage", "speed"] and not bool(actions[command]["purchased"]):
@@ -1307,9 +1321,9 @@ func _refresh_targeting() -> void:
 	special_upgrade.visible = not _special_upgrade_command.is_empty()
 	alternate_upgrade.visible = not _alternate_upgrade_command.is_empty()
 	if special_upgrade.visible:
-		_refresh_action(special_upgrade, actions[_special_upgrade_command])
+		_refresh_action(special_upgrade, actions[_special_upgrade_command], int(upgrade_quotes.get(_special_upgrade_command, -1)))
 	if alternate_upgrade.visible:
-		_refresh_action(alternate_upgrade, actions[_alternate_upgrade_command])
+		_refresh_action(alternate_upgrade, actions[_alternate_upgrade_command], int(upgrade_quotes.get(_alternate_upgrade_command, -1)))
 	for button: Button in _extra_upgrade_buttons.values():
 		button.hide()
 	for index: int in range(2, choices.size()):
@@ -1325,7 +1339,7 @@ func _refresh_targeting() -> void:
 			_upgrade_row.add_child(button)
 			_extra_upgrade_buttons[command] = button
 		_extra_upgrade_buttons[command].show()
-		_refresh_action(_extra_upgrade_buttons[command], actions[command])
+		_refresh_action(_extra_upgrade_buttons[command], actions[command], int(upgrade_quotes.get(command, -1)))
 	var second_archer: bool = bool(tower.get("special_upgraded", false)) and String(stats.get("special_upgrade", "")) == "second_archer"
 	var advancements: Dictionary = stats.get("advancements", {})
 	var available: Dictionary = advancement_actions(tower, stats)
@@ -1348,7 +1362,7 @@ func _refresh_targeting() -> void:
 		var button: Button = advancement_buttons[command]
 		button.visible = second_archer and available.has(command)
 		if button.visible:
-			_refresh_action(button, available[command])
+			_refresh_action(button, available[command], int(upgrade_quotes.get(command, -1)))
 		else:
 			button.disabled = true
 	_upgrade_row.visible = _upgrade_row.get_children().any(func(button: Button) -> bool: return button.visible)
@@ -1361,13 +1375,12 @@ func _refresh_targeting() -> void:
 	sell_button.tooltip_text += "\nPress again to sell." if armed else "\nPress twice to sell."
 
 
-func _refresh_action(button: Button, action: Dictionary) -> void:
+func _refresh_action(button: Button, action: Dictionary, price: int) -> void:
 	var purchased: bool = bool(action["purchased"])
 	button.visible = not purchased
 	var locked: bool = bool(action["locked"])
-	var price: int = int(action["cost"])
-	button.text = "%s\n%s" % [action["title"], "Locked" if locked else str(price)]
-	button.disabled = purchased or locked or targeting_button.disabled or _own_coins() < price
+	button.text = "%s\n%s" % [action["title"], "Locked" if locked else (str(price) if price >= 0 else "Unavailable")]
+	button.disabled = purchased or locked or price < 0 or targeting_button.disabled or _own_coins() < price
 	button.tooltip_text = String(action["description"])
 	if locked:
 		button.tooltip_text += "\nRequires the preceding upgrades; permanent branches are exclusive."
@@ -1865,7 +1878,7 @@ func _refresh() -> void:
 	_refresh_commander()
 	item_panel.visible = planning != null and planning.active
 	if planning != null:
-		item_panel.refresh(planning.combat, planning.local_slot(), _commander_input_available() and int(planning.combat.get("phase", -1)) != MatchCombat.Phase.FINISHED)
+		item_panel.refresh(planning.combat, planning.local_slot(), planning.can_manage_towers(planning.local_slot()))
 	if not debug_button.visible:
 		debug_popup.hide()
 	if planning == null:

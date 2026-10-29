@@ -23,10 +23,11 @@ func _state(slot: int) -> Dictionary:
 	return state
 
 
-func hit_multiplier(slot: int, tower: Dictionary, enemy: Dictionary, context: Dictionary) -> float:
+func hit_multiplier(slot: int, tower: Dictionary, enemy: Dictionary, context: Dictionary, time: float = -1.0) -> float:
 	var result: float = 1.0
 	var receipt: Dictionary = _state(slot)["receipt"]
-	if runtime.has(slot, &"necromancers_receipt") and float(receipt.get(int(enemy["id"]), 0.0)) > runtime.clock + EPSILON:
+	var sample_clock: float = runtime.clock if time < 0.0 else runtime.clock - (runtime.combat._elapsed - time)
+	if runtime.has(slot, &"necromancers_receipt") and float(receipt.get(int(enemy["id"]), 0.0)) > sample_clock + EPSILON:
 		result *= float(runtime.params(slot, &"necromancers_receipt")["damage_multiplier"])
 	if tower.is_empty() or bool(context.get("item_only", false)):
 		return result
@@ -39,11 +40,13 @@ func hit_multiplier(slot: int, tower: Dictionary, enemy: Dictionary, context: Di
 		var parameters: Dictionary = runtime.params(slot, &"butchers_apron")
 		if float(enemy["hp"]) < float(enemy["max_hp"]) * float(parameters["hp_fraction"]):
 			result *= float(parameters["damage_multiplier"])
-	if runtime.has(slot, &"frostbite_nail") and bool(enemy.get("slowed", false)):
+	var slowed: bool = bool(enemy.get("slowed", false)) if time < 0.0 else float(enemy.get("_step_slow_until", 0.0)) > time + EPSILON
+	if runtime.has(slot, &"frostbite_nail") and slowed:
 		result *= float(runtime.params(slot, &"frostbite_nail")["damage_multiplier"])
 	if runtime.has(slot, &"watchmans_cup"):
 		var parameters: Dictionary = runtime.params(slot, &"watchmans_cup")
-		if runtime.combat.item_enemy_on_final_tiles(enemy, int(parameters["tiles"])):
+		var progress: float = float(enemy["progress"]) if time < 0.0 else runtime.combat._historical_progress(enemy, time)
+		if progress + EPSILON >= float(enemy["route"].size() - int(parameters["tiles"])):
 			result *= float(parameters["damage_multiplier"])
 	if runtime.has(slot, BRACE) and String(tower.get("type_id", "")) == "orc_ballista":
 		var tracking: Dictionary = _state(slot)["brace"].get(int(tower["id"]), {})
@@ -51,6 +54,14 @@ func hit_multiplier(slot: int, tower: Dictionary, enemy: Dictionary, context: Di
 			var parameters: Dictionary = runtime.params(slot, BRACE)
 			result *= 1.0 + minf(float(parameters["maximum_bonus"]), float(tracking["elapsed"]) * float(parameters["damage_per_second"]))
 	return result
+
+
+func continuous_damage_boundary(slot: int, enemy: Dictionary) -> int:
+	if runtime.has(slot, &"butchers_apron"):
+		var threshold: float = float(enemy["max_hp"]) * float(runtime.params(slot, &"butchers_apron")["hp_fraction"])
+		if float(enemy["hp"]) >= threshold:
+			return maxi(1, int(enemy["hp"]) - ceili(threshold) + 1)
+	return int(enemy["hp"])
 
 
 func before_attack(slot: int, tower: Dictionary, _context: Dictionary) -> void:
@@ -331,6 +342,8 @@ func needs_combat_events() -> bool:
 	if needs_attack_tracking():
 		return true
 	for slot: int in range(2):
+		if runtime.has(slot, &"butchers_apron") or runtime.has(slot, &"frostbite_nail") or runtime.has(slot, &"watchmans_cup"):
+			return true
 		var state: Dictionary = _state(slot)
 		if not state["infected"].is_empty() or not state["receipt"].is_empty():
 			return true

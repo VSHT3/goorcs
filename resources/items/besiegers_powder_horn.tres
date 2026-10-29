@@ -14,4 +14,4 @@ flavor_text = ""
 icon_texture = ExtResource("2")
 detail_texture = ExtResource("3")
 mechanics = PackedStringArray("Affects grenade and rocket explosions, not ordinary arrows.", "Fire immunity still prevents explosion damage.")
-runtime = {"stats": [{"filter": "explosive_arrow", "values": {"splash_radius_multiplier": 1.2, "attack_rate_multiplier": 0.9}}]}
+runtime = {"stats": [{"filter": "grenade_rocket_arrow", "values": {"splash_radius_multiplier": 1.2, "attack_rate_multiplier": 0.9}}]}

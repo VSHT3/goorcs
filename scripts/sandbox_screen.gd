@@ -438,7 +438,7 @@ func _confirmation(title: String, message: String, callback: Callable) -> Confir
 	dialog.confirmed.connect(callback)
 	dialog.visibility_changed.connect(func() -> void:
 		if not dialog.visible:
-			world.set_input_blocked(false)
+			_refresh.call_deferred()
 	)
 	add_child(dialog)
 	return dialog
@@ -577,10 +577,10 @@ func _enemy_clicked(enemy_id: int) -> void:
 
 
 func cancel_interaction() -> bool:
-	if item_panel != null and item_panel.expanded:
+	var panel_was_open: bool = item_panel != null and item_panel.expanded
+	if panel_was_open:
 		item_panel.close()
-		return true
-	var had_selection: bool = placement_id != &"" or selected_tower_id >= 0 or selected_enemy_id >= 0
+	var had_selection: bool = panel_was_open or placement_id != &"" or selected_tower_id >= 0 or selected_enemy_id >= 0
 	placement_id = &""
 	selected_tower_id = -1
 	selected_enemy_id = -1

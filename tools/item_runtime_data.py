@@ -89,7 +89,7 @@ RUNTIME = {
     "choir_of_empty_helmets": special("choir_of_empty_helmets", radius=2.0, damage_per_identity=0.08, max_identities=4),
     "necromancers_receipt": special("necromancers_receipt", damage_multiplier=1.25, duration=5.0),
     "stormglass_tuning_fork": stat("lightning", chain_range_add=0.50),
-    "besiegers_powder_horn": stat("explosive_arrow", splash_radius_multiplier=1.20, attack_rate_multiplier=0.90),
+    "besiegers_powder_horn": stat("grenade_rocket_arrow", splash_radius_multiplier=1.20, attack_rate_multiplier=0.90),
     "cartographers_field_atlas": stat("attacking", range_add=0.50, damage_multiplier=0.90),
     "trollhide_apron": special("trollhide_apron", duration_multiplier=0.65),
     "moon_salt_jerky": stat("attacking", damage_multiplier=1.15, crit_chance_add=0.05),

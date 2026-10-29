@@ -219,7 +219,17 @@ func _can_activate_stats(slot: int, id: StringName, target_id: int) -> bool:
 func advance(delta: float) -> void:
 	if not is_finite(delta) or delta <= 0.0 or int(combat.phase) != 1:
 		return
+	begin_interval(delta)
+	finish_interval(delta)
+
+
+## Publish the event timestamp without retiring effects that own this interval.
+func begin_interval(delta: float) -> void:
 	clock += delta
+
+
+## Continuous consumers finish before boundary expiries and activations.
+func finish_interval(delta: float) -> void:
 	if not _has_history:
 		return
 	for slot: int in range(2):
@@ -238,6 +248,8 @@ func advance(delta: float) -> void:
 	economy.advance(delta)
 	combat_effects.advance(delta)
 	defense.advance(delta)
+
+
 func needs_combat_events() -> bool:
 	for board: Dictionary in boards:
 		if not board["active"].is_empty():

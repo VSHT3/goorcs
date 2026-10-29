@@ -17,6 +17,8 @@ func _init() -> void:
 	_test_send_prices_provenance_and_transfer()
 	_test_mark_attribution_and_normal_bounty()
 	_test_all_items_one_board_economy()
+	_test_rush_pulse_partition_independence()
+	_test_authoritative_upgrade_quotes()
 	if failures == 0:
 		print("PASS: all economy items, real purchases/production/kill/clear/send callbacks, fractional ledgers, cycle RNG, replacement, deadlines, attribution, atomic rejects and all130 composition")
 	quit(1 if failures > 0 else 0)
@@ -467,3 +469,54 @@ func _test_all_items_one_board_economy() -> void:
 	var frozen: Dictionary = combat.snapshot()
 	_check(not combat.set_items(0, ["dabloons", "unknown"]) and not combat.set_items(0, ["dabloons", "dabloons"]) and not combat.set_items(0, ["dabloons", 3]) and combat.snapshot() == frozen and combat.item_runtime.random.state == random_before, "Unknown/duplicate/nonstrings reject the whole all130 owned-set edit atomically")
 	_check(combat.item_runtime.state(1)["economy"].get("stone_counter", 0) == 0, "All130 board never advances the opponent's counter")
+
+
+func _rush_pulse_field() -> MatchCombat:
+	var combat: MatchCombat = _new(["philosophorers_stoner"])
+	var source: Dictionary = _attacker(combat)
+	_check(combat.build(0, Vector2i(0, 1), &"rune_obelisk", 0), "Rush fixture purchases its actual pulse tower")
+	var rune: Dictionary = combat.towers[0].back()
+	for upgrade: String in ["damage", "speed", "onyx_ring"]:
+		_check(combat.upgrade_tower(0, int(rune["id"]), upgrade), "Rush fixture purchases its authored Rune prerequisite " + upgrade)
+	_start(combat)
+	for index: int in range(5):
+		_kill(combat, source)
+	combat.advance(3.0)
+	_check(is_equal_approx(float(combat.item_runtime.state(0)["economy"]["rush_until"]) - combat.item_runtime.clock, 1.0), "Five actual kills leave the exact one-second Gold Rush scenario after three host seconds")
+	combat.enemies[0][0]["hp"] = 1
+	rune["cooldown"] = 0.5
+	return combat
+
+
+func _test_rush_pulse_partition_independence() -> void:
+	for deadline: float in [0.5, 1.0, 1.5]:
+		var coarse: MatchCombat = _rush_pulse_field()
+		var fine: MatchCombat = _rush_pulse_field()
+		coarse.towers[0].back()["cooldown"] = deadline
+		fine.towers[0].back()["cooldown"] = deadline
+		var coarse_before: int = coarse.coins[0]
+		var fine_before: int = fine.coins[0]
+		coarse.advance(2.0)
+		for index: int in range(200):
+			fine.advance(0.01)
+		var expected: int = 15 if deadline < 1.0 else 3
+		_check(coarse.coins[0] - coarse_before == expected and fine.coins[0] - fine_before == expected, "A real Onyx kill at +%.1fs pays%d across a two-second coarse/fine advance without owning Mimic" % [deadline, expected])
+		_check(int(coarse.towers[0].back()["kills"]) == 1 and int(fine.towers[0].back()["kills"]) == 1, "Pulse death ownership retires one actual victim at the Gold Rush boundary")
+
+
+func _test_authoritative_upgrade_quotes() -> void:
+	var combat: MatchCombat = _new(["dabloons"])
+	var tower: Dictionary = _attacker(combat)
+	var published: Dictionary = combat.snapshot(false)["towers"][0][0]["upgrade_quotes"]
+	_check(published == {"damage": 27, "speed": 27}, "Metadata-free host snapshots quote only presently legal discounted upgrade actions")
+	var before: int = combat.coins[0]
+	_check(combat.upgrade_tower(0, int(tower["id"]), "damage") and before - combat.coins[0] == int(published["damage"]), "The host debits exactly the authoritative published base-upgrade price")
+	published = combat.snapshot(false)["towers"][0][0]["upgrade_quotes"]
+	_check(not published.has("damage") and published.get("speed", -1) == 41 and not published.has("special"), "Quotes advance with accepted level while excluding purchased and unavailable actions")
+	_check(combat.upgrade_tower(0, int(tower["id"]), "speed"), "Quote fixture purchases its real second prerequisite")
+	for upgrade: String in ["special", "bomb_arrows", "bigger_bombs", "anti_orc_grenades", "aom", "aom_speed_1", "aom_speed_2"]:
+		published = combat.snapshot(false)["towers"][0][0]["upgrade_quotes"]
+		_check(published.has(upgrade), "Authoritative quote includes the next legal authored advancement " + upgrade)
+		before = combat.coins[0]
+		_check(combat.upgrade_tower(0, int(tower["id"]), upgrade) and before - combat.coins[0] == int(published.get(upgrade, -1)), "Each real advancement purchase charges precisely its published discounted price " + upgrade)
+	_check(combat.snapshot(false)["towers"][0][0]["upgrade_quotes"].is_empty(), "A completed terminal branch publishes no fictitious follow-up upgrades")

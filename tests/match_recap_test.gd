@@ -47,7 +47,7 @@ func run() -> void:
 	var enemy: Dictionary = combat.enemies[0][0]
 	var hp: int = enemy["hp"]
 	combat._hit(0, tower, 0, 3)
-	combat._ignite(enemy, tower, {"burn_dps": 100.0, "burn_duration": 1.0})
+	combat._ignite(0, enemy, tower, {"burn_dps": 100.0, "burn_duration": 1.0})
 	var refund: int = tower["sell_value"]
 	check(combat.sell_tower(0, tower["id"]), "Killer sells while its actual burn remains")
 	combat.advance(0.1)

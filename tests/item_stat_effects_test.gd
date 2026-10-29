@@ -54,7 +54,7 @@ const CASES: Array = [
 	["smith_kings_hammer", "forge", {"damage_bonus": 0.25}],
 	["glacial_chisel", "rune", {"freeze_slow_multiplier": 0.7}],
 	["stormglass_tuning_fork", "lightning", {"jump_distance": 2.5}],
-	["besiegers_powder_horn", "explosive_arrow", {"splash_radius": 1.2, "speed_multiplier": 0.9}],
+	["besiegers_powder_horn", "grenade_rocket_arrow", {"splash_radius": 1.2, "speed_multiplier": 0.9}],
 	["cartographers_field_atlas", "attacking", {"range": 3.5, "damage_multiplier": 0.9}],
 	["moon_salt_jerky", "attacking", {"damage_multiplier": 1.15, "crit_chance": 0.05}],
 	["falconers_hood", "arrow", {"crit_chance": 0.1, "speed_multiplier": 0.9}],
@@ -73,7 +73,7 @@ const CASES: Array = [
 	["orc_kings_signet", "attacking", {"damage_multiplier": 1.3, "speed_multiplier": 1.15}],
 	["titans_heart", "attacking", {"damage_multiplier": 1.8, "speed_multiplier": 0.7}],
 	["perfect_scope", "attacking", {"range": 4.0, "crit_chance": 0.1}],
-	["heartwood_siege_arm", "orcapult", {"lift_next": 1}],
+	["heartwood_siege_arm", "orcapult", {"lift": 2.5}],
 	["empresss_warcoat", "attacking", {"damage_multiplier": 1.2, "crit_damage_multiplier": 2.9}],
 	["leviathan_anchor", "orcapult", {"item_throw_distance": 1.0, "speed_multiplier": 0.8}],
 	["stormcallers_crown", "lightning", {"hit_count": 4, "damage_multiplier": 0.8}],
@@ -94,6 +94,9 @@ func _init() -> void:
 	_test_records()
 	_test_individual_stats()
 	_test_composition_and_boundaries()
+	_test_real_explosive_eligibility()
+	_test_real_lift_classes()
+	_test_real_crit_composition()
 	_test_real_refresh_support_and_continuous()
 	if failures == 0:
 		print("PASS: all authored item schemas, every static modifier, eligibility, multiplicative composition, support purity/maxima, crit boundaries, evolution refresh, cooldown preservation and all-130 continuous combat")
@@ -159,9 +162,9 @@ func _fixture(filter_name: String) -> Dictionary:
 				var key: String = {"forge": "damage_bonus", "command_banner": "attack_speed_bonus", "lookout_horn": "range_aura", "bloodlust_totem": "crit_chance"}[filter_name]
 				tower["behavior_config"][key] = 1.0 if filter_name == "lookout_horn" else 0.2
 		"fire", "fire_arrow": tower["element"] = "fire"
-		"explosive_arrow", "molotov", "flamethrower":
+		"explosive_arrow", "grenade_rocket_arrow", "molotov", "flamethrower":
 			tower["element"] = "fire"
-			var weapon: String = "rocket" if filter_name == "explosive_arrow" else filter_name
+			var weapon: String = "rocket" if filter_name in ["explosive_arrow", "grenade_rocket_arrow"] else filter_name
 			tower["effective_attack_config"] = {"weapon": weapon, "splash_radius": 1.0, "burn_duration": 4.0, "burn_dps": 5.0, "continuous_dps": 10.0}
 	return tower
 
@@ -189,9 +192,6 @@ func _test_individual_stats() -> void:
 				actual = float(tower["behavior_config"]["damage_bonus"]) / 0.2
 				_near(float(tower["behavior_config"]["attack_speed_bonus"]) / 0.2, float(expected[key]), identity + " retained speed component")
 			elif key == "support_crit": actual = float(tower["behavior_config"]["crit_chance"])
-			elif key == "lift_next":
-				_check(float(tower["behavior_config"]["lift"]) > 1.0, "Heartwood admits next nonboss weight class")
-				continue
 			elif tower["behavior_config"].has(key): actual = float(tower["behavior_config"][key])
 			elif tower["effective_attack_config"].has(key): actual = float(tower["effective_attack_config"][key])
 			else: actual = float(tower[key])
@@ -234,7 +234,7 @@ func _test_composition_and_boundaries() -> void:
 	_check(ItemStatEffects.matches_filter(physical, "physical_ballista"), "Physical Ballista initially eligible")
 	physical["element"] = "magic"
 	_check(not ItemStatEffects.matches_filter(physical, "physical_ballista"), "Element evolution removes Physical eligibility")
-	for filter_name: String in ["projectile", "explosive_arrow", "molotov", "pulsed_rune"]:
+	for filter_name: String in ["projectile", "explosive_arrow", "grenade_rocket_arrow", "molotov", "pulsed_rune"]:
 		var negative: Dictionary = _fixture("flamethrower" if filter_name != "pulsed_rune" else "rune")
 		_check(not ItemStatEffects.matches_filter(negative, filter_name), filter_name + " excludes wrong continuous branch")
 	_check(combat.set_items(0, ["choir_of_empty_helmets", "empty_throne"]), "Equip neighborhood items")
@@ -268,6 +268,135 @@ func _built(combat: MatchCombat, cell: Vector2i, type_id: StringName, commands: 
 	for command: String in commands:
 		_check(combat.upgrade_tower(0, tower["id"], command), "Upgrade real %s %s" % [type_id, command])
 	return tower
+
+
+func _start_stat_wave(combat: MatchCombat) -> void:
+	var route: Array[Vector2i] = [Vector2i(4, 6), Vector2i(5, 6), Vector2i(6, 6), Vector2i(7, 6), Vector2i(8, 6)]
+	var next: Dictionary = {route[0]: [route[1]], route[1]: [route[2]], route[2]: [route[3]], route[3]: [route[4]], route[4]: []}
+	var routing: Array[Dictionary] = [{"route": route, "next": next}, {"route": route, "next": next}]
+	_check(combat.sandbox_start(routing, 1, [] as Array[String]), "Real stat-consumer wave starts")
+
+
+func _test_real_explosive_eligibility() -> void:
+	var combat: MatchCombat = MatchCombat.new(rules)
+	var tower: Dictionary = _built(combat, Vector2i(5, 5), &"arrow_tower", ["damage", "speed", "special"])
+	var branches: Array[String] = ["bomb_arrows", "bigger_bombs", "anti_orc_grenades", "aom"]
+	var radii: Array[float] = [0.85, 1.25, 1.5, 2.5]
+	var subsets: Array = [[], ["packed_powder"], ["besiegers_powder_horn"], ["packed_powder", "besiegers_powder_horn"]]
+	_start_stat_wave(combat)
+	_check(combat.sandbox_spawn(0, &"grunt", 2), "Real explosive consumers get two ordinary targets")
+	var primary: Dictionary = combat.enemies[0][0]
+	var neighbor: Dictionary = combat.enemies[0][1]
+	primary["pos"] = Vector2(5, 6)
+	for index: int in range(branches.size()):
+		_check(combat.set_items(0, []), "Clear powder between real branch upgrades")
+		_check(combat.upgrade_tower(0, tower["id"], branches[index]), "Buy real explosive branch %s" % branches[index])
+		var baseline_rate: float = tower["speed_multiplier"]
+		for ids: Array in subsets:
+			_check(combat.set_items(0, ids), "Equip real explosive subset %s" % [ids])
+			var eligible: int = int("packed_powder" in ids) + int(index >= 2 and "besiegers_powder_horn" in ids)
+			_near(float(tower["effective_attack_config"]["splash_radius"]), radii[index] * pow(1.2, eligible), "%s radius with %s" % [branches[index], ids])
+			_near(float(tower["speed_multiplier"]), baseline_rate * pow(0.9, eligible), "%s rate drawback with %s" % [branches[index], ids])
+			if index < 2:
+				# One tile is outside Bomb Arrows; sqrt(2) is outside Bigger Bombs.
+				# Both become reachable only when Packed Powder really enlarges the blast.
+				neighbor["pos"] = Vector2(6, 6) if index == 0 else Vector2(6, 7)
+				primary["hp"] = 1000000
+				neighbor["hp"] = 1000000
+				combat._attack_arrow(0, tower, int(primary["id"]), primary["pos"], tower["effective_attack_config"])
+				_check((int(neighbor["hp"]) < 1000000) == ("packed_powder" in ids), "%s real splash hits its newly reachable neighbor only with Packed Powder: %s" % [branches[index], ids])
+	for commands: Array in [
+		["damage", "speed", "special"],
+		["damage", "speed", "special", "fire_arrows", "molotov"],
+		["damage", "speed", "special", "fire_arrows", "molotov", "quick_pitch", "flamethrower"]
+	]:
+		var excluded: MatchCombat = MatchCombat.new(rules)
+		var other: Dictionary = _built(excluded, Vector2i(5, 5), &"arrow_tower", commands)
+		var baseline: Dictionary = other["effective_attack_config"].duplicate(true)
+		var baseline_rate: float = other["speed_multiplier"]
+		_check(excluded.set_items(0, ["packed_powder", "besiegers_powder_horn"]), "Equip powders on non-explosive real Arrow branches")
+		_check(other["effective_attack_config"] == baseline, "Ordinary arrows, Molotovs and Flamethrowers retain authored attack configuration")
+		_near(float(other["speed_multiplier"]), baseline_rate, "Powders never penalize non-explosive real branches")
+
+
+func _test_real_lift_classes() -> void:
+	var cases: Array = [
+		[[], 1.0, 2.5, "brute", true],
+		[["damage", "speed", "special", "siege_arm"], 2.5, 3.5, "rage_orc", true],
+		[["damage", "speed", "special", "siege_arm", "iron_counterweight"], 3.5, 6.0, "orc_chief", true],
+		[["damage", "speed", "special", "siege_arm", "iron_counterweight", "ogre_crew", "warlords_trebuchet"], 6.0, 6.0, "greater_shaorc", false],
+		[["damage", "speed", "special", "long_toss"], 2.5, 3.5, "rage_orc", true],
+		[["damage", "speed", "special", "long_toss", "greased_sling", "rude_awakening", "over_the_wall"], 3.5, 6.0, "orc_chief", true]
+	]
+	for row: Array in cases:
+		var combat: MatchCombat = MatchCombat.new(rules)
+		var tower: Dictionary = _built(combat, Vector2i(5, 5), &"orcapult", row[0])
+		_near(float(tower["behavior_config"]["lift"]), float(row[1]), "Real Orcapult starts in its authored lift class")
+		var slam: float = tower["damage"]
+		var landing: float = tower["behavior_config"]["landing_progress"]
+		_check(combat.set_items(0, ["heartwood_siege_arm"]), "Equip Heartwood on real lift progression")
+		_near(float(tower["behavior_config"]["lift"]), float(row[2]), "Heartwood advances exactly one authored arm-capacity class")
+		_near(float(tower["damage"]), slam, "Heartwood does not alter slam damage")
+		_near(float(tower["behavior_config"]["landing_progress"]), landing, "Heartwood does not alter throw distance")
+		combat.item_recompute(0)
+		_near(float(tower["behavior_config"]["lift"]), float(row[2]), "Repeated refresh never compounds lift classes")
+		_start_stat_wave(combat)
+		combat._spawn_enemy(0, row[3], 1.0, combat._elapsed)
+		var enemy: Dictionary = combat.enemies[0].back()
+		tower["cooldown"] = 0.0
+		combat._attack_catapult(0, tower, 0.0)
+		_check((combat.flights.size() == 1) == bool(row[4]), "Actual catapult launch respects the next authored lift class and its ceiling")
+		if bool(row[4]):
+			_check(int(combat.flights[0]["enemy"]["id"]) == int(enemy["id"]), "The heavier real enemy, not a substitute, is launched")
+		else:
+			_check(combat.enemies[0].has(enemy), "Enemies beyond the top authored lift class remain on their route")
+		_check(combat.set_items(0, []), "Remove Heartwood after the real launch")
+		_near(float(tower["behavior_config"]["lift"]), float(row[1]), "Removing Heartwood restores the authored capacity")
+	var boss_combat: MatchCombat = MatchCombat.new(rules)
+	var arm: Dictionary = _built(boss_combat, Vector2i(5, 5), &"orcapult", [])
+	_check(boss_combat.set_items(0, ["heartwood_siege_arm", "leviathan_anchor"]), "Heartwood and Anchor coexist on a real arm")
+	_near(float(arm["behavior_config"]["lift"]), 2.5, "Anchor composition retains base Brute eligibility")
+	_start_stat_wave(boss_combat)
+	boss_combat._spawn_enemy(0, "grand_mage_orcafus", 1.0, boss_combat._elapsed)
+	var boss: Dictionary = boss_combat.enemies[0].back()
+	_check(not MatchCombat.throwable(boss, boss_combat._enemy_types[boss["type_id"]], INF), "The actual lift consumer rejects a real boss regardless of capacity")
+	arm["cooldown"] = 0.0
+	boss_combat._attack_catapult(0, arm, 0.0)
+	_check(boss_combat.flights.is_empty(), "Heartwood plus Anchor never launches a boss")
+
+
+func _test_real_crit_composition() -> void:
+	var combat: MatchCombat = MatchCombat.new(rules)
+	var totem: Dictionary = _built(combat, Vector2i(5, 5), &"war_drums", ["damage", "speed", "bloodlust_totem", "sharpened_hooks", "blood_frenzy", "skullsplitter_totem"])
+	var attacker: Dictionary = _built(combat, Vector2i(6, 5), &"arrow_tower", [])
+	var cases: Array = [
+		[["vermilion_war_sash"], 0.3, 0.25],
+		[["forbidden_beat", "vermilion_war_sash"], 0.6, 0.55],
+		[["forbidden_beat", "saints_marrow_flute"], 0.9, 0.75],
+		[["forbidden_beat", "saints_marrow_flute", "vermilion_war_sash"], 0.9, 0.75]
+	]
+	for row: Array in cases:
+		_check(combat.set_items(0, row[0]), "Equip real Totem crit subset %s" % [row[0]])
+		_near(float(totem["behavior_config"]["crit_chance"]), float(row[1]), "Real Totem retains raw multiplied aura strength")
+		_near(float(attacker["crit_chance"]), float(row[2]), "Aura and item additions compose before one final chance clamp")
+		combat.item_recompute(0)
+		_near(float(attacker["crit_chance"]), float(row[2]), "Crit refresh never compounds aura or subtracts Sash twice")
+	_start_stat_wave(combat)
+	_check(combat.sandbox_spawn(0, &"grunt", 1), "Actual critical-hit consumer gets a real ordinary enemy")
+	var enemy: Dictionary = combat.enemies[0][0]
+	enemy["hp"] = 1000000
+	enemy["max_hp"] = 1000000
+	var oracle: RandomNumberGenerator = RandomNumberGenerator.new()
+	oracle.seed = 90210
+	combat._crit_random.seed = 90210
+	var distinguished: bool = false
+	for index: int in range(256):
+		var roll: float = oracle.randf()
+		distinguished = distinguished or (roll >= 0.7 and roll < 0.75)
+		var before: int = enemy["hp"]
+		_check(combat._hit(0, attacker, 0, 10), "Accepted discrete hit consumes composed final crit chance")
+		_check(before - int(enemy["hp"]) == (28 if roll < 0.75 else 10), "Actual Sash hit follows final 75-percent chance, not a prematurely capped 70-percent chance")
+	_check(distinguished, "Deterministic hit sequence exercises the premature-cap gap")
 
 
 func _test_real_refresh_support_and_continuous() -> void:

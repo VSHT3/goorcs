@@ -479,7 +479,7 @@ func _test_fractional_damage() -> void:
 			if branch == "burn":
 				var config: Dictionary = combat.snapshot()["tower_types"]["arrow_tower"]["advancements"]["fire_arrows"].duplicate(true)
 				config["burn_dps"] = 1.0
-				combat._ignite(enemy, tower, config)
+				combat._ignite(0, enemy, tower, config)
 				tower["cooldown"] = 1000.0
 			var hp: int = enemy["hp"]
 			combat.advance(0.5)
@@ -603,7 +603,7 @@ func _test_stunned_weapons() -> void:
 	var target: Dictionary = _find(combat, TROLL)
 	tower["cooldown"] = 1000.0
 	combat.advance(24.899999)
-	combat._ignite(target, tower, combat.snapshot()["tower_types"]["arrow_tower"]["advancements"]["fire_arrows"])
+	combat._ignite(0, target, tower, combat.snapshot()["tower_types"]["arrow_tower"]["advancements"]["fire_arrows"])
 	combat.advance(1.35)
 	_check(tower["stun_count"] == 1 and float(tower["stunned_remaining"]) > 29.99, "Existing-burn fixture reaches a real accepted club stun")
 	var hp: int = target["hp"]

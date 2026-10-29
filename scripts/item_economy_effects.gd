@@ -206,10 +206,8 @@ func advance(delta: float) -> void:
 
 func needs_combat_events() -> bool:
 	for slot: int in range(2):
-		if not runtime.has(slot, &"mimics_lunch_pail"):
-			continue
 		var state: Dictionary = _state(slot)
-		if not bool(state.get("mimic_ready", false)) or (runtime.has(slot, ORC_STONE) and float(state.get("rush_until", 0.0)) > runtime.clock + EPSILON):
+		if (runtime.has(slot, &"mimics_lunch_pail") and not bool(state.get("mimic_ready", false))) or (runtime.has(slot, ORC_STONE) and float(state.get("rush_until", 0.0)) > runtime.clock + EPSILON):
 			return true
 	return false
 

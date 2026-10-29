@@ -25,10 +25,15 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(save_directory)
 	main = load("res://scenes/main.tscn").instantiate() as Control
 	main.combat_rules = CombatRules.new()
+	main.combat_rules.roll_rules = null
+	main.combat_rules.starting_coins = 41
+	var starting_items: Array[PackedStringArray] = [PackedStringArray(["dabloons"]), PackedStringArray()]
+	main.combat_rules.starting_items = starting_items
 	main.collection_store = CollectionStore.new(save_directory.path_join("collection.json"))
 	main.statistics_store = EnemyStatisticsStore.new(save_directory.path_join("statistics.json"))
 	root.add_child(main)
 	await _settle()
+	await _test_normal_planning()
 	await _key(KEY_S)
 	sandbox = main.sandbox_screen
 	if not _check(sandbox != null and sandbox.visible and sandbox.controller != null, "S opens the real playable Sandbox"):
@@ -96,6 +101,12 @@ func _run() -> void:
 	_check(not entry.has("charges") and not panel._action_status["witchs_folded_ladder:active"].text.contains("-1"), "Uncharged actives show no negative placeholder count")
 	var cannon_selector: OptionButton = panel.target_selectors["minute_hand_cannon:active"]
 	_check(cannon_selector.item_count == 1 and int(cannon_selector.get_item_metadata(0)) == int(tower["id"]), "Target picker offers the actual friendly projectile tower")
+	sandbox.selected_tower_id = int(tower["id"])
+	sandbox._refresh()
+	await _click(cannon_selector)
+	_check(cannon_selector.get_popup().visible, "Native item target picker opens its accessible popup")
+	await _key(KEY_ESCAPE)
+	_check(not cannon_selector.get_popup().visible and panel.expanded and sandbox.selected_tower_id == int(tower["id"]), "Escape closes the item target popup before its panel or underlying inspection")
 	cannon_selector.select(0)
 	panel.refresh(sandbox.controller.state, 0, true)
 	var cannon_button: Button = panel.action_buttons["minute_hand_cannon:active"]
@@ -127,7 +138,150 @@ func _run() -> void:
 	_check(not panel._details.text.contains("Charges:"), "Items without real charges omit the charge row in their details")
 	if not capture_directory.is_empty():
 		await _capture("active_items_in_combat")
+	await _test_sandbox_transitions(int(tower["id"]))
 	await _finish()
+
+
+func _test_normal_planning() -> void:
+	await _click(main.play_button)
+	await _click(main.play_screen.singleplayer_button)
+	var planning: MatchPlanning = main.planning
+	_check(preload("res://tests/commander_fixture_worker.gd").complete_solo(planning), "Normal item UI completes the real commander draft")
+	if not _check(planning.select_loadout([&"arrow_tower"]) and planning.commit_loadout(), "Normal item UI enters an accepted MatchPlanning run"):
+		return
+	await _settle()
+	var screen: MatchPlanningScreen = main.play_screen.planning_screen
+	var arrow: TowerShopButton = screen.shop_buttons[&"arrow_tower"]
+	_check(arrow.cost == 41 and not arrow.disabled and arrow.tooltip_text.begins_with("41 Coins"), "Dabloons at exactly 41 Coins displays an affordable 41-Coin Arrow in the normal palette, not raw 45")
+	if not capture_directory.is_empty():
+		await _capture("normal_dabloons_palette_41")
+	var cell: Vector2i = preload("res://tests/commander_fixture_worker.gd").free_cell(planning, Vector2i(3, 2))
+	await _click(arrow)
+	await _click_point(screen.world.cell_screen_position(0, cell))
+	if not _check(planning.combat["towers"][0].size() == 1 and int(planning.combat["coins"][0]) == 0, "Native normal purchase spends the displayed discounted 41 Coins"):
+		planning.stop_singleplayer()
+		main._show_menu()
+		return
+	var tower_id: int = int(planning.combat["towers"][0][0]["id"])
+	for command: String in ["damage", "speed", "special"]:
+		var tower: Dictionary = planning.combat["towers"][0][0]
+		var action: Dictionary = MatchPlanningScreen.tower_upgrade_actions(tower, planning.combat["tower_types"]["arrow_tower"])[command]
+		var price: int = ceili(float(action["cost"]) * 0.9)
+		planning._host_combat.coins = [price, price]
+		planning._publish_snapshot()
+		await _settle()
+		var button: Button = screen.damage_upgrade if command == "damage" else (screen.speed_upgrade if command == "speed" else screen.special_upgrade)
+		_check(not button.disabled and button.text.ends_with("\n%d" % price), "Normal %s upgrade displays and enables the authoritative discounted price" % command)
+		await _click(button)
+		_check(int(planning.combat["coins"][0]) == 0 and bool(planning.combat["towers"][0][0].get(command + "_upgraded", false)), "Native %s upgrade spends exactly its displayed discounted price" % command)
+	var upgraded: Dictionary = planning.combat["towers"][0][0]
+	var advancements: Dictionary = MatchPlanningScreen.advancement_actions(upgraded, planning.combat["tower_types"]["arrow_tower"])
+	if _check(not advancements.is_empty(), "Real base and special purchases unlock the authored archer advancements"):
+		var command: String = String(advancements.keys()[0])
+		var price: int = ceili(float(advancements[command]["cost"]) * 0.9)
+		planning._host_combat.coins = [price, price]
+		planning._publish_snapshot()
+		await _settle()
+		var button: Button = screen.advancement_buttons[command]
+		_check(not button.disabled and button.text.ends_with("\n%d" % price), "Normal advancement displays the host-discounted price after real prerequisite purchases")
+		await _click(button)
+		_check(int(planning.combat["coins"][0]) == 0 and String(planning.combat["towers"][0][0]["advancement"]) == command, "Native advancement charges its exact displayed price")
+	var send_type: String = String(screen._selected_enemy_type)
+	var send_price: int = ceili(float(planning.combat["enemy_types"][send_type]["send_cost"]) * 0.9)
+	planning._host_combat.coins = [send_price, send_price]
+	planning._publish_snapshot()
+	await _settle()
+	_check(not screen.send_button.disabled and screen.send_button.text.begins_with("Send · %d/" % send_price) and screen.send_button.tooltip_text.contains(": %d Coins;" % send_price), "Normal send caption, tooltip and affordability use the same owner-specific discounted quote")
+	await _click(screen.send_button)
+	_check(int(planning.combat["coins"][0]) == 0 and int(planning.combat["queued_send_orders"][1]) == 1, "Native send spends the displayed discounted price")
+	var obstacle: Vector2i = planning.combat["commanders"][0]["obstacles"][0]
+	var clear_price: int = ceili(float(CommanderRules.CLEAR_COST) * 0.9)
+	planning._host_combat.coins = [clear_price, clear_price]
+	planning._publish_snapshot()
+	await _settle()
+	await _click_point(screen.world.cell_screen_position(0, obstacle))
+	_check(not screen.obstacle_clear_button.disabled and screen.obstacle_clear_button.text == "Clear · %d Coins" % clear_price, "Normal terrain Clear displays and enables its discounted host quote")
+	await _click(screen.obstacle_clear_button)
+	_check(int(planning.combat["coins"][0]) == 0 and not planning.combat["commanders"][0]["obstacles"].has(obstacle), "Native terrain Clear spends exactly the displayed quote")
+	var all_ids: Array = planning._host_combat.item_runtime.definitions.keys()
+	_check(planning._host_combat.set_items(0, all_ids), "Normal host accepts all 130 items together without acquisition")
+	planning._host_combat.coins[0] = 100000
+	planning._host_combat.reroll_currency[0] = 100
+	planning._publish_snapshot()
+	await _settle()
+	var panel: ItemRuntimePanel = screen.item_panel
+	await _click(panel.toggle_button)
+	_check(panel.owned_buttons.size() == 130 and not panel.editor_button.visible, "Normal MatchPlanning renders all 130 owned items without exposing Sandbox acquisition controls")
+	screen.selected_tower_id = tower_id
+	screen._refresh()
+	await _key(KEY_ESCAPE)
+	_check(not panel.expanded and screen.selected_tower_id == tower_id and panel.toggle_button.has_focus(), "Normal Escape dismisses only the Items layer and restores toggle focus, preserving tower inspection")
+	await _click(panel.toggle_button)
+	screen.cancel_interaction()
+	_check(not panel.expanded and screen.selected_tower_id == -1, "Normal programmatic cancellation clears both Items and the previous tower selection")
+	await _click(panel.toggle_button)
+	_check(not panel.action_buttons["spore_spawn_of_marko:feed"].disabled, "Normal item feeding is enabled before Ready")
+	planning._host_ready[0] = true
+	planning._publish_snapshot()
+	await _settle()
+	_check(not planning.can_manage_towers(0) and not planning.item_command(0, &"spore_spawn_of_marko", "feed"), "Accepted Ready state makes the actual host reject item commands")
+	for button: Button in panel.action_buttons.values():
+		_check(button.disabled, "Normal Ready disables every native item action instead of offering host-rejected commands")
+	if not capture_directory.is_empty():
+		await _capture("normal_all130_ready")
+	await _key(KEY_ESCAPE)
+	_check(not panel.expanded and not screen.pause_menu.visible, "Items remains keyboard-dismissable after Ready disables its actions")
+	planning.stop_singleplayer()
+	main._show_menu()
+	await _settle()
+
+
+func _test_sandbox_transitions(tower_id: int) -> void:
+	var panel: ItemRuntimePanel = sandbox.item_panel
+	sandbox.selected_tower_id = tower_id
+	sandbox._refresh()
+	await _click(panel.editor_button)
+	_check(panel.editing and panel.search.has_focus(), "Owned-set editor moves keyboard focus into its search field")
+	await _key(KEY_ESCAPE)
+	_check(panel.expanded and not panel.editing and panel.editor_button.has_focus(), "Escape leaves the editor before dismissing Items and restores editor-toggle focus")
+	sandbox._request_reset()
+	await _settle()
+	await _key(KEY_ESCAPE)
+	_check(not sandbox.reset_dialog.visible and panel.expanded and sandbox.world._input_blocked and sandbox.world._world_viewport.gui_disable_input, "Canceling Sandbox reset cannot unblock the world underneath expanded Items")
+	sandbox.width_input.value += 1
+	await _settle()
+	sandbox._request_resize()
+	await _settle()
+	await _key(KEY_ESCAPE)
+	_check(not sandbox.resize_dialog.visible and panel.expanded and sandbox.world._input_blocked and sandbox.world._world_viewport.gui_disable_input, "Canceling Sandbox resize also preserves the expanded Items input barrier")
+	await _key(KEY_ESCAPE)
+	_check(not panel.expanded and sandbox.selected_tower_id == tower_id and panel.toggle_button.has_focus(), "Sandbox Escape dismisses Items without discarding the underlying tower")
+	await _click(panel.toggle_button)
+	sandbox._select_placement(&"arrow_tower")
+	_check(not panel.expanded and sandbox.selected_tower_id == -1 and sandbox.placement_id == &"arrow_tower", "Programmatic palette selection fully cancels old tower inspection even when Items was open")
+	sandbox.cancel_interaction()
+	sandbox.selected_tower_id = tower_id
+	sandbox._refresh()
+	await _click(panel.toggle_button)
+	sandbox._request_reset()
+	await _settle()
+	sandbox.reset_dialog.get_ok_button().pressed.emit()
+	await _settle()
+	_check(not panel.expanded and sandbox.selected_tower_id == -1 and sandbox.controller.state["towers"][0].is_empty(), "Confirming reset with Items open clears removed tower selection as well as the panel")
+	_check(sandbox.controller.build(Vector2i(3, 2), &"arrow_tower"), "Resize transition receives a real replacement tower")
+	sandbox.selected_tower_id = int(sandbox.controller.state["towers"][0][0]["id"])
+	sandbox._refresh()
+	await _click(panel.toggle_button)
+	sandbox.width_input.value += 1
+	await _settle()
+	sandbox._request_resize()
+	await _settle()
+	sandbox.resize_dialog.get_ok_button().pressed.emit()
+	await _settle()
+	_check(not panel.expanded and sandbox.selected_tower_id == -1 and sandbox.controller.state["towers"][0].is_empty(), "Confirming resize with Items open clears removed tower selection and the panel")
+	_check(sandbox.controller.combat.item_runtime.owned_ids(0).size() == 130, "Panel cleanup and confirmed map changes preserve all 130 owned items")
+	if not capture_directory.is_empty():
+		await _capture("sandbox_items_transition_cleanup")
 
 
 func _connect_path(controller: SandboxController) -> void:
@@ -158,14 +312,18 @@ func _click(control: Control) -> void:
 	if sandbox != null and sandbox.item_panel.scroll.is_ancestor_of(control):
 		sandbox.item_panel.scroll.ensure_control_visible(control)
 		await process_frame
-	var bounds: Rect2 = control.get_global_rect()
-	var point: Vector2 = bounds.get_center()
+	await _click_point(control.get_global_rect().get_center(), control)
+
+
+func _click_point(point: Vector2, control: Control = null) -> void:
+	var bounds: Rect2 = control.get_global_rect() if control != null else Rect2()
 	await _motion(point)
-	var hovered_bounds: Rect2 = control.get_global_rect()
-	if hovered_bounds != bounds:
-		point = hovered_bounds.get_center()
-		await _motion(point)
-	_check(control.get_global_rect().has_point(pointer_position), "Native pointer remains over the hit target after layout settles")
+	if control != null:
+		var hovered_bounds: Rect2 = control.get_global_rect()
+		if hovered_bounds != bounds:
+			point = hovered_bounds.get_center()
+			await _motion(point)
+		_check(control.get_global_rect().has_point(pointer_position), "Native pointer remains over the hit target after layout settles")
 	for pressed: bool in [true, false]:
 		var event := InputEventMouseButton.new()
 		event.position = root.get_final_transform() * point
@@ -207,5 +365,5 @@ func _finish() -> void:
 		DirAccess.remove_absolute(save_directory.path_join(file))
 	DirAccess.remove_absolute(save_directory)
 	if failures == 0:
-		print("PASS: all-130 Sandbox ownership, rendered inspection and live item command controls")
+		print("PASS: normal discounted prices and Ready gating, all-130 ownership, native item actions and layered keyboard/modal transitions")
 	quit(1 if failures > 0 else 0)
